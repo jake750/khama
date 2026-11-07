@@ -122,6 +122,7 @@ button:disabled {
 }
 
 .tabs {
+  position: relative;
   display: flex;
   gap: 4px;
   margin-inline-start: 12px;
@@ -141,12 +142,10 @@ button:disabled {
 
 .tab:hover {
   color: var(--text);
-  background: var(--surface-2);
 }
 
 .tab[aria-current="page"] {
   color: var(--text);
-  background: var(--surface-2);
 }
 
 .spacer {
@@ -358,6 +357,8 @@ button:disabled {
 }
 
 .segmented {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -380,10 +381,12 @@ button:disabled {
   font-weight: 500;
 }
 
-.segmented button[aria-pressed="true"] {
-  background: var(--surface);
+.segmented button:hover:not(:disabled) {
   color: var(--text);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+}
+
+.segmented button[aria-pressed="true"] {
+  color: var(--text);
 }
 
 .toggle {
@@ -426,9 +429,6 @@ button:disabled {
   background: var(--accent);
 }
 
-.toggle input:checked + .switch::after {
-  inset-inline-start: 21px;
-}
 
 .toggle input:focus-visible + .switch {
   outline: 2px solid var(--accent);
@@ -588,12 +588,11 @@ details.tech pre {
   height: 100%;
   border-radius: inherit;
   background: var(--accent);
-  transition: width 0.25s ease;
 }
 
 .progress.indeterminate > div {
   width: 35% !important;
-  animation: indeterminate 1.1s infinite ease-in-out;
+  animation: indeterminate 1.4s infinite var(--ease-io);
 }
 
 /* يتحرك الشريط في اتجاه القراءة: يسار←يمين بالإنجليزية، يمين←يسار بالعربية */
@@ -859,6 +858,19 @@ details.tech pre {
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
   --ease-io: cubic-bezier(0.72, 0, 0.28, 1);
   --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* نابض شبه مُخمَّد: يصل بسرعة ويستقر دون ارتداد ظاهر (إحساس iOS) */
+  --ease-spring: var(--ease-out);
+  --dir: 1;
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --ease-spring: linear(0, 0.057, 0.185, 0.339, 0.49, 0.625, 0.737, 0.825, 0.89, 0.937, 0.969, 0.989, 1.002, 1.008, 1.011, 1.011, 1.01, 1.009, 1.007, 1.005, 1.004, 1.003, 1.002, 1.001, 1.001, 1 62.5%, 1);
+  }
+}
+
+[dir="rtl"] {
+  --dir: -1;
 }
 
 @keyframes rise-in {
@@ -878,6 +890,13 @@ details.tech pre {
   from {
     opacity: 0;
     transform: translate(-50%, 16px) scale(0.96);
+  }
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, 10px) scale(0.97);
   }
 }
 
@@ -907,7 +926,11 @@ details.tech pre {
 }
 
 .toast {
-  animation: toast-in 0.4s var(--ease-back);
+  animation: toast-in 0.5s var(--ease-spring);
+}
+
+.toast.leaving {
+  animation: toast-out 0.26s var(--ease-in) forwards;
 }
 
 /* الأزرار تنضغط قليلًا تحت الإصبع */
@@ -935,24 +958,37 @@ details.tech pre {
   transition: background-color 0.25s var(--ease-out);
 }
 
+/* الزر الدائري يتحرك بـtransform (لا يعيد تخطيط الصفحة) ويتمدد قليلًا تحت الضغط */
 .switch::after {
-  transition: inset-inline-start 0.35s var(--ease-back), width 0.2s var(--ease-out);
+  transform-origin: var(--switch-origin, left) center;
+  transition: transform 0.4s var(--ease-spring);
+}
+
+[dir="rtl"] .switch::after {
+  --switch-origin: right;
 }
 
 .toggle:active .switch::after {
-  width: 20px;
+  transform: scaleX(1.25);
 }
 
 .toggle input:checked + .switch::after {
-  inset-inline-start: 21px;
+  transform: translateX(calc(18px * var(--dir)));
 }
 
 .toggle:active input:checked + .switch::after {
-  inset-inline-start: 17px;
+  transform-origin: var(--switch-origin-end, right) center;
+  transform: translateX(calc(18px * var(--dir))) scaleX(1.25);
 }
 
+[dir="rtl"] .toggle:active input:checked + .switch::after {
+  --switch-origin-end: left;
+}
+
+/* التحديثات تصل كل نصف ثانية تقريبًا: انزلاق خطي بطول الفترة نفسها
+   يجعل الشريط يتحرك باستمرار بدل «قفزة ثم توقف» */
 .progress > div {
-  transition: width 0.4s var(--ease-out);
+  transition: width 0.6s linear;
 }
 
 .url-input {
@@ -1379,4 +1415,84 @@ img.file-thumb {
 
 .stems-row {
   margin-top: 16px;
+}
+
+/* ============ حركة إضافية ============ */
+
+/* «حبّة» واحدة تنزلق إلى التبويب/الخيار المختار بدل أن يقفز اللون */
+.tab-pill,
+.seg-pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, width;
+  transition:
+    transform 0.5s var(--ease-spring),
+    width 0.5s var(--ease-spring),
+    height 0.5s var(--ease-spring),
+    opacity 0.2s var(--ease-out);
+}
+
+.tabs {
+  isolation: isolate;
+}
+
+.tab-pill {
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.seg-pill {
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+}
+
+.tab,
+.segmented button {
+  position: relative;
+}
+
+/* القوائم المتحركة: المسافة داخل الغلاف حتى تنطوي معه */
+.job-list > .li,
+.file-list > .li {
+  display: flow-root;
+}
+
+.job-list > .li > .card {
+  margin-top: 12px;
+}
+
+.file-list {
+  gap: 0;
+}
+
+.file-list > .li + .li > .file-row {
+  margin-top: 8px;
+}
+
+/* البطاقات والخيارات ترتفع قليلًا عند المرور */
+.preset:hover:not(:disabled):not([aria-pressed="true"]) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.main {
+  scroll-behavior: smooth;
+}
+
+/* تبديل الثيم: كل الألوان تتلاشى معًا */
+.theme-anim,
+.theme-anim *,
+.theme-anim *::before,
+.theme-anim *::after {
+  transition:
+    background-color 0.45s var(--ease-io),
+    border-color 0.45s var(--ease-io),
+    color 0.45s var(--ease-io),
+    fill 0.45s var(--ease-io),
+    box-shadow 0.45s var(--ease-io) !important;
 }

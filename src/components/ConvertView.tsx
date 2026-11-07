@@ -6,6 +6,7 @@ import { useI18n, type Dict } from "../i18n";
 import { estimateSize, GROUPS, presetById, presetFits, PRESETS, suggestPreset, type PresetDef, type PresetGroup } from "../presets";
 import { ErrorBox } from "./ErrorBox";
 import { Icon } from "./Icon";
+import { AnimatedList } from "../motion";
 import { Segmented, Toggle } from "./Segmented";
 import { TrimRange } from "./TrimRange";
 
@@ -244,7 +245,7 @@ export function ConvertView(props: {
             {t.clearFiles}
           </button>
         </div>
-        <div className="file-list">
+        <AnimatedList className="file-list">
           {files.map((f) => (
             <div className="file-row" key={f.path}>
               {f.info?.thumbnail ? (
@@ -279,7 +280,7 @@ export function ConvertView(props: {
               </button>
             </div>
           ))}
-        </div>
+        </AnimatedList>
         {suggestion && suggestion !== preset.id && (
           <div className="alert info suggestion">
             <Icon name="check" size={16} />

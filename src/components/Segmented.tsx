@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
+import { useSlidingIndicator } from "../motion";
 
 export interface SegOption<T extends string> {
   value: T;
@@ -14,8 +15,12 @@ export function Segmented<T extends string>(props: {
   onChange: (v: T) => void;
   label: string;
 }) {
+  const box = useRef<HTMLDivElement>(null);
+  // «حبّة» واحدة تنزلق إلى الزر المختار
+  const pill = useSlidingIndicator(box, 'button[aria-pressed="true"]', `${props.value}|${props.options.length}`);
   return (
-    <div className="segmented" role="group" aria-label={props.label}>
+    <div className="segmented" role="group" aria-label={props.label} ref={box}>
+      <span className="seg-pill" ref={pill} aria-hidden="true" />
       {props.options.map((o) => (
         <button
           key={o.value}

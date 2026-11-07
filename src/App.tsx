@@ -9,6 +9,7 @@ import { isActive, JobCard, type Job } from "./components/JobCard";
 import { SettingsView } from "./components/SettingsView";
 import { formatTimecode } from "./format";
 import { dictionaries, I18n, type Dict } from "./i18n";
+import { AnimatedList, reducedMotion, usePresence, useSlidingIndicator } from "./motion";
 import { presetById } from "./presets";
 
 type Tab = "download" | "convert" | "settings";
@@ -23,8 +24,18 @@ function useTheme(theme: Settings["theme"] | undefined): "dark" | "light" {
     return () => media.removeEventListener("change", onChange);
   }, [media]);
   const resolved = theme === "system" || !theme ? (systemLight ? "light" : "dark") : theme;
+  const first = useRef(true);
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", resolved);
+    const root = document.documentElement;
+    // عند التبديل (لا عند الفتح): الألوان تتلاشى إلى الثيم الجديد بدل الوميض
+    if (!first.current && !reducedMotion()) {
+      root.classList.add("theme-anim");
+      const t = window.setTimeout(() => root.classList.remove("theme-anim"), 500);
+      root.setAttribute("data-theme", resolved);
+      return () => window.clearTimeout(t);
+    }
+    first.current = false;
+    root.setAttribute("data-theme", resolved);
   }, [resolved]);
   return resolved;
 }
@@ -57,6 +68,9 @@ export default function App() {
   tRef.current = t;
 
   const resolvedTheme = useTheme(settings?.theme);
+  const [toastShown, toastLeaving] = usePresence(toastMsg, 260);
+  const tabsRef = useRef<HTMLElement>(null);
+  const tabPill = useSlidingIndicator(tabsRef, '.tab[aria-current="page"]', `${tab}|${lang}`);
 
   // اللغة تحدد اتجاه الصفحة: العربية من اليمين لليسار
   useEffect(() => {
@@ -226,7 +240,8 @@ export default function App() {
             <span className="brand-mark"><Icon name="film" size={18} /></span>
             {t.appName}
           </div>
-          <nav className="tabs">
+          <nav className="tabs" ref={tabsRef}>
+            <span className="tab-pill" ref={tabPill} aria-hidden="true" />
             {tabs.map((x) => (
               <button key={x.id} className="tab" aria-current={tab === x.id ? "page" : undefined} onClick={() => setTab(x.id)}>
                 <Icon name={x.icon} size={16} /> <span>{x.label}</span>
@@ -294,10 +309,9 @@ export default function App() {
                       </button>
                     )}
                   </div>
-                  {shown.length === 0 ? (
-                    <div className="card empty">{tab === "convert" ? t.convertJobsEmpty : t.jobsEmpty}</div>
-                  ) : (
-                    shown.map((j) => (
+                  {shown.length === 0 && <div className="card empty">{tab === "convert" ? t.convertJobsEmpty : t.jobsEmpty}</div>}
+                  <AnimatedList className="job-list">
+                    {shown.map((j) => (
                       <JobCard
                         key={j.id}
                         job={j}
@@ -309,8 +323,8 @@ export default function App() {
                         onSplit={j.markers?.length ? () => split(j) : undefined}
                         onCopyMarkers={j.markers?.length ? () => copyMarkers(j) : undefined}
                       />
-                    ))
-                  )}
+                    ))}
+                  </AnimatedList>
                 </>
               )}
             </div>
@@ -326,7 +340,11 @@ export default function App() {
           </div>
         )}
 
-        {toastMsg && <div className="toast" role="status">{toastMsg}</div>}
+        {toastShown && (
+          <div className={`toast ${toastLeaving ? "leaving" : ""}`} role="status">
+            {toastShown}
+          </div>
+        )}
       </div>
     </I18n.Provider>
   );
