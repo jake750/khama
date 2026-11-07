@@ -29,8 +29,11 @@ const target =
   execFileSync("rustc", ["-vV"], { encoding: "utf8" }).match(/host: (\S+)/)[1];
 
 const YTDLP = "https://github.com/yt-dlp/yt-dlp/releases/latest/download";
-// بناءات FFmpeg التي يوصي بها yt-dlp نفسه (GPL، نسخة "shared" لتقليل الحجم)
+// بناءات FFmpeg (GPL، نسخة "shared" لتقليل الحجم):
+// Windows من yt-dlp/FFmpeg-Builds (التي يوصي بها yt-dlp)، و Linux من BtbN/FFmpeg-Builds
+// (المصدر الأصلي لتلك البناءات، لأن yt-dlp لا ينشر نسخة shared لـ Linux)
 const FFB = "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest";
+const BTBN = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest";
 const DENO = "https://github.com/denoland/deno/releases/latest/download";
 // macOS: لا توجد بناءات رسمية، نستخدم martin-riedl.de (FFmpeg 9.0.2، لكل معمارية)
 const MRIEDL = "https://ffmpeg.martin-riedl.de/download/macos";
@@ -38,17 +41,17 @@ const MRIEDL = "https://ffmpeg.martin-riedl.de/download/macos";
 const PLAN = {
   "x86_64-pc-windows-msvc": {
     ytdlp: "yt-dlp.exe",
-    ffmpeg: { archive: "ffmpeg-master-latest-win64-gpl-shared.zip" },
+    ffmpeg: { base: FFB, archive: "ffmpeg-master-latest-win64-gpl-shared.zip" },
     deno: "deno-x86_64-pc-windows-msvc.zip",
   },
   "x86_64-unknown-linux-gnu": {
     ytdlp: "yt-dlp_linux",
-    ffmpeg: { archive: "ffmpeg-master-latest-linux64-gpl-shared.tar.xz" },
+    ffmpeg: { base: BTBN, archive: "ffmpeg-master-latest-linux64-gpl-shared.tar.xz" },
     deno: "deno-x86_64-unknown-linux-gnu.zip",
   },
   "aarch64-unknown-linux-gnu": {
     ytdlp: "yt-dlp_linux_aarch64",
-    ffmpeg: { archive: "ffmpeg-master-latest-linuxarm64-gpl-shared.tar.xz" },
+    ffmpeg: { base: BTBN, archive: "ffmpeg-master-latest-linuxarm64-gpl-shared.tar.xz" },
     deno: "deno-aarch64-unknown-linux-gnu.zip",
   },
   "aarch64-apple-darwin": {
@@ -185,8 +188,8 @@ try {
         place(findFile(path.join(src, tool), `/${tool}`), path.join(FF_DIR, "bin", tool));
       }
     } else {
-      const { archive } = plan.ffmpeg;
-      const buf = await fetchVerified(`${FFB}/${archive}`, `${FFB}/checksums.sha256`);
+      const { base, archive } = plan.ffmpeg;
+      const buf = await fetchVerified(`${base}/${archive}`, `${base}/checksums.sha256`);
       extract(buf, archive, src);
       const binDir = path.dirname(findFile(src, `/bin/ffmpeg${exe}`));
       const root = path.dirname(binDir);
