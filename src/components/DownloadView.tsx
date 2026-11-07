@@ -183,6 +183,7 @@ export function DownloadView(props: {
 
         <div>
           <span className="field-label">{t.format}</span>
+          <div className="swap-in" key={s.kind}>
           {s.kind === "video" ? (
             <Segmented<VideoFormat>
               label={t.format}
@@ -205,10 +206,13 @@ export function DownloadView(props: {
               ]}
             />
           )}
+          </div>
         </div>
 
-        {s.kind === "video" && (
-          <div style={{ gridColumn: "1 / -1" }}>
+        <div className="collapse" data-open={s.kind === "video"} aria-hidden={s.kind !== "video" || undefined}>
+          <div>
+          <div className="video-only">
+          <div>
             <span className="field-label">{t.quality}</span>
             <Segmented<string>
               label={t.quality}
@@ -223,10 +227,7 @@ export function DownloadView(props: {
             />
             {qualityHint && <div className="faint" style={{ marginTop: 6 }}>{qualityHint}</div>}
           </div>
-        )}
-
-        {s.kind === "video" && (
-          <div style={{ gridColumn: "1 / -1" }}>
+          <div>
             <Toggle
               checked={s.editorReady}
               onChange={(editorReady) => update({ editorReady })}
@@ -234,7 +235,9 @@ export function DownloadView(props: {
               hint={t.editorReadyHint}
             />
           </div>
-        )}
+          </div>
+          </div>
+        </div>
       </div>
 
       {info && (

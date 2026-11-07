@@ -41,17 +41,47 @@ export function useSlidingIndicator(container: RefObject<HTMLElement | null>, se
       el.style.opacity = "0";
       return;
     }
+    const to = { x: active.offsetLeft, y: active.offsetTop, w: active.offsetWidth, h: active.offsetHeight };
     const glide = animate && s.placed && !reducedMotion();
-    if (!glide) el.style.transition = "none";
-    el.style.opacity = "1";
-    el.style.width = `${active.offsetWidth}px`;
-    el.style.height = `${active.offsetHeight}px`;
-    el.style.transform = `translate(${active.offsetLeft}px, ${active.offsetTop}px)`;
-    if (!glide) {
-      void el.offsetWidth; // نثبّت الموضع بلا حركة ثم نعيد الانتقال
-      el.style.transition = "";
+
+    // من أين نبدأ؟ من الموضع المرئي الآن (حتى لو قُطعت حركة سابقة في منتصفها)
+    let from = to;
+    if (glide) {
+      const cs = getComputedStyle(el);
+      const m = new DOMMatrix(cs.transform);
+      from = { x: m.e, y: m.f, w: parseFloat(cs.width), h: parseFloat(cs.height) };
+      el.getAnimations().forEach((a) => a.cancel());
     }
+
+    el.style.opacity = "1";
+    el.style.width = `${to.w}px`;
+    el.style.height = `${to.h}px`;
+    el.style.transform = `translate(${to.x}px, ${to.y}px)`;
     s.placed = true;
+    if (!glide || (from.x === to.x && from.y === to.y && from.w === to.w)) return;
+
+    // حركة «سائلة»: الحافة الأمامية تسبق والخلفية تلحق، فتتمطّط الحبّة في منتصف الطريق
+    // ثم تنكمش وتستقر على الخيار الجديد. تمطيط خفيف للعرض وانضغاط بسيط للارتفاع.
+    // كل حافة لها منحنى خاص: الأمامية تنطلق وتهدأ، والخلفية تبدأ ببطء ثم تلحق.
+    // نحسب الإطارات مسبقًا فتبقى السرعة متصلة بلا أي قفزة.
+    const right = to.x >= from.x;
+    const lead = (t: number) => 1 - Math.pow(1 - t, 3);
+    const trail = (t: number) => t * t * t * (t * (6 * t - 15) + 10);
+    const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
+    const frames: Keyframe[] = [];
+    const N = 36;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const kl = right ? trail(t) : lead(t);
+      const kr = right ? lead(t) : trail(t);
+      const l = lerp(from.x, to.x, kl);
+      const r = lerp(from.x + from.w, to.x + to.w, kr);
+      const baseH = lerp(from.h, to.h, t);
+      const h = baseH * (1 - 0.08 * Math.sin(Math.PI * t)); // انضغاط خفيف في منتصف الطريق
+      const y = lerp(from.y, to.y, lead(t)) + (baseH - h) / 2;
+      frames.push({ transform: `translate(${l}px, ${y}px)`, width: `${r - l}px`, height: `${h}px` });
+    }
+    el.animate(frames, { duration: 540, easing: "linear" });
   };
 
   // يعمل بعد كل رسم، لكنه لا يقيس إلا إذا تغيّر المختار أو ظهر الحاوي لأول مرة

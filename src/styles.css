@@ -1433,9 +1433,6 @@ img.file-thumb {
   opacity: 0;
   will-change: transform, width;
   transition:
-    transform 0.55s var(--ease-glide),
-    width 0.55s var(--ease-glide),
-    height 0.55s var(--ease-glide),
     box-shadow 0.2s var(--ease-out),
     opacity 0.2s var(--ease-out);
 }
@@ -1514,4 +1511,28 @@ img.file-thumb {
     color 0.45s var(--ease-io),
     fill 0.45s var(--ease-io),
     box-shadow 0.45s var(--ease-io) !important;
+}
+
+/* تبديل فيديو/صوت: خيارات الصيغة تتبدّل بصعود خفيف، وصف الجودة ينطوي بدل أن يختفي فجأة */
+.swap-in {
+  animation: swap-in 0.42s var(--ease-out) backwards;
+}
+
+@keyframes swap-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(2px);
+  }
+}
+
+.options > .collapse {
+  grid-column: 1 / -1;
+  margin-top: -16px;
+}
+
+.video-only {
+  display: grid;
+  gap: 16px;
+  padding-top: 16px;
 }
