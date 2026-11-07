@@ -1,5 +1,5 @@
 import type { AppError, DownloadRequest, JobState } from "../api";
-import { formatEta, formatSpeed } from "../format";
+import { formatDuration, formatEta, formatSpeed } from "../format";
 import { useI18n, type Dict } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
 import { Icon } from "./Icon";
@@ -73,6 +73,7 @@ export function JobCard(props: {
           <span className="faint">
             {r.kind === "audio" ? (r.audioFormat === "m4a" ? "AAC" : r.audioFormat.toUpperCase()) : r.videoFormat.toUpperCase()}
             {r.kind === "video" && ` · ${r.quality === "best" ? t.best : r.quality + "p"}`}
+            {r.end != null && <span className="ltr"> · ✂ {formatDuration(r.start ?? 0)}–{formatDuration(r.end)}</span>}
           </span>
         </div>
 

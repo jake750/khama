@@ -57,6 +57,35 @@ pub struct DownloadRequest {
     /// "best" | "2160" | "1440" | "1080" | "720" | "480"
     pub quality: String,
     pub editor_ready: bool,
+    /// تحميل جزء فقط: بداية ونهاية بالثواني (فارغ = الملف كاملًا)
+    #[serde(default)]
+    pub start: Option<f64>,
+    #[serde(default)]
+    pub end: Option<f64>,
+}
+
+/// المقطع المطلوب بعد التحقق: (بداية، نهاية). None = الملف كاملًا
+pub fn section(req: &DownloadRequest) -> Option<(f64, f64)> {
+    let s = req.start.filter(|v| v.is_finite() && *v >= 0.0).unwrap_or(0.0);
+    let e = req.end.filter(|v| v.is_finite() && *v > s)?;
+    // جزء يبدأ من الصفر بدون نهاية محددة = الملف كاملًا
+    Some((s, e)).filter(|_| req.start.is_some() || req.end.is_some())
+}
+
+/// 75.5 → "1:15.500" (صيغة يفهمها yt-dlp و ffmpeg)
+fn ts(sec: f64) -> String {
+    let ms = (sec * 1000.0).round() as u64;
+    format!("{}:{:02}:{:02}.{:03}", ms / 3_600_000, ms / 60_000 % 60, ms / 1000 % 60, ms % 1000)
+}
+
+/// 75.5 → "01m15s" لاسم الملف
+fn ts_name(sec: f64) -> String {
+    let s = sec.floor() as u64;
+    if s >= 3600 {
+        format!("{}h{:02}m{:02}s", s / 3600, s / 60 % 60, s % 60)
+    } else {
+        format!("{:02}m{:02}s", s / 60, s % 60)
+    }
 }
 
 /// تحديث تستقبله الواجهة. الحقول الفارغة لا تُرسل، فتدمجها الواجهة مع ما لديها.
@@ -148,13 +177,23 @@ fn download_args(tools: &Tools, cookies: Vec<String>, req: &DownloadRequest, out
     let mut a = tools::ytdlp_base_args(tools);
     a.extend(cookies);
     a.extend(format_args(req));
+    let mut template = "%(title).150B.%(ext)s".to_string();
+    if let Some((s, e)) = section(req) {
+        // * = بالوقت (لا بالفصول). نجبر إطارات مفتاحية عند نقطتي القص حتى يكون القص دقيقًا بالإطار
+        a.push("--download-sections".into());
+        a.push(format!("*{}-{}", ts(s), ts(e)));
+        if req.kind == "video" {
+            a.push("--force-keyframes-at-cuts".into());
+        }
+        template = format!("%(title).130B [{} - {}].%(ext)s", ts_name(s), ts_name(e));
+    }
     a.extend([
         "-P".into(),
         out.to_string_lossy().into_owned(),
         "-P".into(),
         format!("temp:{}", work.to_string_lossy()),
         "-o".into(),
-        "%(title).150B.%(ext)s".into(),
+        template,
         "--windows-filenames".into(), // أسماء ملفات تصلح على كل الأنظمة
         "--no-mtime".into(),          // تاريخ الملف = وقت التنزيل (أسهل للفرز في المجلد)
         "--newline".into(),
@@ -693,7 +732,22 @@ mod tests {
             audio_format: fmt.into(),
             quality: q.into(),
             editor_ready: editor,
+            start: None,
+            end: None,
         }
+    }
+
+    #[test]
+    fn sections() {
+        let mut r = req("video", "mp4", "1080", true);
+        assert_eq!(section(&r), None);
+        r.start = Some(75.5);
+        r.end = Some(130.0);
+        assert_eq!(section(&r), Some((75.5, 130.0)));
+        assert_eq!(ts(75.5), "0:01:15.500");
+        assert_eq!(ts_name(3725.0), "1h02m05s");
+        r.end = Some(10.0); // نهاية قبل البداية
+        assert_eq!(section(&r), None);
     }
 
     #[test]

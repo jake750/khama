@@ -15,6 +15,7 @@ import { useI18n } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
 import { Icon } from "./Icon";
 import { Segmented, Toggle } from "./Segmented";
+import { TrimRange, type Range } from "./TrimRange";
 
 const QUALITIES = ["best", "2160", "1440", "1080", "720", "480"] as const;
 
@@ -38,12 +39,15 @@ export function DownloadView(props: {
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<AppError | null>(null);
   const probeToken = useRef(0);
+  const [trimOn, setTrimOn] = useState(false);
+  const [range, setRange] = useState<Range | null>(null);
 
   // عند تغيّر الرابط: ننتظر نصف ثانية (حتى ينتهي اللصق/الكتابة) ثم نجلب معلوماته.
   // probeToken يمنع ردًّا قديمًا من الكتابة فوق رد أحدث.
   useEffect(() => {
     const clean = url.trim();
     setStartError(null);
+    setRange(null);
     if (!isHttpUrl(clean)) {
       probeToken.current++;
       setProbe({ status: "idle" });
@@ -64,6 +68,9 @@ export function DownloadView(props: {
 
   const info = probe.status === "ok" ? probe.info : null;
   const maxHeight = info?.heights[0];
+  const duration = info && !info.isLive && info.duration ? info.duration : null;
+  const activeRange = trimOn && duration ? (range ?? { start: 0, end: duration }) : null;
+  const isPartial = !!activeRange && !!duration && (activeRange.start > 0 || activeRange.end < duration - 0.05);
 
   async function paste() {
     try {
@@ -88,6 +95,8 @@ export function DownloadView(props: {
           audioFormat: s.audioFormat,
           quality: s.quality,
           editorReady: s.editorReady,
+          start: isPartial ? activeRange!.start : null,
+          end: isPartial ? activeRange!.end : null,
         },
         info?.title ?? clean,
       );
@@ -225,6 +234,22 @@ export function DownloadView(props: {
           </div>
         )}
       </div>
+
+      {info && (
+        <div className="trim-box">
+          <Toggle
+            checked={trimOn && !info.isLive}
+            onChange={setTrimOn}
+            title={t.trimToggle}
+            hint={info.isLive ? t.trimLive : t.trimHint}
+          />
+          <div className="collapse" data-open={!!activeRange}>
+            <div>
+              {duration && <TrimRange duration={duration} value={activeRange ?? { start: 0, end: duration }} onChange={setRange} />}
+            </div>
+          </div>
+        </div>
+      )}
 
       {startError && <ErrorBox error={startError} />}
 

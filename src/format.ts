@@ -39,3 +39,17 @@ export const isHttpUrl = (s: string) => /^https?:\/\/\S+$/i.test(s.trim());
 export function extractUrls(text: string): string[] {
   return Array.from(new Set(text.match(/https?:\/\/[^\s"'<>]+/gi) ?? []));
 }
+
+/** "1:15" أو "1:02:05" أو "75" أو "1:15.5" ← ثوانٍ. نص غير صالح ← null */
+export function parseTime(text: string): number | null {
+  const parts = text.trim().replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).split(":");
+  if (parts.length === 0 || parts.length > 3 || parts.some((p) => !/^\d+(\.\d+)?$/.test(p))) return null;
+  return parts.reduce((acc, p) => acc * 60 + Number(p), 0);
+}
+
+/** مثل formatDuration لكن يُبقي أجزاء الثانية إن وُجدت: 75.5 ← "1:15.5" */
+export function formatTimecode(sec: number): string {
+  const whole = Math.floor(sec);
+  const frac = Math.round((sec - whole) * 10);
+  return formatDuration(whole) + (frac ? `.${frac}` : "");
+}

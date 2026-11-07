@@ -136,6 +136,7 @@ export default function App() {
               </div>
             )}
 
+            <div className="view" key={tab}>
             {tab === "download" ? (
               <>
                 <DownloadView settings={settings} update={update} outputDir={outputDir} onChooseDir={chooseDir} onStart={startDownload} />
@@ -176,6 +177,7 @@ export default function App() {
                 toast={toast}
               />
             )}
+            </div>
           </div>
         </main>
 

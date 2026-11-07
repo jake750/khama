@@ -49,6 +49,9 @@ export interface DownloadRequest {
   audioFormat: AudioFormat;
   quality: string;
   editorReady: boolean;
+  /** تحميل جزء فقط (بالثواني) */
+  start?: number | null;
+  end?: number | null;
 }
 
 export type JobState =
