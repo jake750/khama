@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "خامة",
+        "title": "Khama",
         "width": 1040,
         "height": 760,
         "minWidth": 760,
@@ -28,7 +28,7 @@
     "active": true,
     "targets": ["nsis", "app", "dmg", "appimage", "deb", "rpm"],
     "category": "Video",
-    "shortDescription": "أداة تنزيل وسائط للممنتجين",
+    "shortDescription": "Media downloader for video editors",
     "license": "MIT",
     "externalBin": ["binaries/khama-yt-dlp", "binaries/khama-deno"],
     "resources": {
@@ -44,7 +44,7 @@
     ],
     "windows": {
       "nsis": {
-        "languages": ["Arabic", "English"],
+        "languages": ["English", "Arabic"],
         "displayLanguageSelector": false
       }
     }

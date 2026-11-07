@@ -14,6 +14,8 @@ use crate::errors::AppError;
 pub struct Settings {
     /// مجلد الحفظ. فارغ = مجلد التنزيلات الافتراضي للنظام
     pub output_dir: Option<String>,
+    /// لغة الواجهة: "en" (الافتراضية) | "ar"
+    pub language: String,
     /// "dark" | "light" | "system"
     pub theme: String,
     /// "video" | "audio"
@@ -37,6 +39,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             output_dir: None,
+            language: "en".into(),
             theme: "dark".into(),
             kind: "video".into(),
             video_format: "mp4".into(),
@@ -56,7 +59,7 @@ fn config_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
     let dir = app
         .path()
         .app_config_dir()
-        .map_err(|e| AppError::with_detail("تعذّر تحديد مجلد إعدادات التطبيق.", e.to_string()))?;
+        .map_err(|e| AppError::with_detail("configDir", e.to_string()))?;
     fs::create_dir_all(&dir)?;
     Ok(dir)
 }
@@ -84,7 +87,7 @@ pub fn resolve_output_dir(app: &AppHandle, s: &Settings) -> Result<PathBuf, AppE
     }
     app.path()
         .download_dir()
-        .map_err(|_| AppError::new("لم أجد مجلد التنزيلات. اختر مجلد الحفظ من الإعدادات."))
+        .map_err(|_| AppError::new("noDownloadsDir"))
 }
 
 // ---------------- أوامر تستدعيها الواجهة ----------------
@@ -125,9 +128,7 @@ pub fn save_cookies(app: AppHandle, content: String) -> Result<(), AppError> {
         .filter(|l| !l.starts_with('#') && l.split('\t').count() >= 7)
         .count();
     if valid_lines == 0 {
-        return Err(AppError::new(
-            "هذا ليس ملف كوكيز صالحًا. نحتاج صيغة Netscape (cookies.txt) كما تصدّرها إضافة «Get cookies.txt LOCALLY».",
-        ));
+        return Err(AppError::new("cookiesInvalid"));
     }
     let mut out = String::from("# Netscape HTTP Cookie File\n");
     out.push_str(content.trim_start_matches("# Netscape HTTP Cookie File\n"));

@@ -43,17 +43,14 @@ fn managed_ytdlp(app: &AppHandle) -> Result<PathBuf, AppError> {
     let dir = app
         .path()
         .app_local_data_dir()
-        .map_err(|e| AppError::with_detail("تعذّر تحديد مجلد بيانات التطبيق.", e.to_string()))?
+        .map_err(|e| AppError::with_detail("dataDir", e.to_string()))?
         .join("bin");
     std::fs::create_dir_all(&dir)?;
     Ok(dir.join(format!("yt-dlp{EXE}")))
 }
 
 fn missing(name: &str, path: &Path) -> AppError {
-    AppError::with_detail(
-        format!("الأداة {name} غير موجودة. أعد تثبيت التطبيق."),
-        path.display().to_string(),
-    )
+    AppError::with_param("toolMissing", name, path.display().to_string())
 }
 
 pub fn resolve(app: &AppHandle) -> Result<Tools, AppError> {
@@ -63,7 +60,7 @@ pub fn resolve(app: &AppHandle) -> Result<Tools, AppError> {
     let ffmpeg_dir = app
         .path()
         .resource_dir()
-        .map_err(|e| AppError::with_detail("تعذّر تحديد مجلد موارد التطبيق.", e.to_string()))?
+        .map_err(|e| AppError::with_detail("resourceDir", e.to_string()))?
         .join("ffmpeg")
         .join("bin");
     let tools = Tools {
@@ -212,11 +209,7 @@ pub async fn update_ytdlp(app: AppHandle) -> Result<UpdateResult, AppError> {
     let (ok, out, err) = run_capture(&path, &["-U"]).await?;
     if !ok {
         let raw = format!("{out}\n{err}");
-        let mut e = crate::errors::friendly_ytdlp_error(&raw);
-        if !raw.to_lowercase().contains("unable to download") {
-            e.message = "تعذّر تحديث yt-dlp. تحقق من اتصالك بالإنترنت ثم أعد المحاولة.".into();
-        }
-        return Err(e);
+        return Err(AppError::with_detail("updateFailed", crate::errors::tail(&raw, 12)));
     }
     let after = first_line(&path, "--version").await;
     Ok(UpdateResult { updated: before != after, version: after })

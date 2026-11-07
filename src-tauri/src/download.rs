@@ -92,7 +92,7 @@ fn emit(app: &AppHandle, u: JobUpdate) {
 fn validate_url(url: &str) -> Result<String, AppError> {
     let url = url.trim();
     if !(url.starts_with("http://") || url.starts_with("https://")) {
-        return Err(AppError::new("الصق رابطًا صحيحًا يبدأ بـ http:// أو https://"));
+        return Err(AppError::new("invalidUrl"));
     }
     Ok(url.to_string())
 }
@@ -340,7 +340,7 @@ async fn check_media(tools: &Tools, file: &Path) -> Result<MediaCheck, AppError>
     )
     .await?;
     if !ok {
-        return Err(AppError::with_detail("تعذّر فحص الملف بعد التنزيل.", tail(&err, 8)));
+        return Err(AppError::with_detail("probeFileFailed", tail(&err, 8)));
     }
     let j: Value = serde_json::from_str(&out).unwrap_or(Value::Null);
     let streams = j["streams"].as_array().cloned().unwrap_or_default();
@@ -420,7 +420,7 @@ async fn convert_for_editing(
         RunOutcome::Canceled => Ok(None),
         RunOutcome::Exited { success: true, .. } => Ok(Some(output)),
         RunOutcome::Exited { stderr, .. } => Err(AppError::with_detail(
-            "اكتمل التنزيل لكن فشل تحويل الملف لصيغة المونتاج.",
+            "convertFailed",
             tail(&stderr, 10),
         )),
     }
@@ -449,7 +449,7 @@ async fn move_into(src: &Path, dir: &Path) -> Result<PathBuf, AppError> {
     // rename يفشل إن كان المجلدان على قرصين مختلفين، فننسخ ثم نحذف
     if tokio::fs::rename(src, &dest).await.is_err() {
         tokio::fs::copy(src, &dest).await.map_err(|e| {
-            AppError::with_detail("تعذّر نقل الملف إلى مجلد الحفظ. تأكد من صلاحية الكتابة ومن المساحة المتاحة.", e.to_string())
+            AppError::with_detail("moveFailed", e.to_string())
         })?;
         let _ = tokio::fs::remove_file(src).await;
     }
@@ -462,7 +462,7 @@ fn jobs_root(app: &AppHandle) -> Result<PathBuf, AppError> {
     Ok(app
         .path()
         .app_cache_dir()
-        .map_err(|e| AppError::with_detail("تعذّر تحديد المجلد المؤقت.", e.to_string()))?
+        .map_err(|e| AppError::with_detail("cacheDir", e.to_string()))?
         .join("jobs"))
 }
 
@@ -484,7 +484,7 @@ async fn run_job(
     let tools = tools::resolve(app)?;
     let final_dir = settings::resolve_output_dir(app, &settings)?;
     std::fs::create_dir_all(&final_dir).map_err(|e| {
-        AppError::with_detail("تعذّر إنشاء مجلد الحفظ. اختر مجلدًا آخر من الإعدادات.", e.to_string())
+        AppError::with_detail("outputDirCreate", e.to_string())
     })?;
     let out = job_dir.join("out");
     let work = job_dir.join("work");
@@ -529,7 +529,7 @@ async fn run_job(
     }
     let mut file = match file.filter(|f| f.exists()) {
         Some(f) => f,
-        None => return Err(AppError::new("انتهى التنزيل لكن لم أجد الملف الناتج.")),
+        None => return Err(AppError::new("noOutputFile")),
     };
 
     // 2) جاهز للمونتاج؟
@@ -581,11 +581,9 @@ pub async fn start_download(
                 file: Some(path.to_string_lossy().into_owned()),
                 ..Default::default()
             },
+            // إن فشل شيء بعد ضغط "إلغاء" فهو نتيجة الإلغاء، لا خطأ حقيقي
+            Ok(None) | Err(_) if *rx.borrow() => JobUpdate { id, state: "canceled", ..Default::default() },
             Ok(None) => JobUpdate { id, state: "canceled", ..Default::default() },
-            Err(e) if *rx.borrow() => {
-                let _ = e;
-                JobUpdate { id, state: "canceled", ..Default::default() }
-            }
             Err(e) => JobUpdate { id, state: "error", error: Some(e), ..Default::default() },
         };
         if let Ok(dir) = job_dir {
@@ -631,14 +629,14 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
     let run = tools::run_capture(&tools.ytdlp, &args);
     let (ok, out, err) = tokio::time::timeout(Duration::from_secs(90), run)
         .await
-        .map_err(|_| AppError::new("استغرق الموقع وقتًا طويلًا في الرد. تحقق من الاتصال ثم أعد المحاولة."))??;
+        .map_err(|_| AppError::new("timeout"))??;
     if !ok {
         return Err(friendly_ytdlp_error(&err));
     }
     let j: Value = serde_json::from_str(&out)
-        .map_err(|e| AppError::with_detail("تعذّرت قراءة معلومات الرابط.", e.to_string()))?;
+        .map_err(|e| AppError::with_detail("probeParse", e.to_string()))?;
     if j["_type"].as_str() == Some("playlist") {
-        return Err(AppError::new("هذا رابط قائمة تشغيل. تنزيل القوائم قادم في المرحلة الثانية؛ الصق رابط فيديو واحد."));
+        return Err(AppError::new("playlist"));
     }
     let mut heights: Vec<u32> = j["formats"]
         .as_array()
@@ -652,7 +650,7 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
     heights.sort_unstable_by(|a, b| b.cmp(a));
     heights.dedup();
     Ok(ProbeInfo {
-        title: j["title"].as_str().unwrap_or("بدون عنوان").to_string(),
+        title: j["title"].as_str().unwrap_or("Untitled").to_string(),
         thumbnail: j["thumbnail"].as_str().map(String::from),
         duration: j["duration"].as_f64(),
         uploader: j["uploader"].as_str().or(j["channel"].as_str()).map(String::from),
@@ -667,7 +665,7 @@ pub fn reveal_file(app: AppHandle, path: String) -> Result<(), AppError> {
     use tauri_plugin_opener::OpenerExt;
     app.opener()
         .reveal_item_in_dir(&path)
-        .map_err(|e| AppError::with_detail("تعذّر فتح المجلد.", e.to_string()))
+        .map_err(|e| AppError::with_detail("openFolder", e.to_string()))
 }
 
 #[tauri::command]
@@ -678,7 +676,7 @@ pub fn open_output_dir(app: AppHandle, settings: State<'_, SettingsState>) -> Re
     std::fs::create_dir_all(&dir)?;
     app.opener()
         .open_path(dir.to_string_lossy(), None::<&str>)
-        .map_err(|e| AppError::with_detail("تعذّر فتح المجلد.", e.to_string()))
+        .map_err(|e| AppError::with_detail("openFolder", e.to_string()))
 }
 
 // ======================= اختبارات =======================
