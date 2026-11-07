@@ -237,7 +237,7 @@ export default function App() {
       <div className="app">
         <header className="topbar">
           <div className="brand">
-            <span className="brand-mark"><Icon name="film" size={18} /></span>
+            <img className="brand-mark" src="/logo.svg" alt="" />
             {t.appName}
           </div>
           <nav className="tabs" ref={tabsRef}>

@@ -111,14 +111,12 @@ button:disabled {
   font-size: 18px;
 }
 
+/* الشعار: «خ» ونقطتها سهم تنزيل. ملف SVG فيه هامش شفاف صغير، فنكبّره بقدره */
 .brand-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  display: grid;
-  place-items: center;
-  background: var(--accent);
-  color: var(--accent-ink);
+  display: block;
+  width: 36px;
+  height: 36px;
+  margin: -3px;
 }
 
 .tabs {
