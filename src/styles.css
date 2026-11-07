@@ -3,6 +3,7 @@
   --bg: #111315;
   --surface: #191c1f;
   --surface-2: #22262a;
+  --pill: #353b41;
   --border: #2c3136;
   --text: #eceeef;
   --text-dim: #9aa3ab;
@@ -23,6 +24,7 @@
   --bg: #f4f5f6;
   --surface: #ffffff;
   --surface-2: #eef0f2;
+  --pill: #ffffff;
   --border: #dde1e5;
   --text: #15191c;
   --text-dim: #5b646c;
@@ -858,11 +860,14 @@ details.tech pre {
   --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
   /* نابض شبه مُخمَّد: يصل بسرعة ويستقر دون ارتداد ظاهر (إحساس iOS) */
   --ease-spring: var(--ease-out);
+  --ease-glide: var(--ease-io);
   --dir: 1;
 }
 
 @supports (transition-timing-function: linear(0, 1)) {
   :root {
+    /* انزلاق المؤشّر: يتسارع بلطف (لا يقفز في أول إطار) ويستقر بتجاوز ٢٪ فقط */
+    --ease-glide: linear(0, 0.028, 0.098, 0.193, 0.3, 0.408, 0.513, 0.609, 0.694, 0.767, 0.829, 0.88, 0.92, 0.952, 0.976, 0.993, 1.005, 1.013, 1.017, 1.019, 1.02, 1.019, 1.018, 1.016, 1.014, 1.011, 1.009, 1.007, 1.006, 1.004, 1.003, 1.002, 1 80%, 1);
     --ease-spring: linear(0, 0.057, 0.185, 0.339, 0.49, 0.625, 0.737, 0.825, 0.89, 0.937, 0.969, 0.989, 1.002, 1.008, 1.011, 1.011, 1.01, 1.009, 1.007, 1.005, 1.004, 1.003, 1.002, 1.001, 1.001, 1 62.5%, 1);
   }
 }
@@ -1428,9 +1433,10 @@ img.file-thumb {
   opacity: 0;
   will-change: transform, width;
   transition:
-    transform 0.5s var(--ease-spring),
-    width 0.5s var(--ease-spring),
-    height 0.5s var(--ease-spring),
+    transform 0.55s var(--ease-glide),
+    width 0.55s var(--ease-glide),
+    height 0.55s var(--ease-glide),
+    box-shadow 0.2s var(--ease-out),
     opacity 0.2s var(--ease-out);
 }
 
@@ -1445,8 +1451,23 @@ img.file-thumb {
 
 .seg-pill {
   border-radius: 8px;
-  background: var(--surface);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+  background: var(--pill);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 1px 3px rgb(0 0 0 / 0.25);
+}
+
+/* حلقة التركيز على الخيار المختار ترافق المؤشّر بدل أن تظهر ثابتة على الزر */
+.segmented button[aria-pressed="true"]:focus-visible,
+.tab[aria-current="page"]:focus-visible {
+  outline: none;
+}
+
+.segmented:has(button[aria-pressed="true"]:focus-visible) .seg-pill,
+.tabs:has(.tab[aria-current="page"]:focus-visible) .tab-pill {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 1px 3px rgb(0 0 0 / 0.25);
 }
 
 .tab,
