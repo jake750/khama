@@ -3,6 +3,7 @@
 mod convert;
 mod download;
 mod errors;
+mod separate;
 mod settings;
 mod tools;
 

@@ -149,6 +149,7 @@ export function ConvertView(props: {
       o.end = opts.end ?? single?.duration ?? null;
     }
     if (kind === "copy") o.mute = opts.mute;
+    if (kind === "stems") return o;
     if (showPicture) {
       Object.assign(o, {
         size: opts.size, aspect: opts.aspect, fps: kind === "frame" ? null : opts.fps, rotate: opts.rotate,

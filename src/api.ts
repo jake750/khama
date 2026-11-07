@@ -128,6 +128,8 @@ export interface DownloadRequest {
   /** تحميل جزء فقط (بالثواني) */
   start?: number | null;
   end?: number | null;
+  /** إزالة بالذكاء الاصطناعي: "voice" = أبقِ الصوت البشري (احذف الموسيقى) | "music" = أبقِ الموسيقى */
+  stems?: "voice" | "music" | null;
 }
 
 export type JobState =
@@ -136,6 +138,8 @@ export type JobState =
   | "analyzing"
   | "downloading"
   | "processing"
+  | "preparing"
+  | "separating"
   | "converting"
   | "done"
   | "error"

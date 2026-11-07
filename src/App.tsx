@@ -198,7 +198,7 @@ export default function App() {
     if (!j.convert || !j.markers?.length) return;
     const input = j.convert.inputs[0];
     // نعيد الترميز (بجودة عالية) حتى يكون القطع دقيقًا بالإطار، لا عند أقرب إطار مفتاحي
-    const preset = j.convert.inputs.length && presetById("edit_h264") ? "edit_h264" : "rewrap_mkv";
+    const preset = "edit_h264";
     const splitAt = j.markers.map(([s, e]) => (s === e ? s : (s + e) / 2));
     startConvert(
       { inputs: [input], preset, options: { ...defaultOptions(), quality: "high", hw: settings.convertHw, start: j.convert.options.start, end: j.convert.options.end, splitAt } },

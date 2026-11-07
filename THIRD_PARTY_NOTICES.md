@@ -9,6 +9,8 @@ processes and does not link to them, so each keeps its own license.
 | **yt-dlp** (`khama-yt-dlp`) | The Unlicense. The official release executable bundles third-party code, and the combined executable is distributed under **GPLv3+**. | https://github.com/yt-dlp/yt-dlp |
 | **FFmpeg / FFprobe** (`ffmpeg/`) | **GPLv3** build (includes libx264 and other GPL components). | Windows builds: https://github.com/yt-dlp/FFmpeg-Builds — Linux builds: https://github.com/BtbN/FFmpeg-Builds — macOS builds: https://ffmpeg.martin-riedl.de — FFmpeg source: https://git.ffmpeg.org/ffmpeg.git |
 | **Deno** (`khama-deno`) | MIT | https://github.com/denoland/deno |
+| **ONNX Runtime** 1.22 (downloaded on first use of music removal, not bundled) | MIT | https://github.com/microsoft/onnxruntime |
+| **UVR-MDX-NET-Voc_FT** model (downloaded on first use, not bundled) | Released by the Ultimate Vocal Remover project; see its terms | https://github.com/Anjok07/ultimatevocalremovergui — file from https://github.com/TRvlvr/model_repo |
 | **IBM Plex Sans Arabic** (font) | SIL Open Font License 1.1 | https://github.com/IBM/plex |
 | **Tauri** | MIT / Apache-2.0 | https://github.com/tauri-apps/tauri |
 | **React** | MIT | https://github.com/facebook/react |

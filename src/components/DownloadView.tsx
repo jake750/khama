@@ -41,6 +41,7 @@ export function DownloadView(props: {
   const probeToken = useRef(0);
   const [trimOn, setTrimOn] = useState(false);
   const [range, setRange] = useState<Range | null>(null);
+  const [stems, setStems] = useState<"off" | "voice" | "music">("off");
 
   // عند تغيّر الرابط: ننتظر نصف ثانية (حتى ينتهي اللصق/الكتابة) ثم نجلب معلوماته.
   // probeToken يمنع ردًّا قديمًا من الكتابة فوق رد أحدث.
@@ -97,6 +98,7 @@ export function DownloadView(props: {
           editorReady: s.editorReady,
           start: isPartial ? activeRange!.start : null,
           end: isPartial ? activeRange!.end : null,
+          stems: stems === "off" ? null : stems,
         },
         info?.title ?? clean,
       );
@@ -250,6 +252,25 @@ export function DownloadView(props: {
           </div>
         </div>
       )}
+
+      <div className="stems-row">
+        <span className="field-label">{t.stemsLabel}</span>
+        <Segmented<"off" | "voice" | "music">
+          label={t.stemsLabel}
+          value={stems}
+          onChange={setStems}
+          options={[
+            { value: "off", label: t.stemsOff },
+            { value: "voice", label: t.stemsVoice },
+            { value: "music", label: t.stemsMusic },
+          ]}
+        />
+        <div className="collapse" data-open={stems !== "off"}>
+          <div>
+            <div className="faint" style={{ marginTop: 6 }}>{t.stemsHint}</div>
+          </div>
+        </div>
+      </div>
 
       {startError && <ErrorBox error={startError} />}
 

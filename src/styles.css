@@ -1376,3 +1376,7 @@ img.file-thumb {
   height: 34px;
   max-width: 200px;
 }
+
+.stems-row {
+  margin-top: 16px;
+}

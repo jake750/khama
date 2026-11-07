@@ -25,8 +25,23 @@ Paste a link, pick a format, and get a file that drops straight into Premiere, D
 - **Save folder** of your choice, remembered between sessions.
 - **English or Arabic UI** (full RTL), dark or light theme. Errors are explained in plain language, with the raw technical details one click away.
 - **Cookies** (optional): read from your browser, or paste/import a `cookies.txt`. Useful for age-restricted videos or YouTube's "are you a bot?" check.
+- **Download only a part**: pick a start and end, and only that section is downloaded (frame-accurate).
+- **Remove music or voice with AI**: keep only the dialogue (or only the music) of a download or any local file. The model (~140 MB) is downloaded once, on first use, and runs fully offline.
 - **Update yt-dlp in one click**. Sites change often, and this is the usual fix when downloads start failing.
 - **Private by design**: no analytics, no telemetry. Khama only contacts the sites you download from, plus GitHub when you press "Update yt-dlp".
+
+### Converter
+
+A built-in encoder for files already on your computer. Drag files in, pick what you want to *do* (not a codec), and go.
+
+- **For editing**: Edit-ready H.264 (fixes phone VFR sync), ProRes Proxy/LT/422/HQ/4444, DNxHR LB/SQ/HQ/HQX (best for free DaVinci Resolve), light 540p proxies.
+- **For publishing**: YouTube, Reels/TikTok/Shorts (auto 9:16 crop), small files for WhatsApp, H.265, AV1, WebM, GIF.
+- **Audio**: WAV, MP3, AAC, FLAC, Opus, and AI music/voice removal.
+- **Tools**: rewrap without re-encoding, grab a frame, PNG sequence, find scene cuts / black frames / silences, then split at those points.
+- **Options**: trim, resize, crop to aspect, frame rate, speed, rotate/flip, deinterlace, denoise, HDR→SDR, 3D LUTs, burned-in subtitles (Arabic shaping supported), logo watermark, timecode, two-pass loudness normalization (−14/−16/−23 LUFS), replace or remove audio, merge several files.
+- **Smart checks**: each file is inspected and flagged (variable frame rate, HDR, interlaced, 10-bit, heavy codecs), with a suggested preset.
+- **Graphics card encoding** (NVIDIA NVENC, Intel QSV, AMD AMF, Apple VideoToolbox), detected by actually testing the hardware.
+- **Queue, size estimate, time left, cancel**, and **watch folders** that convert new files automatically.
 
 ### Install
 
@@ -122,8 +137,21 @@ MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-l
 - **مجلد حفظ** تختاره أنت، ويُحفظ اختيارك.
 - **واجهة بالإنجليزية أو العربية** (RTL كاملة)، بثيم داكن أو فاتح. رسائل الخطأ مفهومة، والتفاصيل التقنية متاحة بنقرة.
 - **الكوكيز** (اختيارية): من متصفحك مباشرة، أو بلصق ملف `cookies.txt` أو استيراده. تفيد مع الفيديوهات المقيّدة بالعمر، أو حين يسأل يوتيوب «هل أنت روبوت؟».
+- **تحميل جزء فقط**: حدّد البداية والنهاية، ويُحمَّل هذا الجزء وحده بدقة الإطار.
+- **إزالة الموسيقى أو الصوت البشري بالذكاء الاصطناعي**: أبقِ الحوار وحده (أو الموسيقى وحدها) لأي تنزيل أو ملف على جهازك. النموذج (حوالي 140MB) يُنزَّل مرة واحدة عند أول استخدام، ويعمل بلا إنترنت بعدها.
 - **تحديث yt-dlp بنقرة واحدة**: المواقع تتغيّر كثيرًا، وهذا غالبًا هو الحل حين يبدأ التنزيل بالفشل.
 - **الخصوصية**: لا تحليلات ولا تتبّع. تتصل خامة فقط بالمواقع التي تنزّل منها، وبـ GitHub حين تضغط «تحديث yt-dlp».
+
+### المحوّل
+
+محوّل مدمج للملفات الموجودة على جهازك: اسحب الملفات، واختر **ماذا تريد أن تفعل** (لا الكودك)، وابدأ.
+
+- **للمونتاج**: H.264 جاهز للمونتاج (يصلح تزامن فيديو الجوال)، وProRes بكل درجاته، وDNxHR (الأفضل لـ DaVinci Resolve المجاني)، وبروكسي خفيف.
+- **للنشر**: يوتيوب، ريلز/تيك توك/شورتس (قص 9:16 تلقائي)، حجم صغير لواتساب، H.265، AV1، WebM، GIF.
+- **صوت**: WAV وMP3 وAAC وFLAC وOpus، وإزالة الموسيقى أو الصوت بالذكاء الاصطناعي.
+- **أدوات**: تغيير الحاوية بلا إعادة ترميز، التقاط إطار، سلسلة صور، كشف المشاهد والشاشات السوداء والصمت ثم التقسيم عندها.
+- **خيارات**: قص، مقاس، قص لنسبة، معدل إطارات، سرعة، تدوير، إزالة التداخل، تقليل التشويش، HDR ← SDR، ملفات LUT، ترجمة مطبوعة (تدعم العربية)، شعار، تايم كود، توحيد مستوى الصوت، استبدال الصوت أو حذفه، ودمج عدة ملفات.
+- **فحص ذكي** لكل ملف مع اقتراح الصيغة المناسبة، و**تسريع بكرت الشاشة**، وطابور وتقدير للحجم والوقت، و**مجلدات مراقَبة** تحوّل كل ملف جديد تلقائيًا.
 
 ### التثبيت
 

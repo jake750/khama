@@ -23,7 +23,7 @@ export interface Job {
   markers?: [number, number][];
 }
 
-const ACTIVE: JobState[] = ["queued", "starting", "analyzing", "downloading", "processing", "converting"];
+const ACTIVE: JobState[] = ["queued", "starting", "analyzing", "downloading", "processing", "preparing", "separating", "converting"];
 export const isActive = (j: Job) => ACTIVE.includes(j.state);
 
 function statusText(t: Dict, j: Job): string {
@@ -38,6 +38,10 @@ function statusText(t: Dict, j: Job): string {
       return j.stage === "video" ? t.stDownloadingVideo : j.stage === "audio" ? t.stDownloadingAudio : t.stDownloading;
     case "processing":
       return t.stProcessing;
+    case "preparing":
+      return t.stPreparing;
+    case "separating":
+      return t.stSeparating;
     case "converting":
       return j.type === "convert" ? t.stEncoding : t.stConverting;
     case "done":
@@ -64,7 +68,7 @@ export function JobCard(props: {
   const active = isActive(j);
   // نسبة مجهولة (انتظار/تحضير/معالجة) ← شريط متحرك بدل رقم
   const indeterminate =
-    active && (j.percent == null || ["queued", "starting", "processing"].includes(j.state) || (j.state === "analyzing" && !j.percent));
+    active && (j.percent == null || ["queued", "starting", "processing"].includes(j.state) || (j.state === "separating" && !j.percent) || (j.state === "analyzing" && !j.percent));
   const fileName = j.file?.split(/[\\/]/).pop();
   const audioOnly = j.request?.kind === "audio" || j.meta.startsWith("WAV") || j.meta.startsWith("MP3");
   const r = j.request;

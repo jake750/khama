@@ -31,6 +31,7 @@ use tokio::{
 
 use crate::{
     errors::{AppError, friendly_ytdlp_error, tail},
+    separate,
     settings::{self, Settings, SettingsState},
     tools::{self, Tools},
 };
@@ -62,6 +63,9 @@ pub struct DownloadRequest {
     pub start: Option<f64>,
     #[serde(default)]
     pub end: Option<f64>,
+    /// إزالة بالذكاء الاصطناعي بعد التنزيل: "voice" (أبقِ الصوت البشري = احذف الموسيقى) | "music"
+    #[serde(default)]
+    pub stems: Option<String>,
 }
 
 /// المقطع المطلوب بعد التحقق: (بداية، نهاية). None = الملف كاملًا
@@ -588,7 +592,22 @@ async fn run_job(
         }
     }
 
-    // 3) النقل إلى مجلد المستخدم
+    // 3) إزالة الموسيقى (أو الصوت البشري)؟
+    if let Some(keep) = req.stems.as_deref().and_then(separate::Keep::parse) {
+        let duration = check_media(&tools, &file).await.ok().and_then(|c| c.duration);
+        let sep_dir = job_dir.join("sep");
+        std::fs::create_dir_all(&sep_dir)?;
+        let stem = file.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        let ext = file.extension().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "mp4".into());
+        let tag = if keep == separate::Keep::Voice { "no music" } else { "music only" };
+        let out = sep_dir.join(format!("{stem} [{tag}].{ext}"));
+        if !separate::process_file(app, id, &tools, &file, &out, keep, None, None, duration, &job_dir.join("sepwork"), cancel).await? {
+            return Ok(None);
+        }
+        file = out;
+    }
+
+    // 4) النقل إلى مجلد المستخدم
     Ok(Some(move_into(&file, &final_dir).await?))
 }
 
@@ -738,6 +757,7 @@ mod tests {
             editor_ready: editor,
             start: None,
             end: None,
+            stems: None,
         }
     }
 

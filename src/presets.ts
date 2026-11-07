@@ -5,7 +5,7 @@ import type { ConvertOptions, Issue, MediaInfo } from "./api";
 import type { Lang } from "./i18n";
 
 export type PresetGroup = "edit" | "publish" | "audio" | "tools";
-export type PresetKind = "video" | "audio" | "frame" | "sequence" | "gif" | "copy" | "detect";
+export type PresetKind = "video" | "audio" | "frame" | "sequence" | "gif" | "copy" | "detect" | "stems";
 
 export interface PresetDef {
   id: string;
@@ -140,6 +140,16 @@ export const PRESETS: PresetDef[] = [
 
   // ---------- صوت ----------
   P({
+    id: "stem_voice", group: "audio", kind: "stems", ext: "wav", quality: false, hw: false,
+    name: { en: "Remove music (AI)", ar: "إزالة الموسيقى (ذكاء اصطناعي)" },
+    desc: { en: "Keeps only voices. Video stays as is with the new audio.", ar: "يُبقي الأصوات البشرية فقط. الفيديو يبقى كما هو بالصوت الجديد." },
+  }),
+  P({
+    id: "stem_music", group: "audio", kind: "stems", ext: "wav", quality: false, hw: false,
+    name: { en: "Remove voice (AI)", ar: "إزالة الصوت البشري (ذكاء اصطناعي)" },
+    desc: { en: "Keeps only the music — an instant instrumental.", ar: "يُبقي الموسيقى فقط، نسخة بلا غناء." },
+  }),
+  P({
     id: "wav", group: "audio", kind: "audio", ext: "wav", quality: false, hw: false,
     name: { en: "WAV", ar: "WAV" },
     desc: { en: "Uncompressed. Best for editing and mixing.", ar: "بلا ضغط. الأفضل للمونتاج والمكس." },
@@ -219,7 +229,7 @@ export const GROUPS: PresetGroup[] = ["edit", "publish", "audio", "tools"];
 export function presetFits(p: PresetDef, m?: MediaInfo | null): boolean {
   if (!m) return true;
   if (p.id === "detect_silence") return m.audio.length > 0;
-  if (p.kind === "audio") return m.audio.length > 0;
+  if (p.kind === "audio" || p.kind === "stems") return m.audio.length > 0;
   if (p.kind === "copy") return true;
   return !!m.video;
 }
@@ -271,6 +281,9 @@ export function estimateSize(p: PresetDef, m: MediaInfo, o: ConvertOptions): num
     videoMbps = base * ((w * h * fps) / (1920 * 1080 * 30));
   } else if (p.kind === "gif" && m.video) {
     videoMbps = 4;
+  } else if (p.kind === "stems") {
+    if (m.video) return m.duration ? (m.size * span) / m.duration : null;
+    return 44100 * 2 * 2 * span;
   } else if (p.kind === "copy") {
     return m.duration ? (m.size * span) / m.duration : null;
   } else if (p.kind !== "audio") {

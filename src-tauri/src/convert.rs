@@ -23,6 +23,7 @@ use tokio::sync::{OnceCell, Semaphore, watch};
 use crate::{
     download::{self, JobUpdate, Jobs, RunOutcome, emit, fraction, num, run_streaming, unique_path},
     errors::{AppError, tail},
+    separate,
     settings::{self, SettingsState},
     tools::{self, Tools},
 };
@@ -292,6 +293,8 @@ pub enum PKind {
     Copy,
     /// كشف (مشاهد / سواد / صمت) بلا ملف ناتج
     Detect,
+    /// فصل الصوت البشري عن الموسيقى بالذكاء الاصطناعي
+    Stems,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -329,6 +332,9 @@ const PRESETS: &[Preset] = &[
     Preset { id: "aac", kind: PKind::Audio, ext: "m4a", suffix: "audio" },
     Preset { id: "flac", kind: PKind::Audio, ext: "flac", suffix: "audio" },
     Preset { id: "opus", kind: PKind::Audio, ext: "opus", suffix: "audio" },
+    // ext هنا افتراضي: الفيديو يبقى بحاويته، والصوت يخرج WAV
+    Preset { id: "stem_voice", kind: PKind::Stems, ext: "wav", suffix: "no music" },
+    Preset { id: "stem_music", kind: PKind::Stems, ext: "wav", suffix: "music only" },
     // أدوات
     Preset { id: "rewrap_mp4", kind: PKind::Copy, ext: "mp4", suffix: "rewrap" },
     Preset { id: "rewrap_mov", kind: PKind::Copy, ext: "mov", suffix: "rewrap" },
@@ -1175,6 +1181,41 @@ async fn run_convert(
             return Ok(None);
         };
         return Ok(Some((first_path, Some(parse_markers(p.id, &log)))));
+    }
+
+    // ---- إزالة الموسيقى / الصوت البشري ----
+    if p.kind == PKind::Stems {
+        let info = &infos[0];
+        if info.audio.is_empty() {
+            return Err(AppError::new("noAudioStream"));
+        }
+        let src_ext = first_path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+        let ext = if info.video.is_some() {
+            if matches!(src_ext.as_str(), "mp4" | "mov" | "mkv" | "webm") { src_ext.as_str() } else { "mp4" }
+        } else {
+            "wav"
+        };
+        let keep = if p.id == "stem_music" { separate::Keep::Music } else { separate::Keep::Voice };
+        let dir = output_dir_for(app, o, &first_path)?;
+        std::fs::create_dir_all(&dir).map_err(|e| AppError::with_detail("outputDirCreate", e.to_string()))?;
+        let stem = first_path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "file".into());
+        let temp = dir.join(format!(".khama-{id}-part.{ext}"));
+        let start = o.start.filter(|v| *v > 0.0);
+        let ok = separate::process_file(app, id, &tools, &first_path, &temp, keep, start, o.end, info.duration, &work, cancel).await;
+        match ok {
+            Ok(true) => {}
+            Ok(false) => {
+                let _ = std::fs::remove_file(&temp);
+                return Ok(None);
+            }
+            Err(e) => {
+                let _ = std::fs::remove_file(&temp);
+                return Err(e);
+            }
+        }
+        let dest = unique_path(&dir, &format!("{stem} [{}].{ext}", p.suffix));
+        std::fs::rename(&temp, &dest).map_err(|e| AppError::with_detail("moveFailed", e.to_string()))?;
+        return Ok(Some((dest, None)));
     }
 
     let hw = if o.hw { hw_list(&tools).await } else { vec![] };
