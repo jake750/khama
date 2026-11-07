@@ -21,6 +21,7 @@ pub fn run() {
             let handle = app.handle().clone();
             app.manage(settings::SettingsState(Mutex::new(settings::load(&handle))));
             download::clean_stale_jobs(&handle);
+            convert::spawn_watcher(handle.clone());
             // في الخلفية: جهّز نسخة yt-dlp القابلة للتحديث
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = tools::ensure_managed_ytdlp(&handle).await {

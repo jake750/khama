@@ -23,6 +23,82 @@ export interface Settings {
   cookiesMode: CookiesMode;
   cookiesBrowser: string;
   acceptedNotice: boolean;
+  convertDest: "source" | "output";
+  convertPreset: string;
+  convertHw: boolean;
+  watchFolders: WatchFolder[];
+}
+
+export interface WatchFolder {
+  dir: string;
+  preset: string;
+  enabled: boolean;
+}
+
+export interface VideoInfo {
+  codec: string;
+  profile?: string | null;
+  width: number;
+  height: number;
+  fps?: number | null;
+  vfr: boolean;
+  pixFmt: string;
+  bitDepth: number;
+  hdr: boolean;
+  interlaced: boolean;
+}
+
+export interface AudioInfo {
+  codec: string;
+  channels: number;
+  sampleRate: number;
+}
+
+export type Issue = "vfr" | "hdr" | "interlaced" | "tenBit" | "heavyCodec" | "noAudio" | "resolveFreeAudio";
+
+export interface MediaInfo {
+  path: string;
+  name: string;
+  size: number;
+  duration?: number | null;
+  container: string;
+  bitrate?: number | null;
+  video?: VideoInfo | null;
+  audio: AudioInfo[];
+  subtitles: number;
+  thumbnail?: string | null;
+  issues: Issue[];
+}
+
+export interface ConvertOptions {
+  quality: "high" | "balanced" | "small";
+  hw: boolean;
+  size?: number | null;
+  aspect?: string | null;
+  fps?: string | null;
+  speed?: number | null;
+  rotate?: string | null;
+  deinterlace: boolean;
+  denoise: boolean;
+  tonemap: boolean;
+  lut?: string | null;
+  subtitles?: string | null;
+  watermark?: string | null;
+  watermarkPos?: string | null;
+  timecode: boolean;
+  loudness?: number | null;
+  replaceAudio?: string | null;
+  mute: boolean;
+  start?: number | null;
+  end?: number | null;
+  splitAt: number[];
+  outDir?: string | null;
+}
+
+export interface ConvertRequest {
+  inputs: string[];
+  preset: string;
+  options: ConvertOptions;
 }
 
 /** الخطأ كما يرسله Rust: رمز يُترجم في الواجهة (انظر i18n.ts) + تفاصيل تقنية */
@@ -55,7 +131,9 @@ export interface DownloadRequest {
 }
 
 export type JobState =
+  | "queued"
   | "starting"
+  | "analyzing"
   | "downloading"
   | "processing"
   | "converting"
@@ -72,6 +150,7 @@ export interface JobUpdate {
   eta?: number;
   file?: string;
   error?: AppError;
+  markers?: [number, number][];
 }
 
 export interface ToolsInfo {
@@ -102,4 +181,9 @@ export const api = {
   openOutputDir: () => invoke<void>("open_output_dir"),
   onJobUpdate: (cb: (u: JobUpdate) => void): Promise<UnlistenFn> =>
     listen<JobUpdate>("job-update", (e) => cb(e.payload)),
+  analyzeFile: (path: string) => invoke<MediaInfo>("analyze_file", { path }),
+  hwEncoders: () => invoke<string[]>("hw_encoders"),
+  startConvert: (request: ConvertRequest) => invoke<number>("start_convert", { request }),
+  onWatchFile: (cb: (hit: { path: string; preset: string; outDir: string }) => void): Promise<UnlistenFn> =>
+    listen<{ path: string; preset: string; outDir: string }>("watch-file", (e) => cb(e.payload)),
 };

@@ -1,5 +1,7 @@
+import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useRef, useState } from "react";
-import { api, asAppError, type AppError, type CookiesMode, type Language, type Settings, type Theme, type ToolsInfo } from "../api";
+import { PRESETS } from "../presets";
+import { api, asAppError, type AppError, type CookiesMode, type Language, type Settings, type Theme, type ToolsInfo, type WatchFolder } from "../api";
 import { useI18n } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
 import { Icon } from "./Icon";
@@ -66,6 +68,7 @@ export function SettingsView(props: {
       </div>
 
       <CookiesSection settings={s} update={update} toast={props.toast} />
+      <WatchSection settings={props.settings} update={props.update} />
       <ToolsSection toast={props.toast} />
 
       {/* ---------- حول ---------- */}
@@ -257,6 +260,54 @@ function ToolsSection(props: { toast: (m: string) => void }) {
         </button>
       </div>
       {updateError && <ErrorBox error={updateError} />}
+    </div>
+  );
+}
+
+/** المجلدات المراقَبة: كل ملف جديد فيها يُحوَّل تلقائيًا */
+function WatchSection(props: { settings: Settings; update: (p: Partial<Settings>) => void }) {
+  const { t, lang } = useI18n();
+  const list = props.settings.watchFolders;
+  const set = (watchFolders: WatchFolder[]) => props.update({ watchFolders });
+  const add = async () => {
+    const dir = await open({ directory: true });
+    if (typeof dir === "string" && !list.some((w) => w.dir === dir)) {
+      set([...list, { dir, preset: props.settings.convertPreset || "edit_h264", enabled: true }]);
+    }
+  };
+  return (
+    <div className="card settings-section">
+      <h3>{t.watchTitle}</h3>
+      <p className="faint" style={{ marginTop: 0 }}>{t.watchIntro}</p>
+      {list.length === 0 && <p className="faint">{t.watchEmpty}</p>}
+      {list.map((w, i) => (
+        <div className="watch-row" key={w.dir}>
+          <label className="toggle" title={w.dir}>
+            <input
+              type="checkbox"
+              checked={w.enabled}
+              onChange={(e) => set(list.map((x, k) => (k === i ? { ...x, enabled: e.target.checked } : x)))}
+            />
+            <span className="switch" />
+          </label>
+          <span className="path ltr" title={w.dir}>{w.dir}</span>
+          <select
+            className="select"
+            value={w.preset}
+            onChange={(e) => set(list.map((x, k) => (k === i ? { ...x, preset: e.target.value } : x)))}
+          >
+            {PRESETS.filter((p) => p.kind !== "detect").map((p) => (
+              <option key={p.id} value={p.id}>{p.name[lang]}</option>
+            ))}
+          </select>
+          <button className="icon-btn" style={{ width: 32, height: 32 }} aria-label={t.remove} title={t.remove} onClick={() => set(list.filter((_, k) => k !== i))}>
+            <Icon name="x" size={16} />
+          </button>
+        </div>
+      ))}
+      <button className="btn btn-sm" onClick={add} style={{ marginTop: 8 }}>
+        <Icon name="plus" size={16} /> {t.addWatch}
+      </button>
     </div>
   );
 }
