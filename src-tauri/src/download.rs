@@ -40,8 +40,8 @@ use crate::{
 /// العمليات الجارية: لكل عملية "زر إلغاء" (قناة watch نرسل فيها true)
 #[derive(Default)]
 pub struct Jobs {
-    next_id: AtomicU64,
-    cancels: Mutex<HashMap<u64, watch::Sender<bool>>>,
+    pub(crate) next_id: AtomicU64,
+    pub(crate) cancels: Mutex<HashMap<u64, watch::Sender<bool>>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -110,9 +110,12 @@ pub struct JobUpdate {
     pub file: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<AppError>,
+    /// نتائج الكشف (مشاهد، لقطات سوداء، صمت): [بداية، نهاية]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub markers: Option<Vec<[f64; 2]>>,
 }
 
-fn emit(app: &AppHandle, u: JobUpdate) {
+pub(crate) fn emit(app: &AppHandle, u: JobUpdate) {
     let _ = app.emit("job-update", u);
 }
 
@@ -214,13 +217,13 @@ fn download_args(tools: &Tools, cookies: Vec<String>, req: &DownloadRequest, out
 
 // ======================= تشغيل عملية مع إمكانية الإلغاء =======================
 
-enum RunOutcome {
+pub(crate) enum RunOutcome {
     Exited { success: bool, stderr: String },
     Canceled,
 }
 
 /// يوقف العملية وكل ما شغّلته (yt-dlp يشغّل ffmpeg، ونسخة Windows منه تشغّل نفسها مرتين)
-async fn kill_tree(child: &mut Child) {
+pub(crate) async fn kill_tree(child: &mut Child) {
     if let Some(pid) = child.id() {
         #[cfg(windows)]
         {
@@ -240,12 +243,12 @@ async fn kill_tree(child: &mut Child) {
 
 /// ينتهي عندما يضغط المستخدم "إلغاء".
 /// (دالة مستقلة حتى لا نُبقي قفل القناة محجوزًا أثناء انتظار أشياء أخرى)
-async fn canceled(rx: &mut watch::Receiver<bool>) {
+pub(crate) async fn canceled(rx: &mut watch::Receiver<bool>) {
     let _ = rx.wait_for(|c| *c).await;
 }
 
 /// يشغّل أمرًا، ويمرّر كل سطر من مخرجاته إلى on_line، ويوقفه إن ضغط المستخدم إلغاء
-async fn run_streaming(
+pub(crate) async fn run_streaming(
     mut cmd: Command,
     cancel: &mut watch::Receiver<bool>,
     mut on_line: impl FnMut(&str),
@@ -261,8 +264,9 @@ async fn run_streaming(
         while let Ok(Some(l)) = r.next_segment().await {
             buf.push_str(String::from_utf8_lossy(&l).trim_end_matches('\r'));
             buf.push('\n');
-            if buf.len() > 65_536 {
-                let mut cut = buf.len() - 32_768;
+            // نحتفظ بآخر 2MB (نتائج الكشف عن المشاهد قد تكون طويلة)
+            if buf.len() > 4_194_304 {
+                let mut cut = buf.len() - 2_097_152;
                 while !buf.is_char_boundary(cut) {
                     cut += 1;
                 }
@@ -298,7 +302,7 @@ async fn run_streaming(
 
 // ======================= قراءة أسطر التقدّم =======================
 
-fn num(s: &str) -> Option<f64> {
+pub(crate) fn num(s: &str) -> Option<f64> {
     s.trim().parse::<f64>().ok().filter(|v| v.is_finite())
 }
 
@@ -355,7 +359,7 @@ struct MediaCheck {
     audio_ok: bool,
 }
 
-fn fraction(s: &str) -> Option<f64> {
+pub(crate) fn fraction(s: &str) -> Option<f64> {
     let (a, b) = s.split_once('/')?;
     let (a, b) = (num(a)?, num(b)?);
     (b > 0.0).then(|| a / b)
@@ -468,7 +472,7 @@ async fn convert_for_editing(
 // ======================= نقل الملف النهائي =======================
 
 /// اسم غير مستخدم: "اسم.mp4" ← "اسم (1).mp4" ← "اسم (2).mp4"
-fn unique_path(dir: &Path, name: &str) -> PathBuf {
+pub(crate) fn unique_path(dir: &Path, name: &str) -> PathBuf {
     let p = dir.join(name);
     if !p.exists() {
         return p;
@@ -497,7 +501,7 @@ async fn move_into(src: &Path, dir: &Path) -> Result<PathBuf, AppError> {
 
 // ======================= العملية الكاملة =======================
 
-fn jobs_root(app: &AppHandle) -> Result<PathBuf, AppError> {
+pub(crate) fn jobs_root(app: &AppHandle) -> Result<PathBuf, AppError> {
     Ok(app
         .path()
         .app_cache_dir()

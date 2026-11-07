@@ -1,5 +1,6 @@
 //! نقطة دخول التطبيق: نسجّل الإضافات والحالة المشتركة والأوامر التي تستدعيها الواجهة.
 
+mod convert;
 mod download;
 mod errors;
 mod settings;
@@ -15,6 +16,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(download::Jobs::default())
+        .manage(convert::ConvertQueue::default())
         .setup(|app| {
             let handle = app.handle().clone();
             app.manage(settings::SettingsState(Mutex::new(settings::load(&handle))));
@@ -41,6 +43,9 @@ pub fn run() {
             download::cancel_download,
             download::reveal_file,
             download::open_output_dir,
+            convert::analyze_file,
+            convert::hw_encoders,
+            convert::start_convert,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

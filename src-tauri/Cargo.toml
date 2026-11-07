@@ -20,6 +20,8 @@ tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# لتحويل الصورة المصغّرة إلى data URL
+base64 = "0.22"
 # لتشغيل yt-dlp و ffmpeg كعمليات منفصلة وقراءة مخرجاتها سطرًا بسطر
 tokio = { version = "1", features = ["process", "io-util", "sync", "macros", "time", "fs"] }
 

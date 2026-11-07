@@ -33,6 +33,23 @@ pub struct Settings {
     pub cookies_browser: String,
     /// هل قرأ المستخدم تنبيه حقوق المحتوى
     pub accepted_notice: bool,
+    /// أين يُحفظ ناتج التحويل: "source" (بجانب الملف الأصلي) | "output" (مجلد الحفظ)
+    pub convert_dest: String,
+    /// آخر Preset استُخدم في المحوّل
+    pub convert_preset: String,
+    /// استخدام كرت الشاشة في التحويل إن توفر
+    pub convert_hw: bool,
+    /// مجلدات مراقَبة: كل ملف جديد فيها يُحوَّل تلقائيًا
+    pub watch_folders: Vec<WatchFolder>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WatchFolder {
+    pub dir: String,
+    pub preset: String,
+    #[serde(default)]
+    pub enabled: bool,
 }
 
 impl Default for Settings {
@@ -49,6 +66,10 @@ impl Default for Settings {
             cookies_mode: "none".into(),
             cookies_browser: "firefox".into(),
             accepted_notice: false,
+            convert_dest: "source".into(),
+            convert_preset: "edit_h264".into(),
+            convert_hw: true,
+            watch_folders: Vec::new(),
         }
     }
 }
