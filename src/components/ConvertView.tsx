@@ -6,7 +6,7 @@ import { useI18n, type Dict } from "../i18n";
 import { estimateSize, GROUPS, presetById, presetFits, PRESETS, suggestPreset, type PresetDef, type PresetGroup } from "../presets";
 import { ErrorBox } from "./ErrorBox";
 import { Icon } from "./Icon";
-import { AnimatedList } from "../motion";
+import { AnimatedList, SlideSwitch } from "../motion";
 import { Segmented, Toggle } from "./Segmented";
 import { TrimRange } from "./TrimRange";
 
@@ -308,7 +308,8 @@ export function ConvertView(props: {
           onChange={setGroup}
           options={GROUPS.map((g) => ({ value: g, label: groupName(t, g) }))}
         />
-        <div className="preset-grid" key={group}>
+        <SlideSwitch id={group} index={GROUPS.indexOf(group)} distance={40}>
+        <div className="preset-grid">
           {PRESETS.filter((p) => p.group === group).map((p) => {
             const ok = fits(p);
             return (
@@ -326,6 +327,7 @@ export function ConvertView(props: {
             );
           })}
         </div>
+        </SlideSwitch>
 
         {(preset.quality || preset.hw) && (
           <div className="options" style={{ marginTop: 16 }}>

@@ -15,6 +15,7 @@ import { useI18n } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
 import { Icon } from "./Icon";
 import { Segmented, Toggle } from "./Segmented";
+import { SlideSwitch } from "../motion";
 import { isMobile, MOBILE_SAVE_DIR } from "../platform";
 import { TrimRange, type Range } from "./TrimRange";
 
@@ -184,7 +185,7 @@ export function DownloadView(props: {
 
         <div>
           <span className="field-label">{t.format}</span>
-          <div className="swap-in" key={s.kind}>
+          <SlideSwitch id={s.kind} index={s.kind === "video" ? 0 : 1} distance={28}>
           {s.kind === "video" ? (
             <Segmented<VideoFormat>
               label={t.format}
@@ -207,10 +208,10 @@ export function DownloadView(props: {
               ]}
             />
           )}
-          </div>
+          </SlideSwitch>
         </div>
 
-        <div className="collapse" data-open={s.kind === "video"} aria-hidden={s.kind !== "video" || undefined}>
+        <div className="collapse slide-x" data-open={s.kind === "video"} aria-hidden={s.kind !== "video" || undefined}>
           <div>
           <div className="video-only">
           <div>
