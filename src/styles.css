@@ -93,6 +93,8 @@ button:disabled {
 .app {
   display: grid;
   grid-template-rows: auto 1fr;
+  /* عمود بعرض الشاشة بالضبط: المحتوى العريض يلتف بدل أن يمدّ الصفحة (مهم على الهاتف) */
+  grid-template-columns: minmax(0, 1fr);
   height: 100%;
 }
 
@@ -177,6 +179,7 @@ button:disabled {
   max-width: 880px;
   margin: 0 auto;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -1535,4 +1538,31 @@ img.file-thumb {
   display: grid;
   gap: 16px;
   padding-top: 16px;
+}
+
+/* ============ الهاتف ============ */
+@media (max-width: 560px) {
+  .topbar {
+    gap: 8px;
+    padding: 10px 14px;
+  }
+  .brand {
+    font-size: 16px;
+  }
+  .tabs {
+    margin-inline-start: 4px;
+  }
+  .main {
+    padding: 14px 12px;
+  }
+  .card {
+    padding: 16px;
+  }
+  .options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .action-row .btn-lg {
+    width: 100%;
+    justify-content: center;
+  }
 }

@@ -15,6 +15,7 @@ import { useI18n } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
 import { Icon } from "./Icon";
 import { Segmented, Toggle } from "./Segmented";
+import { isMobile, MOBILE_SAVE_DIR } from "../platform";
 import { TrimRange, type Range } from "./TrimRange";
 
 const QUALITIES = ["best", "2160", "1440", "1080", "720", "480"] as const;
@@ -95,10 +96,10 @@ export function DownloadView(props: {
           videoFormat: s.videoFormat,
           audioFormat: s.audioFormat,
           quality: s.quality,
-          editorReady: s.editorReady,
+          editorReady: s.editorReady && !isMobile,
           start: isPartial ? activeRange!.start : null,
           end: isPartial ? activeRange!.end : null,
-          stems: stems === "off" ? null : stems,
+          stems: stems === "off" || isMobile ? null : stems,
         },
         info?.title ?? clean,
       );
@@ -227,14 +228,14 @@ export function DownloadView(props: {
             />
             {qualityHint && <div className="faint" style={{ marginTop: 6 }}>{qualityHint}</div>}
           </div>
-          <div>
+          {!isMobile && <div>
             <Toggle
               checked={s.editorReady}
               onChange={(editorReady) => update({ editorReady })}
               title={t.editorReady}
               hint={t.editorReadyHint}
             />
-          </div>
+          </div>}
           </div>
           </div>
         </div>
@@ -256,7 +257,7 @@ export function DownloadView(props: {
         </div>
       )}
 
-      <div className="stems-row">
+      {!isMobile && <div className="stems-row">
         <span className="field-label">{t.stemsLabel}</span>
         <Segmented<"off" | "voice" | "music">
           label={t.stemsLabel}
@@ -273,7 +274,7 @@ export function DownloadView(props: {
             <div className="faint" style={{ marginTop: 6 }}>{t.stemsHint}</div>
           </div>
         </div>
-      </div>
+      </div>}
 
       {startError && <ErrorBox error={startError} />}
 
@@ -281,8 +282,8 @@ export function DownloadView(props: {
         <div className="save-to">
           <Icon name="folder" size={16} />
           <span>{t.saveTo}</span>
-          <span className="path ltr" title={props.outputDir}>{props.outputDir}</span>
-          <button className="btn btn-sm btn-ghost" onClick={props.onChooseDir}>{t.change}</button>
+          <span className="path ltr" title={props.outputDir}>{isMobile ? MOBILE_SAVE_DIR : props.outputDir}</span>
+          {!isMobile && <button className="btn btn-sm btn-ghost" onClick={props.onChooseDir}>{t.change}</button>}
         </div>
         <button className="btn btn-primary btn-lg" disabled={!isHttpUrl(url) || starting} onClick={start}>
           <Icon name="download" /> {t.download}

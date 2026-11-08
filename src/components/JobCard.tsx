@@ -56,7 +56,7 @@ function statusText(t: Dict, j: Job): string {
 export function JobCard(props: {
   job: Job;
   onCancel: () => void;
-  onReveal: () => void;
+  onReveal?: () => void;
   onRetry: () => void;
   onRemove: () => void;
   onConvert?: () => void;
@@ -143,7 +143,7 @@ export function JobCard(props: {
             <Icon name="convert" size={16} /> {t.sendToConvert}
           </button>
         )}
-        {j.state === "done" && j.file && (
+        {j.state === "done" && j.file && props.onReveal && (
           <button className="btn btn-sm" onClick={props.onReveal}>
             <Icon name="folder" size={16} /> {t.showInFolder}
           </button>

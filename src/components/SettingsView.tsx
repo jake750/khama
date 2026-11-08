@@ -6,6 +6,7 @@ import { useI18n } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
 import { Icon } from "./Icon";
 import { Segmented } from "./Segmented";
+import { isMobile, MOBILE_SAVE_DIR } from "../platform";
 
 // المتصفحات التي يستطيع yt-dlp قراءة الكوكيز منها، حسب النظام
 const isMac = navigator.userAgent.includes("Mac");
@@ -57,18 +58,18 @@ export function SettingsView(props: {
           <div className="setting-row">
             <div style={{ minWidth: 0 }}>
               <div>{t.saveFolder}</div>
-              <div className="faint ltr" style={{ wordBreak: "break-all" }}>{props.outputDir}</div>
+              <div className="faint ltr" style={{ wordBreak: "break-all" }}>{isMobile ? MOBILE_SAVE_DIR : props.outputDir}</div>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            {!isMobile && <div style={{ display: "flex", gap: 8 }}>
               <button className="btn" onClick={props.onOpenDir}><Icon name="folder" size={16} /> {t.open}</button>
               <button className="btn" onClick={props.onChooseDir}>{t.choose}</button>
-            </div>
+            </div>}
           </div>
         </div>
       </div>
 
       <CookiesSection settings={s} update={update} toast={props.toast} />
-      <WatchSection settings={props.settings} update={props.update} />
+      {!isMobile && <WatchSection settings={props.settings} update={props.update} />}
       <ToolsSection toast={props.toast} />
 
       {/* ---------- حول ---------- */}
@@ -113,7 +114,8 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
 
   const modes: { value: CookiesMode; title: string; hint: string }[] = [
     { value: "none", title: t.cookiesNone, hint: t.cookiesNoneHint },
-    { value: "browser", title: t.cookiesBrowser, hint: t.cookiesBrowserHint },
+    // لا يمكن قراءة كوكيز متصفحات الهاتف من تطبيق آخر
+    ...(isMobile ? [] : [{ value: "browser" as CookiesMode, title: t.cookiesBrowser, hint: t.cookiesBrowserHint }]),
     { value: "file", title: t.cookiesFile, hint: t.cookiesFileHint },
   ];
 
@@ -231,7 +233,7 @@ function ToolsSection(props: { toast: (m: string) => void }) {
   const tools: [string, string | null | undefined][] = [
     ["yt-dlp", info?.ytdlp],
     ["FFmpeg", info?.ffmpeg],
-    ["Deno", info?.deno],
+    [isMobile ? "QuickJS" : "Deno", info?.deno],
   ];
 
   return (

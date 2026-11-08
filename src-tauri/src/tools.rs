@@ -22,23 +22,32 @@ use crate::errors::AppError;
 pub const EXE: &str = if cfg!(windows) { ".exe" } else { "" };
 
 pub struct Tools {
+    /// البرنامج الذي نشغّله لـ yt-dlp (على الهاتف: Python، و yt-dlp أول وسيط له)
     pub ytdlp: PathBuf,
-    pub deno: PathBuf,
+    /// وسائط تسبق وسائط yt-dlp (فارغة على الكمبيوتر)
+    pub ytdlp_prefix: Vec<String>,
+    /// متغيرات بيئة إضافية لكل الأدوات (مكتبات Python/FFmpeg على الهاتف)
+    pub env: Vec<(String, String)>,
+    /// محرّك JavaScript ليوتيوب: "deno:<path>" على الكمبيوتر، "quickjs:<path>" على الهاتف
+    pub js_runtime: String,
     pub ffmpeg: PathBuf,
     pub ffprobe: PathBuf,
-    /// المجلد الذي فيه ffmpeg (يُمرَّر لـ yt-dlp عبر --ffmpeg-location)
+    /// يُمرَّر لـ yt-dlp عبر --ffmpeg-location (مجلد على الكمبيوتر، ملف ffmpeg نفسه على الهاتف)
     pub ffmpeg_dir: PathBuf,
 }
 
+#[cfg_attr(mobile, allow(dead_code))]
 fn exe_dir() -> Result<PathBuf, AppError> {
     let exe = std::env::current_exe()?;
     Ok(exe.parent().map(Path::to_path_buf).unwrap_or_default())
 }
 
+#[cfg_attr(mobile, allow(dead_code))]
 fn bundled_ytdlp() -> Result<PathBuf, AppError> {
     Ok(exe_dir()?.join(format!("khama-yt-dlp{EXE}")))
 }
 
+#[cfg_attr(mobile, allow(dead_code))]
 fn managed_ytdlp(app: &AppHandle) -> Result<PathBuf, AppError> {
     let dir = app
         .path()
@@ -53,6 +62,21 @@ fn missing(name: &str, path: &Path) -> AppError {
     AppError::with_param("toolMissing", name, path.display().to_string())
 }
 
+#[cfg(mobile)]
+pub fn resolve(app: &AppHandle) -> Result<Tools, AppError> {
+    let p = crate::mobile::paths(app)?;
+    Ok(Tools {
+        ytdlp: PathBuf::from(&p.python),
+        ytdlp_prefix: vec![p.ytdlp.clone()],
+        env: p.env.into_iter().collect(),
+        js_runtime: format!("quickjs:{}", p.quickjs),
+        ffmpeg: PathBuf::from(&p.ffmpeg),
+        ffprobe: PathBuf::new(),
+        ffmpeg_dir: PathBuf::from(&p.ffmpeg),
+    })
+}
+
+#[cfg(desktop)]
 pub fn resolve(app: &AppHandle) -> Result<Tools, AppError> {
     let managed = managed_ytdlp(app)?;
     let ytdlp = if managed.exists() { managed } else { bundled_ytdlp()? };
@@ -63,16 +87,20 @@ pub fn resolve(app: &AppHandle) -> Result<Tools, AppError> {
         .map_err(|e| AppError::with_detail("resourceDir", e.to_string()))?
         .join("ffmpeg")
         .join("bin");
+    if !deno.exists() {
+        return Err(missing("Deno", &deno));
+    }
     let tools = Tools {
         ffmpeg: ffmpeg_dir.join(format!("ffmpeg{EXE}")),
         ffprobe: ffmpeg_dir.join(format!("ffprobe{EXE}")),
         ytdlp,
-        deno,
+        ytdlp_prefix: Vec::new(),
+        env: Vec::new(),
+        js_runtime: format!("deno:{}", deno.to_string_lossy()),
         ffmpeg_dir,
     };
     for (name, p) in [
         ("yt-dlp", &tools.ytdlp),
-        ("Deno", &tools.deno),
         ("FFmpeg", &tools.ffmpeg),
         ("FFprobe", &tools.ffprobe),
     ] {
@@ -113,8 +141,37 @@ pub fn ytdlp_base_args(tools: &Tools) -> Vec<String> {
         "--ffmpeg-location".into(),
         tools.ffmpeg_dir.to_string_lossy().into_owned(),
         "--js-runtimes".into(),
-        format!("deno:{}", tools.deno.to_string_lossy()),
+        tools.js_runtime.clone(),
     ]
+}
+
+/// أمر yt-dlp جاهز (مع Python ومتغيرات البيئة على الهاتف)
+pub fn ytdlp_command(tools: &Tools) -> Command {
+    let mut c = command(&tools.ytdlp);
+    c.args(&tools.ytdlp_prefix).envs(tools.env.iter().map(|(k, v)| (k, v)));
+    c
+}
+
+/// أمر ffmpeg جاهز
+pub fn ffmpeg_command(tools: &Tools) -> Command {
+    let mut c = command(&tools.ffmpeg);
+    c.envs(tools.env.iter().map(|(k, v)| (k, v)));
+    c
+}
+
+/// يشغّل yt-dlp وينتظر مخرجاته كاملة
+pub async fn run_ytdlp(tools: &Tools, args: &[&str]) -> Result<(bool, String, String), AppError> {
+    let out = ytdlp_command(tools)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .await?;
+    Ok((
+        out.status.success(),
+        String::from_utf8_lossy(&out.stdout).into_owned(),
+        String::from_utf8_lossy(&out.stderr).into_owned(),
+    ))
 }
 
 /// يشغّل أداة وينتظر مخرجاتها كاملة
@@ -132,13 +189,24 @@ pub async fn run_capture(program: &Path, args: &[&str]) -> Result<(bool, String,
     ))
 }
 
+#[cfg_attr(mobile, allow(dead_code))]
 async fn first_line(program: &Path, arg: &str) -> Option<String> {
     let (_, out, _) = run_capture(program, &[arg]).await.ok()?;
     out.lines().next().map(|l| l.trim().to_string())
 }
 
+/// على الهاتف: نفكّ الأدوات مبكرًا في الخلفية حتى يكون أول تنزيل سريعًا
+#[cfg(mobile)]
+pub async fn ensure_managed_ytdlp(app: &AppHandle) -> Result<(), AppError> {
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::mobile::paths(&app).map(|_| ()))
+        .await
+        .map_err(|e| AppError::with_detail("toolsSetup", e.to_string()))?
+}
+
 /// أول تشغيل (أو بعد تحديث التطبيق): انسخ yt-dlp المضمّن إلى مجلد البيانات
 /// إن لم يكن موجودًا هناك، أو إن كانت النسخة المضمّنة أحدث.
+#[cfg(desktop)]
 pub async fn ensure_managed_ytdlp(app: &AppHandle) -> Result<(), AppError> {
     let bundled = bundled_ytdlp()?;
     let managed = managed_ytdlp(app)?;
@@ -174,19 +242,27 @@ pub struct ToolsInfo {
     deno: Option<String>,
 }
 
+async fn version_of(mut cmd: Command, arg: &str) -> Option<String> {
+    let out = cmd.arg(arg).stdout(Stdio::piped()).stderr(Stdio::null()).output().await.ok()?;
+    String::from_utf8_lossy(&out.stdout).lines().next().map(|l| l.trim().to_string())
+}
+
 #[tauri::command]
 pub async fn tools_info(app: AppHandle) -> Result<ToolsInfo, AppError> {
     let t = resolve(&app)?;
+    let js = t.js_runtime.split_once(':').map(|(_, p)| PathBuf::from(p)).unwrap_or_default();
+    let js_cmd = command(&js);
     let (ytdlp, ffmpeg, deno) = tokio::join!(
-        first_line(&t.ytdlp, "--version"),
-        first_line(&t.ffmpeg, "-version"),
-        first_line(&t.deno, "--version"),
+        version_of(ytdlp_command(&t), "--version"),
+        version_of(ffmpeg_command(&t), "-version"),
+        version_of(js_cmd, "--version"),
     );
     Ok(ToolsInfo {
         ytdlp,
         // "ffmpeg version N-12345-gabc Copyright..." ← نأخذ رقم الإصدار فقط
         ffmpeg: ffmpeg.and_then(|l| l.split_whitespace().nth(2).map(str::to_string)),
-        deno: deno.and_then(|l| l.split_whitespace().nth(1).map(str::to_string)),
+        // "deno 2.x.y" أو "QuickJS version 2025-04-26": نأخذ أول كلمة تبدأ برقم
+        deno: deno.and_then(|l| l.split_whitespace().find(|w| w.starts_with(|c: char| c.is_ascii_digit())).map(str::to_string)),
     })
 }
 
@@ -197,7 +273,18 @@ pub struct UpdateResult {
     updated: bool,
 }
 
+/// تحديث yt-dlp على الهاتف: عبر مكتبة youtubedl-android
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn update_ytdlp(app: AppHandle) -> Result<UpdateResult, AppError> {
+    let r = tauri::async_runtime::spawn_blocking(move || crate::mobile::update_ytdlp(&app))
+        .await
+        .map_err(|e| AppError::with_detail("updateFailed", e.to_string()))??;
+    Ok(UpdateResult { updated: r.updated, version: r.version })
+}
+
 /// تحديث yt-dlp: يتصل بـ GitHub فقط عندما يضغط المستخدم الزر
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn update_ytdlp(app: AppHandle) -> Result<UpdateResult, AppError> {
     ensure_managed_ytdlp(&app).await?;

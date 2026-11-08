@@ -15,6 +15,18 @@ processes and does not link to them, so each keeps its own license.
 | **Tauri** | MIT / Apache-2.0 | https://github.com/tauri-apps/tauri |
 | **React** | MIT | https://github.com/facebook/react |
 
+### Android app only
+
+The Android app links the youtubedl-android library, which is GPL-3.0. **The Android
+APK as a whole is therefore distributed under GPL-3.0**; the desktop apps stay MIT.
+
+| Component | License | Source |
+|---|---|---|
+| **youtubedl-android** 0.18 (library + ffmpeg module) | GPL-3.0 | https://github.com/JunkFood02/youtubedl-android |
+| **Python** (bundled by youtubedl-android) | PSF License | https://www.python.org |
+| **FFmpeg** for Android (bundled by youtubedl-android) | GPL | https://ffmpeg.org |
+| **QuickJS** JavaScript engine (bundled by youtubedl-android) | MIT | https://bellard.org/quickjs/ |
+
 ## GPL source availability
 
 The bundled yt-dlp and FFmpeg binaries are unmodified upstream builds. Their

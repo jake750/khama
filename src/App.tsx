@@ -10,6 +10,7 @@ import { SettingsView } from "./components/SettingsView";
 import { formatTimecode } from "./format";
 import { dictionaries, I18n, type Dict } from "./i18n";
 import { AnimatedList, reducedMotion, usePresence, useSlidingIndicator } from "./motion";
+import { isMobile } from "./platform";
 import { presetById } from "./presets";
 
 type Tab = "download" | "convert" | "settings";
@@ -165,6 +166,7 @@ export default function App() {
 
   // السحب والإفلات من خارج التطبيق (Tauri يعطينا المسارات الحقيقية)
   useEffect(() => {
+    if (isMobile) return;
     const un = getCurrentWebview().onDragDropEvent((e) => {
       const p = e.payload;
       if (p.type === "enter" || p.type === "over") setDragging(true);
@@ -228,7 +230,7 @@ export default function App() {
 
   const tabs: { id: Tab; icon: "download" | "convert" | "settings"; label: string }[] = [
     { id: "download", icon: "download", label: t.tabDownload },
-    { id: "convert", icon: "convert", label: t.tabConvert },
+    ...(isMobile ? [] : [{ id: "convert" as Tab, icon: "convert" as const, label: t.tabConvert }]),
     { id: "settings", icon: "settings", label: t.tabSettings },
   ];
 
@@ -316,10 +318,10 @@ export default function App() {
                         key={j.id}
                         job={j}
                         onCancel={() => api.cancelDownload(j.id)}
-                        onReveal={() => j.file && api.revealFile(j.file)}
+                        onReveal={isMobile ? undefined : () => j.file && api.revealFile(j.file)}
                         onRetry={() => retry(j)}
                         onRemove={() => setJobs((p) => p.filter((x) => x.id !== j.id))}
-                        onConvert={j.type === "download" && j.file ? () => addFiles([j.file!]) : undefined}
+                        onConvert={!isMobile && j.type === "download" && j.file ? () => addFiles([j.file!]) : undefined}
                         onSplit={j.markers?.length ? () => split(j) : undefined}
                         onCopyMarkers={j.markers?.length ? () => copyMarkers(j) : undefined}
                       />

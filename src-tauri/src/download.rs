@@ -31,7 +31,6 @@ use tokio::{
 
 use crate::{
     errors::{AppError, friendly_ytdlp_error, tail},
-    separate,
     settings::{self, Settings, SettingsState},
     tools::{self, Tools},
 };
@@ -529,6 +528,10 @@ async fn run_job(
     cancel: &mut watch::Receiver<bool>,
 ) -> Result<Option<PathBuf>, AppError> {
     let tools = tools::resolve(app)?;
+    // على الهاتف: ننهي الملف داخل التطبيق ثم ننقله إلى Download/Khama العام
+    #[cfg(mobile)]
+    let final_dir = jobs_root(app)?.join("ready");
+    #[cfg(desktop)]
     let final_dir = settings::resolve_output_dir(app, &settings)?;
     std::fs::create_dir_all(&final_dir).map_err(|e| {
         AppError::with_detail("outputDirCreate", e.to_string())
@@ -537,7 +540,7 @@ async fn run_job(
     let work = job_dir.join("work");
 
     // 1) التنزيل
-    let mut cmd = tools::command(&tools.ytdlp);
+    let mut cmd = tools::ytdlp_command(&tools);
     cmd.args(download_args(&tools, cookie_args(app, &settings), &req, &out, &work));
 
     let mut file: Option<PathBuf> = None;
@@ -579,7 +582,8 @@ async fn run_job(
         None => return Err(AppError::new("noOutputFile")),
     };
 
-    // 2) جاهز للمونتاج؟
+    // 2) جاهز للمونتاج؟ (الكمبيوتر فقط: نسخة الهاتف لا تحمل ffprobe)
+    #[cfg(desktop)]
     if req.kind == "video" && req.editor_ready {
         emit(app, JobUpdate { id, state: "processing", ..Default::default() });
         let check = check_media(&tools, &file).await?;
@@ -592,8 +596,10 @@ async fn run_job(
         }
     }
 
-    // 3) إزالة الموسيقى (أو الصوت البشري)؟
-    if let Some(keep) = req.stems.as_deref().and_then(separate::Keep::parse) {
+    // 3) إزالة الموسيقى (أو الصوت البشري)؟ (الكمبيوتر فقط)
+    #[cfg(desktop)]
+    if let Some(keep) = req.stems.as_deref().and_then(crate::separate::Keep::parse) {
+        use crate::separate;
         let duration = check_media(&tools, &file).await.ok().and_then(|c| c.duration);
         let sep_dir = job_dir.join("sep");
         std::fs::create_dir_all(&sep_dir)?;
@@ -608,7 +614,17 @@ async fn run_job(
     }
 
     // 4) النقل إلى مجلد المستخدم
-    Ok(Some(move_into(&file, &final_dir).await?))
+    let done = move_into(&file, &final_dir).await?;
+    #[cfg(mobile)]
+    {
+        let app = app.clone();
+        let published = tauri::async_runtime::spawn_blocking(move || crate::mobile::publish(&app, &done))
+            .await
+            .map_err(|e| AppError::with_detail("saveFailed", e.to_string()))??;
+        return Ok(Some(PathBuf::from(published.path)));
+    }
+    #[cfg(desktop)]
+    Ok(Some(done))
 }
 
 // ======================= أوامر تستدعيها الواجهة =======================
@@ -688,7 +704,7 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
     args.extend(["-J".to_string(), "--".to_string(), url]);
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
 
-    let run = tools::run_capture(&tools.ytdlp, &args);
+    let run = tools::run_ytdlp(&tools, &args);
     let (ok, out, err) = tokio::time::timeout(Duration::from_secs(90), run)
         .await
         .map_err(|_| AppError::new("timeout"))??;
