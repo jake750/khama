@@ -79,6 +79,40 @@ button:disabled {
   opacity: 0.5;
 }
 
+/* شريط التمرير: مقبض نحيف مستدير باللون الأساسي، بلا أسهم ولا مسار ظاهر */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  min-height: 40px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--accent);
+  border-width: 2px;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--accent);
+}
+
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -906,16 +940,24 @@ details.tech pre {
   }
 }
 
-/* عند تبديل التبويب: البطاقات تصعد بتتابع خفيف (كل واحدة تبدأ قبل انتهاء سابقتها) */
-.view > .card,
-.view > .alert,
-.view > .jobs-header {
-  animation: rise-in 0.45s var(--ease-out) backwards;
+/* تبديل باتجاه (تبويبات، فيديو/صوت، مجموعات الصيغ): المغادر يُرفع فوق القادم حتى يختفي */
+.slide-switch {
+  position: relative;
 }
-.view > :nth-child(2) { animation-delay: 0.05s; }
-.view > :nth-child(3) { animation-delay: 0.1s; }
-.view > :nth-child(4) { animation-delay: 0.15s; }
-.view > :nth-child(n + 5) { animation-delay: 0.2s; }
+
+.slide-pane[data-out] {
+  position: absolute;
+  inset: 0 0 auto 0;
+  pointer-events: none;
+}
+
+.slide-pane {
+  will-change: transform, opacity;
+}
+
+.main {
+  overflow-x: hidden;
+}
 
 .job {
   animation: rise-in 0.4s var(--ease-out) backwards;
@@ -1021,15 +1063,13 @@ details.tech pre {
   min-height: 0;
 }
 
-/* من يفضّل تقليل الحركة في إعدادات نظامه: نلغيها */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-delay: 0s !important;
-    transition-duration: 0.01ms !important;
-  }
+/* إيقاف الحركة (data-motion="reduce" على الجذر) */
+:root[data-motion="reduce"] *,
+:root[data-motion="reduce"] *::before,
+:root[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0s !important;
+  transition-duration: 0.01ms !important;
 }
 
 .trim-box {
@@ -1516,17 +1556,18 @@ img.file-thumb {
     box-shadow 0.45s var(--ease-io) !important;
 }
 
-/* تبديل فيديو/صوت: خيارات الصيغة تتبدّل بصعود خفيف، وصف الجودة ينطوي بدل أن يختفي فجأة */
-.swap-in {
-  animation: swap-in 0.42s var(--ease-out) backwards;
+/* صف الجودة: ينطوي وينزلق مع «فيديو» (يمين/يسار حسب مكان الزر) بدل أن يختفي فجأة */
+.collapse.slide-x > div > * {
+  transition:
+    transform 0.45s var(--ease-out),
+    opacity 0.3s var(--ease-out);
 }
 
-@keyframes swap-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-    filter: blur(2px);
-  }
+.collapse.slide-x:not([data-open="true"]) > div > * {
+  transform: translateX(calc(-40px * var(--dir)));
+  opacity: 0;
+  transition-timing-function: cubic-bezier(0.3, 0.1, 0.6, 1);
+  transition-duration: 0.3s;
 }
 
 .options > .collapse {

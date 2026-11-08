@@ -16,7 +16,9 @@ export const EASE_OUT = "cubic-bezier(0.16, 1, 0.3, 1)";
 export const EASE_IN = "cubic-bezier(0.7, 0, 0.84, 0)";
 export const EASE_IO = "cubic-bezier(0.65, 0, 0.35, 1)";
 
-export const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+// الحركة جزء من تصميم التطبيق، فلا نتبع إعداد «تأثيرات الحركة» في ويندوز (كثيرون يطفئونه لتسريع النظام).
+// من يريد إيقافها يضع data-motion="reduce" على الجذر.
+export const reducedMotion = () => document.documentElement.dataset.motion === "reduce";
 
 /**
  * مؤشّر منزلق تحت العنصر المختار (تبويبات، أزرار مجزّأة).
@@ -265,4 +267,113 @@ export function smoothThemeSwitch(apply: () => void) {
   root.classList.add("theme-anim");
   apply();
   window.setTimeout(() => root.classList.remove("theme-anim"), 450);
+}
+
+/**
+ * تبديل محتوى باتجاه: عند الانتقال إلى خيار على اليمين ينزلق المحتوى الحالي إلى اليسار ويختفي،
+ * ويدخل الجديد من اليمين (والعكس). الاتجاه بصري، فيُعكس في الواجهة العربية.
+ * المغادر يبقى نفس النسخة (لا يُعاد بناؤه) ويُرفع فوق الجديد حتى تنتهي حركته، والحاوي يغيّر ارتفاعه بانسياب.
+ */
+export function SlideSwitch(props: { id: string; index: number; children: ReactNode; className?: string; distance?: number }) {
+  const [cur, setCur] = useState({ id: props.id, index: props.index, dir: 0 });
+  const [leaving, setLeaving] = useState<{ id: string; el: ReactNode; dir: number }[]>([]);
+  const last = useRef<ReactNode>(props.children);
+  const ready = useRef(false);
+  const box = useRef<HTMLDivElement>(null);
+  const lastH = useRef(0);
+
+  if (cur.id !== props.id) {
+    const rtl = document.documentElement.dir === "rtl" ? -1 : 1;
+    const dir = Math.sign(props.index - cur.index) * rtl || 1;
+    const prev = { id: cur.id, el: last.current, dir };
+    setLeaving((l) => [...l.filter((x) => x.id !== props.id && x.id !== prev.id), prev]);
+    setCur({ id: props.id, index: props.index, dir });
+  }
+
+  useLayoutEffect(() => {
+    last.current = props.children;
+  });
+
+  // عند التبديل فقط (لا عند كل رسم): نعرف الارتفاع القديم من المراقب
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    // الارتفاع ينتقل من القديم إلى الجديد بدل أن يقفز ما تحته
+    const h = el.offsetHeight;
+    if (ready.current && lastH.current && h !== lastH.current && !reducedMotion()) {
+      el.animate([{ height: `${lastH.current}px` }, { height: `${h}px` }], { duration: 460, easing: EASE_OUT });
+    }
+    lastH.current = h;
+  }, [cur.id]);
+
+  useEffect(() => {
+    ready.current = true;
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => (lastH.current = el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const D = props.distance ?? 48;
+  return (
+    <div className={`slide-switch ${props.className ?? ""}`} ref={box}>
+      {leaving.map((l) => (
+        <SlidePane key={l.id} out dir={l.dir} distance={D} animate onGone={() => setLeaving((x) => x.filter((y) => y.id !== l.id))}>
+          {l.el}
+        </SlidePane>
+      ))}
+      <SlidePane key={cur.id} out={false} dir={cur.dir} distance={D} animate={ready.current} onGone={() => {}}>
+        {props.children}
+      </SlidePane>
+    </div>
+  );
+}
+
+function SlidePane(props: { out: boolean; dir: number; distance: number; animate: boolean; children: ReactNode; onGone: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const onGone = useRef(props.onGone);
+  onGone.current = props.onGone;
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !props.animate) return;
+    if (reducedMotion()) {
+      if (props.out) onGone.current();
+      return;
+    }
+    // نبدأ من الموضع المرئي الآن، فلو رجع المستخدم في منتصف الحركة لا يقفز شيء
+    const cs = getComputedStyle(el);
+    const fromX = new DOMMatrix(cs.transform).e;
+    const fromO = parseFloat(cs.opacity);
+    el.getAnimations().forEach((a) => a.cancel());
+    const d = props.distance * props.dir;
+    if (props.out) {
+      // يغادر بسرعة نحو الجهة المعاكسة ويبهت قبل أن يصل، فلا يتزاحم مع القادم
+      const a = el.animate(
+        [
+          { transform: `translateX(${fromX}px)`, opacity: fromO },
+          { transform: `translateX(${-d}px)`, opacity: 0 },
+        ],
+        { duration: 280, easing: "cubic-bezier(0.3, 0.1, 0.6, 1)", fill: "forwards" },
+      );
+      a.onfinish = () => onGone.current();
+    } else {
+      const start = fromO < 1 ? fromX : d;
+      el.animate(
+        [
+          { transform: `translateX(${start}px)`, opacity: fromO < 1 ? fromO : 0 },
+          { transform: "none", opacity: 1 },
+        ],
+        { duration: 520, delay: fromO < 1 ? 0 : 110, easing: EASE_OUT, fill: "backwards" },
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.out]);
+
+  return (
+    <div className="slide-pane" ref={ref} data-out={props.out || undefined} inert={props.out || undefined} aria-hidden={props.out || undefined}>
+      {props.children}
+    </div>
+  );
 }

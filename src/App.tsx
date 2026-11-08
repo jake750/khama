@@ -9,7 +9,7 @@ import { isActive, JobCard, type Job } from "./components/JobCard";
 import { SettingsView } from "./components/SettingsView";
 import { formatTimecode } from "./format";
 import { dictionaries, I18n, type Dict } from "./i18n";
-import { AnimatedList, reducedMotion, usePresence, useSlidingIndicator } from "./motion";
+import { AnimatedList, reducedMotion, SlideSwitch, usePresence, useSlidingIndicator } from "./motion";
 import { isMobile } from "./platform";
 import { presetById } from "./presets";
 
@@ -239,7 +239,7 @@ export default function App() {
       <div className="app">
         <header className="topbar">
           <div className="brand">
-            <img className="brand-mark" src="/logo.svg" alt="" />
+            <img className="brand-mark" src="/logo.png" alt="" />
             {t.appName}
           </div>
           <nav className="tabs" ref={tabsRef}>
@@ -274,7 +274,8 @@ export default function App() {
               </div>
             )}
 
-            <div className="view" key={tab}>
+            <SlideSwitch id={tab} index={tabs.findIndex((x) => x.id === tab)}>
+            <div className="view">
               {tab === "download" && (
                 <DownloadView settings={settings} update={update} outputDir={outputDir} onChooseDir={chooseDir} onStart={startDownload} />
               )}
@@ -330,6 +331,7 @@ export default function App() {
                 </>
               )}
             </div>
+            </SlideSwitch>
           </div>
         </main>
 
