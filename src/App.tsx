@@ -7,6 +7,7 @@ import { DownloadView } from "./components/DownloadView";
 import { Icon } from "./components/Icon";
 import { isActive, JobCard, type Job } from "./components/JobCard";
 import { SettingsView } from "./components/SettingsView";
+import { UpdateDialog } from "./components/UpdateDialog";
 import { formatTimecode } from "./format";
 import { dictionaries, I18n, type Dict } from "./i18n";
 import { AnimatedList, reducedMotion, usePresence, useSlidingIndicator } from "./motion";
@@ -347,6 +348,9 @@ export default function App() {
             {toastShown}
           </div>
         )}
+
+        {/* تحديثات خامة: للكمبيوتر فقط (أندرويد يتحدّث بملف APK جديد) */}
+        {!isMobile && <UpdateDialog />}
       </div>
     </I18n.Provider>
   );

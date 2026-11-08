@@ -48,5 +48,12 @@
         "displayLanguageSelector": false
       }
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": ["https://github.com/jake750/khama/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
   }
 }

@@ -1566,3 +1566,85 @@ img.file-thumb {
     justify-content: center;
   }
 }
+
+/* ============ نافذة تحديث خامة ============ */
+.update-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 0.45);
+  backdrop-filter: blur(6px);
+}
+
+.update-card {
+  display: grid;
+  gap: 16px;
+  width: min(440px, 100%);
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow), 0 24px 60px rgb(0 0 0 / 0.3);
+}
+
+.update-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.update-head h2 {
+  margin: 0 0 2px;
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.update-head p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.update-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.update-notes {
+  max-height: 140px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 13px;
+  user-select: text;
+}
+
+.update-notes p {
+  margin: 4px 0 0;
+  color: var(--text-dim);
+  white-space: pre-line;
+}
+
+.update-progress .progress {
+  margin-top: 6px;
+}
+
+.update-card .alert {
+  margin: 0;
+}
+
+/* الزر الأساسي في آخر السطر: يمينًا بالإنجليزية ويسارًا بالعربية */
+.update-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

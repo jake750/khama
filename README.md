@@ -28,7 +28,7 @@ Paste a link, pick a format, and get a file that drops straight into Premiere, D
 - **Download only a part**: pick a start and end, and only that section is downloaded (frame-accurate).
 - **Remove music or voice with AI**: keep only the dialogue (or only the music) of a download or any local file. The model (~140 MB) is downloaded once, on first use, and runs fully offline.
 - **Update yt-dlp in one click**. Sites change often, and this is the usual fix when downloads start failing.
-- **Private by design**: no analytics, no telemetry. Khama only contacts the sites you download from, plus GitHub when you press "Update yt-dlp".
+- **Private by design**: no analytics, no telemetry. Khama only contacts the sites you download from, plus GitHub to check for Khama updates at launch and when you press "Update yt-dlp".
 
 ### Converter
 
@@ -140,7 +140,7 @@ MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-l
 - **تحميل جزء فقط**: حدّد البداية والنهاية، ويُحمَّل هذا الجزء وحده بدقة الإطار.
 - **إزالة الموسيقى أو الصوت البشري بالذكاء الاصطناعي**: أبقِ الحوار وحده (أو الموسيقى وحدها) لأي تنزيل أو ملف على جهازك. النموذج (حوالي 140MB) يُنزَّل مرة واحدة عند أول استخدام، ويعمل بلا إنترنت بعدها.
 - **تحديث yt-dlp بنقرة واحدة**: المواقع تتغيّر كثيرًا، وهذا غالبًا هو الحل حين يبدأ التنزيل بالفشل.
-- **الخصوصية**: لا تحليلات ولا تتبّع. تتصل خامة فقط بالمواقع التي تنزّل منها، وبـ GitHub حين تضغط «تحديث yt-dlp».
+- **الخصوصية**: لا تحليلات ولا تتبّع. تتصل خامة فقط بالمواقع التي تنزّل منها، وبـ GitHub للبحث عن تحديثات خامة عند فتحها، وحين تضغط «تحديث yt-dlp».
 
 ### المحوّل
 

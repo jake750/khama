@@ -25,7 +25,10 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(download::Jobs::default());
     #[cfg(desktop)]
-    let builder = builder.manage(convert::ConvertQueue::default());
+    let builder = builder
+        .manage(convert::ConvertQueue::default())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
     #[cfg(mobile)]
     let builder = builder.plugin(mobile::init());
 
