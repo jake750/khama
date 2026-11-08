@@ -349,8 +349,8 @@ export default function App() {
           </div>
         )}
 
-        {/* تحديثات خامة: للكمبيوتر فقط (أندرويد يتحدّث بملف APK جديد) */}
-        {!isMobile && <UpdateDialog />}
+        {/* تحديثات خامة: الكمبيوتر يثبّتها بنفسه، والهاتف يفتح رابط ملف APK الجديد */}
+        <UpdateDialog />
       </div>
     </I18n.Provider>
   );

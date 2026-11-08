@@ -129,6 +129,7 @@ const en = {
   appUpdateInstalling: "Installing — Khama will restart by itself.",
   appUpdateFailed: "The update couldn't be installed. You can download it from the releases page instead.",
   appUpdateOpenPage: "Open download page",
+  appUpdateApkHint: "Tap Update to download the new APK, then open it to install.",
 
   // ---- المحوّل ----
   tabConvert: "Convert",
@@ -410,6 +411,7 @@ const ar: Dict = {
   appUpdateInstalling: "جارٍ التثبيت، وستُفتح خامة من جديد تلقائيًا.",
   appUpdateFailed: "تعذّر تثبيت التحديث. يمكنك تنزيله من صفحة الإصدارات بدلًا من ذلك.",
   appUpdateOpenPage: "فتح صفحة التنزيل",
+  appUpdateApkHint: "اضغط «تحديث» لتنزيل ملف APK الجديد، ثم افتحه لتثبيته.",
 
   // ---- المحوّل ----
   tabConvert: "التحويل",
