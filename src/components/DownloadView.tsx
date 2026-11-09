@@ -42,7 +42,9 @@ export function DownloadView(props: {
   const [startError, setStartError] = useState<AppError | null>(null);
   const probeToken = useRef(0);
   const [trimOn, setTrimOn] = useState(false);
-  const [range, setRange] = useState<Range | null>(null);
+  // المقاطع المختارة (null = مقطع واحد يغطي الفيديو كله، قبل أن يحرّك المستخدم شيئًا)
+  const [clips, setClips] = useState<Range[] | null>(null);
+  const [joinClips, setJoinClips] = useState(true);
   const [stems, setStems] = useState<"off" | "voice" | "music">("off");
 
   // عند تغيّر الرابط: ننتظر نصف ثانية (حتى ينتهي اللصق/الكتابة) ثم نجلب معلوماته.
@@ -50,7 +52,7 @@ export function DownloadView(props: {
   useEffect(() => {
     const clean = url.trim();
     setStartError(null);
-    setRange(null);
+    setClips(null);
     if (!isHttpUrl(clean)) {
       probeToken.current++;
       setProbe({ status: "idle" });
@@ -72,8 +74,23 @@ export function DownloadView(props: {
   const info = probe.status === "ok" ? probe.info : null;
   const maxHeight = info?.heights[0];
   const duration = info && !info.isLive && info.duration ? info.duration : null;
-  const activeRange = trimOn && duration ? (range ?? { start: 0, end: duration }) : null;
-  const isPartial = !!activeRange && !!duration && (activeRange.start > 0 || activeRange.end < duration - 0.05);
+  const activeClips = trimOn && duration ? (clips ?? [{ start: 0, end: duration }]) : null;
+  const multi = !!activeClips && activeClips.length > 1;
+  const single = activeClips?.length === 1 ? activeClips[0] : null;
+  const isPartial = !!single && !!duration && (single.start > 0 || single.end < duration - 0.05);
+  // الدمج يحتاج ffmpeg على الكمبيوتر؛ على الهاتف تُحفظ المقاطع ملفات منفصلة
+  const willJoin = multi && joinClips && !isMobile;
+
+  const setClip = (i: number, r: Range) => setClips((activeClips ?? []).map((c, j) => (j === i ? r : c)));
+  const removeClip = (i: number) => setClips((activeClips ?? []).filter((_, j) => j !== i));
+  function addClip() {
+    if (!duration || !activeClips) return;
+    // المقطع الجديد يبدأ بعد آخر مقطع (أو من البداية إن لم يبقَ وقت)، بطول 10% من الفيديو
+    const len = Math.max(Math.min(duration / 10, 60), Math.min(1, duration));
+    const lastEnd = Math.max(...activeClips.map((c) => c.end));
+    const start = lastEnd + len <= duration ? lastEnd : 0;
+    setClips([...activeClips, { start, end: Math.min(start + len, duration) }]);
+  }
 
   async function paste() {
     try {
@@ -98,9 +115,11 @@ export function DownloadView(props: {
           audioFormat: s.audioFormat,
           quality: s.quality,
           editorReady: s.editorReady && !isMobile,
-          start: isPartial ? activeRange!.start : null,
-          end: isPartial ? activeRange!.end : null,
+          start: isPartial ? single!.start : null,
+          end: isPartial ? single!.end : null,
           stems: stems === "off" || isMobile ? null : stems,
+          clips: multi ? activeClips!.map((c) => [c.start, c.end] as [number, number]) : [],
+          joinClips: willJoin,
         },
         info?.title ?? clean,
       );
@@ -250,9 +269,47 @@ export function DownloadView(props: {
             title={t.trimToggle}
             hint={info.isLive ? t.trimLive : t.trimHint}
           />
-          <div className="collapse" data-open={!!activeRange}>
+          <div className="collapse" data-open={!!activeClips}>
             <div>
-              {duration && <TrimRange duration={duration} value={activeRange ?? { start: 0, end: duration }} onChange={setRange} />}
+              {duration && (activeClips ?? [{ start: 0, end: duration }]).map((c, i) => (
+                <div className="clip" key={i}>
+                  {multi && (
+                    <div className="clip-head">
+                      <span className="clip-name">{t.clipN(i + 1)}</span>
+                      <button className="btn btn-sm btn-ghost" onClick={() => removeClip(i)} title={t.removeClip} aria-label={t.removeClip}>
+                        <Icon name="trash" size={16} />
+                      </button>
+                    </div>
+                  )}
+                  <TrimRange duration={duration} value={c} onChange={(r) => setClip(i, r)} />
+                </div>
+              ))}
+              {duration && (
+                <div className="clips-footer">
+                  <button className="btn btn-sm" onClick={addClip}>
+                    <Icon name="plus" size={16} /> {t.addClip}
+                  </button>
+                  {multi && !isMobile && (
+                    <div className="clips-output">
+                      <span className="field-label">{t.clipsOutput}</span>
+                      <Segmented<"join" | "separate">
+                        label={t.clipsOutput}
+                        value={joinClips ? "join" : "separate"}
+                        onChange={(v) => setJoinClips(v === "join")}
+                        options={[
+                          { value: "join", label: t.clipsJoin },
+                          { value: "separate", label: t.clipsSeparate },
+                        ]}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+              {multi && (
+                <div className="faint" style={{ marginTop: 8 }}>
+                  {willJoin ? t.clipsJoinHint(activeClips!.length) : t.clipsSeparateHint(activeClips!.length)}
+                </div>
+              )}
             </div>
           </div>
         </div>

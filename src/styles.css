@@ -1081,6 +1081,32 @@ details.tech pre {
 .trim-box .trim-track::before {
   background: var(--border);
 }
+.trim-box .clip + .clip {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.clip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.clip-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+.clips-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+.clips-output .field-label {
+  display: block;
+}
 
 /* ============ المحوّل ============ */
 .ltr-num {

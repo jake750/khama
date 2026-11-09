@@ -65,6 +65,12 @@ pub struct DownloadRequest {
     /// إزالة بالذكاء الاصطناعي بعد التنزيل: "voice" (أبقِ الصوت البشري = احذف الموسيقى) | "music"
     #[serde(default)]
     pub stems: Option<String>,
+    /// عدة مقاطع من نفس الفيديو: [[بداية، نهاية], ...] بالثواني (فارغ = استخدم start/end)
+    #[serde(default)]
+    pub clips: Vec<[f64; 2]>,
+    /// مع عدة مقاطع: true = تُدمج في فيديو واحد، false = ملف لكل مقطع
+    #[serde(default)]
+    pub join_clips: bool,
 }
 
 /// المقطع المطلوب بعد التحقق: (بداية، نهاية). None = الملف كاملًا
@@ -73,6 +79,21 @@ pub fn section(req: &DownloadRequest) -> Option<(f64, f64)> {
     let e = req.end.filter(|v| v.is_finite() && *v > s)?;
     // جزء يبدأ من الصفر بدون نهاية محددة = الملف كاملًا
     Some((s, e)).filter(|_| req.start.is_some() || req.end.is_some())
+}
+
+/// كل المقاطع المطلوبة بعد التحقق، مرتّبة حسب البداية. فارغة = الملف كاملًا
+pub fn clips(req: &DownloadRequest) -> Vec<(f64, f64)> {
+    if req.clips.is_empty() {
+        return section(req).into_iter().collect();
+    }
+    let mut v: Vec<(f64, f64)> = req
+        .clips
+        .iter()
+        .map(|[s, e]| (*s, *e))
+        .filter(|(s, e)| s.is_finite() && e.is_finite() && *s >= 0.0 && *e > *s)
+        .collect();
+    v.sort_by(|a, b| a.0.total_cmp(&b.0));
+    v
 }
 
 /// 75.5 → "1:15.500" (صيغة يفهمها yt-dlp و ffmpeg)
@@ -179,12 +200,19 @@ pub fn format_args(req: &DownloadRequest) -> Vec<String> {
     a
 }
 
-fn download_args(tools: &Tools, cookies: Vec<String>, req: &DownloadRequest, out: &Path, work: &Path) -> Vec<String> {
+fn download_args(
+    tools: &Tools,
+    cookies: Vec<String>,
+    req: &DownloadRequest,
+    section: Option<(f64, f64)>,
+    out: &Path,
+    work: &Path,
+) -> Vec<String> {
     let mut a = tools::ytdlp_base_args(tools);
     a.extend(cookies);
     a.extend(format_args(req));
     let mut template = "%(title).150B.%(ext)s".to_string();
-    if let Some((s, e)) = section(req) {
+    if let Some((s, e)) = section {
         // * = بالوقت (لا بالفصول). نجبر إطارات مفتاحية عند نقطتي القص حتى يكون القص دقيقًا بالإطار
         a.push("--download-sections".into());
         a.push(format!("*{}-{}", ts(s), ts(e)));
@@ -536,13 +564,75 @@ async fn run_job(
     std::fs::create_dir_all(&final_dir).map_err(|e| {
         AppError::with_detail("outputDirCreate", e.to_string())
     })?;
-    let out = job_dir.join("out");
-    let work = job_dir.join("work");
+    let cookies = cookie_args(app, &settings);
+    let parts = clips(&req);
+    // الدمج يحتاج ffmpeg، وهو على الكمبيوتر فقط
+    let join = req.join_clips && parts.len() > 1 && cfg!(desktop);
 
-    // 1) التنزيل
-    let mut cmd = tools::ytdlp_command(&tools);
-    cmd.args(download_args(&tools, cookie_args(app, &settings), &req, &out, &work));
+    // مقطع واحد أو الملف كاملًا: كالسابق
+    if parts.len() <= 1 {
+        let section = parts.first().copied();
+        let Some(file) = fetch(app, id, &tools, &cookies, &req, section, job_dir, (0, 1), cancel).await? else {
+            return Ok(None);
+        };
+        let Some(file) = finish(app, id, &tools, &req, file, job_dir, cancel).await? else {
+            return Ok(None);
+        };
+        return deliver(app, &file, &final_dir).await.map(Some);
+    }
 
+    let n = parts.len();
+    let mut files = Vec::with_capacity(n);
+    for (i, sec) in parts.iter().enumerate() {
+        let dir = job_dir.join(format!("clip{i}"));
+        let Some(file) = fetch(app, id, &tools, &cookies, &req, Some(*sec), &dir, (i, n), cancel).await? else {
+            return Ok(None);
+        };
+        files.push((file, dir));
+    }
+
+    if join {
+        emit(app, JobUpdate { id, state: "processing", ..Default::default() });
+        let inputs: Vec<PathBuf> = files.iter().map(|(f, _)| f.clone()).collect();
+        let Some(joined) = concat_files(&tools, &req, &inputs, &job_dir.join("joined"), cancel).await? else {
+            return Ok(None);
+        };
+        let Some(file) = finish(app, id, &tools, &req, joined, job_dir, cancel).await? else {
+            return Ok(None);
+        };
+        return deliver(app, &file, &final_dir).await.map(Some);
+    }
+
+    // ملف لكل مقطع: نعيد مسار الأول (الواجهة تفتح مجلده)
+    let mut first = None;
+    for (file, dir) in files {
+        let Some(file) = finish(app, id, &tools, &req, file, &dir, cancel).await? else {
+            return Ok(None);
+        };
+        let done = deliver(app, &file, &final_dir).await?;
+        first.get_or_insert(done);
+    }
+    Ok(first)
+}
+
+/// تنزيل مقطع واحد (أو الملف كاملًا) بـ yt-dlp إلى dir/out.
+/// part = (رقم المقطع، عدد المقاطع) لحساب نسبة التقدم الكلية.
+#[allow(clippy::too_many_arguments)]
+async fn fetch(
+    app: &AppHandle,
+    id: u64,
+    tools: &Tools,
+    cookies: &[String],
+    req: &DownloadRequest,
+    section: Option<(f64, f64)>,
+    dir: &Path,
+    part: (usize, usize),
+    cancel: &mut watch::Receiver<bool>,
+) -> Result<Option<PathBuf>, AppError> {
+    let mut cmd = tools::ytdlp_command(tools);
+    cmd.args(download_args(tools, cookies.to_vec(), req, section, &dir.join("out"), &dir.join("work")));
+
+    let (i, n) = (part.0 as f64, part.1.max(1) as f64);
     let mut file: Option<PathBuf> = None;
     let mut last = Instant::now() - Duration::from_secs(1);
     let outcome = run_streaming(cmd, cancel, |line| {
@@ -555,7 +645,7 @@ async fn run_job(
                         id,
                         state: "downloading",
                         stage: Some(p.stage),
-                        percent: p.percent,
+                        percent: p.percent.map(|v| (i * 100.0 + v) / n),
                         speed: p.speed,
                         eta: p.eta,
                         ..Default::default()
@@ -577,54 +667,133 @@ async fn run_job(
         RunOutcome::Exited { success: false, stderr } => return Err(friendly_ytdlp_error(&stderr)),
         RunOutcome::Exited { success: true, .. } => {}
     }
-    let mut file = match file.filter(|f| f.exists()) {
-        Some(f) => f,
-        None => return Err(AppError::new("noOutputFile")),
-    };
+    match file.filter(|f| f.exists()) {
+        Some(f) => Ok(Some(f)),
+        None => Err(AppError::new("noOutputFile")),
+    }
+}
 
-    // 2) جاهز للمونتاج؟ (الكمبيوتر فقط: نسخة الهاتف لا تحمل ffprobe)
+/// ما بعد التنزيل: جاهز للمونتاج، ثم إزالة الموسيقى/الصوت. dir = مجلد عمل خاص بهذا الملف.
+#[allow(unused_variables, unused_mut)]
+async fn finish(
+    app: &AppHandle,
+    id: u64,
+    tools: &Tools,
+    req: &DownloadRequest,
+    mut file: PathBuf,
+    dir: &Path,
+    cancel: &mut watch::Receiver<bool>,
+) -> Result<Option<PathBuf>, AppError> {
+    // جاهز للمونتاج؟ (الكمبيوتر فقط: نسخة الهاتف لا تحمل ffprobe)
     #[cfg(desktop)]
     if req.kind == "video" && req.editor_ready {
         emit(app, JobUpdate { id, state: "processing", ..Default::default() });
-        let check = check_media(&tools, &file).await?;
+        let check = check_media(tools, &file).await?;
         if !(check.video_ok && check.audio_ok) {
             emit(app, JobUpdate { id, state: "converting", percent: Some(0.0), ..Default::default() });
-            match convert_for_editing(app, id, &tools, &file, &job_dir.join("conv"), &check, cancel).await? {
+            match convert_for_editing(app, id, tools, &file, &dir.join("conv"), &check, cancel).await? {
                 Some(converted) => file = converted,
                 None => return Ok(None),
             }
         }
     }
 
-    // 3) إزالة الموسيقى (أو الصوت البشري)؟ (الكمبيوتر فقط)
+    // إزالة الموسيقى (أو الصوت البشري)؟ (الكمبيوتر فقط)
     #[cfg(desktop)]
     if let Some(keep) = req.stems.as_deref().and_then(crate::separate::Keep::parse) {
         use crate::separate;
-        let duration = check_media(&tools, &file).await.ok().and_then(|c| c.duration);
-        let sep_dir = job_dir.join("sep");
+        let duration = check_media(tools, &file).await.ok().and_then(|c| c.duration);
+        let sep_dir = dir.join("sep");
         std::fs::create_dir_all(&sep_dir)?;
         let stem = file.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
         let ext = file.extension().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "mp4".into());
         let tag = if keep == separate::Keep::Voice { "no music" } else { "music only" };
         let out = sep_dir.join(format!("{stem} [{tag}].{ext}"));
-        if !separate::process_file(app, id, &tools, &file, &out, keep, None, None, duration, &job_dir.join("sepwork"), cancel).await? {
+        if !separate::process_file(app, id, tools, &file, &out, keep, None, None, duration, &dir.join("sepwork"), cancel).await? {
             return Ok(None);
         }
         file = out;
     }
+    Ok(Some(file))
+}
 
-    // 4) النقل إلى مجلد المستخدم
-    let done = move_into(&file, &final_dir).await?;
+/// النقل إلى مجلد المستخدم (وعلى الهاتف: إلى Download/Khama العام)
+async fn deliver(app: &AppHandle, file: &Path, final_dir: &Path) -> Result<PathBuf, AppError> {
+    let done = move_into(file, final_dir).await?;
     #[cfg(mobile)]
     {
         let app = app.clone();
         let published = tauri::async_runtime::spawn_blocking(move || crate::mobile::publish(&app, &done))
             .await
             .map_err(|e| AppError::with_detail("saveFailed", e.to_string()))??;
-        return Ok(Some(PathBuf::from(published.path)));
+        return Ok(PathBuf::from(published.path));
     }
     #[cfg(desktop)]
-    Ok(Some(done))
+    {
+        let _ = app;
+        Ok(done)
+    }
+}
+
+/// "اسم [00m10s - 00m20s].mp4" + 3 مقاطع ← "اسم [3 clips].mp4"
+fn joined_name(first: &Path, count: usize) -> String {
+    let stem = first.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    let base = match stem.rfind(" [") {
+        Some(i) if stem.ends_with(']') => &stem[..i],
+        _ => stem.as_str(),
+    };
+    let ext = first.extension().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "mp4".into());
+    format!("{base} [{count} clips].{ext}")
+}
+
+/// سطر في قائمة concat الخاصة بـ ffmpeg (نهرب علامة ' داخل المسار)
+fn concat_line(p: &Path) -> String {
+    let s = p.to_string_lossy().replace('\\', "/").replace('\'', r"'\''");
+    format!("file '{s}'\n")
+}
+
+/// يدمج المقاطع بالترتيب في ملف واحد. أولًا بلا إعادة ترميز (سريع، والمقاطع من نفس المصدر)،
+/// وإن فشل ذلك نعيد الترميز.
+async fn concat_files(
+    tools: &Tools,
+    req: &DownloadRequest,
+    inputs: &[PathBuf],
+    dir: &Path,
+    cancel: &mut watch::Receiver<bool>,
+) -> Result<Option<PathBuf>, AppError> {
+    std::fs::create_dir_all(dir)?;
+    let list = dir.join("list.txt");
+    std::fs::write(&list, inputs.iter().map(|p| concat_line(p)).collect::<String>())?;
+    let output = dir.join(joined_name(&inputs[0], inputs.len()));
+    let is_wav = output.extension().is_some_and(|e| e == "wav");
+
+    let mut last_err = String::new();
+    for reencode in [false, true] {
+        let mut cmd = tools::command(&tools.ffmpeg);
+        cmd.args(["-hide_banner", "-nostdin", "-y", "-f", "concat", "-safe", "0", "-i"]).arg(&list);
+        if !reencode || is_wav {
+            cmd.args(["-c", "copy"]);
+        } else if req.kind == "video" {
+            cmd.args(["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "320k"]);
+        } else if output.extension().is_some_and(|e| e == "mp3") {
+            cmd.args(["-c:a", "libmp3lame", "-q:a", "0"]);
+        } else {
+            cmd.args(["-c:a", "aac", "-b:a", "320k"]);
+        }
+        if req.kind == "video" || output.extension().is_some_and(|e| e == "m4a") {
+            cmd.args(["-movflags", "+faststart"]);
+        }
+        cmd.arg(&output);
+        match run_streaming(cmd, cancel, |_| {}).await? {
+            RunOutcome::Canceled => return Ok(None),
+            RunOutcome::Exited { success: true, .. } => return Ok(Some(output)),
+            RunOutcome::Exited { stderr, .. } => last_err = tail(&stderr, 10),
+        }
+        if is_wav {
+            break;
+        }
+    }
+    Err(AppError::with_detail("joinFailed", last_err))
 }
 
 // ======================= أوامر تستدعيها الواجهة =======================
@@ -774,7 +943,29 @@ mod tests {
             start: None,
             end: None,
             stems: None,
+            clips: vec![],
+            join_clips: false,
         }
+    }
+
+    #[test]
+    fn multiple_clips() {
+        let mut r = req("video", "mp4", "1080", true);
+        assert!(clips(&r).is_empty());
+        r.start = Some(5.0);
+        r.end = Some(9.0);
+        assert_eq!(clips(&r), vec![(5.0, 9.0)]);
+        // المقاطع تتقدّم على start/end، وتُرتّب، والخاطئ منها يُهمل
+        r.clips = vec![[60.0, 70.0], [10.0, 20.0], [30.0, 25.0], [f64::NAN, 3.0]];
+        assert_eq!(clips(&r), vec![(10.0, 20.0), (60.0, 70.0)]);
+    }
+
+    #[test]
+    fn joined_names() {
+        let p = Path::new("C:/x/My Video [00m10s - 00m20s].mp4");
+        assert_eq!(joined_name(p, 3), "My Video [3 clips].mp4");
+        assert_eq!(joined_name(Path::new("/a/plain.mp3"), 2), "plain [2 clips].mp3");
+        assert_eq!(concat_line(Path::new(r"C:\a\it's.mp4")), "file 'C:/a/it'\\''s.mp4'\n");
     }
 
     #[test]

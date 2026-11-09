@@ -130,6 +130,10 @@ export interface DownloadRequest {
   end?: number | null;
   /** إزالة بالذكاء الاصطناعي: "voice" = أبقِ الصوت البشري (احذف الموسيقى) | "music" = أبقِ الموسيقى */
   stems?: "voice" | "music" | null;
+  /** عدة مقاطع [بداية، نهاية] بالثواني (تتقدّم على start/end) */
+  clips?: [number, number][];
+  /** مع عدة مقاطع: true = فيديو واحد، false = ملف لكل مقطع */
+  joinClips?: boolean;
 }
 
 export type JobState =
