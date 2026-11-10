@@ -14,7 +14,7 @@ use std::{
     path::{Path, PathBuf},
     process::Stdio,
     sync::{
-        Mutex,
+        Arc, Mutex,
         atomic::{AtomicU64, Ordering},
     },
     time::{Duration, Instant},
@@ -26,11 +26,12 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     process::{Child, Command},
-    sync::watch,
+    sync::{Semaphore, watch},
 };
 
 use crate::{
     errors::{AppError, friendly_ytdlp_error, tail},
+    playlist::{self, Entry},
     settings::{self, Settings, SettingsState},
     tools::{self, Tools},
 };
@@ -43,6 +44,21 @@ pub struct Jobs {
     pub(crate) next_id: AtomicU64,
     pub(crate) cancels: Mutex<HashMap<u64, watch::Sender<bool>>>,
 }
+
+/// عدد التنزيلات التي تعمل معًا. الباقي ينتظر دوره (مهم مع قوائم التشغيل الطويلة)
+const PARALLEL_DOWNLOADS: usize = 3;
+
+pub struct DownloadQueue(pub Arc<Semaphore>);
+
+impl Default for DownloadQueue {
+    fn default() -> Self {
+        Self(Arc::new(Semaphore::new(PARALLEL_DOWNLOADS)))
+    }
+}
+
+/// إزالة الموسيقى ثقيلة على المعالج والذاكرة: ملف واحد في كل مرة
+#[cfg(desktop)]
+static SEPARATING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,6 +87,9 @@ pub struct DownloadRequest {
     /// مع عدة مقاطع: true = تُدمج في فيديو واحد، false = ملف لكل مقطع
     #[serde(default)]
     pub join_clips: bool,
+    /// مجلد فرعي داخل مجلد الحفظ (اسم قائمة التشغيل). على الكمبيوتر فقط
+    #[serde(default)]
+    pub subdir: Option<String>,
 }
 
 /// المقطع المطلوب بعد التحقق: (بداية، نهاية). None = الملف كاملًا
@@ -211,6 +230,10 @@ fn download_args(
     let mut a = tools::ytdlp_base_args(tools);
     a.extend(cookies);
     a.extend(format_args(req));
+    // أغنية من سبوتيفاي: رابط بحث، نأخذ أول نتيجة فقط
+    if req.url.starts_with(playlist::MUSIC_SEARCH) {
+        a.extend(["--playlist-items".into(), "1".into()]);
+    }
     let mut template = "%(title).150B.%(ext)s".to_string();
     if let Some((s, e)) = section {
         // * = بالوقت (لا بالفصول). نجبر إطارات مفتاحية عند نقطتي القص حتى يكون القص دقيقًا بالإطار
@@ -560,7 +583,13 @@ async fn run_job(
     #[cfg(mobile)]
     let final_dir = jobs_root(app)?.join("ready");
     #[cfg(desktop)]
-    let final_dir = settings::resolve_output_dir(app, &settings)?;
+    let final_dir = {
+        let base = settings::resolve_output_dir(app, &settings)?;
+        match req.subdir.as_deref().and_then(playlist::folder_name) {
+            Some(sub) => base.join(sub),
+            None => base,
+        }
+    };
     std::fs::create_dir_all(&final_dir).map_err(|e| {
         AppError::with_detail("outputDirCreate", e.to_string())
     })?;
@@ -709,6 +738,11 @@ async fn finish(
         let ext = file.extension().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "mp4".into());
         let tag = if keep == separate::Keep::Voice { "no music" } else { "music only" };
         let out = sep_dir.join(format!("{stem} [{tag}].{ext}"));
+        emit(app, JobUpdate { id, state: "separating", ..Default::default() });
+        let _turn = tokio::select! {
+            g = SEPARATING.lock() => g,
+            _ = canceled(cancel) => return Ok(None),
+        };
         if !separate::process_file(app, id, tools, &file, &out, keep, None, None, duration, &dir.join("sepwork"), cancel).await? {
             return Ok(None);
         }
@@ -802,6 +836,7 @@ async fn concat_files(
 pub async fn start_download(
     app: AppHandle,
     jobs: State<'_, Jobs>,
+    queue: State<'_, DownloadQueue>,
     settings: State<'_, SettingsState>,
     request: DownloadRequest,
 ) -> Result<u64, AppError> {
@@ -811,9 +846,25 @@ pub async fn start_download(
     let id = jobs.next_id.fetch_add(1, Ordering::Relaxed) + 1;
     let (tx, mut rx) = watch::channel(false);
     jobs.cancels.lock().unwrap().insert(id, tx);
+    let slots = queue.0.clone();
 
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
+        // ننتظر دورنا إن كانت كل الخانات مشغولة (والإلغاء ممكن أثناء الانتظار)
+        let _slot = match slots.clone().try_acquire_owned() {
+            Ok(p) => p,
+            Err(_) => {
+                emit(&app2, JobUpdate { id, state: "queued", ..Default::default() });
+                tokio::select! {
+                    p = slots.acquire_owned() => p.expect("semaphore never closed"),
+                    _ = canceled(&mut rx) => {
+                        app2.state::<Jobs>().cancels.lock().unwrap().remove(&id);
+                        emit(&app2, JobUpdate { id, state: "canceled", ..Default::default() });
+                        return;
+                    }
+                }
+            }
+        };
         emit(&app2, JobUpdate { id, state: "starting", ..Default::default() });
         let job_dir = jobs_root(&app2).map(|r| r.join(id.to_string()));
         let result = match &job_dir {
@@ -860,17 +911,51 @@ pub struct ProbeInfo {
     /// الدقات المتوفرة (للفيديو)، من الأعلى للأقل
     heights: Vec<u32>,
     is_live: bool,
+    /// رابط قائمة تشغيل: عناصرها (والحقول أعلاه تصف القائمة نفسها)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    entries: Option<Vec<Entry>>,
 }
 
-/// يقرأ معلومات الرابط (العنوان، الصورة، الدقات المتاحة) دون تنزيل
+/// قائمة سبوتيفاي: نجلب صفحة المشغّل المضمَّن بـ yt-dlp ونقرأ منها أسماء الأغاني
+async fn probe_spotify(tools: &Tools, embed: String) -> Result<ProbeInfo, AppError> {
+    let mut args = tools::ytdlp_base_args(tools);
+    args.extend(["--force-generic-extractor", "--dump-pages", "--skip-download", "--"].map(String::from));
+    args.push(embed);
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    // yt-dlp ينتهي بخطأ "Unsupported URL" بعد طباعة الصفحة، وهذا متوقّع
+    let (_, out, err) = tokio::time::timeout(Duration::from_secs(60), tools::run_ytdlp(tools, &args))
+        .await
+        .map_err(|_| AppError::new("timeout"))??;
+    let Some(page) = playlist::page_from_dump(&out) else {
+        return Err(AppError::with_detail("spotifyFailed", tail(&err, 6)));
+    };
+    let list = playlist::parse_spotify_page(&page)?;
+    Ok(ProbeInfo {
+        title: list.title,
+        thumbnail: list.thumbnail,
+        duration: None,
+        uploader: list.owner,
+        site: Some("Spotify".into()),
+        heights: vec![],
+        is_live: false,
+        entries: Some(list.entries),
+    })
+}
+
+/// يقرأ معلومات الرابط (العنوان، الصورة، الدقات المتاحة) دون تنزيل.
+/// رابط قائمة تشغيل: يعيد عناصرها في entries.
 #[tauri::command]
 pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: String) -> Result<ProbeInfo, AppError> {
     let url = validate_url(&url)?;
     let s = settings.0.lock().unwrap().clone();
     let tools = tools::resolve(&app)?;
+    if let Some(embed) = playlist::spotify_embed_url(&url) {
+        return probe_spotify(&tools, embed).await;
+    }
     let mut args = tools::ytdlp_base_args(&tools);
     args.extend(cookie_args(&app, &s));
-    args.extend(["-J".to_string(), "--".to_string(), url]);
+    // --flat-playlist: عناصر القائمة دون فتح كل واحد منها (لا يؤثّر على رابط فيديو واحد)
+    args.extend(["-J".to_string(), "--flat-playlist".to_string(), "--".to_string(), url]);
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
 
     let run = tools::run_ytdlp(&tools, &args);
@@ -883,7 +968,26 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
     let j: Value = serde_json::from_str(&out)
         .map_err(|e| AppError::with_detail("probeParse", e.to_string()))?;
     if j["_type"].as_str() == Some("playlist") {
-        return Err(AppError::new("playlist"));
+        let entries = playlist::entries_from_ytdlp(&j);
+        if entries.is_empty() {
+            return Err(AppError::new("playlistEmpty"));
+        }
+        let thumbnail = j["thumbnails"]
+            .as_array()
+            .and_then(|t| t.last())
+            .and_then(|t| t["url"].as_str())
+            .map(String::from)
+            .or_else(|| entries.iter().find_map(|e| e.thumbnail.clone()));
+        return Ok(ProbeInfo {
+            title: j["title"].as_str().unwrap_or("Playlist").to_string(),
+            thumbnail,
+            duration: None,
+            uploader: j["uploader"].as_str().or(j["channel"].as_str()).map(String::from),
+            site: j["extractor_key"].as_str().map(|k| k.trim_end_matches("Tab").trim_end_matches("Set").to_string()),
+            heights: vec![],
+            is_live: false,
+            entries: Some(entries),
+        });
     }
     let mut heights: Vec<u32> = j["formats"]
         .as_array()
@@ -904,6 +1008,7 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
         site: j["extractor_key"].as_str().map(String::from),
         heights,
         is_live: j["is_live"].as_bool().unwrap_or(false),
+        entries: None,
     })
 }
 
@@ -945,6 +1050,7 @@ mod tests {
             stems: None,
             clips: vec![],
             join_clips: false,
+            subdir: None,
         }
     }
 

@@ -116,6 +116,17 @@ export interface ProbeInfo {
   site?: string | null;
   heights: number[];
   isLive: boolean;
+  /** رابط قائمة تشغيل: عناصرها (والحقول أعلاه تصف القائمة نفسها) */
+  entries?: PlaylistEntry[];
+}
+
+export interface PlaylistEntry {
+  /** رابط العنصر (لأغاني سبوتيفاي: رابط بحث في YouTube Music) */
+  url: string;
+  title: string;
+  uploader?: string | null;
+  duration?: number | null;
+  thumbnail?: string | null;
 }
 
 export interface DownloadRequest {
@@ -134,6 +145,8 @@ export interface DownloadRequest {
   clips?: [number, number][];
   /** مع عدة مقاطع: true = فيديو واحد، false = ملف لكل مقطع */
   joinClips?: boolean;
+  /** مجلد فرعي داخل مجلد الحفظ (اسم قائمة التشغيل) */
+  subdir?: string | null;
 }
 
 export type JobState =

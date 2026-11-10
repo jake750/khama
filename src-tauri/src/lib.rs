@@ -9,6 +9,7 @@ mod download;
 mod errors;
 #[cfg(mobile)]
 mod mobile;
+mod playlist;
 #[cfg(desktop)]
 mod separate;
 mod settings;
@@ -23,7 +24,8 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .manage(download::Jobs::default());
+        .manage(download::Jobs::default())
+        .manage(download::DownloadQueue::default());
     #[cfg(desktop)]
     let builder = builder
         .manage(convert::ConvertQueue::default())

@@ -6,6 +6,7 @@ import {
   type AudioFormat,
   type DownloadRequest,
   type Kind,
+  type PlaylistEntry,
   type ProbeInfo,
   type Settings,
   type VideoFormat,
@@ -18,6 +19,7 @@ import { Segmented, Toggle } from "./Segmented";
 import { SlideSwitch } from "../motion";
 import { isMobile, MOBILE_SAVE_DIR } from "../platform";
 import { TrimRange, type Range } from "./TrimRange";
+import { PlaylistPanel } from "./PlaylistPanel";
 
 const QUALITIES = ["best", "2160", "1440", "1080", "720", "480"] as const;
 
@@ -46,6 +48,10 @@ export function DownloadView(props: {
   const [clips, setClips] = useState<Range[] | null>(null);
   const [joinClips, setJoinClips] = useState(true);
   const [stems, setStems] = useState<"off" | "voice" | "music">("off");
+  // قائمة التشغيل: العناصر المحدَّدة للتنزيل، وأيّها تُزال منه الموسيقى (إن اختار "عناصر أحدّدها")
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [stemsScope, setStemsScope] = useState<"all" | "pick">("all");
+  const [picked, setPicked] = useState<Set<number>>(new Set());
 
   // عند تغيّر الرابط: ننتظر نصف ثانية (حتى ينتهي اللصق/الكتابة) ثم نجلب معلوماته.
   // probeToken يمنع ردًّا قديمًا من الكتابة فوق رد أحدث.
@@ -63,7 +69,11 @@ export function DownloadView(props: {
       setProbe({ status: "loading" });
       try {
         const info = await api.probe(clean);
-        if (token === probeToken.current) setProbe({ status: "ok", info });
+        if (token === probeToken.current) {
+          setSelected(new Set(info.entries?.map((_, i) => i) ?? []));
+          setPicked(new Set());
+          setProbe({ status: "ok", info });
+        }
       } catch (e) {
         if (token === probeToken.current) setProbe({ status: "error", error: asAppError(e) });
       }
@@ -72,9 +82,14 @@ export function DownloadView(props: {
   }, [url]);
 
   const info = probe.status === "ok" ? probe.info : null;
+  const entries = info?.entries ?? null;
   const maxHeight = info?.heights[0];
-  const duration = info && !info.isLive && info.duration ? info.duration : null;
+  const duration = info && !entries && !info.isLive && info.duration ? info.duration : null;
   const activeClips = trimOn && duration ? (clips ?? [{ start: 0, end: duration }]) : null;
+  const stemsOn = stems !== "off" && !isMobile;
+  const stemsLabel = stems === "music" ? t.stemsMusic : t.stemsVoice;
+  // العناصر المحدَّدة التي ستُزال منها الموسيقى
+  const stemsCount = !entries || !stemsOn ? 0 : stemsScope === "all" ? selected.size : [...picked].filter((i) => selected.has(i)).length;
   const multi = !!activeClips && activeClips.length > 1;
   const single = activeClips?.length === 1 ? activeClips[0] : null;
   const isPartial = !!single && !!duration && (single.start > 0 || single.end < duration - 0.05);
@@ -101,11 +116,55 @@ export function DownloadView(props: {
     }
   }
 
+  /** قائمة تشغيل: عملية تنزيل لكل عنصر محدَّد (Rust يشغّل 3 معًا والباقي ينتظر) */
+  async function startPlaylist(list: PlaylistEntry[], folder: string) {
+    let firstError: AppError | null = null;
+    for (const i of [...selected].sort((a, b) => a - b)) {
+      const e = list[i];
+      if (!e) continue;
+      const removeHere = stemsOn && (stemsScope === "all" || picked.has(i));
+      try {
+        await props.onStart(
+          {
+            url: e.url,
+            kind: s.kind,
+            videoFormat: s.videoFormat,
+            audioFormat: s.audioFormat,
+            quality: s.quality,
+            editorReady: s.editorReady && !isMobile,
+            start: null,
+            end: null,
+            stems: removeHere ? (stems as "voice" | "music") : null,
+            clips: [],
+            joinClips: false,
+            subdir: folder,
+          },
+          e.title,
+        );
+      } catch (err) {
+        firstError ??= asAppError(err);
+      }
+    }
+    if (firstError) throw firstError;
+  }
+
   async function start() {
     const clean = url.trim();
     if (!isHttpUrl(clean) || starting) return;
+    if (entries && selected.size === 0) return;
     setStarting(true);
     setStartError(null);
+    if (entries && info) {
+      try {
+        await startPlaylist(entries, info.title);
+        setUrl("");
+      } catch (e) {
+        setStartError(asAppError(e));
+      } finally {
+        setStarting(false);
+      }
+      return;
+    }
     try {
       await props.onStart(
         {
@@ -178,12 +237,33 @@ export function DownloadView(props: {
           <div style={{ minWidth: 0 }}>
             <div className="preview-title">{info.title}</div>
             <div className="faint">
-              {[info.uploader, formatDuration(info.duration), info.site, maxHeight ? t.upTo(maxHeight) : null]
+              {(entries
+                ? [t.plItems(entries.length), info.uploader, info.site]
+                : [info.uploader, formatDuration(info.duration), info.site, maxHeight ? t.upTo(maxHeight) : null]
+              )
                 .filter(Boolean)
                 .join(" · ")}
             </div>
           </div>
         </div>
+      )}
+
+      {entries && info?.site === "Spotify" && (
+        <div className="alert info">
+          <Icon name="music" size={16} />
+          <span>{t.spotifyHint}</span>
+        </div>
+      )}
+
+      {entries && (
+        <PlaylistPanel
+          entries={entries}
+          selected={selected}
+          onSelected={setSelected}
+          pickLabel={stemsOn && stemsScope === "pick" ? stemsLabel : null}
+          picked={picked}
+          onPicked={setPicked}
+        />
       )}
 
       {probe.status === "error" && <ErrorBox error={probe.error} />}
@@ -261,7 +341,7 @@ export function DownloadView(props: {
         </div>
       </div>
 
-      {info && (
+      {info && !entries && (
         <div className="trim-box">
           <Toggle
             checked={trimOn && !info.isLive}
@@ -329,6 +409,23 @@ export function DownloadView(props: {
         />
         <div className="collapse" data-open={stems !== "off"}>
           <div>
+            {entries && (
+              <div className="stems-scope">
+                <span className="field-label">{t.stemsApplyTo}</span>
+                <Segmented<"all" | "pick">
+                  label={t.stemsApplyTo}
+                  value={stemsScope}
+                  onChange={setStemsScope}
+                  options={[
+                    { value: "all", label: t.stemsApplyAll },
+                    { value: "pick", label: t.stemsApplyPick },
+                  ]}
+                />
+                <div className="faint" style={{ marginTop: 6 }}>
+                  {stemsScope === "pick" ? t.stemsPickHint(stemsCount, selected.size, stemsLabel) : t.stemsAllHint(stemsCount)}
+                </div>
+              </div>
+            )}
             <div className="faint" style={{ marginTop: 6 }}>{t.stemsHint}</div>
           </div>
         </div>
@@ -343,8 +440,12 @@ export function DownloadView(props: {
           <span className="path ltr" title={props.outputDir}>{isMobile ? MOBILE_SAVE_DIR : props.outputDir}</span>
           {!isMobile && <button className="btn btn-sm btn-ghost" onClick={props.onChooseDir}>{t.change}</button>}
         </div>
-        <button className="btn btn-primary btn-lg" disabled={!isHttpUrl(url) || starting} onClick={start}>
-          <Icon name="download" /> {t.download}
+        <button
+          className="btn btn-primary btn-lg"
+          disabled={!isHttpUrl(url) || starting || (!!entries && selected.size === 0)}
+          onClick={start}
+        >
+          <Icon name="download" /> {entries ? t.downloadN(selected.size) : t.download}
         </button>
       </div>
     </div>
