@@ -26,11 +26,18 @@ export const reducedMotion = () => document.documentElement.dataset.motion === "
  */
 export function useSlidingIndicator(container: RefObject<HTMLElement | null>, selector: string, dep: unknown) {
   const pill = useRef<HTMLSpanElement>(null);
-  const state = useRef<{ box: HTMLElement | null; dep: unknown; placed: boolean; ro: ResizeObserver | null }>({
+  const state = useRef<{
+    box: HTMLElement | null;
+    dep: unknown;
+    placed: boolean;
+    ro: ResizeObserver | null;
+    mo: MutationObserver | null;
+  }>({
     box: null,
     dep: undefined,
     placed: false,
     ro: null,
+    mo: null,
   });
 
   const place = (animate: boolean) => {
@@ -100,6 +107,11 @@ export function useSlidingIndicator(container: RefObject<HTMLElement | null>, se
       // تغيّر الخط/اللغة/حجم النافذة: نعيد القياس بلا حركة
       s.ro = new ResizeObserver(() => place(false));
       s.ro.observe(box);
+      // تبديل اتجاه الصفحة (عربي ↔ إنجليزي) يعكس أماكن الخيارات دون أن تتغيّر أحجامها،
+      // فلا يلاحظه ResizeObserver: نراقب dir على الصفحة ونعيد القياس
+      s.mo?.disconnect();
+      s.mo = new MutationObserver(() => place(false));
+      s.mo.observe(document.documentElement, { attributes: true, attributeFilter: ["dir"] });
       box.querySelectorAll("button").forEach((b) => s.ro?.observe(b));
       place(false);
       return;
@@ -110,7 +122,15 @@ export function useSlidingIndicator(container: RefObject<HTMLElement | null>, se
     place(true);
   });
 
-  useEffect(() => () => state.current.ro?.disconnect(), []);
+  useEffect(
+    () => () => {
+      state.current.ro?.disconnect();
+      state.current.mo?.disconnect();
+      // إن رُكّب المكوّن من جديد (StrictMode يفعل ذلك) نعيد إنشاء المراقبين
+      state.current.box = null;
+    },
+    [],
+  );
 
   return pill;
 }

@@ -13,8 +13,9 @@ function TimeField(props: { label: string; value: number; onCommit: (v: number) 
   useEffect(() => setText(formatTimecode(props.value)), [props.value]);
   const commit = () => {
     const v = parseTime(text);
-    if (v == null) setText(formatTimecode(props.value));
-    else props.onCommit(v);
+    if (v != null) props.onCommit(v);
+    // نعيد عرض القيمة الفعلية: إن رُفضت القيمة أو عُدّلت، لا يبقى في الحقل رقم لا يطابق الشريط
+    setText(formatTimecode(props.value));
   };
   return (
     <label className="time-field">
@@ -48,6 +49,16 @@ export function TrimRange(props: { duration: number; value: Range; onChange: (r:
     props.onChange({ start, end });
   };
   const pct = (v: number) => `${(v / d) * 100}%`;
+  // من الحقول: بداية بعد النهاية تحرّك النهاية معها (بنفس المدة)، ونهاية قبل البداية تحرّك البداية
+  const len = r.end - r.start;
+  const typeStart = (v: number) => {
+    v = Math.max(0, Math.min(v, d - minGap));
+    set(v, v + minGap > r.end ? Math.min(v + len, d) : r.end);
+  };
+  const typeEnd = (v: number) => {
+    v = Math.max(minGap, Math.min(v, d));
+    set(v - minGap < r.start ? Math.max(v - len, 0) : r.start, v);
+  };
 
   return (
     <div className="trim">
@@ -73,12 +84,12 @@ export function TrimRange(props: { duration: number; value: Range; onChange: (r:
         />
       </div>
       <div className="trim-fields">
-        <TimeField label={t.trimStart} value={r.start} onCommit={(v) => set(v, r.end)} />
+        <TimeField label={t.trimStart} value={r.start} onCommit={typeStart} />
         <div className="trim-length">
           <span className="field-label">{t.trimLength}</span>
           <span className="ltr">{formatDuration(r.end - r.start)}</span>
         </div>
-        <TimeField label={t.trimEnd} value={r.end} onCommit={(v) => set(r.start, v)} />
+        <TimeField label={t.trimEnd} value={r.end} onCommit={typeEnd} />
       </div>
     </div>
   );
