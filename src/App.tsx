@@ -7,6 +7,7 @@ import { DownloadView } from "./components/DownloadView";
 import { Icon } from "./components/Icon";
 import { isActive, JobCard, type Job } from "./components/JobCard";
 import { SettingsView } from "./components/SettingsView";
+import { UpdateDialog } from "./components/UpdateDialog";
 import { formatTimecode } from "./format";
 import { dictionaries, I18n, type Dict } from "./i18n";
 import { AnimatedList, reducedMotion, SlideSwitch, usePresence, useSlidingIndicator } from "./motion";
@@ -349,6 +350,9 @@ export default function App() {
             {toastShown}
           </div>
         )}
+
+        {/* تحديثات خامة: الكمبيوتر يثبّتها بنفسه، والهاتف يفتح رابط ملف APK الجديد */}
+        <UpdateDialog />
       </div>
     </I18n.Provider>
   );

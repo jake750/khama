@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile",
+  "description": "للهاتف فقط: فتح رابط ملف APK الجديد من صفحة إصدارات خامة على GitHub",
+  "platforms": ["android", "iOS"],
+  "windows": ["main"],
+  "permissions": [{ "identifier": "opener:allow-open-url", "allow": [{ "url": "https://github.com/jake750/khama/*" }] }]
+}

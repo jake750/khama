@@ -123,9 +123,21 @@ const en = {
   updatedTo: (v: string) => `yt-dlp updated to ${v}`,
 
   aboutTitle: "About",
-  aboutBody: "Open source under the MIT license. No analytics, no tracking — Khama only talks to the sites you download from (and GitHub when you update yt-dlp).",
+  aboutBody: "Open source under the MIT license. No analytics, no tracking — Khama only talks to the sites you download from (and GitHub, to check for Khama updates at launch and when you update yt-dlp).",
   notice: "Download only content you have the right to use. You are responsible for respecting copyright and each site's terms.",
   gotIt: "Got it",
+
+  // ---- تحديث خامة نفسها ----
+  appUpdateTitle: "A new version of Khama is out",
+  appUpdateBody: (v: string, cur: string) => `Khama ${v} is ready to install. You have ${cur}.`,
+  appUpdateNotes: "What's new",
+  appUpdateNow: "Update",
+  appUpdateLater: "Later",
+  appUpdateDownloading: "Downloading the update…",
+  appUpdateInstalling: "Installing — Khama will restart by itself.",
+  appUpdateFailed: "The update couldn't be installed. You can download it from the releases page instead.",
+  appUpdateOpenPage: "Open download page",
+  appUpdateApkHint: "Tap Update to download the new APK, then open it to install.",
 
   // ---- المحوّل ----
   tabConvert: "Convert",
@@ -403,9 +415,20 @@ const ar: Dict = {
   updatedTo: (v) => `حُدّث yt-dlp إلى ${v}`,
 
   aboutTitle: "حول",
-  aboutBody: "مفتوح المصدر برخصة MIT. لا تحليلات ولا تتبّع؛ خامة تتصل فقط بالمواقع التي تنزّل منها (وبـ GitHub عند تحديث yt-dlp).",
+  aboutBody: "مفتوح المصدر برخصة MIT. لا تحليلات ولا تتبّع؛ خامة تتصل فقط بالمواقع التي تنزّل منها (وبـ GitHub للبحث عن تحديثات خامة عند فتحها، وعند تحديث yt-dlp).",
   notice: "نزّل فقط محتوى يحق لك استخدامه. أنت مسؤول عن احترام حقوق النشر وشروط كل موقع.",
   gotIt: "فهمت",
+
+  appUpdateTitle: "صدرت نسخة جديدة من خامة",
+  appUpdateBody: (v: string, cur: string) => `النسخة ${v} جاهزة للتثبيت، ونسختك الحالية ${cur}.`,
+  appUpdateNotes: "الجديد",
+  appUpdateNow: "تحديث",
+  appUpdateLater: "لاحقًا",
+  appUpdateDownloading: "جارٍ تنزيل التحديث…",
+  appUpdateInstalling: "جارٍ التثبيت، وستُفتح خامة من جديد تلقائيًا.",
+  appUpdateFailed: "تعذّر تثبيت التحديث. يمكنك تنزيله من صفحة الإصدارات بدلًا من ذلك.",
+  appUpdateOpenPage: "فتح صفحة التنزيل",
+  appUpdateApkHint: "اضغط «تحديث» لتنزيل ملف APK الجديد، ثم افتحه لتثبيته.",
 
   // ---- المحوّل ----
   tabConvert: "التحويل",
