@@ -415,7 +415,7 @@ export default function App() {
           <div className="topbar-tools">
             {!isMobile && (
               <button className="icon-btn ghost" title={compact ? t.compactOff : t.compactOn} aria-label={compact ? t.compactOff : t.compactOn} onClick={toggleCompact}>
-                <Icon name={compact ? "maximize" : "minimize"} size={17} />
+                <Icon name={compact ? "maximize" : "minimize"} size={20} />
               </button>
             )}
             <button
@@ -424,7 +424,7 @@ export default function App() {
               aria-label={t.toggleTheme}
               onClick={() => update({ theme: resolvedTheme === "light" ? "dark" : "light" })}
             >
-              <Icon name={resolvedTheme === "light" ? "moon" : "sun"} size={17} />
+              <Icon name={resolvedTheme === "light" ? "moon" : "sun"} size={20} />
             </button>
           </div>
         </header>
@@ -501,7 +501,7 @@ export default function App() {
                     {shown.length === 0 && (
                       <div className="empty-state">
                         <div className="empty-art">
-                          <Icon name={tab === "convert" ? "convert" : "download"} size={26} />
+                          <Icon name={tab === "convert" ? "convert" : "download"} size={24} />
                         </div>
                         <p>{tab === "convert" ? t.convertJobsEmpty : t.jobsEmpty}</p>
                         {tab === "download" && !isMobile && <p className="faint">{t.jobsEmptyHint}</p>}
@@ -533,7 +533,7 @@ export default function App() {
         {dragging && tab !== "convert" && (
           <div className="drop-overlay">
             <div>
-              <Icon name="convert" size={32} />
+              <Icon name="convert" size={24} />
               <b>{t.dropHere}</b>
             </div>
           </div>

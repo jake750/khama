@@ -2,42 +2,27 @@
    الدفعة الثانية: هوية أوضح، سلّم خطوط، حقل رابط أكبر، إضافات، سجلّ، إعدادات بأقسام.
    يُحمَّل بعد styles.css فيتقدّم عليه عند التعارض.
    ===================================================================== */
-:root {
-  /* ألوان الشعار: تدرّج الفيروزي والسهم الأصفر */
-  --brand-1: #3fb8a5;
-  --brand-2: #0c6b65;
-  --spark: #ffc857;
-  --brand-grad: linear-gradient(135deg, var(--brand-1), var(--brand-2));
-  /* سلّم الخطوط: 12 / 13 / 15 / 18 / 22 */
-  --fs-xs: 12px;
-  --fs-sm: 13px;
-  --fs-md: 15px;
-  --fs-lg: 18px;
-  --fs-xl: 22px;
-}
-
 .card h2 {
-  font-size: var(--fs-lg);
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: var(--fs-card);
+  font-weight: var(--fw-bold);
 }
 
 .card-head h2 {
-  font-size: var(--fs-xl);
-  line-height: 1.3;
+  font-size: var(--fs-title);
+  line-height: 1.35;
 }
 
 .card-head p {
-  margin: 4px 0 18px;
+  margin: var(--s-1) 0 var(--s-5);
 }
 
 .jobs-header h3 {
-  font-size: var(--fs-md);
-  font-weight: 700;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-bold);
 }
 
 .brand-name {
-  font-size: var(--fs-lg);
+  font-size: var(--fs-card);
 }
 
 /* ---------- الشريط العلوي ---------- */
@@ -53,7 +38,7 @@
 .icon-btn.sm {
   width: 30px;
   height: 30px;
-  border-radius: 8px;
+  border-radius: var(--r-xs);
 }
 
 .container.wide {
@@ -69,11 +54,11 @@
 .url-field {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   height: 58px;
-  padding-inline: 18px 8px;
+  padding-inline: 20px 8px;
   border: 1.5px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--r-md);
   background: var(--bg);
   color: var(--text-faint);
   transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
@@ -94,7 +79,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  font-size: 16px;
+  font-size: var(--fs-body);
   color: var(--text);
   box-shadow: none;
 }
@@ -106,16 +91,16 @@
 .url-action {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   height: 42px;
   min-width: 42px;
   justify-content: center;
   padding: 0 12px;
   border: 0;
-  border-radius: 11px;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--text-dim);
-  font-weight: 600;
+  font-weight: var(--fw-semi);
 }
 
 .url-action:hover {
@@ -131,8 +116,8 @@
 .url-note {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 6px 4px 0;
+  gap: 8px;
+  margin: 8px 4px 0;
   color: var(--accent);
 }
 
@@ -146,7 +131,7 @@
   padding: 4px;
   align-items: center;
   background: transparent;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-meta);
 }
 
 .alert.inline svg {
@@ -165,13 +150,13 @@
 .clip-banner {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 12px;
   padding-block: 8px;
-  padding-inline: 14px 8px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--spark) 14%, var(--surface-2));
-  border: 1px solid color-mix(in srgb, var(--spark) 40%, transparent);
+  padding-inline: 16px 8px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--spark) 45%, transparent), var(--shadow);
   animation: rise-in 0.35s var(--ease-out);
 }
 
@@ -184,7 +169,7 @@
   flex: 1;
   min-width: 0;
   display: grid;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-meta);
 }
 
 .clip-banner-text .ltr {
@@ -197,10 +182,10 @@
 /* عدة روابط */
 .link-list {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   margin-top: 12px;
   padding: 12px;
-  border-radius: 12px;
+  border-radius: var(--r-sm);
   background: var(--surface-2);
 }
 
@@ -208,7 +193,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-meta);
   color: var(--text-dim);
 }
 
@@ -227,8 +212,8 @@
 }
 
 .preview-action {
-  margin-top: 6px;
-  margin-inline-start: -10px;
+  margin-top: 8px;
+  margin-inline-start: -12px;
 }
 
 /* الخيارات قبل أن يُلصق رابط: باهتة، وتتضح عند الاقتراب منها */
@@ -249,17 +234,17 @@
 details.extras {
   margin-top: 16px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--r-sm);
 }
 
 details.extras > summary {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 14px;
+  padding: 12px 16px;
   cursor: pointer;
   list-style: none;
-  font-weight: 600;
+  font-weight: var(--fw-semi);
 }
 
 details.extras > summary::-webkit-details-marker {
@@ -278,35 +263,35 @@ details.extras[open] > summary > svg:last-child {
 
 .extras-count {
   color: var(--accent);
-  font-size: var(--fs-xs);
-  font-weight: 600;
+  font-size: var(--fs-cap);
+  font-weight: var(--fw-semi);
 }
 
 .extras-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px 24px;
-  padding: 4px 14px 16px;
+  padding: 4px 16px 16px;
 }
 
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .chip-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   height: 30px;
   padding: 0 12px;
   border: 1px solid var(--border);
-  border-radius: 99px;
+  border-radius: var(--r-pill);
   background: transparent;
   color: var(--text-dim);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-meta);
 }
 
 .chip-btn:hover {
@@ -322,7 +307,7 @@ details.extras[open] > summary > svg:last-child {
 
 .chip-btn small {
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: var(--fs-cap);
 }
 
 /* ---------- البدء: الآن أو لاحقًا ---------- */
@@ -333,7 +318,7 @@ details.extras[open] > summary > svg:last-child {
 .schedule-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -348,9 +333,9 @@ details.extras[open] > summary > svg:last-child {
   width: 100%;
   max-height: 320px;
   aspect-ratio: 16 / 9;
-  margin-top: 14px;
-  border-radius: 10px;
-  background: #000;
+  margin-top: 16px;
+  border-radius: var(--r-sm);
+  background: var(--bg);
 }
 
 .trim-here {
@@ -361,7 +346,7 @@ details.extras[open] > summary > svg:last-child {
 
 /* ---------- سطر الحفظ والزر ---------- */
 .action-row {
-  gap: 10px;
+  gap: 12px;
 }
 
 .folder-picker {
@@ -377,10 +362,10 @@ details.extras[open] > summary > svg:last-child {
   height: 40px;
   padding: 0 12px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--text-dim);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-meta);
 }
 
 .folder-btn:hover,
@@ -394,7 +379,7 @@ details.extras[open] > summary > svg:last-child {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text);
-  font-weight: 600;
+  font-weight: var(--fw-semi);
 }
 
 .menu {
@@ -405,11 +390,11 @@ details.extras[open] > summary > svg:last-child {
   display: grid;
   min-width: 280px;
   max-width: min(460px, 80vw);
-  padding: 6px;
+  padding: 8px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--r-sm);
   background: var(--surface);
-  box-shadow: 0 16px 40px rgb(0 0 0 / 0.35);
+  box-shadow: var(--shadow-2);
   animation: rise-in 0.2s var(--ease-out);
 }
 
@@ -418,11 +403,11 @@ details.extras[open] > summary > svg:last-child {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-xs);
   background: transparent;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-meta);
   text-align: start;
 }
 
@@ -441,21 +426,21 @@ button.menu-item:hover {
 }
 
 .menu-label {
-  padding: 8px 10px 2px;
+  padding: 8px 12px 2px;
   color: var(--text-faint);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-cap);
 }
 
 .menu-sep {
   height: 1px;
-  margin: 4px 6px;
+  margin: 4px 8px;
   background: var(--border);
 }
 
 .project-pick {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   color: var(--text-dim);
 }
 
@@ -465,18 +450,8 @@ button.menu-item:hover {
 }
 
 .download-btn {
-  background: var(--brand-grad);
-  border-color: transparent;
-  color: #fff;
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--brand-1) 35%, transparent);
-}
-
-.download-btn svg {
-  color: var(--spark);
-}
-
-.download-btn:disabled {
-  box-shadow: none;
+  min-width: 160px;
+  border-radius: var(--r-md);
 }
 
 /* ---------- بطاقات التنزيل: صورة الفيديو، والتقدّم يملأ البطاقة ---------- */
@@ -512,7 +487,7 @@ button.menu-item:hover {
 .job-icon.has-thumb {
   width: 72px;
   height: 42px;
-  border-radius: 8px;
+  border-radius: var(--r-xs);
 }
 
 .job-icon.has-thumb img {
@@ -532,8 +507,8 @@ button.menu-item:hover {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: rgb(0 0 0 / 0.6);
-  color: #fff;
+  background: var(--scrim);
+  color: var(--on-hero);
 }
 
 .job-icon.has-thumb.done .job-badge {
@@ -543,7 +518,7 @@ button.menu-item:hover {
 
 .job-icon.has-thumb.error .job-badge {
   background: var(--danger);
-  color: #fff;
+  color: var(--on-hero);
 }
 
 .job-icon:not(.has-thumb) .job-badge {
@@ -574,9 +549,9 @@ button.menu-item:hover {
   display: grid;
   justify-items: center;
   gap: 4px;
-  padding: 36px 20px 28px;
+  padding: 32px 20px 32px;
   border: 1.5px dashed var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--r-lg);
   text-align: center;
   color: var(--text-dim);
 }
@@ -588,23 +563,14 @@ button.menu-item:hover {
 .empty-art {
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
-  margin-bottom: 8px;
-  border-radius: 16px;
-  background: var(--brand-grad);
-  color: var(--spark);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--brand-2) 40%, transparent);
-}
-
-.drop-overlay > div {
-  border-color: var(--spark);
+  margin-bottom: var(--s-2);
+  color: var(--text-faint);
 }
 
 /* ---------- السجلّ ---------- */
 .history {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .history-head {
@@ -625,7 +591,7 @@ button.menu-item:hover {
   height: 42px;
   padding: 0 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--r-sm);
   background: var(--bg);
   color: var(--text-faint);
 }
@@ -644,10 +610,10 @@ button.menu-item:hover {
 }
 
 .history-group h4 {
-  margin: 4px 0 6px;
+  margin: 4px 0 8px;
   color: var(--text-faint);
-  font-size: var(--fs-xs);
-  font-weight: 600;
+  font-size: var(--fs-cap);
+  font-weight: var(--fw-semi);
 }
 
 .history-item {
@@ -656,7 +622,7 @@ button.menu-item:hover {
   gap: 12px;
   align-items: center;
   padding: 8px;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
 }
 
 .history-item:hover {
@@ -676,7 +642,7 @@ button.menu-item:hover {
   place-items: center;
   width: 64px;
   height: 36px;
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   object-fit: cover;
   background: var(--surface-2);
   color: var(--text-faint);
@@ -708,13 +674,13 @@ button.menu-item:hover {
 .settings-nav button {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
+  gap: 12px;
+  padding: 8px 12px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--text-dim);
-  font-weight: 500;
+  font-weight: var(--fw-semi);
   text-align: start;
 }
 
@@ -745,7 +711,7 @@ button.menu-item:hover {
 .setting-row.column {
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
+  gap: 12px;
 }
 
 .setting-row.end {
@@ -759,7 +725,7 @@ button.menu-item:hover {
 
 .code {
   font-family: ui-monospace, Consolas, monospace;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-cap);
   color: var(--text);
 }
 
@@ -808,12 +774,12 @@ button.menu-item:hover {
 }
 
 .app.compact .card {
-  padding: 14px;
+  padding: 16px;
 }
 
 .app.compact .card-head h2 {
-  font-size: var(--fs-md);
-  margin-bottom: 10px;
+  font-size: var(--fs-body);
+  margin-bottom: 12px;
 }
 
 .app.compact .thumb {
@@ -862,9 +828,377 @@ button.menu-item:hover {
     justify-content: flex-end;
   }
   .card-head h2 {
-    font-size: var(--fs-lg);
+    font-size: var(--fs-card);
   }
   .url-action.paste span {
     display: none;
   }
+}
+
+/* =====================================================================
+   قواعد التصميم (DESIGN-RULES): بطل واحد لكل شاشة، زخرفة «خ» واحدة،
+   حافة واحدة، إيقاع أقسام 32/12، وتنقّل سفلي زجاجي على الهاتف.
+   ===================================================================== */
+
+/* ---------- الإيقاع: حواف وأقسام ---------- */
+.main {
+  padding: var(--gutter);
+}
+
+.card {
+  padding: var(--s-6);
+}
+
+.view > .card + .card {
+  margin-top: var(--s-4);
+}
+
+.jobs-header {
+  margin: var(--s-4) 0 0;
+  padding-inline: var(--s-1);
+}
+
+.job-list > .li > .card {
+  margin-top: var(--s-3);
+}
+
+.empty-state {
+  margin-top: var(--title-gap);
+  padding: var(--s-8) var(--s-5);
+  border: 1px dashed var(--border);
+}
+
+.card h2,
+.section-head h2 {
+  font-size: var(--fs-sec);
+  line-height: 1.4;
+}
+
+.faint {
+  font-size: var(--fs-meta);
+  line-height: 1.55;
+}
+
+.field-label {
+  font-size: var(--fs-cap);
+  font-weight: var(--fw-semi);
+  line-height: 16px;
+}
+
+/* ---------- الزخرفة: «خ» مكبّرة ومقصوصة بلون واحد وشفافية منخفضة ----------
+   حرف الشعار نفسه، فهي عربية ومرتبطة بالهوية. تُستعمل في 3 أماكن فقط:
+   بطل التنزيل، ومنطقة الإفلات في المحوّل، ونافذة التحديث. */
+.motif {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.motif::after {
+  content: "خ";
+  position: absolute;
+  z-index: -1;
+  inset-inline-end: -0.06em;
+  top: 50%;
+  font-family: "IBM Plex Sans Arabic", sans-serif;
+  font-size: var(--motif-size, 400px);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  color: var(--motif-color, var(--on-hero));
+  opacity: var(--motif-opacity, 0.11);
+  transform: translateY(-62%);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ---------- بطل شاشة التنزيل: الشيء الوحيد المطلوب، الصق الرابط ---------- */
+.download-card {
+  box-shadow: var(--shadow-hero);
+}
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin: calc(var(--s-6) * -1) calc(var(--s-6) * -1) var(--s-6);
+  padding: var(--s-6);
+  border-radius: calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px) 0 0;
+  background: linear-gradient(160deg, var(--hero-1), var(--hero-2) 85%);
+  color: var(--on-hero);
+  --motif-size: 420px;
+}
+
+.hero .card-head h2 {
+  color: var(--on-hero);
+}
+
+.hero .card-head p,
+.hero .url-note {
+  color: color-mix(in srgb, var(--on-hero) 78%, transparent);
+}
+
+.hero .url-field {
+  border-color: color-mix(in srgb, var(--on-hero) 20%, transparent);
+  background: rgb(3 22 21 / 0.42);
+  color: color-mix(in srgb, var(--on-hero) 70%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.hero .url-field:focus-within {
+  border-color: color-mix(in srgb, var(--on-hero) 70%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--on-hero) 14%, transparent);
+  color: var(--on-hero);
+}
+
+.hero .url-field.has-error {
+  border-color: var(--spark);
+}
+
+.hero .url-field .url-input {
+  color: var(--on-hero);
+}
+
+.hero .url-field .url-input::placeholder {
+  color: color-mix(in srgb, var(--on-hero) 62%, transparent);
+}
+
+.hero .url-action {
+  color: color-mix(in srgb, var(--on-hero) 80%, transparent);
+}
+
+.hero .url-action:hover,
+.hero .url-action.paste {
+  background: color-mix(in srgb, var(--on-hero) 14%, transparent);
+  color: var(--on-hero);
+}
+
+.hero .clip-banner {
+  color: var(--text);
+}
+
+.url-field {
+  height: 56px;
+  padding-inline: var(--s-4) var(--s-2);
+  border-radius: var(--r-md);
+}
+
+.url-action {
+  height: 40px;
+  min-width: 40px;
+  border-radius: var(--r-xs);
+}
+
+/* ---------- منطقة الإفلات (المحوّل) ---------- */
+.dropzone {
+  --motif-color: var(--accent);
+  --motif-opacity: 0.07;
+  --motif-size: 360px;
+  border-style: dashed;
+}
+
+.drop-icon {
+  border-radius: var(--r-md);
+}
+
+/* ---------- نافذة التحديث ---------- */
+.update-card {
+  --motif-color: var(--accent);
+  --motif-opacity: 0.06;
+  --motif-size: 300px;
+  border-radius: var(--r-lg);
+  padding: var(--s-6);
+}
+
+/* ---------- الأزرار ---------- */
+.btn {
+  border-radius: var(--r-sm);
+}
+
+.btn-sm {
+  border-radius: var(--r-xs);
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: none;
+  background: color-mix(in srgb, var(--accent) 88%, var(--on-hero));
+}
+
+/* منطقة لمس ≥ 44px للأزرار الصغيرة دون تكبير شكلها */
+.btn-sm,
+.icon-btn,
+.chip-btn,
+.pl-stem {
+  position: relative;
+}
+
+.btn-sm::before,
+.icon-btn::before,
+.chip-btn::before,
+.pl-stem::before {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
+
+/* ---------- الإعدادات: التبويب النشط بخلفية، بلا شريط جانبي ملوّن ---------- */
+.settings-nav button[aria-current="true"],
+[dir="rtl"] .settings-nav button[aria-current="true"] {
+  background: var(--surface-2);
+  box-shadow: none;
+  color: var(--accent);
+}
+
+/* ---------- شريط التمرير: هادئ، ولا يظهر في الحاويات الأفقية ---------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--text-faint) 45%, transparent);
+}
+
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--text-faint);
+}
+
+.settings-nav,
+.marker-list,
+.chips {
+  scrollbar-width: none;
+}
+
+.settings-nav::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- الحالات الماضية: شفافية لا لون ---------- */
+.history-item.missing {
+  opacity: 0.5;
+}
+
+/* ---------- الهاتف: حافة 16، وتبويبات سفلية زجاجية ---------- */
+@media (max-width: 560px) {
+  :root {
+    --gutter: var(--s-4);
+  }
+  .topbar {
+    padding: var(--s-3) var(--gutter);
+  }
+  .main {
+    padding: var(--gutter);
+    padding-bottom: calc(64px + var(--s-6) + env(safe-area-inset-bottom));
+  }
+  .card {
+    padding: var(--s-4);
+  }
+  .hero {
+    margin: calc(var(--s-4) * -1) calc(var(--s-4) * -1) var(--s-5);
+    padding: var(--s-5) var(--s-4);
+  }
+  .hero {
+    --motif-size: 300px;
+  }
+  .card-head h2 {
+    font-size: var(--fs-sec);
+  }
+  .tabs {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 15;
+    justify-content: space-around;
+    margin: 0;
+    padding: var(--s-2) var(--s-3) calc(var(--s-2) + env(safe-area-inset-bottom));
+    min-height: 64px;
+    background: color-mix(in srgb, var(--surface) 72%, transparent);
+    backdrop-filter: blur(24px) saturate(1.8);
+    -webkit-backdrop-filter: blur(24px) saturate(1.8);
+    box-shadow: inset 0 1px 0 var(--border);
+  }
+  .tabs .tab {
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--s-1) 0;
+    color: var(--text-faint);
+    font-size: var(--fs-cap);
+  }
+  .tabs .tab > span:not(.tab-dot) {
+    display: block;
+  }
+  .tabs .tab[aria-current="page"] {
+    color: var(--accent);
+  }
+  .tabs .tab-dot {
+    position: absolute;
+    top: var(--s-1);
+    inset-inline-start: calc(50% + 10px);
+  }
+  .tab-pill {
+    background: transparent;
+  }
+}
+
+/* ---------- جولة المراجعة الأولى ---------- */
+/* التقدّم يظهر مرة واحدة: الشريط فقط، بلا تعبئة خلفية مكرّرة */
+.job::before {
+  content: none;
+}
+
+/* حالة الفراغ: نص هادئ بلا صندوق متقطّع (المتقطّع لمنطقة الإفلات فقط) */
+.empty-state {
+  border: 0;
+  padding: var(--s-8) var(--s-5) var(--s-6);
+}
+
+/* السجلّ: الأفعال الثانوية تظهر عند المرور، فيبقى الصف قابلًا للمسح بالعين */
+@media (hover: hover) {
+  .history-item .job-actions .icon-btn {
+    opacity: 0;
+    transition: opacity var(--t-ui, 0.2s) var(--ease-out);
+  }
+  .history-item:hover .job-actions .icon-btn,
+  .history-item:focus-within .job-actions .icon-btn {
+    opacity: 1;
+  }
+}
+
+/* الهاتف: الخيارات المجزّأة في سطر واحد قابل للتمرير بدل الالتفاف لسطرين */
+@media (max-width: 560px) {
+  .segmented {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .segmented::-webkit-scrollbar {
+    display: none;
+  }
+  .segmented button {
+    flex-shrink: 0;
+  }
+}
+
+/* عناصر الشبكة تنكمش فلا يمدّها شريط خيارات طويل خارج البطاقة */
+.options > *,
+.video-only > *,
+.collapse > div,
+.stems-row,
+.schedule-row {
+  min-width: 0;
+}
+
+/* العناوين الطويلة تُقطع بسطرين لا بسطر واحد (العربي يفقد معناه سريعًا) */
+.job-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
 }

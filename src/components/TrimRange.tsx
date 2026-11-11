@@ -109,10 +109,10 @@ export function TrimRange(props: { duration: number; value: Range; onChange: (r:
       {props.preview && (
         <div className="trim-here">
           <button type="button" className="btn btn-sm btn-ghost" onClick={() => here("start")}>
-            <Icon name="flagStart" size={14} /> {t.setStartHere}
+            <Icon name="flagStart" size={16} /> {t.setStartHere}
           </button>
           <button type="button" className="btn btn-sm btn-ghost" onClick={() => here("end")}>
-            {t.setEndHere} <Icon name="flagEnd" size={14} />
+            {t.setEndHere} <Icon name="flagEnd" size={16} />
           </button>
         </div>
       )}

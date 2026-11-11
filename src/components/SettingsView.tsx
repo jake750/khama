@@ -301,7 +301,7 @@ function ProjectsSection(props: { settings: Settings; update: (p: Partial<Settin
               update({ projects: s.projects.filter((x) => x.name !== p.name), activeProject: s.activeProject === p.name ? null : s.activeProject })
             }
           >
-            <Icon name="x" size={14} />
+            <Icon name="x" size={16} />
           </button>
         </div>
       ))}
@@ -387,7 +387,7 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
         {s.cookiesMode === "file" && (
           <div style={{ display: "grid", gap: 10 }}>
             <div className="faint" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <Icon name={hasSaved ? "check" : "x"} size={14} />
+              <Icon name={hasSaved ? "check" : "x"} size={16} />
               {hasSaved ? t.cookiesSaved : t.cookiesNotSaved}
             </div>
             <textarea className="textarea" placeholder={t.cookiesPlaceholder} value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} />

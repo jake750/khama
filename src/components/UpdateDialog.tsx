@@ -171,7 +171,7 @@ export function UpdateDialog() {
 
   return (
     <div className="update-backdrop" ref={backdrop} onClick={(e) => e.target === e.currentTarget && close()}>
-      <div className="update-card" ref={card} role="dialog" aria-modal="true" aria-labelledby="update-title" aria-describedby="update-body">
+      <div className="update-card motif" ref={card} role="dialog" aria-modal="true" aria-labelledby="update-title" aria-describedby="update-body">
         <div className="update-head">
           <span className="update-icon" aria-hidden="true">
             <Icon name="download" size={20} />

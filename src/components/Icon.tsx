@@ -42,7 +42,7 @@ const paths = {
 
 export type IconName = keyof typeof paths;
 
-export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
+export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   return (
     <svg
       width={size}

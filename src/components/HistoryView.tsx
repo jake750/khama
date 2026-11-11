@@ -70,7 +70,7 @@ export function HistoryView(props: {
         </div>
         {list && list.length > 0 && (
           <button className="btn btn-sm btn-ghost" onClick={clear}>
-            <Icon name="trash" size={14} /> {t.historyClear}
+            <Icon name="trash" size={16} /> {t.historyClear}
           </button>
         )}
       </div>
@@ -85,7 +85,7 @@ export function HistoryView(props: {
       {list && list.length === 0 && (
         <div className="empty-state">
           <div className="empty-art">
-            <Icon name="history" size={28} />
+            <Icon name="history" size={24} />
           </div>
           <p>{t.historyEmpty}</p>
         </div>
@@ -113,7 +113,7 @@ export function HistoryView(props: {
                 title={canDrag ? t.dragHint : undefined}
               >
                 {e.thumbnail ? <img className="history-thumb" src={e.thumbnail} alt="" /> : (
-                  <div className="history-thumb"><Icon name={e.kind === "audio" ? "music" : "film"} size={18} /></div>
+                  <div className="history-thumb"><Icon name={e.kind === "audio" ? "music" : "film"} size={20} /></div>
                 )}
                 <div className="history-body">
                   <div className="job-title" title={e.title}>{e.title}</div>
@@ -126,11 +126,11 @@ export function HistoryView(props: {
                 <div className="job-actions">
                   {e.exists && !isMobile && (
                     <button className="btn btn-sm" onClick={() => api.revealFile(e.file).catch(() => {})}>
-                      <Icon name="folder" size={14} /> {t.showInFolder}
+                      <Icon name="folder" size={16} /> {t.showInFolder}
                     </button>
                   )}
                   <button className="btn btn-sm btn-ghost" onClick={() => props.onDownloadAgain(e.url)} title={t.downloadAgain}>
-                    <Icon name="retry" size={14} /> <span className="hide-sm">{t.downloadAgain}</span>
+                    <Icon name="retry" size={16} /> <span className="hide-sm">{t.downloadAgain}</span>
                   </button>
                   <button
                     className="icon-btn sm"
@@ -138,10 +138,10 @@ export function HistoryView(props: {
                     aria-label={t.copyLink}
                     onClick={() => navigator.clipboard.writeText(e.url).then(() => props.toast(t.toastCopied)).catch(() => {})}
                   >
-                    <Icon name="copy" size={14} />
+                    <Icon name="copy" size={16} />
                   </button>
                   <button className="icon-btn sm" title={t.remove} aria-label={t.remove} onClick={() => remove(e.id)}>
-                    <Icon name="x" size={14} />
+                    <Icon name="x" size={16} />
                   </button>
                 </div>
               </div>

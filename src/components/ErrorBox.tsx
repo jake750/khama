@@ -36,7 +36,7 @@ export function ErrorBox(props: {
         <span style={{ flex: 1 }}>{errorText(t, error)}</span>
         {fix && (
           <button className="btn btn-sm" onClick={() => props.onFix!(fix)}>
-            <Icon name={fix === "cookies" ? "settings" : "retry"} size={14} /> {fixLabel}
+            <Icon name={fix === "cookies" ? "settings" : "retry"} size={16} /> {fixLabel}
           </button>
         )}
       </div>

@@ -95,11 +95,11 @@ function FilePick(props: {
       <span className="field-label">{props.label}</span>
       <div className="file-pick-row">
         <button className="btn btn-sm" onClick={pick} disabled={copying}>
-          <Icon name="file" size={15} /> {copying ? t.importing : props.value ? baseName(props.value) : t.pick}
+          <Icon name="file" size={16} /> {copying ? t.importing : props.value ? baseName(props.value) : t.pick}
         </button>
         {props.value && (
           <button className="icon-btn" style={{ width: 30, height: 30 }} title={t.unpick} aria-label={t.unpick} onClick={() => props.onChange(null)}>
-            <Icon name="x" size={14} />
+            <Icon name="x" size={16} />
           </button>
         )}
       </div>
@@ -248,9 +248,9 @@ export function ConvertView(props: {
   // ============ بلا ملفات: منطقة الإفلات ============
   if (files.length === 0) {
     return (
-      <div className={`card dropzone ${props.dragging ? "over" : ""}`}>
+      <div className={`card dropzone motif ${props.dragging ? "over" : ""}`}>
         <div className="drop-icon">
-          <Icon name="convert" size={28} />
+          <Icon name="convert" size={24} />
         </div>
         <h2>{props.dragging ? t.dropHere : isMobile ? t.pickTitleMobile : t.dropTitle}</h2>
         <p className="faint">{t.dropSub}</p>
@@ -293,7 +293,7 @@ export function ConvertView(props: {
                   <div className="issues">
                     {f.info.issues.map((i) => (
                       <span key={i} className={`issue ${i === "noAudio" ? "" : "warn"}`} title={t.issues[i]}>
-                        <Icon name="alert" size={13} /> {t.issues[i]}
+                        <Icon name="alert" size={16} /> {t.issues[i]}
                       </span>
                     ))}
                   </div>
@@ -532,7 +532,7 @@ export function ConvertView(props: {
         <div className="action-row">
           {isMobile ? (
             <div className="dest faint">
-              <Icon name="folder" size={15} /> <span className="ltr">{MOBILE_SAVE_DIR}</span>
+              <Icon name="folder" size={16} /> <span className="ltr">{MOBILE_SAVE_DIR}</span>
             </div>
           ) : (
             <div className="dest">

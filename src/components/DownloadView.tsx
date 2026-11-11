@@ -391,67 +391,69 @@ export function DownloadView(props: {
 
   return (
     <div className="card download-card">
-      <div className="card-head">
-        <h2>{t.pasteTitle}</h2>
-        <p className="faint">{t.pasteSub}</p>
-      </div>
-
-      {props.clipUrl && props.clipUrl !== url.trim() && (
-        <div className="clip-banner" role="status">
-          <Icon name="link" size={16} />
-          <span className="clip-banner-text">
-            <b>{t.clipboardBanner}</b>
-            <span className="ltr">{props.clipUrl}</span>
-          </span>
-          <button
-            className="btn btn-sm btn-primary"
-            onClick={() => {
-              setUrl(props.clipUrl!);
-              props.onClipDone();
-            }}
-          >
-            {t.useLink}
-          </button>
-          <button className="btn btn-sm btn-ghost" onClick={props.onClipDone}>{t.dismiss}</button>
+      <div className="hero motif">
+        <div className="card-head">
+          <h2>{t.pasteTitle}</h2>
+          <p className="faint">{t.pasteSub}</p>
         </div>
-      )}
 
-      <div className={`url-field ${probe.status === "error" || startError ? "has-error" : ""}`}>
-        <Icon name="link" size={20} />
-        <input
-          ref={input}
-          className="url-input ltr"
-          placeholder={t.urlPlaceholder}
-          value={url}
-          spellCheck={false}
-          autoFocus
-          onChange={(e) => {
-            setUrl(e.target.value);
-            setAutoPasted(false);
-          }}
-          onKeyDown={(e) => e.key === "Enter" && start()}
-          aria-label={t.urlAria}
-        />
-        {url ? (
-          <button
-            className="url-action"
-            onClick={() => {
-              setUrl("");
-              setAutoPasted(false);
-              input.current?.focus();
-            }}
-            title={t.remove}
-            aria-label={t.remove}
-          >
-            <Icon name="x" size={18} />
-          </button>
-        ) : (
-          <button className="url-action paste" onClick={paste} title={t.pasteTooltip}>
-            <Icon name="paste" size={18} /> <span>{t.paste}</span>
-          </button>
+        {props.clipUrl && props.clipUrl !== url.trim() && (
+          <div className="clip-banner" role="status">
+            <Icon name="link" size={16} />
+            <span className="clip-banner-text">
+              <b>{t.clipboardBanner}</b>
+              <span className="ltr">{props.clipUrl}</span>
+            </span>
+            <button
+              className="btn btn-sm btn-primary"
+              onClick={() => {
+                setUrl(props.clipUrl!);
+                props.onClipDone();
+              }}
+            >
+              {t.useLink}
+            </button>
+            <button className="btn btn-sm btn-ghost" onClick={props.onClipDone}>{t.dismiss}</button>
+          </div>
         )}
+
+        <div className={`url-field ${probe.status === "error" || startError ? "has-error" : ""}`}>
+          <Icon name="link" size={20} />
+          <input
+            ref={input}
+            className="url-input ltr"
+            placeholder={t.urlPlaceholder}
+            value={url}
+            spellCheck={false}
+            autoFocus
+            onChange={(e) => {
+              setUrl(e.target.value);
+              setAutoPasted(false);
+            }}
+            onKeyDown={(e) => e.key === "Enter" && start()}
+            aria-label={t.urlAria}
+          />
+          {url ? (
+            <button
+              className="url-action"
+              onClick={() => {
+                setUrl("");
+                setAutoPasted(false);
+                input.current?.focus();
+              }}
+              title={t.remove}
+              aria-label={t.remove}
+            >
+              <Icon name="x" size={20} />
+            </button>
+          ) : (
+            <button className="url-action paste" onClick={paste} title={t.pasteTooltip}>
+              <Icon name="paste" size={20} /> <span>{t.paste}</span>
+            </button>
+          )}
+        </div>
+        {autoPasted && url && <div className="faint url-note"><Icon name="check" size={16} /> {t.autoPasted}</div>}
       </div>
-      {autoPasted && url && <div className="faint url-note"><Icon name="check" size={14} /> {t.autoPasted}</div>}
 
       {probe.status === "error" && !multiLinks && <ErrorBox error={probe.error} inline onFix={fix} />}
 
@@ -460,7 +462,7 @@ export function DownloadView(props: {
           <div className="faint">{t.multiLinks(urls.length)}</div>
           {urls.map((u) => (
             <div className="link-item" key={u}>
-              <Icon name="link" size={14} />
+              <Icon name="link" size={16} />
               <span className="ltr">{u}</span>
               <button
                 className="icon-btn sm"
@@ -468,7 +470,7 @@ export function DownloadView(props: {
                 title={t.removeLink}
                 onClick={() => setUrl(urls.filter((x) => x !== u).join(" "))}
               >
-                <Icon name="x" size={14} />
+                <Icon name="x" size={16} />
               </button>
             </div>
           ))}
@@ -500,7 +502,7 @@ export function DownloadView(props: {
             </div>
             {info.thumbnail && !entries && (
               <button className="btn btn-sm btn-ghost preview-action" onClick={saveThumb} disabled={savingThumb}>
-                <Icon name="image" size={14} /> {t.saveThumb}
+                <Icon name="image" size={16} /> {t.saveThumb}
               </button>
             )}
           </div>
@@ -766,7 +768,7 @@ export function DownloadView(props: {
               onChange={setWhen}
               options={[
                 { value: "now", label: t.startNow },
-                { value: "later", label: <><Icon name="clock" size={14} /> {t.startLater}</> },
+                { value: "later", label: <><Icon name="clock" size={16} /> {t.startLater}</> },
               ]}
             />
             {when === "later" && (

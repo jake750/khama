@@ -31,12 +31,12 @@ export function FolderPicker(props: { current: string; recent: string[]; onPick:
         <Icon name="folder" size={16} />
         <span className="faint">{t.saveTo}</span>
         <span className="folder-name ltr">{folderName(props.current)}</span>
-        <Icon name="chevron" size={14} />
+        <Icon name="chevron" size={16} />
       </button>
       {open && (
         <div className="menu" role="menu">
           <div className="menu-item current" title={props.current}>
-            <Icon name="check" size={14} />
+            <Icon name="check" size={16} />
             <span className="ltr">{props.current}</span>
           </div>
           {others.length > 0 && <div className="menu-label">{t.recentFolders}</div>}
@@ -51,7 +51,7 @@ export function FolderPicker(props: { current: string; recent: string[]; onPick:
                 setOpen(false);
               }}
             >
-              <Icon name="folder" size={14} />
+              <Icon name="folder" size={16} />
               <span className="ltr">{d}</span>
             </button>
           ))}
@@ -64,7 +64,7 @@ export function FolderPicker(props: { current: string; recent: string[]; onPick:
               props.onChoose();
             }}
           >
-            <Icon name="plus" size={14} /> {t.chooseFolder}
+            <Icon name="plus" size={16} /> {t.chooseFolder}
           </button>
         </div>
       )}

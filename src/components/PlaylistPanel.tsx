@@ -51,7 +51,7 @@ export function PlaylistPanel(props: {
                 {e.thumbnail ? (
                   <img className="pl-thumb" src={e.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" />
                 ) : (
-                  <span className="pl-thumb pl-thumb-empty"><Icon name="music" size={14} /></span>
+                  <span className="pl-thumb pl-thumb-empty"><Icon name="music" size={16} /></span>
                 )}
                 <span className="pl-text">
                   <span className="pl-title" title={e.title}>{e.title}</span>
@@ -65,7 +65,7 @@ export function PlaylistPanel(props: {
                   onClick={() => props.onPicked((cur) => toggle(cur, i))}
                   title={props.pickLabel}
                 >
-                  <Icon name={picked.has(i) ? "check" : "plus"} size={14} />
+                  <Icon name={picked.has(i) ? "check" : "plus"} size={16} />
                   <span>{props.pickLabel}</span>
                 </button>
               )}
