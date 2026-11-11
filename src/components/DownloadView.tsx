@@ -36,6 +36,11 @@ type Stills = "off" | "5" | "10" | "scene";
 /** آخر رابط لصقناه تلقائيًا من الحافظة: لا نلصقه مرة ثانية بعد أن يمسحه المستخدم */
 let lastAutoPasted = "";
 
+/** يبقى الرابط ومعاينته عند الانتقال لتبويب آخر والعودة (الشاشة تُبنى من جديد) */
+let draftUrl = "";
+let lastProbe: { url: string; info: ProbeInfo } | null = null;
+let lastInject = 0;
+
 export interface StartMeta {
   title: string;
   thumbnail?: string | null;
@@ -59,7 +64,10 @@ export function DownloadView(props: {
 }) {
   const { t } = useI18n();
   const { settings: s, update } = props;
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(() => draftUrl);
+  useEffect(() => {
+    draftUrl = url;
+  }, [url]);
   const [autoPasted, setAutoPasted] = useState(false);
   const [probe, setProbe] = useState<ProbeState>({ status: "idle" });
   const [reprobe, setReprobe] = useState(0);
@@ -101,10 +109,19 @@ export function DownloadView(props: {
       return;
     }
     const token = ++probeToken.current;
+    // نفس الرابط الذي عاينّاه قبل الانتقال لتبويب آخر: نعرضه فورًا بلا انتظار
+    if (lastProbe?.url === clean && reprobe === 0) {
+      const info = lastProbe.info;
+      setSelected(new Set(info.entries?.map((_, i) => i) ?? []));
+      setPicked(new Set());
+      setProbe({ status: "ok", info });
+      return;
+    }
     const timer = setTimeout(async () => {
       setProbe({ status: "loading" });
       try {
         const info = await api.probe(clean);
+        lastProbe = { url: clean, info };
         if (token === probeToken.current) {
           setSelected(new Set(info.entries?.map((_, i) => i) ?? []));
           setPicked(new Set());
@@ -119,7 +136,11 @@ export function DownloadView(props: {
 
   // رابط من السجلّ
   useEffect(() => {
-    if (props.inject) setUrl(props.inject.url);
+    // نتجاهل رابطًا عالجناه من قبل (لا يعود بعد الانتقال بين التبويبات)
+    if (props.inject && props.inject.n !== lastInject) {
+      lastInject = props.inject.n;
+      setUrl(props.inject.url);
+    }
   }, [props.inject]);
 
   /** يقرأ أول رابط في الحافظة (عبر Tauri: يعمل على الكمبيوتر والهاتف) */
