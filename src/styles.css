@@ -1873,3 +1873,19 @@ img.file-thumb {
     display: none;
   }
 }
+
+/* الأسماء الطويلة لا تخرج من الشاشة: عناصر الشبكة تنكمش، والكلمات الطويلة بلا مسافات تنكسر */
+.file-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.file-list > .li,
+.job-list > .li {
+  min-width: 0;
+}
+
+.preview-title,
+.file-name {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
