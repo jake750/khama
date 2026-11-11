@@ -57,7 +57,6 @@ impl Default for DownloadQueue {
 }
 
 /// إزالة الموسيقى ثقيلة على المعالج والذاكرة: ملف واحد في كل مرة
-#[cfg(desktop)]
 static SEPARATING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -681,7 +680,7 @@ async fn run_job(
     };
     let parts = clips(&req);
     // الدمج يحتاج ffmpeg، وهو على الكمبيوتر فقط
-    let join = req.join_clips && parts.len() > 1 && cfg!(desktop);
+    let join = req.join_clips && parts.len() > 1;
 
     // الترجمة والصورة ومعلومات المصدر: تُجلب مرة واحدة قبل التنزيل
     let side = fetch_sidecars(&tools, &cookies, &req, &job_dir.join("side"), cancel).await?;
@@ -875,7 +874,6 @@ async fn deliver_with_extras(
     std::fs::create_dir_all(final_dir).map_err(|e| AppError::with_detail("outputDirCreate", e.to_string()))?;
 
     // لقطات ثابتة: قبل نقل الفيديو (نحتاجه في مكانه المؤقت)
-    #[cfg(desktop)]
     let stills_dir = match req.stills.as_deref().filter(|_| req.kind == "video" && !req.original) {
         Some(mode) => match grab_stills(tools, file, mode, &work.join("stills"), cancel).await? {
             Some(d) => Some(d),
@@ -908,7 +906,6 @@ async fn deliver_with_extras(
             eprintln!("deliver info: {e:?}");
         }
     }
-    #[cfg(desktop)]
     if let Some(dir) = stills_dir {
         let dest = unique_path(final_dir, &format!("{stem} stills"));
         if std::fs::rename(&dir, &dest).is_err() {
@@ -917,12 +914,16 @@ async fn deliver_with_extras(
                 std::fs::copy(e.path(), dest.join(e.file_name()))?;
             }
         }
+        // الهاتف: المجلد كله إلى Download/Khama/<الاسم> stills
+        #[cfg(mobile)]
+        if let Err(e) = crate::mobile::publish_any(app, dest).await {
+            eprintln!("deliver stills: {e:?}");
+        }
     }
     Ok(Some(done))
 }
 
 /// لقطات JPG من الفيديو: كل N ثانية، أو عند تغيّر المشهد
-#[cfg(desktop)]
 async fn grab_stills(
     tools: &Tools,
     file: &Path,
@@ -1107,8 +1108,7 @@ async fn finish(
     dir: &Path,
     cancel: &mut watch::Receiver<bool>,
 ) -> Result<Option<PathBuf>, AppError> {
-    // جاهز للمونتاج؟ (الكمبيوتر فقط: نسخة الهاتف لا تحمل ffprobe)
-    #[cfg(desktop)]
+    // جاهز للمونتاج؟
     if req.kind == "video" && req.editor_ready && !req.original {
         emit(app, JobUpdate { id, state: "processing", ..Default::default() });
         let check = check_media(tools, &file).await?;
@@ -1121,8 +1121,7 @@ async fn finish(
         }
     }
 
-    // إزالة الموسيقى (أو الصوت البشري)؟ (الكمبيوتر فقط)
-    #[cfg(desktop)]
+    // إزالة الموسيقى (أو الصوت البشري)؟
     if let Some(keep) = req.stems.as_deref().and_then(crate::separate::Keep::parse) {
         use crate::separate;
         let duration = check_media(tools, &file).await.ok().and_then(|c| c.duration);

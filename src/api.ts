@@ -258,6 +258,8 @@ export const api = {
   toolsInfo: () => invoke<ToolsInfo>("tools_info"),
   updateYtdlp: () => invoke<{ version?: string; updated: boolean }>("update_ytdlp"),
   probe: (url: string) => invoke<ProbeInfo>("probe", { url }),
+  /** على الهاتف: ينسخ ملفات اختارها المستخدم (content://) داخل التطبيق ويعيد مساراتها */
+  importFiles: (paths: string[]) => invoke<string[]>("import_files", { paths }),
   startDownload: (request: DownloadRequest) => invoke<number>("start_download", { request }),
   cancelDownload: (id: number) => invoke<void>("cancel_download", { id }),
   revealFile: (path: string) => invoke<void>("reveal_file", { path }),

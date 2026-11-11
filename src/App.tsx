@@ -382,7 +382,7 @@ export default function App() {
 
   const tabs: { id: Tab; icon: IconName; label: string }[] = [
     { id: "download", icon: "download", label: t.tabDownload },
-    ...(isMobile ? [] : [{ id: "convert" as Tab, icon: "convert" as IconName, label: t.tabConvert }]),
+    { id: "convert" as Tab, icon: "convert" as IconName, label: t.tabConvert },
     { id: "history", icon: "history", label: t.tabHistory },
     { id: "settings", icon: "settings", label: t.tabSettings },
   ];
@@ -516,7 +516,7 @@ export default function App() {
                           onReveal={isMobile ? undefined : () => j.file && api.revealFile(j.file)}
                           onRetry={() => retry(j)}
                           onRemove={() => setJobs((p) => p.filter((x) => x.id !== j.id))}
-                          onConvert={!isMobile && j.type === "download" && j.file ? () => addFiles([j.file!]) : undefined}
+                          onConvert={j.type === "download" && j.file ? () => addFiles([j.file!]) : undefined}
                           onSplit={j.markers?.length ? () => split(j) : undefined}
                           onCopyMarkers={j.markers?.length ? () => copyMarkers(j) : undefined}
                           onDragOut={!isMobile && j.file ? () => dragOut(j.file!) : undefined}

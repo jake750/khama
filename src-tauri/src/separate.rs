@@ -3,6 +3,7 @@
 //! نستخدم نموذج MDX-Net المفتوح (UVR-MDX-NET-Voc_FT) عبر ONNX Runtime.
 //! كلاهما لا يُضمَّن في التطبيق: يُنزَّلان مرة واحدة عند أول استخدام (~140MB على Windows)،
 //! ونتحقق من بصمة SHA-256 لكل ملف قبل استخدامه.
+//! على أندرويد: ONNX Runtime مضمّن في التطبيق (من Maven)، والنموذج وحده يُنزَّل.
 //!
 //! طريقة العمل باختصار:
 //!   1. ffmpeg يفك صوت الملف إلى أرقام (44.1kHz ستيريو)
@@ -152,12 +153,39 @@ fn tar() -> PathBuf {
 
 /// ينزّل ملفًا مع إرسال التقدّم (نقيس حجم الملف الجزئي) وإمكانية الإلغاء
 async fn fetch(
+    app: &AppHandle,
     url: &str,
     dest: &Path,
     on_bytes: &mut (dyn FnMut(u64) + Send),
     cancel: &mut watch::Receiver<bool>,
 ) -> Result<bool, AppError> {
     let _ = std::fs::remove_file(dest);
+    // أندرويد: بشبكة النظام نفسه (لا curl هناك، وتشغيل عملية جديدة أثقل)
+    #[cfg(target_os = "android")]
+    {
+        let (app2, url2, dest2) = (app.clone(), url.to_string(), dest.to_path_buf());
+        let mut task = tauri::async_runtime::spawn_blocking(move || crate::mobile::fetch_file(&app2, &url2, &dest2));
+        loop {
+            tokio::select! {
+                r = &mut task => {
+                    r.map_err(|e| AppError::with_detail("aiDownload", e.to_string()))??;
+                    on_bytes(std::fs::metadata(dest).map(|m| m.len()).unwrap_or(0));
+                    return Ok(true);
+                }
+                _ = tokio::time::sleep(Duration::from_millis(300)) => {
+                    on_bytes(std::fs::metadata(dest).map(|m| m.len()).unwrap_or(0));
+                }
+                _ = crate::download::canceled(cancel) => {
+                    crate::mobile::cancel_fetch(app);
+                    let _ = task.await;
+                    let _ = std::fs::remove_file(dest);
+                    return Ok(false);
+                }
+            }
+        }
+    }
+    #[allow(unreachable_code)]
+    let _ = app;
     let mut cmd = tools::command(&curl());
     cmd.args(["-L", "--fail", "--silent", "--show-error", "--retry", "3", "-o"])
         .arg(dest)
@@ -199,16 +227,30 @@ pub async fn ensure_assets(
     id: u64,
     cancel: &mut watch::Receiver<bool>,
 ) -> Result<Option<(PathBuf, PathBuf)>, AppError> {
-    let runtime = RUNTIME.ok_or_else(|| AppError::new("aiUnsupported"))?;
     let _guard = SETUP.lock().await;
     let dir = ai_dir(app)?;
     std::fs::create_dir_all(&dir)?;
-    let lib = dir.join(runtime.name);
     let model = dir.join(MODEL.name);
-    // ملف صغير يسجّل أننا تحققنا من المكتبة بعد استخراجها (بصمتها تخص الأرشيف لا الملف)
-    let lib_ok = dir.join(format!("{}.ok", runtime.name));
 
-    let need_lib = !(lib.exists() && std::fs::read_to_string(&lib_ok).is_ok_and(|s| s.trim() == runtime.sha256));
+    // أندرويد: المكتبة مضمّنة في التطبيق
+    #[cfg(target_os = "android")]
+    let (runtime, lib, lib_ok, need_lib) = {
+        let libdir = crate::mobile::paths(app)?.libdir;
+        let lib = Path::new(&libdir).join("libonnxruntime.so");
+        if !lib.exists() {
+            return Err(AppError::with_detail("aiUnsupported", lib.display().to_string()));
+        }
+        (Asset { url: "", sha256: "", size: 0, member: None, name: "" }, lib, PathBuf::new(), false)
+    };
+    #[cfg(not(target_os = "android"))]
+    let (runtime, lib, lib_ok, need_lib) = {
+        let runtime = RUNTIME.ok_or_else(|| AppError::new("aiUnsupported"))?;
+        let lib = dir.join(runtime.name);
+        // ملف صغير يسجّل أننا تحققنا من المكتبة بعد استخراجها (بصمتها تخص الأرشيف لا الملف)
+        let lib_ok = dir.join(format!("{}.ok", runtime.name));
+        let need = !(lib.exists() && std::fs::read_to_string(&lib_ok).is_ok_and(|s| s.trim() == runtime.sha256));
+        (runtime, lib, lib_ok, need)
+    };
     let need_model = !(model.exists() && std::fs::metadata(&model).is_ok_and(|m| m.len() == MODEL.size));
     if !need_lib && !need_model {
         return Ok(Some((lib, model)));
@@ -237,7 +279,7 @@ pub async fn ensure_assets(
                 });
             }
         };
-        if !fetch(&url, &tmp, &mut on_bytes, cancel).await? {
+        if !fetch(app, &url, &tmp, &mut on_bytes, cancel).await? {
             return Ok(None);
         }
         let hash = sha256_file(&tmp)?;

@@ -189,7 +189,7 @@ export function DownloadView(props: {
   const maxHeight = info?.heights[0];
   const duration = info && !entries && !info.isLive && info.duration ? info.duration : null;
   const activeClips = trimOn && duration ? (clips ?? [{ start: 0, end: duration }]) : null;
-  const stemsOn = stems !== "off" && !isMobile;
+  const stemsOn = stems !== "off";
   const stemsLabel = stems === "music" ? t.stemsMusic : t.stemsVoice;
   // العناصر المحدَّدة التي ستُزال منها الموسيقى
   const stemsCount = !entries || !stemsOn ? 0 : stemsScope === "all" ? selected.size : [...picked].filter((i) => selected.has(i)).length;
@@ -197,7 +197,7 @@ export function DownloadView(props: {
   const single = activeClips?.length === 1 ? activeClips[0] : null;
   const isPartial = !!single && !!duration && (single.start > 0 || single.end < duration - 0.05);
   // الدمج يحتاج ffmpeg على الكمبيوتر؛ على الهاتف تُحفظ المقاطع ملفات منفصلة
-  const willJoin = multi && joinClips && !isMobile;
+  const willJoin = multi && joinClips;
   const original = !!info?.original;
   const ready = !!info || multiLinks;
 
@@ -298,7 +298,7 @@ export function DownloadView(props: {
     videoFormat: s.videoFormat,
     audioFormat: s.audioFormat,
     quality: s.quality,
-    editorReady: s.editorReady && !isMobile && !opts?.original,
+    editorReady: s.editorReady && !opts?.original,
     start: null,
     end: null,
     stems: null,
@@ -307,7 +307,7 @@ export function DownloadView(props: {
     subs: subsForRequest,
     thumbnail: s.wantThumb,
     infoFile: s.wantInfo,
-    stills: stills !== "off" && !isMobile && s.kind === "video" ? stills : null,
+    stills: stills !== "off" && s.kind === "video" ? stills : null,
     original: !!opts?.original,
   });
 
@@ -593,7 +593,7 @@ export function DownloadView(props: {
                     />
                     {qualityHint && <div className="faint" style={{ marginTop: 6 }}>{qualityHint}</div>}
                   </div>
-                  {!isMobile && (
+                  {(
                     <div>
                       <Toggle checked={s.editorReady} onChange={(editorReady) => update({ editorReady })} title={t.editorReady} hint={t.editorReadyHint} />
                     </div>
@@ -639,7 +639,7 @@ export function DownloadView(props: {
                     <button className="btn btn-sm" onClick={addClip}>
                       <Icon name="plus" size={16} /> {t.addClip}
                     </button>
-                    {multi && !isMobile && (
+                    {multi && (
                       <div className="clips-output">
                         <span className="field-label">{t.clipsOutput}</span>
                         <Segmented<"join" | "separate">
@@ -699,7 +699,7 @@ export function DownloadView(props: {
             </div>
             <Toggle checked={s.wantThumb} onChange={(wantThumb) => update({ wantThumb })} title={t.thumbToggle} hint={t.thumbHint} />
             <Toggle checked={s.wantInfo} onChange={(wantInfo) => update({ wantInfo })} title={t.infoToggle} hint={t.infoHint} />
-            {!isMobile && s.kind === "video" && !original && (
+            {s.kind === "video" && !original && (
               <div>
                 <span className="field-label">{t.stillsLabel}</span>
                 <Segmented<Stills>
@@ -719,7 +719,7 @@ export function DownloadView(props: {
           </div>
         </details>
 
-        {!isMobile && !original && (
+        {!original && (
           <div className="stems-row">
             <span className="field-label">{t.stemsLabel}</span>
             <Segmented<"off" | "voice" | "music">
@@ -751,7 +751,7 @@ export function DownloadView(props: {
                     </div>
                   </div>
                 )}
-                <div className="faint" style={{ marginTop: 6 }}>{t.stemsHint}</div>
+                <div className="faint" style={{ marginTop: 6 }}>{isMobile ? t.stemsHintMobile : t.stemsHint}</div>
               </div>
             </div>
           </div>
@@ -780,7 +780,7 @@ export function DownloadView(props: {
       {startError && <ErrorBox error={startError} inline onFix={fix} />}
 
       <div className="action-row">
-        {!isMobile && s.projects.length > 0 && (
+        {s.projects.length > 0 && (
           <label className="project-pick" title={t.project}>
             <Icon name="layers" size={16} />
             <select

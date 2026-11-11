@@ -5,7 +5,6 @@
 
 #[cfg(desktop)]
 mod background;
-#[cfg(desktop)]
 mod convert;
 mod download;
 mod errors;
@@ -13,7 +12,6 @@ mod history;
 #[cfg(mobile)]
 mod mobile;
 mod playlist;
-#[cfg(desktop)]
 mod separate;
 mod settings;
 mod srt;
@@ -32,10 +30,10 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(download::Jobs::default())
         .manage(download::DownloadQueue::default())
-        .manage(history::HistoryState::default());
+        .manage(history::HistoryState::default())
+        .manage(convert::ConvertQueue::default());
     #[cfg(desktop)]
     let builder = builder
-        .manage(convert::ConvertQueue::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_drag::init())
@@ -95,6 +93,7 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
             convert::analyze_file,
             convert::hw_encoders,
             convert::start_convert,
+            convert::import_files,
     ]
 }
 
@@ -119,5 +118,9 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         history::add_history,
         history::remove_history,
         history::clear_history,
+        convert::analyze_file,
+        convert::hw_encoders,
+        convert::start_convert,
+        convert::import_files,
     ]
 }

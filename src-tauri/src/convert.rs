@@ -237,7 +237,10 @@ pub async fn analyze_file(app: AppHandle, path: String) -> Result<MediaInfo, App
 // ======================= مشفّرات كرت الشاشة =======================
 
 fn hw_candidates() -> &'static [&'static str] {
-    if cfg!(target_os = "macos") {
+    if cfg!(target_os = "android") {
+        // شريحة الهاتف (MediaCodec): أسرع بكثير من المعالج وأقل حرارة
+        &["h264_mediacodec", "hevc_mediacodec"]
+    } else if cfg!(target_os = "macos") {
         &["h264_videotoolbox", "hevc_videotoolbox"]
     } else if cfg!(windows) {
         &["h264_nvenc", "hevc_nvenc", "h264_qsv", "hevc_qsv", "h264_amf", "hevc_amf"]
@@ -246,24 +249,41 @@ fn hw_candidates() -> &'static [&'static str] {
     }
 }
 
-/// يجرّب كل مشفّر بترميز إطار واحد صغير: الموجود في FFmpeg لا يعني أن الجهاز يدعمه
+/// يجرّب كل مشفّر بترميز إطارات قليلة إلى ملف حقيقي: الموجود في FFmpeg لا يعني أن الجهاز يدعمه،
+/// وبعض المشفّرات (MediaCodec على بعض الهواتف) تنجح بلا أن تُخرج أي إطار، فنتأكد أن في الملف فيديو.
 async fn detect_hw(tools: &Tools) -> Vec<String> {
     let mut found = Vec::new();
+    let dir = std::env::temp_dir().join(format!("khama-hw-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
     for enc in hw_candidates() {
         let fmt = if enc.ends_with("_qsv") { "nv12" } else { "yuv420p" };
+        let out = dir.join(format!("{enc}.mp4"));
         let ok = tools::command(&tools.ffmpeg)
             .args([
-                "-hide_banner", "-loglevel", "error", "-nostdin", "-f", "lavfi", "-i", "color=s=256x256:d=0.2",
-                "-frames:v", "2", "-pix_fmt", fmt, "-c:v", enc, "-f", "null", "-",
+                "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-f", "lavfi", "-i", "testsrc2=s=320x240:r=30:d=0.5",
+                "-pix_fmt", fmt, "-c:v", enc, "-b:v", "1M",
             ])
+            .arg(&out)
             .output();
-        if let Ok(Ok(o)) = tokio::time::timeout(Duration::from_secs(15), ok).await {
-            if o.status.success() {
+        if let Ok(Ok(o)) = tokio::time::timeout(Duration::from_secs(20), ok).await {
+            if o.status.success() && video_packets(tools, &out).await > 0 {
                 found.push(enc.to_string());
             }
         }
+        let _ = std::fs::remove_file(&out);
     }
+    let _ = std::fs::remove_dir_all(&dir);
     found
+}
+
+/// عدد إطارات الفيديو المرمّزة في ملف (0 = لا فيديو)
+async fn video_packets(tools: &Tools, file: &Path) -> u64 {
+    let f = file.to_string_lossy();
+    let args = ["-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", &f];
+    match tools::run_capture(&tools.ffprobe, &args).await {
+        Ok((true, out, _)) => out.trim().parse().unwrap_or(0),
+        _ => 0,
+    }
 }
 
 async fn hw_list(tools: &Tools) -> Vec<String> {
@@ -478,6 +498,8 @@ fn atempo_chain(speed: f64) -> Vec<String> {
 fn timecode_font() -> Option<String> {
     let candidates: &[&str] = if cfg!(windows) {
         &["C:/Windows/Fonts/consola.ttf", "C:/Windows/Fonts/cour.ttf", "C:/Windows/Fonts/arial.ttf"]
+    } else if cfg!(target_os = "android") {
+        &["/system/fonts/DroidSansMono.ttf", "/system/fonts/CutiveMono.ttf", "/system/fonts/Roboto-Regular.ttf"]
     } else if cfg!(target_os = "macos") {
         &["/System/Library/Fonts/Menlo.ttc", "/System/Library/Fonts/Monaco.ttf", "/Library/Fonts/Arial.ttf"]
     } else {
@@ -517,6 +539,20 @@ pub fn output_dims(w: u32, h: u32, o: &ConvertOptions, default_short: Option<u32
 }
 
 /// إعدادات المشفّر لكل Preset
+/// مشفّر الهاتف لا يفهم CRF: نحسب معدّل بت يقابله من المقاس وعدد الإطارات
+fn mediacodec_bitrate(src: Option<&VideoInfo>, o: &ConvertOptions, crf: u32) -> u64 {
+    let (w, h, fps) = src.map(|v| (v.width, v.height, v.fps.unwrap_or(30.0))).unwrap_or((1920, 1080, 30.0));
+    let (w, h) = output_dims(w, h, o, None);
+    // بت لكل بكسل: أعلى جودة ← رقم أكبر
+    let bpp = match crf {
+        0..=18 => 0.16,
+        19..=22 => 0.11,
+        23..=26 => 0.07,
+        _ => 0.04,
+    };
+    ((w as f64 * h as f64 * fps.clamp(1.0, 120.0) * bpp) as u64).clamp(500_000, 80_000_000)
+}
+
 fn codec_args(p: &Preset, o: &ConvertOptions, hw: &[String], src: Option<&VideoInfo>) -> Vec<String> {
     let q = o.quality.as_str();
     let pick = |high: u32, bal: u32, small: u32| match q {
@@ -540,6 +576,9 @@ fn codec_args(p: &Preset, o: &ConvertOptions, hw: &[String], src: Option<&VideoI
                 let qp = (crf + 1).to_string();
                 s(&["-c:v", e, "-rc", "cqp", "-qp_i", &qp, "-qp_p", &qp, "-qp_b", &qp, "-pix_fmt", "yuv420p"])
             }
+            Some(e) if e.ends_with("_mediacodec") => {
+                s(&["-c:v", e, "-b:v", &mediacodec_bitrate(src, o, crf).to_string(), "-pix_fmt", "yuv420p"])
+            }
             Some(e) if e.ends_with("_videotoolbox") => {
                 // مقياس جودة VideoToolbox من 1 إلى 100
                 let vq = 100 - (crf * 2).min(90);
@@ -558,8 +597,6 @@ fn codec_args(p: &Preset, o: &ConvertOptions, hw: &[String], src: Option<&VideoI
     };
     let aac = |k: u32| s(&["-c:a", "aac", "-b:a", &format!("{k}k")]);
     let pcm = || s(&["-c:a", "pcm_s16le"]);
-    let _ = src;
-
     let mut a = match p.id {
         "edit_h264" => [avc_hevc("h264", pick(16, 18, 22)), aac(320)].concat(),
         "proxy" => [avc_hevc("h264", 26), aac(160), s(&["-g", "12"])].concat(),
@@ -1082,6 +1119,13 @@ fn parse_loudnorm(stderr: &str) -> Option<String> {
 }
 
 fn output_dir_for(app: &AppHandle, o: &ConvertOptions, input: &Path) -> Result<PathBuf, AppError> {
+    // الهاتف: ننهي الملف داخل التطبيق، ثم يُنقل إلى Download/Khama
+    #[cfg(mobile)]
+    {
+        let _ = (o, input);
+        return Ok(download::jobs_root(app)?.join("ready"));
+    }
+    #[allow(unreachable_code)]
     if let Some(d) = &o.out_dir {
         return Ok(PathBuf::from(d));
     }
@@ -1215,7 +1259,7 @@ async fn run_convert(
         }
         let dest = unique_path(&dir, &format!("{stem} [{}].{ext}", p.suffix));
         std::fs::rename(&temp, &dest).map_err(|e| AppError::with_detail("moveFailed", e.to_string()))?;
-        return Ok(Some((dest, None)));
+        return Ok(Some((deliver(app, dest).await?, None)));
     }
 
     let hw = if o.hw { hw_list(&tools).await } else { vec![] };
@@ -1270,7 +1314,16 @@ async fn run_convert(
 
     let plan = build_plan(&p, o, &infos, &hw, &target, loudnorm.as_deref())?;
     emit(app, JobUpdate { id, state: "converting", percent: Some(0.0), ..Default::default() });
-    let result = run_ffmpeg(app, id, &tools, &plan.args, &work, plan.duration, "converting", cancel).await;
+    let mut result = run_ffmpeg(app, id, &tools, &plan.args, &work, plan.duration, "converting", cancel).await;
+    // مشفّر كرت الشاشة/الهاتف أنهى بلا فيديو (يحدث مع MediaCodec على بعض الأجهزة): نعيد بالمعالج
+    let used_hw = plan.args.iter().any(|a| hw.contains(a));
+    if used_hw && !folder_out && p.kind == PKind::Video && matches!(result, Ok(Some(_))) && video_packets(&tools, &temp).await == 0 {
+        eprintln!("hw encoder produced no video, retrying on CPU");
+        let _ = std::fs::remove_file(&temp);
+        let plan = build_plan(&p, o, &infos, &[], &target, loudnorm.as_deref())?;
+        emit(app, JobUpdate { id, state: "converting", percent: Some(0.0), ..Default::default() });
+        result = run_ffmpeg(app, id, &tools, &plan.args, &work, plan.duration, "converting", cancel).await;
+    }
     let cleanup = || {
         if folder_out {
             let _ = std::fs::remove_dir_all(&temp);
@@ -1291,7 +1344,36 @@ async fn run_convert(
     }
     let dest = unique_path(&dir, &final_name);
     std::fs::rename(&temp, &dest).map_err(|e| AppError::with_detail("moveFailed", e.to_string()))?;
-    Ok(Some((dest, None)))
+    Ok(Some((deliver(app, dest).await?, None)))
+}
+
+/// على الهاتف: الناتج (ملف أو مجلد) يُنقل إلى Download/Khama العام
+async fn deliver(app: &AppHandle, dest: PathBuf) -> Result<PathBuf, AppError> {
+    #[cfg(mobile)]
+    return crate::mobile::publish_any(app, dest).await;
+    #[cfg(desktop)]
+    {
+        let _ = app;
+        Ok(dest)
+    }
+}
+
+/// ملفات اختارها المستخدم: على الهاتف تأتي كروابط content:// فننسخها داخل التطبيق أولًا
+#[tauri::command]
+pub async fn import_files(app: AppHandle, paths: Vec<String>) -> Result<Vec<String>, AppError> {
+    #[cfg(mobile)]
+    {
+        return tauri::async_runtime::spawn_blocking(move || {
+            paths.iter().map(|p| crate::mobile::import_file(&app, p)).collect::<Result<Vec<_>, _>>()
+        })
+        .await
+        .map_err(|e| AppError::with_detail("badInput", e.to_string()))?;
+    }
+    #[cfg(desktop)]
+    {
+        let _ = app;
+        Ok(paths)
+    }
 }
 
 #[tauri::command]

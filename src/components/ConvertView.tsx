@@ -1,6 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useMemo, useState } from "react";
-import type { AppError, ConvertOptions, ConvertRequest, MediaInfo, Settings } from "../api";
+import { api, asAppError, type AppError, type ConvertOptions, type ConvertRequest, type MediaInfo, type Settings } from "../api";
 import { formatBytes, formatDuration } from "../format";
 import { useI18n, type Dict } from "../i18n";
 import { estimateSize, GROUPS, presetById, presetFits, PRESETS, suggestPreset, type PresetDef, type PresetGroup } from "../presets";
@@ -9,6 +9,19 @@ import { Icon } from "./Icon";
 import { AnimatedList, SlideSwitch } from "../motion";
 import { Segmented, Toggle } from "./Segmented";
 import { TrimRange } from "./TrimRange";
+import { isMobile, MOBILE_SAVE_DIR } from "../platform";
+
+/**
+ * يختار ملفات. على الهاتف يعطينا أندرويد روابط content:// بلا اسم ملف حقيقي،
+ * فننسخها داخل التطبيق أولًا (ffmpeg يقرأ ملفات عادية فقط).
+ */
+async function pickFiles(multiple: boolean, filter: { name: string; extensions: string[] }): Promise<string[]> {
+  // فلاتر الامتدادات على أندرويد تتحوّل لأنواع MIME، وبعضها (مثل .cube) غير معروف فيُخفي الملف
+  const p = await open({ multiple, filters: isMobile ? undefined : [filter] });
+  const list = Array.isArray(p) ? p : typeof p === "string" ? [p] : [];
+  if (!list.length || !isMobile) return list;
+  return api.importFiles(list);
+}
 
 /** ملف في قائمة المحوّل */
 export interface SourceFile {
@@ -65,16 +78,24 @@ function FilePick(props: {
   onChange: (path: string | null) => void;
 }) {
   const { t } = useI18n();
+  const [copying, setCopying] = useState(false);
   const pick = async () => {
-    const p = await open({ multiple: false, filters: [{ name: props.label, extensions: props.extensions }] });
-    if (typeof p === "string") props.onChange(p);
+    setCopying(true);
+    try {
+      const [p] = await pickFiles(false, { name: props.label, extensions: props.extensions });
+      if (p) props.onChange(p);
+    } catch {
+      // إلغاء الاختيار أو فشل النسخ: نترك القيمة كما هي
+    } finally {
+      setCopying(false);
+    }
   };
   return (
     <div className="file-pick">
       <span className="field-label">{props.label}</span>
       <div className="file-pick-row">
-        <button className="btn btn-sm" onClick={pick}>
-          <Icon name="file" size={15} /> {props.value ? baseName(props.value) : t.pick}
+        <button className="btn btn-sm" onClick={pick} disabled={copying}>
+          <Icon name="file" size={15} /> {copying ? t.importing : props.value ? baseName(props.value) : t.pick}
         </button>
         {props.value && (
           <button className="icon-btn" style={{ width: 30, height: 30 }} title={t.unpick} aria-label={t.unpick} onClick={() => props.onChange(null)}>
@@ -206,10 +227,19 @@ export function ConvertView(props: {
     }
   }
 
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<AppError | null>(null);
   const chooseFiles = async () => {
-    const p = await open({ multiple: true, filters: [MEDIA_FILTER] });
-    if (Array.isArray(p)) props.addFiles(p);
-    else if (typeof p === "string") props.addFiles([p]);
+    setImporting(true);
+    setImportError(null);
+    try {
+      const paths = await pickFiles(true, MEDIA_FILTER);
+      if (paths.length) props.addFiles(paths);
+    } catch (e) {
+      setImportError(asAppError(e));
+    } finally {
+      setImporting(false);
+    }
   };
 
   const hwNames = (props.hw ?? []).map((e) => e.split("_").pop()!.toUpperCase());
@@ -222,11 +252,12 @@ export function ConvertView(props: {
         <div className="drop-icon">
           <Icon name="convert" size={28} />
         </div>
-        <h2>{props.dragging ? t.dropHere : t.dropTitle}</h2>
+        <h2>{props.dragging ? t.dropHere : isMobile ? t.pickTitleMobile : t.dropTitle}</h2>
         <p className="faint">{t.dropSub}</p>
-        <button className="btn btn-primary btn-lg" onClick={chooseFiles}>
-          <Icon name="plus" /> {t.chooseFiles}
+        <button className="btn btn-primary btn-lg" onClick={chooseFiles} disabled={importing}>
+          <Icon name="plus" /> {importing ? t.importing : t.chooseFiles}
         </button>
+        {importError && <ErrorBox error={importError} />}
       </div>
     );
   }
@@ -351,8 +382,8 @@ export function ConvertView(props: {
                 <Toggle
                   checked={s.convertHw && (props.hw?.length ?? 0) > 0}
                   onChange={(convertHw) => update({ convertHw })}
-                  title={t.hwToggle}
-                  hint={props.hw == null ? t.analyzingFile : props.hw.length ? t.hwHint(hwLabel) : t.hwNone}
+                  title={isMobile ? t.hwToggleMobile : t.hwToggle}
+                  hint={props.hw == null ? t.analyzingFile : props.hw.length ? t.hwHint(hwLabel) : isMobile ? t.hwNoneMobile : t.hwNone}
                 />
               </div>
             )}
@@ -499,18 +530,24 @@ export function ConvertView(props: {
         {error && <ErrorBox error={error} />}
 
         <div className="action-row">
-          <div className="dest">
-            <span className="field-label" style={{ margin: 0 }}>{t.saveTo2}</span>
-            <Segmented<Settings["convertDest"]>
-              label={t.saveTo2}
-              value={s.convertDest}
-              onChange={(convertDest) => update({ convertDest })}
-              options={[
-                { value: "source", label: t.destSource },
-                { value: "output", label: t.destOutput },
-              ]}
-            />
-          </div>
+          {isMobile ? (
+            <div className="dest faint">
+              <Icon name="folder" size={15} /> <span className="ltr">{MOBILE_SAVE_DIR}</span>
+            </div>
+          ) : (
+            <div className="dest">
+              <span className="field-label" style={{ margin: 0 }}>{t.saveTo2}</span>
+              <Segmented<Settings["convertDest"]>
+                label={t.saveTo2}
+                value={s.convertDest}
+                onChange={(convertDest) => update({ convertDest })}
+                options={[
+                  { value: "source", label: t.destSource },
+                  { value: "output", label: t.destOutput },
+                ]}
+              />
+            </div>
+          )}
           <span className="spacer" />
           {estimate != null && (
             <span className="estimate ltr-num" title={t.estimateHint}>

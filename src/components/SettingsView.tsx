@@ -32,7 +32,7 @@ export function SettingsView(props: {
     { id: "general", label: t.secGeneral, icon: "settings", show: true },
     { id: "downloads", label: t.secDownloads, icon: "download", show: true },
     { id: "background", label: t.secBackground, icon: "bell", show: true },
-    { id: "projects", label: t.secProjects, icon: "layers", show: !isMobile },
+    { id: "projects", label: t.secProjects, icon: "layers", show: true },
     { id: "cookies", label: t.secCookies, icon: "file", show: true },
     { id: "watch", label: t.secWatch, icon: "eye", show: !isMobile },
     { id: "tools", label: t.secTools, icon: "chip", show: true },
@@ -119,7 +119,7 @@ export function SettingsView(props: {
 
         <DownloadsSection settings={s} update={update} />
         <BackgroundSection settings={s} update={update} />
-        {!isMobile && <ProjectsSection settings={s} update={update} outputDir={props.outputDir} toast={props.toast} />}
+        {<ProjectsSection settings={s} update={update} outputDir={props.outputDir} toast={props.toast} />}
         <CookiesSection settings={s} update={update} toast={props.toast} />
         {!isMobile && <WatchSection settings={s} update={update} />}
         <ToolsSection toast={props.toast} />
@@ -283,7 +283,7 @@ function ProjectsSection(props: { settings: Settings; update: (p: Partial<Settin
       {s.projects.map((p) => (
         <div className="watch-row project-row" key={p.name}>
           <b className={s.activeProject === p.name ? "accent" : undefined}>{p.name}</b>
-          <span className="path ltr faint" title={p.outputDir ?? props.outputDir}>{p.outputDir ?? props.outputDir}</span>
+          {!isMobile && <span className="path ltr faint" title={p.outputDir ?? props.outputDir}>{p.outputDir ?? props.outputDir}</span>}
           <button
             className="btn btn-sm btn-ghost"
             onClick={() => {

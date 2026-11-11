@@ -104,6 +104,8 @@ dependencies {
     // yt-dlp + Python + FFmpeg + QuickJS لأندرويد (GPL-3.0)
     implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
+    // إزالة الموسيقى بالذكاء الاصطناعي: نستعمل مكتبتها الأصلية libonnxruntime.so من Rust (MIT)
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.22.0")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.4")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.0")

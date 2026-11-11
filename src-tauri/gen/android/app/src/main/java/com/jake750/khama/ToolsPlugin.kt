@@ -5,7 +5,9 @@ import android.content.ContentValues
 import android.media.MediaScannerConnection
 import android.os.Build
 import android.os.Environment
+import android.net.Uri
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
@@ -16,11 +18,29 @@ import app.tauri.plugin.Plugin
 import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 @InvokeArg
 class PublishArgs {
     lateinit var path: String
+    /** مجلد فرعي داخل Download/Khama (مثل مجلد اللقطات الثابتة) */
+    var subdir: String? = null
+}
+
+@InvokeArg
+class FetchArgs {
+    lateinit var url: String
+    lateinit var dest: String
+}
+
+@InvokeArg
+class ImportArgs {
+    lateinit var uri: String
+    /** المجلد الذي نضع فيه النسخة (داخل التطبيق) */
+    lateinit var dir: String
 }
 
 /**
@@ -29,6 +49,7 @@ class PublishArgs {
  *   ثم يشغّلها كود Rust نفسه الذي يعمل على الكمبيوتر.
  * - updateYtdlp: يحدّث yt-dlp عند طلب المستخدم فقط.
  * - publish: ينقل الملف المنتهي إلى مجلد Download/Khama العام ليظهر في المعرض ومدير الملفات.
+ * - importFile: ينسخ ملفًا اختاره المستخدم داخل التطبيق (للمحوّل).
  */
 @TauriPlugin
 class ToolsPlugin(private val activity: Activity) : Plugin(activity) {
@@ -57,6 +78,9 @@ class ToolsPlugin(private val activity: Activity) : Plugin(activity) {
                 ret.put("python", "$bin/libpython.so")
                 ret.put("ytdlp", File(File(base, "yt-dlp"), "yt-dlp").absolutePath)
                 ret.put("ffmpeg", "$bin/libffmpeg.so")
+                ret.put("ffprobe", "$bin/libffprobe.so")
+                // مكتبة ONNX Runtime (لإزالة الموسيقى) مضمّنة هنا
+                ret.put("libdir", bin)
                 // محرّك JavaScript صغير يحتاجه yt-dlp ليوتيوب (بديل Deno على الكمبيوتر)
                 ret.put("quickjs", "$bin/libqjs.so")
                 ret.put("env", env)
@@ -92,12 +116,14 @@ class ToolsPlugin(private val activity: Activity) : Plugin(activity) {
                 val ext = src.extension.lowercase()
                 val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "application/octet-stream"
                 val ret = JSObject()
+                val sub = args.subdir?.replace("/", "_")?.trim()?.takeIf { it.isNotEmpty() }
+                val rel = Environment.DIRECTORY_DOWNLOADS + "/Khama" + (if (sub != null) "/$sub" else "")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     val resolver = activity.contentResolver
                     val values = ContentValues().apply {
                         put(MediaStore.Downloads.DISPLAY_NAME, src.name)
                         put(MediaStore.Downloads.MIME_TYPE, mime)
-                        put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Khama")
+                        put(MediaStore.Downloads.RELATIVE_PATH, rel)
                         put(MediaStore.Downloads.IS_PENDING, 1)
                     }
                     val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
@@ -108,11 +134,18 @@ class ToolsPlugin(private val activity: Activity) : Plugin(activity) {
                     values.clear()
                     values.put(MediaStore.Downloads.IS_PENDING, 0)
                     resolver.update(uri, values, null, null)
+                    // الاسم الفعلي (أندرويد يضيف " (1)" إن وُجد ملف بنفس الاسم)
+                    var name = src.name
+                    resolver.query(uri, arrayOf(MediaStore.Downloads.DISPLAY_NAME), null, null, null)?.use { c ->
+                        if (c.moveToFirst()) name = c.getString(0) ?: name
+                    }
                     ret.put("uri", uri.toString())
-                    ret.put("path", Environment.DIRECTORY_DOWNLOADS + "/Khama/" + src.name)
+                    // مسار كامل: يمكن للتطبيق قراءة ملفاته من جديد (مثلًا لإرسالها للمحوّل)
+                    @Suppress("DEPRECATION")
+                    ret.put("path", File(File(Environment.getExternalStorageDirectory(), rel), name).absolutePath)
                 } else {
                     @Suppress("DEPRECATION")
-                    val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Khama")
+                    val dir = File(Environment.getExternalStorageDirectory(), rel)
                     dir.mkdirs()
                     var dest = File(dir, src.name)
                     var n = 2
@@ -131,5 +164,94 @@ class ToolsPlugin(private val activity: Activity) : Plugin(activity) {
                 invoke.reject(e.message ?: e.toString())
             }
         }
+    }
+
+    /** ملف اختاره المستخدم (content://...): ننسخه داخل التطبيق باسمه الحقيقي ليقرأه ffmpeg */
+    @Command
+    fun importFile(invoke: Invoke) {
+        val args = invoke.parseArgs(ImportArgs::class.java)
+        thread {
+            try {
+                val uri = Uri.parse(args.uri)
+                val resolver = activity.contentResolver
+                var name = uri.lastPathSegment?.substringAfterLast('/') ?: "file"
+                resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                    if (c.moveToFirst()) c.getString(0)?.let { name = it }
+                }
+                name = name.replace("/", "_")
+                val dir = File(args.dir)
+                dir.mkdirs()
+                val dest = File(dir, name)
+                resolver.openInputStream(uri).use { input ->
+                    if (input == null) throw IllegalStateException("cannot open $uri")
+                    dest.outputStream().use { input.copyTo(it, 1 shl 20) }
+                }
+                val ret = JSObject()
+                ret.put("path", dest.absolutePath)
+                invoke.resolve(ret)
+            } catch (e: Throwable) {
+                invoke.reject(e.message ?: e.toString())
+            }
+        }
+    }
+
+    private val fetchCancel = AtomicBoolean(false)
+
+    /**
+     * ينزّل ملفًا كبيرًا (نموذج الذكاء الاصطناعي) بشبكة أندرويد نفسها، ويكتبه في dest أثناء التنزيل
+     * (Rust يقيس حجمه لعرض التقدّم). ينتهي عند الاكتمال، أو برفض عند الخطأ أو الإلغاء.
+     */
+    @Command
+    fun fetchFile(invoke: Invoke) {
+        val args = invoke.parseArgs(FetchArgs::class.java)
+        fetchCancel.set(false)
+        thread {
+            val dest = File(args.dest)
+            try {
+                var url = URL(args.url)
+                var conn: HttpURLConnection
+                var hops = 0
+                // نتبع التحويلات يدويًا (GitHub يحوّل من https إلى https على نطاق آخر)
+                while (true) {
+                    conn = url.openConnection() as HttpURLConnection
+                    conn.instanceFollowRedirects = false
+                    conn.connectTimeout = 30000
+                    conn.readTimeout = 60000
+                    conn.setRequestProperty("User-Agent", "Khama")
+                    val code = conn.responseCode
+                    if (code in 300..399 && hops < 8) {
+                        url = URL(url, conn.getHeaderField("Location"))
+                        conn.disconnect()
+                        hops++
+                        continue
+                    }
+                    if (code !in 200..299) throw IllegalStateException("HTTP $code")
+                    break
+                }
+                dest.parentFile?.mkdirs()
+                conn.inputStream.use { input ->
+                    dest.outputStream().use { out ->
+                        val buf = ByteArray(1 shl 16)
+                        while (true) {
+                            if (fetchCancel.get()) throw InterruptedException("canceled")
+                            val n = input.read(buf)
+                            if (n < 0) break
+                            out.write(buf, 0, n)
+                        }
+                    }
+                }
+                conn.disconnect()
+                invoke.resolve(JSObject())
+            } catch (e: Throwable) {
+                dest.delete()
+                invoke.reject(e.message ?: e.toString())
+            }
+        }
+    }
+
+    @Command
+    fun cancelFetch(invoke: Invoke) {
+        fetchCancel.set(true)
+        invoke.resolve(JSObject())
     }
 }

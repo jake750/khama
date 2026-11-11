@@ -71,7 +71,7 @@ pub fn resolve(app: &AppHandle) -> Result<Tools, AppError> {
         env: p.env.into_iter().collect(),
         js_runtime: format!("quickjs:{}", p.quickjs),
         ffmpeg: PathBuf::from(&p.ffmpeg),
-        ffprobe: PathBuf::new(),
+        ffprobe: PathBuf::from(&p.ffprobe),
         ffmpeg_dir: PathBuf::from(&p.ffmpeg),
     })
 }
