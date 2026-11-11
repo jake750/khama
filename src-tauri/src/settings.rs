@@ -41,6 +41,43 @@ pub struct Settings {
     pub convert_hw: bool,
     /// مجلدات مراقَبة: كل ملف جديد فيها يُحوَّل تلقائيًا
     pub watch_folders: Vec<WatchFolder>,
+    /// قالب اسم الملف: {title} {uploader} {date} {today} {site} {id} {res} {n}
+    pub filename_template: String,
+    /// مجلد فرعي لكل موقع (YouTube/، Instagram/...)
+    pub site_folders: bool,
+    /// حدّ سرعة التنزيل بالميغابايت/ثانية (0 = بلا حدّ)
+    pub rate_limit: u32,
+    /// إشعار من النظام عند انتهاء تنزيل أو فشله
+    pub notify: bool,
+    /// زر الإغلاق يُخفي النافذة في شريط المهام، والتنزيلات تكمل في الخلفية
+    pub close_to_tray: bool,
+    /// اقتراح تنزيل أي رابط يُنسخ (حتى والتطبيق في الخلفية)
+    pub watch_clipboard: bool,
+    /// آخر مجلدات حفظ استُخدمت (الأحدث أولًا)
+    pub recent_dirs: Vec<String>,
+    /// إضافات التنزيل المختارة آخر مرة
+    pub want_subs: bool,
+    pub sub_langs: Vec<String>,
+    pub want_thumb: bool,
+    pub want_info: bool,
+    /// مشاريع: كل مشروع مجلد حفظ وإعدادات خاصة به
+    pub projects: Vec<Project>,
+    pub active_project: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Project {
+    pub name: String,
+    pub output_dir: Option<String>,
+    pub kind: String,
+    pub video_format: String,
+    pub audio_format: String,
+    pub quality: String,
+    pub editor_ready: bool,
+    pub filename_template: String,
+    #[serde(default)]
+    pub site_folders: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,6 +107,19 @@ impl Default for Settings {
             convert_preset: "edit_h264".into(),
             convert_hw: true,
             watch_folders: Vec::new(),
+            filename_template: "{title}".into(),
+            site_folders: false,
+            rate_limit: 0,
+            notify: true,
+            close_to_tray: true,
+            watch_clipboard: false,
+            recent_dirs: Vec::new(),
+            want_subs: false,
+            sub_langs: Vec::new(),
+            want_thumb: false,
+            want_info: false,
+            projects: Vec::new(),
+            active_project: None,
         }
     }
 }
@@ -87,6 +137,16 @@ fn config_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, AppError> {
     Ok(config_dir(app)?.join("settings.json"))
+}
+
+/// عدّاد {n} في قالب اسم الملف: يزيد مع كل تنزيل ويبقى بعد إغلاق التطبيق
+pub fn next_counter(app: &AppHandle) -> u64 {
+    static LOCK: Mutex<()> = Mutex::new(());
+    let _g = LOCK.lock().unwrap();
+    let Ok(p) = config_dir(app).map(|d| d.join("counter.txt")) else { return 1 };
+    let n = fs::read_to_string(&p).ok().and_then(|s| s.trim().parse::<u64>().ok()).unwrap_or(0) + 1;
+    let _ = fs::write(&p, n.to_string());
+    n
 }
 
 pub fn cookies_path(app: &AppHandle) -> Result<PathBuf, AppError> {

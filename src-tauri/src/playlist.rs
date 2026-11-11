@@ -69,7 +69,7 @@ pub fn entries_from_ytdlp(j: &Value) -> Vec<Entry> {
         // قائمة داخل قائمة (مثل تبويبات قناة) لا تُنزَّل كملف واحد
         .filter(|e| {
             e["_type"].as_str() != Some("playlist")
-                && !e["ie_key"].as_str().is_some_and(|k| k.ends_with("Tab") || k.contains("Playlist"))
+                && !e["ie_key"].as_str().is_some_and(|k| k.ends_with("Tab") || k.contains("Playlist") || k.ends_with("Folder"))
         })
         .filter_map(|e| {
             let url = str_field(e, &["url", "webpage_url", "original_url"])

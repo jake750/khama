@@ -43,6 +43,18 @@ A built-in encoder for files already on your computer. Drag files in, pick what 
 - **Graphics card encoding** (NVIDIA NVENC, Intel QSV, AMD AMF, Apple VideoToolbox), detected by actually testing the hardware.
 - **Queue, size estimate, time left, cancel**, and **watch folders** that convert new files automatically.
 
+### For editors (new in 0.2)
+
+- **Drag a finished download straight into Premiere, DaVinci Resolve or CapCut**, from the downloads list or the history.
+- **Subtitles as SRT**, cut to match the part you download. **Thumbnail as JPG** at full resolution. **Source info** (`.txt`) with the link, uploader and dates, for credits.
+- **Several links at once**: paste a whole list and each one is queued. **Google Drive folders** download file by file, in their original format.
+- **Preview the video while trimming**, with "set start here / set end here" buttons.
+- **Stills** every 5 or 10 seconds, or at scene cuts, for moodboards. **Timeline XML** for clips saved separately, so they open laid out in Premiere or Resolve.
+- **History** that survives restarts, with search, "show in folder" and "download again".
+- **Projects**: a save folder plus download options per project, one click to switch. **File name templates** (`{n}_{site}_{title}`…) and a sub-folder per site.
+- **Runs in the background** from the tray, with a **notification** when a download finishes. **Copied links are suggested** automatically (optional).
+- **Speed limit**, **scheduled downloads** ("start at 2:00"), and a **mini window** that stays on top next to your editor.
+
 ### Install
 
 Grab the installer for your system from the [Releases](../../releases) page:
@@ -87,7 +99,7 @@ Run the Rust unit tests:
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-Installers for all three platforms are built automatically by GitHub Actions (`.github/workflows/build.yml`). Run it manually from the **Actions** tab, or push a tag like `v0.1.0` to create a draft release.
+Installers for all three platforms are built automatically by GitHub Actions (`.github/workflows/build.yml`). Run it manually from the **Actions** tab, or push a tag like `v0.2.0` to create a draft release.
 
 ### How it works
 
@@ -103,6 +115,9 @@ React UI (src/)  ──invoke──▶  Rust (src-tauri/src/)  ──spawns─�
 | `src-tauri/src/tools.rs` | Locates bundled tools. Copies yt-dlp to a writable folder so it can self-update |
 | `src-tauri/src/errors.rs` | Maps raw yt-dlp errors to error codes |
 | `src-tauri/src/settings.rs` | Settings and cookies storage (local JSON) |
+| `src-tauri/src/history.rs` | Download history (local JSON) |
+| `src-tauri/src/srt.rs` | Cuts subtitles to the downloaded part |
+| `src-tauri/src/background.rs` | Tray icon, close-to-tray, clipboard watching, mini window |
 | `src/i18n.ts` | English and Arabic dictionaries, including every error message |
 | `src/components/` | UI components |
 | `scripts/fetch-binaries.mjs` | Downloads and verifies the bundled tools per platform |
@@ -153,6 +168,18 @@ MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-l
 - **خيارات**: قص، مقاس، قص لنسبة، معدل إطارات، سرعة، تدوير، إزالة التداخل، تقليل التشويش، HDR ← SDR، ملفات LUT، ترجمة مطبوعة (تدعم العربية)، شعار، تايم كود، توحيد مستوى الصوت، استبدال الصوت أو حذفه، ودمج عدة ملفات.
 - **فحص ذكي** لكل ملف مع اقتراح الصيغة المناسبة، و**تسريع بكرت الشاشة**، وطابور وتقدير للحجم والوقت، و**مجلدات مراقَبة** تحوّل كل ملف جديد تلقائيًا.
 
+### للممنتج (جديد في 0.2)
+
+- **اسحب التنزيل المكتمل مباشرة إلى Premiere أو DaVinci Resolve أو CapCut**، من قائمة التنزيلات أو من السجلّ.
+- **الترجمة بصيغة SRT** مقصوصة على الجزء الذي تنزّله، و**الصورة المصغّرة JPG** بأعلى دقة، و**ملف معلومات المصدر** (‎.txt) فيه الرابط وصاحب المحتوى والتواريخ لذكر المصدر.
+- **عدة روابط مرة واحدة**: الصق قائمة كاملة فيُنزَّل كل رابط بالترتيب. و**مجلدات Google Drive** تُنزَّل ملفًا ملفًا بصيغتها الأصلية.
+- **معاينة الفيديو أثناء القص**، مع زرّي «البداية من هنا / النهاية هنا».
+- **لقطات ثابتة** كل 5 أو 10 ثوانٍ أو عند تغيّر المشهد (للوحات المراجع)، و**ملف تايم لاين XML** للمقاطع المنفصلة يفتح مرتّبًا في Premiere أو Resolve.
+- **سجلّ تنزيلات** يبقى بعد إغلاق التطبيق، فيه بحث و«أظهر في المجلد» و«نزّله مرة أخرى».
+- **مشاريع**: لكل مشروع مجلد حفظ وخيارات تنزيل، والتبديل بنقرة. و**قوالب لأسماء الملفات** (`{n}_{site}_{title}`…) ومجلد فرعي لكل موقع.
+- **العمل في الخلفية** من شريط المهام، مع **إشعار** عند انتهاء التنزيل، و**اقتراح الروابط المنسوخة** تلقائيًا (اختياري).
+- **حدّ للسرعة**، و**تنزيل مجدول** («ابدأ الساعة 2:00»)، و**نافذة مصغّرة** تبقى فوق برنامج المونتاج.
+
 ### التثبيت
 
 حمّل ملف التثبيت المناسب لنظامك من صفحة [الإصدارات](../../releases) (الجدول في القسم الإنجليزي أعلاه). كل الأدوات التي تحتاجها خامة (yt-dlp وFFmpeg وDeno) مضمّنة داخلها، فلا داعي لتثبيت أي شيء آخر.
@@ -190,7 +217,7 @@ npm run tauri build         # بناء ملف تثبيت لنظامك
 
 <div dir="rtl">
 
-ملفات التثبيت للأنظمة الثلاثة تُبنى تلقائيًا عبر GitHub Actions. شغّل البناء يدويًا من تبويب **Actions**، أو ارفع وسمًا مثل `v0.1.0` ليُنشأ إصدار تجريبي (مسودة).
+ملفات التثبيت للأنظمة الثلاثة تُبنى تلقائيًا عبر GitHub Actions. شغّل البناء يدويًا من تبويب **Actions**، أو ارفع وسمًا مثل `v0.2.0` ليُنشأ إصدار تجريبي (مسودة).
 
 ### كيف تعمل؟
 

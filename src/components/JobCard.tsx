@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { AppError, ConvertRequest, DownloadRequest, JobState } from "../api";
 import { formatDuration, formatEta, formatSpeed, formatTimecode } from "../format";
 import { useI18n, type Dict } from "../i18n";
@@ -21,6 +22,10 @@ export interface Job {
   file?: string;
   error?: AppError;
   markers?: [number, number][];
+  /** صورة الفيديو (من المعاينة) */
+  thumbnail?: string | null;
+  /** تنزيل مجدول: وقت البدء (ms) */
+  at?: number;
 }
 
 const ACTIVE: JobState[] = ["queued", "starting", "analyzing", "downloading", "processing", "preparing", "separating", "converting"];
@@ -28,6 +33,8 @@ export const isActive = (j: Job) => ACTIVE.includes(j.state);
 
 function statusText(t: Dict, j: Job): string {
   switch (j.state) {
+    case "scheduled":
+      return t.stScheduled(new Date(j.at ?? 0).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
     case "queued":
       return t.stQueued;
     case "starting":
@@ -62,6 +69,8 @@ export function JobCard(props: {
   onConvert?: () => void;
   onSplit?: () => void;
   onCopyMarkers?: () => void;
+  /** سحب الملف المكتمل إلى برنامج آخر (الكمبيوتر فقط) */
+  onDragOut?: () => void;
 }) {
   const { t } = useI18n();
   const j = props.job;
@@ -73,14 +82,44 @@ export function JobCard(props: {
   const audioOnly = j.request?.kind === "audio" || j.meta.startsWith("WAV") || j.meta.startsWith("MP3");
   const r = j.request;
 
+  const draggable = j.state === "done" && !!j.file && !!props.onDragOut;
+  const fill = active && !indeterminate ? j.percent ?? 0 : 0;
+
   return (
-    <div className="card job">
-      <div className={`job-icon ${j.state === "done" ? "done" : j.state === "error" ? "error" : ""}`}>
-        <Icon
-          name={
-            j.state === "done" ? "check" : j.state === "error" ? "alert" : j.type === "convert" ? "convert" : audioOnly ? "music" : "film"
-          }
-        />
+    <div
+      className={`card job state-${j.state} ${draggable ? "draggable" : ""}`}
+      style={{ "--fill": `${fill}%` } as CSSProperties}
+      draggable={draggable || undefined}
+      onDragStart={
+        draggable
+          ? (e) => {
+              e.preventDefault();
+              props.onDragOut!();
+            }
+          : undefined
+      }
+      title={draggable ? t.dragHint : undefined}
+    >
+      <div className={`job-icon ${j.state === "done" ? "done" : j.state === "error" ? "error" : ""} ${j.thumbnail ? "has-thumb" : ""}`}>
+        {j.thumbnail && <img src={j.thumbnail} alt="" />}
+        <span className="job-badge">
+          <Icon
+            name={
+              j.state === "done"
+                ? "check"
+                : j.state === "error"
+                  ? "alert"
+                  : j.state === "scheduled"
+                    ? "clock"
+                    : j.type === "convert"
+                      ? "convert"
+                      : audioOnly
+                        ? "music"
+                        : "film"
+            }
+            size={j.thumbnail ? 14 : 18}
+          />
+        </span>
       </div>
 
       <div className="job-body">
@@ -133,7 +172,12 @@ export function JobCard(props: {
       </div>
 
       <div className="job-actions">
-        {active && (
+        {draggable && (
+          <span className="drag-grip" aria-hidden="true">
+            <Icon name="grip" size={16} />
+          </span>
+        )}
+        {(active || j.state === "scheduled") && (
           <button className="btn btn-sm btn-danger" onClick={props.onCancel}>
             <Icon name="x" size={16} /> {t.cancel}
           </button>
@@ -153,7 +197,7 @@ export function JobCard(props: {
             <Icon name="retry" size={16} /> {t.retry}
           </button>
         )}
-        {!active && (
+        {!active && j.state !== "scheduled" && (
           <button className="icon-btn" style={{ width: 32, height: 32 }} title={t.remove} aria-label={t.remove} onClick={props.onRemove}>
             <Icon name="x" size={16} />
           </button>

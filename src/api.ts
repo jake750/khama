@@ -27,6 +27,52 @@ export interface Settings {
   convertPreset: string;
   convertHw: boolean;
   watchFolders: WatchFolder[];
+  /** قالب اسم الملف: {title} {uploader} {date} {today} {site} {id} {res} {n} */
+  filenameTemplate: string;
+  siteFolders: boolean;
+  /** حدّ السرعة بالميغابايت/ثانية (0 = بلا حدّ) */
+  rateLimit: number;
+  notify: boolean;
+  closeToTray: boolean;
+  watchClipboard: boolean;
+  recentDirs: string[];
+  wantSubs: boolean;
+  subLangs: string[];
+  wantThumb: boolean;
+  wantInfo: boolean;
+  projects: Project[];
+  activeProject: string | null;
+}
+
+/** مشروع: مجلد حفظ وإعدادات تنزيل خاصة به */
+export interface Project {
+  name: string;
+  outputDir: string | null;
+  kind: Kind;
+  videoFormat: VideoFormat;
+  audioFormat: AudioFormat;
+  quality: string;
+  editorReady: boolean;
+  filenameTemplate: string;
+  siteFolders: boolean;
+}
+
+export interface SubLang {
+  code: string;
+  name: string;
+  auto: boolean;
+}
+
+export interface HistoryEntry {
+  id: number;
+  title: string;
+  url: string;
+  file: string;
+  kind: Kind;
+  meta: string;
+  thumbnail?: string | null;
+  date: number;
+  exists?: boolean;
 }
 
 export interface WatchFolder {
@@ -118,6 +164,11 @@ export interface ProbeInfo {
   isLive: boolean;
   /** رابط قائمة تشغيل: عناصرها (والحقول أعلاه تصف القائمة نفسها) */
   entries?: PlaylistEntry[];
+  subtitles: SubLang[];
+  /** نسخة صغيرة تُشغَّل داخل التطبيق لمعاينة القص */
+  previewUrl?: string | null;
+  /** ملفات Google Drive: تُنزَّل كما هي */
+  original: boolean;
 }
 
 export interface PlaylistEntry {
@@ -147,9 +198,20 @@ export interface DownloadRequest {
   joinClips?: boolean;
   /** مجلد فرعي داخل مجلد الحفظ (اسم قائمة التشغيل) */
   subdir?: string | null;
+  /** لغات الترجمة (SRT بجانب الملف) */
+  subs?: string[];
+  thumbnail?: boolean;
+  infoFile?: boolean;
+  /** لقطات ثابتة: "5" | "10" (كل N ثانية) | "scene" */
+  stills?: string | null;
+  /** مع مقاطع منفصلة: ملف تايم لاين XML */
+  timeline?: boolean;
+  /** الملف الأصلي بلا تحويل (Google Drive) */
+  original?: boolean;
 }
 
 export type JobState =
+  | "scheduled"
   | "queued"
   | "starting"
   | "analyzing"
@@ -205,6 +267,14 @@ export const api = {
   analyzeFile: (path: string) => invoke<MediaInfo>("analyze_file", { path }),
   hwEncoders: () => invoke<string[]>("hw_encoders"),
   startConvert: (request: ConvertRequest) => invoke<number>("start_convert", { request }),
+  saveThumbnail: (url: string) => invoke<string>("save_thumbnail", { url }),
+  getHistory: () => invoke<HistoryEntry[]>("get_history"),
+  addHistory: (entry: HistoryEntry) => invoke<void>("add_history", { entry }),
+  removeHistory: (id: number) => invoke<void>("remove_history", { id }),
+  clearHistory: () => invoke<void>("clear_history"),
+  setCompact: (compact: boolean) => invoke<void>("set_compact", { compact }),
+  quitApp: () => invoke<void>("quit_app"),
+  onClipboardUrl: (cb: (url: string) => void): Promise<UnlistenFn> => listen<string>("clipboard-url", (e) => cb(e.payload)),
   onWatchFile: (cb: (hit: { path: string; preset: string; outDir: string }) => void): Promise<UnlistenFn> =>
     listen<{ path: string; preset: string; outDir: string }>("watch-file", (e) => cb(e.payload)),
 };

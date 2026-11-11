@@ -1,6 +1,6 @@
 [package]
 name = "khama"
-version = "0.1.0"
+version = "0.2.0"
 description = "أداة تنزيل وسائط للممنتجين — Media downloader for video editors"
 authors = ["jake750"]
 license = "MIT"
@@ -15,9 +15,12 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
+# إشعار عند انتهاء التنزيل، وقراءة الحافظة (لصق الرابط ومراقبتها)
+tauri-plugin-notification = "2"
+tauri-plugin-clipboard-manager = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # لتشغيل yt-dlp و ffmpeg كعمليات منفصلة وقراءة مخرجاتها سطرًا بسطر
@@ -34,6 +37,10 @@ sha2 = "0.10"
 # التحديث التلقائي للتطبيق نفسه، ثم إعادة تشغيله (للكمبيوتر فقط؛ أندرويد يتحدّث من المتجر/الملف)
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+# سحب الملف من بطاقة التنزيل إلى برنامج المونتاج مباشرة
+tauri-plugin-drag = "2"
+# نسخة واحدة من التطبيق (فتحه مرة ثانية يُظهر النافذة المخفية في شريط المهام)
+tauri-plugin-single-instance = "2"
 
 [profile.release]
 codegen-units = 1

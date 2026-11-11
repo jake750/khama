@@ -60,7 +60,7 @@ impl Default for DownloadQueue {
 #[cfg(desktop)]
 static SEPARATING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadRequest {
     pub url: String,
@@ -90,6 +90,78 @@ pub struct DownloadRequest {
     /// مجلد فرعي داخل مجلد الحفظ (اسم قائمة التشغيل). على الكمبيوتر فقط
     #[serde(default)]
     pub subdir: Option<String>,
+    /// لغات الترجمة المطلوبة (SRT بجانب الملف). فارغ = بلا ترجمة
+    #[serde(default)]
+    pub subs: Vec<String>,
+    /// الصورة المصغّرة بأعلى دقة كملف JPG بجانب الملف
+    #[serde(default)]
+    pub thumbnail: bool,
+    /// ملف نصي بمعلومات المصدر (الرابط، صاحب المحتوى، التاريخ)
+    #[serde(default)]
+    pub info_file: bool,
+    /// لقطات ثابتة من الفيديو: "5" | "10" (كل N ثانية) | "scene" (عند تغيّر المشهد). الكمبيوتر فقط
+    #[serde(default)]
+    pub stills: Option<String>,
+    /// مع مقاطع منفصلة: ملف تايم لاين XML يفتح في Premiere و DaVinci. الكمبيوتر فقط
+    #[serde(default)]
+    pub timeline: bool,
+    /// الملف الأصلي كما هو بلا تحويل صيغة (ملفات Google Drive مثلًا)
+    #[serde(default)]
+    pub original: bool,
+}
+
+/// ما يحتاجه التنزيل من الإعدادات (يُقرأ مرة عند بدء العملية)
+struct JobOptions {
+    /// قالب yt-dlp لاسم الملف، بلا لاحقة المقطع ولا الامتداد
+    template: String,
+    rate_limit: u32,
+}
+
+/// اليوم بصيغة 2026-11-10 (بلا مكتبة تواريخ: خوارزمية التقويم المدني)
+fn today() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0) as i64;
+    civil_date(secs.div_euclid(86_400))
+}
+
+fn civil_date(days: i64) -> String {
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
+/// قالب المستخدم ← قالب yt-dlp.
+/// {title} {uploader} {date} (تاريخ النشر) {today} {site} {id} {res} {n} (عدّاد)
+pub fn output_template(user: &str, site_folders: bool, n: u64, today: &str) -> String {
+    // نص المستخدم حرفي: نهرب % ونمنع فواصل المسارات
+    let mut t: String = user
+        .trim()
+        .replace('%', "%%")
+        .chars()
+        .map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') { '_' } else { c })
+        .collect();
+    if !t.contains('{') {
+        t = if t.is_empty() { "{title}".into() } else { format!("{t} {{title}}") };
+    }
+    let t = t
+        .replace("{title}", "%(title).120B")
+        .replace("{uploader}", "%(uploader,channel|Unknown).40B")
+        .replace("{date}", "%(upload_date>%Y-%m-%d|)s")
+        .replace("{today}", today)
+        .replace("{site}", "%(extractor_key)s")
+        .replace("{id}", "%(id)s")
+        .replace("{res}", "%(height&{}p|)s")
+        .replace("{n}", &format!("{n:03}"));
+    if site_folders { format!("%(extractor_key)s/{t}") } else { t }
 }
 
 /// المقطع المطلوب بعد التحقق: (بداية، نهاية). None = الملف كاملًا
@@ -188,7 +260,10 @@ fn cookie_args(app: &AppHandle, s: &Settings) -> Vec<String> {
 /// خيارات اختيار الصيغة والجودة. منفصلة لتسهل قراءتها واختبارها.
 pub fn format_args(req: &DownloadRequest) -> Vec<String> {
     let mut a: Vec<String> = Vec::new();
-    if req.kind == "audio" {
+    if req.original {
+        // الملف الأصلي كما رفعه صاحبه (Google Drive: صيغة "source")
+        a.extend(["-f", "source/b"].map(String::from));
+    } else if req.kind == "audio" {
         let fmt = match req.audio_format.as_str() {
             "m4a" | "wav" => req.audio_format.as_str(),
             _ => "mp3",
@@ -223,6 +298,7 @@ fn download_args(
     tools: &Tools,
     cookies: Vec<String>,
     req: &DownloadRequest,
+    opts: &JobOptions,
     section: Option<(f64, f64)>,
     out: &Path,
     work: &Path,
@@ -230,19 +306,22 @@ fn download_args(
     let mut a = tools::ytdlp_base_args(tools);
     a.extend(cookies);
     a.extend(format_args(req));
+    if opts.rate_limit > 0 {
+        a.extend(["-r".into(), format!("{}M", opts.rate_limit)]);
+    }
     // أغنية من سبوتيفاي: رابط بحث، نأخذ أول نتيجة فقط
     if req.url.starts_with(playlist::MUSIC_SEARCH) {
         a.extend(["--playlist-items".into(), "1".into()]);
     }
-    let mut template = "%(title).150B.%(ext)s".to_string();
+    let mut template = format!("{}.%(ext)s", opts.template);
     if let Some((s, e)) = section {
         // * = بالوقت (لا بالفصول). نجبر إطارات مفتاحية عند نقطتي القص حتى يكون القص دقيقًا بالإطار
         a.push("--download-sections".into());
         a.push(format!("*{}-{}", ts(s), ts(e)));
-        if req.kind == "video" {
+        if req.kind == "video" && !req.original {
             a.push("--force-keyframes-at-cuts".into());
         }
-        template = format!("%(title).130B [{} - {}].%(ext)s", ts_name(s), ts_name(e));
+        template = format!("{} [{} - {}].%(ext)s", opts.template, ts_name(s), ts_name(e));
     }
     a.extend([
         "-P".into(),
@@ -594,54 +673,359 @@ async fn run_job(
         AppError::with_detail("outputDirCreate", e.to_string())
     })?;
     let cookies = cookie_args(app, &settings);
+    let user_tpl = &settings.filename_template;
+    let n = if user_tpl.contains("{n}") { settings::next_counter(app) } else { 0 };
+    let opts = JobOptions {
+        template: output_template(user_tpl, settings.site_folders, n, &today()),
+        rate_limit: settings.rate_limit,
+    };
     let parts = clips(&req);
     // الدمج يحتاج ffmpeg، وهو على الكمبيوتر فقط
     let join = req.join_clips && parts.len() > 1 && cfg!(desktop);
 
-    // مقطع واحد أو الملف كاملًا: كالسابق
+    // الترجمة والصورة ومعلومات المصدر: تُجلب مرة واحدة قبل التنزيل
+    let side = fetch_sidecars(&tools, &cookies, &req, &job_dir.join("side"), cancel).await?;
+    let Some(side) = side else { return Ok(None) };
+
+    // مقطع واحد أو الملف كاملًا
     if parts.len() <= 1 {
         let section = parts.first().copied();
-        let Some(file) = fetch(app, id, &tools, &cookies, &req, section, job_dir, (0, 1), cancel).await? else {
+        let Some((file, sub)) = fetch(app, id, &tools, &cookies, &req, &opts, section, job_dir, (0, 1), cancel).await? else {
             return Ok(None);
         };
         let Some(file) = finish(app, id, &tools, &req, file, job_dir, cancel).await? else {
             return Ok(None);
         };
-        return deliver(app, &file, &final_dir).await.map(Some);
+        let dir = final_dir.join(sub);
+        let done = deliver_with_extras(app, &tools, &req, &file, &dir, &side, &parts, job_dir, cancel).await?;
+        return Ok(done);
     }
 
-    let n = parts.len();
-    let mut files = Vec::with_capacity(n);
+    let count = parts.len();
+    let mut files = Vec::with_capacity(count);
     for (i, sec) in parts.iter().enumerate() {
         let dir = job_dir.join(format!("clip{i}"));
-        let Some(file) = fetch(app, id, &tools, &cookies, &req, Some(*sec), &dir, (i, n), cancel).await? else {
+        let Some((file, sub)) = fetch(app, id, &tools, &cookies, &req, &opts, Some(*sec), &dir, (i, count), cancel).await? else {
             return Ok(None);
         };
-        files.push((file, dir));
+        files.push((file, dir, sub));
     }
 
     if join {
         emit(app, JobUpdate { id, state: "processing", ..Default::default() });
-        let inputs: Vec<PathBuf> = files.iter().map(|(f, _)| f.clone()).collect();
+        let inputs: Vec<PathBuf> = files.iter().map(|(f, _, _)| f.clone()).collect();
         let Some(joined) = concat_files(&tools, &req, &inputs, &job_dir.join("joined"), cancel).await? else {
             return Ok(None);
         };
         let Some(file) = finish(app, id, &tools, &req, joined, job_dir, cancel).await? else {
             return Ok(None);
         };
-        return deliver(app, &file, &final_dir).await.map(Some);
+        let dir = final_dir.join(&files[0].2);
+        return deliver_with_extras(app, &tools, &req, &file, &dir, &side, &parts, job_dir, cancel).await;
     }
 
     // ملف لكل مقطع: نعيد مسار الأول (الواجهة تفتح مجلده)
     let mut first = None;
-    for (file, dir) in files {
+    let mut delivered = Vec::with_capacity(count);
+    for (i, (file, dir, sub)) in files.into_iter().enumerate() {
         let Some(file) = finish(app, id, &tools, &req, file, &dir, cancel).await? else {
             return Ok(None);
         };
-        let done = deliver(app, &file, &final_dir).await?;
+        let target = final_dir.join(sub);
+        let Some(done) = deliver_with_extras(app, &tools, &req, &file, &target, &side, &parts[i..=i], &dir, cancel).await? else {
+            return Ok(None);
+        };
+        delivered.push((done.clone(), parts[i]));
         first.get_or_insert(done);
     }
+    #[cfg(desktop)]
+    if req.timeline && req.kind == "video" {
+        if let Err(e) = write_timeline(&tools, &delivered).await {
+            eprintln!("timeline: {e:?}");
+        }
+    }
     Ok(first)
+}
+
+// ======================= الإضافات: ترجمة، صورة، معلومات، لقطات، تايم لاين =======================
+
+/// ما جُلب قبل التنزيل: ملفات بجانب الفيديو + معلومات المصدر
+#[derive(Default)]
+struct Sidecars {
+    /// (الملف، لاحقة اسمه بعد اسم الفيديو) مثل (".../side.en.srt", ".en.srt")
+    files: Vec<(PathBuf, String)>,
+    info: Option<Value>,
+}
+
+/// يجلب الترجمة والصورة المصغّرة ومعلومات المصدر دون تنزيل الفيديو.
+/// Some(فارغ) إن لم يُطلب شيء، None إن ألغى المستخدم.
+async fn fetch_sidecars(
+    tools: &Tools,
+    cookies: &[String],
+    req: &DownloadRequest,
+    dir: &Path,
+    cancel: &mut watch::Receiver<bool>,
+) -> Result<Option<Sidecars>, AppError> {
+    if req.subs.is_empty() && !req.thumbnail && !req.info_file {
+        return Ok(Some(Sidecars::default()));
+    }
+    std::fs::create_dir_all(dir)?;
+    let mut a = tools::ytdlp_base_args(tools);
+    a.extend(cookies.iter().cloned());
+    a.extend(["--skip-download", "--no-simulate"].map(String::from));
+    if req.url.starts_with(playlist::MUSIC_SEARCH) {
+        a.extend(["--playlist-items".into(), "1".into()]);
+    }
+    if !req.subs.is_empty() {
+        a.extend([
+            "--write-subs".into(),
+            "--write-auto-subs".into(),
+            "--sub-langs".into(),
+            req.subs.join(","),
+            "--convert-subs".into(),
+            "srt".into(),
+        ]);
+    }
+    if req.thumbnail {
+        a.extend(["--write-thumbnail", "--convert-thumbnails", "jpg"].map(String::from));
+    }
+    a.extend([
+        "--print".into(),
+        "KHAMA_INFO %(.{title,uploader,channel,webpage_url,upload_date,extractor_key,duration,license,id})j".into(),
+        "-P".into(),
+        dir.to_string_lossy().into_owned(),
+        "-o".into(),
+        "side.%(ext)s".into(),
+        "--".into(),
+        req.url.clone(),
+    ]);
+    let mut cmd = tools::ytdlp_command(tools);
+    cmd.args(a);
+    let mut info = None;
+    let outcome = run_streaming(cmd, cancel, |line| {
+        if let Some(j) = line.strip_prefix("KHAMA_INFO ") {
+            info = serde_json::from_str(j).ok();
+        }
+    })
+    .await?;
+    match outcome {
+        RunOutcome::Canceled => return Ok(None),
+        // الإضافات ليست أساسية: إن فشلت نكمل تنزيل الفيديو نفسه
+        RunOutcome::Exited { success: false, stderr } => eprintln!("sidecars: {}", tail(&stderr, 6)),
+        RunOutcome::Exited { success: true, .. } => {}
+    }
+    let mut files = Vec::new();
+    for e in std::fs::read_dir(dir)?.flatten() {
+        let p = e.path();
+        let name = e.file_name().to_string_lossy().into_owned();
+        let wanted = (req.thumbnail && name.ends_with(".jpg")) || (!req.subs.is_empty() && name.ends_with(".srt"));
+        if let Some(suffix) = name.strip_prefix("side").filter(|_| wanted) {
+            files.push((p, suffix.to_string()));
+        }
+    }
+    files.sort();
+    Ok(Some(Sidecars { files, info: info.filter(|_| req.info_file) }))
+}
+
+/// "اسم.mp4" ← "اسم"
+fn stem_of(p: &Path) -> String {
+    p.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default()
+}
+
+/// نص ملف معلومات المصدر (لذكر المصدر وحقوق المحتوى)
+fn info_text(info: &Value, sections: &[(f64, f64)]) -> String {
+    let s = |k: &str| info[k].as_str().filter(|v| !v.is_empty() && *v != "NA");
+    let mut out = String::new();
+    let mut line = |label: &str, v: Option<String>| {
+        if let Some(v) = v {
+            out.push_str(&format!("{label}: {v}\n"));
+        }
+    };
+    line("Title", s("title").map(String::from));
+    line("Source", s("webpage_url").map(String::from));
+    line("Uploader", s("uploader").or(s("channel")).map(String::from));
+    line(
+        "Published",
+        s("upload_date").filter(|d| d.len() == 8).map(|d| format!("{}-{}-{}", &d[..4], &d[4..6], &d[6..])),
+    );
+    line("Site", s("extractor_key").map(String::from));
+    line("License", s("license").map(String::from));
+    line("Downloaded", Some(today()));
+    if !sections.is_empty() {
+        let parts: Vec<String> = sections.iter().map(|(a, b)| format!("{} - {}", ts(*a), ts(*b))).collect();
+        line("Section", Some(parts.join(", ")));
+    }
+    out.push_str("\nDownloaded with Khama. Respect the rights of the content owner.\n");
+    out
+}
+
+/// ينقل الملف الرئيسي ثم ما معه (ترجمة مقصوصة على المقاطع، صورة، معلومات، لقطات) بنفس الاسم
+#[allow(clippy::too_many_arguments, unused_variables)]
+async fn deliver_with_extras(
+    app: &AppHandle,
+    tools: &Tools,
+    req: &DownloadRequest,
+    file: &Path,
+    final_dir: &Path,
+    side: &Sidecars,
+    sections: &[(f64, f64)],
+    work: &Path,
+    cancel: &mut watch::Receiver<bool>,
+) -> Result<Option<PathBuf>, AppError> {
+    std::fs::create_dir_all(final_dir).map_err(|e| AppError::with_detail("outputDirCreate", e.to_string()))?;
+
+    // لقطات ثابتة: قبل نقل الفيديو (نحتاجه في مكانه المؤقت)
+    #[cfg(desktop)]
+    let stills_dir = match req.stills.as_deref().filter(|_| req.kind == "video" && !req.original) {
+        Some(mode) => match grab_stills(tools, file, mode, &work.join("stills"), cancel).await? {
+            Some(d) => Some(d),
+            None => return Ok(None),
+        },
+        None => None,
+    };
+
+    let done = deliver(app, file, final_dir).await?;
+    let stem = stem_of(&done);
+    let extra_dir = work.join("extras");
+    std::fs::create_dir_all(&extra_dir)?;
+
+    for (src, suffix) in &side.files {
+        let target = extra_dir.join(format!("{stem}{suffix}"));
+        if suffix.ends_with(".srt") && !sections.is_empty() {
+            let content = std::fs::read_to_string(src).unwrap_or_default();
+            std::fs::write(&target, crate::srt::for_sections(&content, sections))?;
+        } else {
+            std::fs::copy(src, &target)?;
+        }
+        if let Err(e) = deliver(app, &target, final_dir).await {
+            eprintln!("deliver extra: {e:?}");
+        }
+    }
+    if let Some(info) = &side.info {
+        let target = extra_dir.join(format!("{stem} - source.txt"));
+        std::fs::write(&target, info_text(info, sections))?;
+        if let Err(e) = deliver(app, &target, final_dir).await {
+            eprintln!("deliver info: {e:?}");
+        }
+    }
+    #[cfg(desktop)]
+    if let Some(dir) = stills_dir {
+        let dest = unique_path(final_dir, &format!("{stem} stills"));
+        if std::fs::rename(&dir, &dest).is_err() {
+            std::fs::create_dir_all(&dest)?;
+            for e in std::fs::read_dir(&dir)?.flatten() {
+                std::fs::copy(e.path(), dest.join(e.file_name()))?;
+            }
+        }
+    }
+    Ok(Some(done))
+}
+
+/// لقطات JPG من الفيديو: كل N ثانية، أو عند تغيّر المشهد
+#[cfg(desktop)]
+async fn grab_stills(
+    tools: &Tools,
+    file: &Path,
+    mode: &str,
+    dir: &Path,
+    cancel: &mut watch::Receiver<bool>,
+) -> Result<Option<PathBuf>, AppError> {
+    std::fs::create_dir_all(dir)?;
+    let filter = match mode {
+        "scene" => "select='eq(n\\,0)+gt(scene\\,0.3)'".to_string(),
+        n => format!("fps=1/{}", n.parse::<u32>().unwrap_or(5).clamp(1, 600)),
+    };
+    let mut cmd = tools::ffmpeg_command(tools);
+    cmd.args(["-hide_banner", "-nostdin", "-y", "-i"])
+        .arg(file)
+        .args(["-vf", &filter, "-fps_mode", "vfr", "-q:v", "2"])
+        .arg(dir.join("still_%03d.jpg"));
+    match run_streaming(cmd, cancel, |_| {}).await? {
+        RunOutcome::Canceled => Ok(None),
+        RunOutcome::Exited { success: true, .. } => Ok(Some(dir.to_path_buf())),
+        RunOutcome::Exited { stderr, .. } => Err(AppError::with_detail("stillsFailed", tail(&stderr, 8))),
+    }
+}
+
+/// ملف تايم لاين بصيغة Final Cut Pro 7 XML (يستورده Premiere و DaVinci Resolve):
+/// المقاطع متتالية على مسار واحد، بنفس ترتيبها في الفيديو الأصلي.
+#[cfg(desktop)]
+async fn write_timeline(tools: &Tools, clips: &[(PathBuf, (f64, f64))]) -> Result<(), AppError> {
+    let Some((first, _)) = clips.first() else { return Ok(()) };
+    let f = first.to_string_lossy();
+    let (_, out, _) = tools::run_capture(
+        &tools.ffprobe,
+        &["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,r_frame_rate", "-of", "json", &f],
+    )
+    .await?;
+    let j: Value = serde_json::from_str(&out).unwrap_or(Value::Null);
+    let s = &j["streams"][0];
+    let width = s["width"].as_u64().unwrap_or(1920);
+    let height = s["height"].as_u64().unwrap_or(1080);
+    let fps = s["r_frame_rate"].as_str().and_then(fraction).unwrap_or(30.0);
+    let mut durations = Vec::new();
+    for (p, (a, b)) in clips {
+        let d = check_media(tools, p).await.ok().and_then(|c| c.duration).unwrap_or(b - a);
+        durations.push(d);
+    }
+    let xml = timeline_xml(clips, &durations, fps, width, height);
+    let dir = first.parent().unwrap_or(Path::new("."));
+    let base = joined_name(first, clips.len());
+    let name = format!("{} timeline.xml", base.rsplit_once('.').map(|(s, _)| s).unwrap_or(&base));
+    std::fs::write(unique_path(dir, &name), xml)?;
+    Ok(())
+}
+
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+}
+
+/// مسار ملف بصيغة file:// (المسافات والرموز مرمّزة)
+fn file_url(p: &Path) -> String {
+    let s = p.to_string_lossy().replace('\\', "/");
+    let mut out = String::from(if s.starts_with('/') { "file://localhost" } else { "file://localhost/" });
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' | b':' => out.push(b as char),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
+pub fn timeline_xml(clips: &[(PathBuf, (f64, f64))], durations: &[f64], fps: f64, width: u64, height: u64) -> String {
+    // timebase عدد صحيح؛ 29.97 و 23.976 تُكتب 30 و 24 مع ntsc=TRUE
+    let ntsc = (fps.round() - fps).abs() > 0.01;
+    let tb = fps.round().max(1.0) as u64;
+    let rate = format!("<rate><timebase>{tb}</timebase><ntsc>{}</ntsc></rate>", if ntsc { "TRUE" } else { "FALSE" });
+    let frames = |sec: f64| (sec * fps).round() as u64;
+    let mut video = String::new();
+    let mut audio = String::new();
+    let mut at = 0u64;
+    for (i, ((p, _), d)) in clips.iter().zip(durations).enumerate() {
+        let len = frames(*d).max(1);
+        let name = xml_escape(&p.file_name().unwrap_or_default().to_string_lossy());
+        let file = format!(
+            "<file id=\"file-{i}\"><name>{name}</name><pathurl>{}</pathurl>{rate}<duration>{len}</duration>\
+             <media><video><samplecharacteristics><width>{width}</width><height>{height}</height></samplecharacteristics></video>\
+             <audio><channelcount>2</channelcount></audio></media></file>",
+            xml_escape(&file_url(p))
+        );
+        video.push_str(&format!(
+            "<clipitem id=\"v-{i}\"><name>{name}</name><duration>{len}</duration>{rate}<start>{at}</start><end>{}</end><in>0</in><out>{len}</out>{file}</clipitem>",
+            at + len
+        ));
+        audio.push_str(&format!(
+            "<clipitem id=\"a-{i}\"><name>{name}</name><duration>{len}</duration>{rate}<start>{at}</start><end>{}</end><in>0</in><out>{len}</out><file id=\"file-{i}\"/><sourcetrack><mediatype>audio</mediatype><trackindex>1</trackindex></sourcetrack></clipitem>",
+            at + len
+        ));
+        at += len;
+    }
+    format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE xmeml>\n<xmeml version=\"4\"><sequence id=\"khama\"><name>Khama clips</name><duration>{at}</duration>{rate}\
+         <media><video><format><samplecharacteristics>{rate}<width>{width}</width><height>{height}</height></samplecharacteristics></format>\
+         <track>{video}</track></video><audio><track>{audio}</track></audio></media></sequence></xmeml>\n"
+    )
 }
 
 /// تنزيل مقطع واحد (أو الملف كاملًا) بـ yt-dlp إلى dir/out.
@@ -653,13 +1037,15 @@ async fn fetch(
     tools: &Tools,
     cookies: &[String],
     req: &DownloadRequest,
+    opts: &JobOptions,
     section: Option<(f64, f64)>,
     dir: &Path,
     part: (usize, usize),
     cancel: &mut watch::Receiver<bool>,
-) -> Result<Option<PathBuf>, AppError> {
+) -> Result<Option<(PathBuf, PathBuf)>, AppError> {
+    let out_dir = dir.join("out");
     let mut cmd = tools::ytdlp_command(tools);
-    cmd.args(download_args(tools, cookies.to_vec(), req, section, &dir.join("out"), &dir.join("work")));
+    cmd.args(download_args(tools, cookies.to_vec(), req, opts, section, &out_dir, &dir.join("work")));
 
     let (i, n) = (part.0 as f64, part.1.max(1) as f64);
     let mut file: Option<PathBuf> = None;
@@ -697,7 +1083,15 @@ async fn fetch(
         RunOutcome::Exited { success: true, .. } => {}
     }
     match file.filter(|f| f.exists()) {
-        Some(f) => Ok(Some(f)),
+        Some(f) => {
+            // مجلد فرعي من القالب (مثل YouTube/) يُحفظ كما هو داخل مجلد الحفظ
+            let sub = f
+                .parent()
+                .and_then(|p| p.strip_prefix(&out_dir).ok())
+                .map(Path::to_path_buf)
+                .unwrap_or_default();
+            Ok(Some((f, sub)))
+        }
         None => Err(AppError::new("noOutputFile")),
     }
 }
@@ -715,7 +1109,7 @@ async fn finish(
 ) -> Result<Option<PathBuf>, AppError> {
     // جاهز للمونتاج؟ (الكمبيوتر فقط: نسخة الهاتف لا تحمل ffprobe)
     #[cfg(desktop)]
-    if req.kind == "video" && req.editor_ready {
+    if req.kind == "video" && req.editor_ready && !req.original {
         emit(app, JobUpdate { id, state: "processing", ..Default::default() });
         let check = check_media(tools, &file).await?;
         if !(check.video_ok && check.audio_ok) {
@@ -914,6 +1308,69 @@ pub struct ProbeInfo {
     /// رابط قائمة تشغيل: عناصرها (والحقول أعلاه تصف القائمة نفسها)
     #[serde(skip_serializing_if = "Option::is_none")]
     entries: Option<Vec<Entry>>,
+    /// لغات الترجمة المتاحة
+    subtitles: Vec<SubLang>,
+    /// رابط مباشر لنسخة صغيرة (فيديو + صوت) لمعاينة القص داخل التطبيق
+    #[serde(skip_serializing_if = "Option::is_none")]
+    preview_url: Option<String>,
+    /// ملفات Google Drive: تُنزَّل كما هي (بلا تحويل صيغة)
+    original: bool,
+}
+
+#[derive(Serialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SubLang {
+    code: String,
+    name: String,
+    /// ترجمة تلقائية (من الكلام) لا مكتوبة
+    auto: bool,
+}
+
+/// لغات الترجمة: المكتوبة أولًا، ثم التلقائية المفيدة فقط (لغة الفيديو الأصلية + العربية والإنجليزية)
+/// لأن يوتيوب يعرض ترجمة آلية لأكثر من 100 لغة.
+pub fn sub_langs(j: &Value) -> Vec<SubLang> {
+    let name_of = |v: &Value, code: &str| {
+        v.as_array()
+            .and_then(|a| a.iter().find_map(|t| t["name"].as_str()))
+            .map(String::from)
+            .unwrap_or_else(|| code.to_string())
+    };
+    let mut out: Vec<SubLang> = Vec::new();
+    if let Some(m) = j["subtitles"].as_object() {
+        for (code, v) in m {
+            if code == "live_chat" {
+                continue;
+            }
+            out.push(SubLang { code: code.clone(), name: name_of(v, code), auto: false });
+        }
+    }
+    if let Some(m) = j["automatic_captions"].as_object() {
+        let lang = j["language"].as_str().unwrap_or("");
+        for (code, v) in m {
+            let base = code.trim_end_matches("-orig");
+            let useful = code.ends_with("-orig") || code == lang || code == "ar" || code == "en";
+            if useful && !out.iter().any(|s| s.code == base || s.code.split('-').next() == Some(base)) {
+                out.push(SubLang { code: code.clone(), name: name_of(v, code), auto: true });
+            }
+        }
+    }
+    out
+}
+
+/// أصغر نسخة فيها صورة وصوت معًا بصيغة MP4 (تكفي للمعاينة وتُشغَّل في المتصفح مباشرة)
+fn preview_url(j: &Value) -> Option<String> {
+    j["formats"]
+        .as_array()?
+        .iter()
+        .filter(|f| {
+            f["vcodec"].as_str().is_some_and(|v| v != "none" && v.starts_with("avc1"))
+                && f["acodec"].as_str().is_some_and(|a| a != "none")
+                && f["ext"].as_str() == Some("mp4")
+                && f["protocol"].as_str() == Some("https")
+        })
+        .min_by_key(|f| f["height"].as_u64().unwrap_or(9999))
+        .and_then(|f| f["url"].as_str())
+        .map(String::from)
 }
 
 /// قائمة سبوتيفاي: نجلب صفحة المشغّل المضمَّن بـ yt-dlp ونقرأ منها أسماء الأغاني
@@ -939,6 +1396,9 @@ async fn probe_spotify(tools: &Tools, embed: String) -> Result<ProbeInfo, AppErr
         heights: vec![],
         is_live: false,
         entries: Some(list.entries),
+        subtitles: vec![],
+        preview_url: None,
+        original: false,
     })
 }
 
@@ -987,6 +1447,9 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
             heights: vec![],
             is_live: false,
             entries: Some(entries),
+            subtitles: vec![],
+            preview_url: None,
+            original: j["extractor_key"].as_str().is_some_and(|k| k.starts_with("GoogleDrive")),
         });
     }
     let mut heights: Vec<u32> = j["formats"]
@@ -1009,7 +1472,47 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
         heights,
         is_live: j["is_live"].as_bool().unwrap_or(false),
         entries: None,
+        subtitles: sub_langs(&j),
+        preview_url: preview_url(&j),
+        original: j["extractor_key"].as_str().is_some_and(|k| k.starts_with("GoogleDrive")),
     })
+}
+
+/// يحفظ الصورة المصغّرة بأعلى دقة (JPG) في مجلد الحفظ، دون تنزيل الفيديو
+#[tauri::command]
+pub async fn save_thumbnail(app: AppHandle, settings: State<'_, SettingsState>, url: String) -> Result<String, AppError> {
+    let url = validate_url(&url)?;
+    let s = settings.0.lock().unwrap().clone();
+    let tools = tools::resolve(&app)?;
+    static N: AtomicU64 = AtomicU64::new(0);
+    let work = jobs_root(&app)?.join(format!("thumb-{}", N.fetch_add(1, Ordering::Relaxed)));
+    let _ = std::fs::remove_dir_all(&work);
+    std::fs::create_dir_all(&work)?;
+    let mut a = tools::ytdlp_base_args(&tools);
+    a.extend(cookie_args(&app, &s));
+    a.extend(["--skip-download", "--write-thumbnail", "--convert-thumbnails", "jpg", "-P"].map(String::from));
+    a.push(work.to_string_lossy().into_owned());
+    a.extend(["-o".into(), "%(title).150B.%(ext)s".into(), "--windows-filenames".into(), "--".into(), url]);
+    let args: Vec<&str> = a.iter().map(String::as_str).collect();
+    let (ok, _, err) = tokio::time::timeout(Duration::from_secs(90), tools::run_ytdlp(&tools, &args))
+        .await
+        .map_err(|_| AppError::new("timeout"))??;
+    let jpg = std::fs::read_dir(&work)?
+        .flatten()
+        .map(|e| e.path())
+        .find(|p| p.extension().is_some_and(|e| e == "jpg"));
+    let Some(jpg) = jpg else {
+        let _ = std::fs::remove_dir_all(&work);
+        return Err(if ok { AppError::new("noThumbnail") } else { friendly_ytdlp_error(&err) });
+    };
+    #[cfg(mobile)]
+    let dir = jobs_root(&app)?.join("ready");
+    #[cfg(desktop)]
+    let dir = settings::resolve_output_dir(&app, &s)?;
+    std::fs::create_dir_all(&dir)?;
+    let done = deliver(&app, &jpg, &dir).await;
+    let _ = std::fs::remove_dir_all(&work);
+    Ok(done?.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -1051,7 +1554,59 @@ mod tests {
             clips: vec![],
             join_clips: false,
             subdir: None,
+            ..Default::default()
         }
+    }
+
+    #[test]
+    fn templates() {
+        assert_eq!(output_template("{title}", false, 0, "2026-11-10"), "%(title).120B");
+        assert_eq!(
+            output_template("ref_{n} {site}", true, 7, "2026-11-10"),
+            "%(extractor_key)s/ref_007 %(extractor_key)s"
+        );
+        // نص بلا متغيرات: يُضاف العنوان بعده، والرموز الممنوعة تُستبدل
+        assert_eq!(output_template("a/b 100%", false, 0, "x"), "a_b 100%% %(title).120B");
+        assert_eq!(output_template("", false, 0, "x"), "%(title).120B");
+        assert_eq!(output_template("{today}_{title}", false, 0, "2026-11-10"), "2026-11-10_%(title).120B");
+    }
+
+    #[test]
+    fn dates() {
+        assert_eq!(civil_date(0), "1970-01-01");
+        assert_eq!(civil_date(20_402), "2025-11-10");
+        assert_eq!(civil_date(11_016), "2000-02-29");
+    }
+
+    #[test]
+    fn subtitle_languages() {
+        let j: Value = serde_json::from_str(r#"{
+            "language": "fr",
+            "subtitles": {"en": [{"name": "English"}], "live_chat": []},
+            "automatic_captions": {"fr-orig": [{"name": "French (Original)"}], "fr": [{"name": "French"}], "en": [{"name": "English"}], "ar": [{"name": "Arabic"}], "de": [{"name": "German"}]}
+        }"#).unwrap();
+        let codes: Vec<(String, bool)> = sub_langs(&j).into_iter().map(|s| (s.code, s.auto)).collect();
+        assert_eq!(codes, vec![("en".into(), false), ("ar".into(), true), ("fr".into(), true)]);
+    }
+
+    #[test]
+    fn timeline() {
+        let clips = vec![(PathBuf::from("C:/v/a b.mp4"), (0.0, 2.0)), (PathBuf::from("C:/v/c&d.mp4"), (5.0, 6.0))];
+        let x = timeline_xml(&clips, &[2.0, 1.0], 29.97, 1920, 1080);
+        assert!(x.contains("<timebase>30</timebase><ntsc>TRUE</ntsc>"));
+        assert!(x.contains("<pathurl>file://localhost/C:/v/a%20b.mp4</pathurl>"));
+        assert!(x.contains("c&amp;d.mp4"));
+        assert!(x.contains("<start>60</start><end>90</end>"));
+    }
+
+    #[test]
+    fn info_file_text() {
+        let j: Value = serde_json::from_str(r#"{"title":"T","webpage_url":"https://x","uploader":"U","upload_date":"20141110","extractor_key":"Youtube","license":"NA"}"#).unwrap();
+        let t = info_text(&j, &[(1.0, 2.5)]);
+        assert!(t.contains("Source: https://x\n"));
+        assert!(t.contains("Published: 2014-11-10\n"));
+        assert!(!t.contains("License"));
+        assert!(t.contains("Section: 0:00:01.000 - 0:00:02.500"));
     }
 
     #[test]

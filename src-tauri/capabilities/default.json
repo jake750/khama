@@ -1,7 +1,15 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "صلاحيات النافذة الرئيسية: الأساسيات + نافذة اختيار المجلد فقط",
-  "windows": ["main"],
-  "permissions": ["core:default", "dialog:allow-open"]
+  "description": "صلاحيات النافذة الرئيسية: الأساسيات، نافذة اختيار المجلد، الإشعارات، وقراءة الحافظة وكتابتها",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "notification:default",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text"
+  ]
 }

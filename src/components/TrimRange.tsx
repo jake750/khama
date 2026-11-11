@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
 import { formatDuration, formatTimecode, parseTime } from "../format";
 import { useI18n } from "../i18n";
+import { Icon } from "./Icon";
 
 export interface Range {
   start: number;
   end: number;
+}
+
+/** ربط الشريط بمشغّل المعاينة: تحريك مقبض يقفز بالفيديو إليه، وأزرار «من هنا» تقرأ وقته */
+export interface PreviewLink {
+  now: () => number | null;
+  seek: (t: number) => void;
 }
 
 /** حقل وقت: يقبل الكتابة الحرة ويطبّق القيمة عند الخروج أو Enter */
@@ -37,7 +44,7 @@ function TimeField(props: { label: string; value: number; onCommit: (v: number) 
  * شريط اختيار جزء من المدة بمقبضين.
  * الشريط دائمًا من اليسار لليمين (خط الزمن)، حتى في الواجهة العربية.
  */
-export function TrimRange(props: { duration: number; value: Range; onChange: (r: Range) => void }) {
+export function TrimRange(props: { duration: number; value: Range; onChange: (r: Range) => void; preview?: PreviewLink | null }) {
   const { t } = useI18n();
   const { duration: d, value: r } = props;
   const step = d > 600 ? 1 : 0.1;
@@ -46,7 +53,15 @@ export function TrimRange(props: { duration: number; value: Range; onChange: (r:
     start = Math.max(0, Math.min(start, d));
     end = Math.max(0, Math.min(end, d));
     if (end - start < minGap) return;
+    // نعرض في المعاينة الطرف الذي تحرّك
+    if (props.preview) props.preview.seek(start !== r.start ? start : end);
     props.onChange({ start, end });
+  };
+  const here = (which: "start" | "end") => {
+    const now = props.preview?.now();
+    if (now == null) return;
+    if (which === "start") typeStart(now);
+    else typeEnd(now);
   };
   const pct = (v: number) => `${(v / d) * 100}%`;
   // من الحقول: بداية بعد النهاية تحرّك النهاية معها (بنفس المدة)، ونهاية قبل البداية تحرّك البداية
@@ -91,6 +106,16 @@ export function TrimRange(props: { duration: number; value: Range; onChange: (r:
         </div>
         <TimeField label={t.trimEnd} value={r.end} onCommit={typeEnd} />
       </div>
+      {props.preview && (
+        <div className="trim-here">
+          <button type="button" className="btn btn-sm btn-ghost" onClick={() => here("start")}>
+            <Icon name="flagStart" size={14} /> {t.setStartHere}
+          </button>
+          <button type="button" className="btn btn-sm btn-ghost" onClick={() => here("end")}>
+            {t.setEndHere} <Icon name="flagEnd" size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
