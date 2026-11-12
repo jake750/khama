@@ -1320,6 +1320,37 @@ img.file-thumb {
   color: var(--warn);
 }
 
+/* الأيقونة لا تصغر حين يلتف النص لعدة أسطر */
+.issue > svg {
+  flex-shrink: 0;
+}
+
+/* الهاتف: العمود ضيق فيلتف التنبيه. نجعله سطرًا كاملًا بزوايا عادية بدل كبسولة منتفخة */
+@media (max-width: 560px) {
+  .file-row {
+    align-items: flex-start;
+  }
+  .file-thumb {
+    width: 64px;
+    height: 36px;
+    margin-top: 2px;
+  }
+  .issues {
+    gap: 6px;
+  }
+  .issue {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: var(--r-xs);
+    line-height: 1.45;
+  }
+  .issue > svg {
+    margin-top: 2px;
+  }
+}
+
 .suggestion {
   align-items: center;
 }
