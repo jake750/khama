@@ -47,7 +47,10 @@ def grid() -> list[dict]:
     return out
 
 
-def match(gt: list[dict], det: list[tuple[int, int]], flashes: list[int]) -> dict:
+def match(gt: list[dict], det: list[tuple[int, int]], flashes: list[int], ignore: list[dict] | None = None) -> dict:
+    # detections inside an "ignore" span (ambiguous parts of a hand-labelled film) count neither way
+    if ignore:
+        det = [(ds, de) for ds, de in det if not any(ds <= z["end"] and de >= z["start"] for z in ignore)]
     used = [False] * len(det)
     tp = {"cut": 0, "gradual": 0}
     n = {"cut": 0, "gradual": 0}
@@ -191,6 +194,32 @@ def main() -> None:
     ax.set_title("Shot-boundary detection, test half", fontsize=10)
     fig.tight_layout()
     fig.savefig(RESULTS / f"scenes_pr{a.tag and '_' + a.tag}.png")
+
+    # ---- real editing: hand-labelled films (scenes/labels/*.json) ----
+    film_rows = []
+    for lab in sorted((Path(__file__).parent / "labels").glob("*.json")):
+        L = json.loads(lab.read_text(encoding="utf-8"))
+        video = (Path(__file__).resolve().parents[1] / L["video"]).resolve()
+        if not video.exists():
+            continue
+        kj = bench_bin("scenes", video, "--grid", work / "grid.json")
+        scores, _ = ffmpeg_scores(video, work / f"{lab.stem}.ffmpeg.json")
+        gt, ign = L["transitions"], L.get("ignore", [])
+        def kdet(pi):
+            return [(b["start"], b["end"]) for b in kj["results"][pi]["boundaries"]]
+        for name, det in [
+            ("FFmpeg scene > 0.30 (old stills)", [(i - 1, i) for i, x in enumerate(scores) if x > 0.30 and i > 0]),
+            ("FFmpeg scene > 0.32 (old detect)", [(i - 1, i) for i, x in enumerate(scores) if x > 0.32 and i > 0]),
+            (f"FFmpeg scene > {best_ff} (best on dev)", [(i - 1, i) for i, x in enumerate(scores) if x > best_ff and i > 0]),
+            ("Khama, cuts only (best on dev)", kdet(cut_only)),
+            ("Khama, full (best on dev)", kdet(best)),
+            ("Khama, shipped defaults", kdet(default_cfg)),
+        ]:
+            film_rows.append(dict(film=lab.stem, method=name, **prf([match(gt, det, [], ign)])))
+    if film_rows:
+        films = pd.DataFrame(film_rows)
+        films.to_csv(RESULTS / f"scenes_films{a.tag and '_' + a.tag}.csv", index=False, float_format="%.4f")
+        print(films[["film", "method", "P", "R", "F1", "R_cut", "R_grad", "tp", "fp", "fn"]].to_string(index=False))
 
 
 if __name__ == "__main__":
