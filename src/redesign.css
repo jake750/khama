@@ -885,30 +885,73 @@ button.menu-item:hover {
   line-height: 16px;
 }
 
-/* ---------- الزخرفة: «خ» مكبّرة ومقصوصة بلون واحد وشفافية منخفضة ----------
-   حرف الشعار نفسه، فهي عربية ومرتبطة بالهوية. تُستعمل في 3 أماكن فقط:
-   بطل التنزيل، ومنطقة الإفلات في المحوّل، ونافذة التحديث. */
+/* ---------- الزخرفة: موجات إشارة تنساب ببطء ----------
+   خطوط جيبية بطبقتين تتحركان بسرعتين واتجاهين (عمق/parallax)، كموجة صوت على شريط المونتاج.
+   ترسمها قناع SVG فيأخذ لونها من --motif-color في كل وضع. تُستعمل في 3 أماكن فقط:
+   بطل التنزيل، ومنطقة الإفلات في المحوّل، ونافذة التحديث. الحركة transform فقط (رخيصة على الهاتف). */
 .motif {
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  --wave-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 160' preserveAspectRatio='none'%3E%3Cpath d='M0 80 C50 22 150 22 200 80 S350 138 400 80' fill='none' stroke='black' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M0 92 C60 50 140 50 200 92 S340 134 400 92' fill='none' stroke='black' stroke-width='1.2' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M0 68 C50 48 150 48 200 68 S350 88 400 68' fill='none' stroke='black' stroke-width='1' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --wave-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 160' preserveAspectRatio='none'%3E%3Cpath d='M0 100 C25 76 75 76 100 100 S175 124 200 100 S275 76 300 100 S375 124 400 100' fill='none' stroke='black' stroke-width='1.2' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M0 56 C25 44 75 44 100 56 S175 68 200 56 S275 44 300 56 S375 68 400 56' fill='none' stroke='black' stroke-width='1' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --wave-a-w: 560px;
+  --wave-b-w: 380px;
+}
+
+.motif::before,
+.motif::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  /* اتجاه فيزيائي عمدًا: الحركة أفقية وتتكرّر، فلا تتأثر بـ RTL */
+  left: 0;
+  /* النصف السفلي: خلف حقل الرابط (زجاجه يُنعّمها)، والعنوان فوقها هادئ */
+  inset-block: 34% -4%;
+  background: var(--motif-color, var(--on-hero));
+  pointer-events: none;
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
+  will-change: transform;
 }
 
 .motif::after {
-  content: "خ";
-  position: absolute;
-  z-index: -1;
-  inset-inline-end: -0.06em;
-  top: 50%;
-  font-family: "IBM Plex Sans Arabic", sans-serif;
-  font-size: var(--motif-size, 400px);
-  font-weight: var(--fw-bold);
-  line-height: 1;
-  color: var(--motif-color, var(--on-hero));
-  opacity: var(--motif-opacity, 0.11);
-  transform: translateY(-62%);
-  pointer-events: none;
-  user-select: none;
+  width: calc(100% + var(--wave-a-w));
+  opacity: calc(var(--motif-opacity, 0.11) * 2.4);
+  -webkit-mask-image: var(--wave-a);
+  mask-image: var(--wave-a);
+  -webkit-mask-size: var(--wave-a-w) 100%;
+  mask-size: var(--wave-a-w) 100%;
+  animation: motif-drift-a 26s linear infinite;
+}
+
+.motif::before {
+  width: calc(100% + var(--wave-b-w));
+  opacity: calc(var(--motif-opacity, 0.11) * 1.4);
+  -webkit-mask-image: var(--wave-b);
+  mask-image: var(--wave-b);
+  -webkit-mask-size: var(--wave-b-w) 100%;
+  mask-size: var(--wave-b-w) 100%;
+  transform: translateX(calc(var(--wave-b-w) * -1));
+  animation: motif-drift-b 19s linear infinite;
+}
+
+/* الإزاحة = عرض بلاطة واحدة بالضبط، فلا يظهر أي قفز عند التكرار */
+@keyframes motif-drift-a {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(var(--wave-a-w) * -1)); }
+}
+
+@keyframes motif-drift-b {
+  from { transform: translateX(calc(var(--wave-b-w) * -1)); }
+  to { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motif::before,
+  .motif::after {
+    animation: none;
+  }
 }
 
 /* ---------- بطل شاشة التنزيل: الشيء الوحيد المطلوب، الصق الرابط ---------- */
@@ -925,7 +968,6 @@ button.menu-item:hover {
   border-radius: calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px) 0 0;
   background: linear-gradient(160deg, var(--hero-1), var(--hero-2) 85%);
   color: var(--on-hero);
-  --motif-size: 420px;
 }
 
 .hero .card-head h2 {
@@ -992,7 +1034,6 @@ button.menu-item:hover {
 .dropzone {
   --motif-color: var(--accent);
   --motif-opacity: 0.07;
-  --motif-size: 360px;
   border-style: dashed;
 }
 
@@ -1004,7 +1045,6 @@ button.menu-item:hover {
 .update-card {
   --motif-color: var(--accent);
   --motif-opacity: 0.06;
-  --motif-size: 300px;
   border-radius: var(--r-lg);
   padding: var(--s-6);
 }
@@ -1099,9 +1139,6 @@ button.menu-item:hover {
   .hero {
     margin: calc(var(--s-4) * -1) calc(var(--s-4) * -1) var(--s-5);
     padding: var(--s-5) var(--s-4);
-  }
-  .hero {
-    --motif-size: 300px;
   }
   .card-head h2 {
     font-size: var(--fs-sec);
@@ -1201,4 +1238,114 @@ button.menu-item:hover {
   white-space: normal;
   overflow-wrap: anywhere;
   line-height: 1.5;
+}
+
+/* =====================================================================
+   شاشة التنزيل بعد المراجعة: الخيارات مطويّة بملخّص، والزر يقول ما سيحدث
+   ===================================================================== */
+details.options-box {
+  margin-top: var(--s-5);
+}
+
+details.options-box .options {
+  margin-top: 0;
+  padding: var(--s-1) var(--s-4) var(--s-4);
+}
+
+/* الملخّص يأخذ ما بقي من السطر ويُقطع بنقاط بدل أن يدفع السهم خارجًا */
+details.extras > summary .extras-count {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quality-hint {
+  margin-top: var(--s-2);
+  padding-inline: var(--s-1);
+}
+
+/* التنظيف بالذكاء الاصطناعي والجدولة صارا داخل «إضافات» */
+details.extras .stems-row,
+details.extras .schedule-row {
+  margin-top: 0;
+  padding: var(--s-2) var(--s-4) var(--s-4);
+  border-top: 1px solid var(--line);
+}
+
+.download-btn-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
+}
+
+.download-btn-text small {
+  font-size: var(--fs-cap);
+  font-weight: var(--fw-regular);
+  opacity: 0.85;
+}
+
+.dest-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-top: var(--s-5);
+}
+
+/* الهاتف */
+@media (max-width: 560px) {
+  /* أكثر من 3 خيارات: شبكة من 3 أعمدة بدل سطر يخرج من الشاشة بلا إشارة */
+  .segmented.seg-many {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    overflow: visible;
+  }
+  /* أربعة خيارات بالضبط: عمودان، فلا يبقى خيار وحيد في سطر */
+  .segmented.seg-many:has(> button:nth-of-type(4):last-of-type) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .segmented.seg-many button {
+    min-width: 0;
+    padding-inline: var(--s-2);
+  }
+  /* في بطاقة التنزيل: كل مجموعة خيارات بعرض البطاقة وأعمدة متساوية (أهداف لمس أكبر، ولا شيء يخرج) */
+  .download-card .segmented {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    width: 100%;
+    overflow: visible;
+  }
+  .download-card .segmented.seg-many {
+    grid-auto-flow: row;
+  }
+  .download-card .segmented button {
+    min-width: 0;
+    padding-inline: var(--s-2);
+    white-space: normal;
+    text-align: center;
+    line-height: 1.35;
+  }
+  /* الملخّص وحده يكفي عنوانًا على الشاشة الضيّقة */
+  details.options-box > summary .summary-label {
+    display: none;
+  }
+
+  /* زر التنزيل ثابت فوق التبويبات السفلية، في متناول الإبهام */
+  .action-row.sticky-action {
+    position: sticky;
+    /* .main محشوّ من الأسفل بارتفاع التبويبات + 24، والالتصاق يُحسب داخل هذا الحشو؛ ننزل 24 حتى يلامس التبويبات */
+    bottom: calc(var(--s-6) * -1);
+    z-index: 5;
+    margin: var(--s-4) calc(var(--s-4) * -1) calc(var(--s-4) * -1);
+    padding: var(--s-3) var(--s-4);
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 var(--r-lg) var(--r-lg);
+    background: var(--surface);
+  }
+  .dest-row + .action-row.sticky-action {
+    margin-top: var(--s-3);
+  }
 }
