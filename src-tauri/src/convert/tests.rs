@@ -1,5 +1,23 @@
 use super::*;
 
+#[test]
+fn calibrated_quality_interpolates_and_falls_back() {
+    // unmeasured encoders keep the previous rule
+    assert_eq!(calibrated_quality("h264_nvenc", 18), 19);
+    for (enc, table) in [("h264_qsv", QSV_H264), ("hevc_qsv", QSV_HEVC)] {
+        // the table points are reproduced, and the mapping never decreases
+        for &(c, q) in table {
+            assert_eq!(calibrated_quality(enc, c as u32), q.round() as u32);
+        }
+        let mut prev = 0;
+        for crf in 10..40 {
+            let q = calibrated_quality(enc, crf);
+            assert!(q >= prev, "{enc}: q({crf}) = {q} < {prev}");
+            prev = q;
+        }
+    }
+}
+
 fn video(w: u32, h: u32) -> MediaInfo {
     MediaInfo {
         path: "in.mp4".into(),

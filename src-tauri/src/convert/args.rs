@@ -138,6 +138,41 @@ pub(super) fn mediacodec_bitrate(src: Option<&VideoInfo>, o: &ConvertOptions, cr
     ((w as f64 * h as f64 * fps.clamp(1.0, 120.0) * bpp) as u64).clamp(500_000, 80_000_000)
 }
 
+/// Hardware quality value that gives the same VMAF as the software CRF (x264 for H.264, x265 for HEVC).
+/// The (crf, value) points come from the measurements in bench/codecs (results/codecs_calibration.csv);
+/// between points the value is interpolated linearly, outside them it follows the slope of the nearest segment.
+/// Encoders that could not be measured keep the previous rule, crf + 1.
+pub fn calibrated_quality(encoder: &str, crf: u32) -> u32 {
+    let table: &[(f64, f64)] = match encoder {
+        "h264_qsv" => QSV_H264,
+        "hevc_qsv" => QSV_HEVC,
+        _ => &[],
+    };
+    if table.len() < 2 {
+        return crf + 1;
+    }
+    let c = crf as f64;
+    let i = table.windows(2).position(|w| c <= w[1].0).unwrap_or(table.len() - 2);
+    let ((x0, y0), (x1, y1)) = (table[i], table[i + 1]);
+    let y = y0 + (c - x0) * (y1 - y0) / (x1 - x0);
+    y.round().clamp(1.0, 51.0) as u32
+}
+
+/// Measured on an Intel i5-1135G7 (Iris Xe, Quick Sync), 12 Xiph.org clips: median over clips.
+/// (CRF of the software encoder, global_quality giving the same VMAF), at the CRFs the app uses.
+pub(super) const QSV_H264: &[(f64, f64)] = &[
+    (16.0, 17.89),
+    (17.0, 18.90),
+    (18.0, 20.32),
+    (19.0, 21.44),
+    (21.0, 22.66),
+    (22.0, 23.43),
+    (23.0, 24.69),
+    (26.0, 28.04),
+    (30.0, 32.99),
+];
+pub(super) const QSV_HEVC: &[(f64, f64)] = &[(19.0, 22.28), (23.0, 25.28), (28.0, 29.79)];
+
 pub(super) fn codec_args(p: &Preset, o: &ConvertOptions, hw: &[String], src: Option<&VideoInfo>) -> Vec<String> {
     let q = o.quality.as_str();
     let pick = |high: u32, bal: u32, small: u32| match q {
@@ -171,7 +206,7 @@ pub(super) fn codec_args(p: &Preset, o: &ConvertOptions, hw: &[String], src: Opt
                 "-preset",
                 "medium",
                 "-global_quality",
-                &(crf + 1).to_string(),
+                &calibrated_quality(e, crf).to_string(),
                 "-pix_fmt",
                 "nv12",
             ]),
