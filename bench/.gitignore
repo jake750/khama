@@ -1,0 +1,5 @@
+.venv/
+data/
+work/
+__pycache__/
+results/*_smoke*
