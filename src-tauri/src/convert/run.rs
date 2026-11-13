@@ -420,8 +420,40 @@ async fn run_detect(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOption
     if p.id != "detect_silence" && info.video.is_none() {
         return Err(AppError::new("noVideoStream"));
     }
-    let args = detect_args(p.id, &info.path, o);
     let dur = o.end.unwrap_or(info.duration.unwrap_or(0.0)) - o.start.unwrap_or(0.0);
+    // المشاهد: خوارزمية خامة (مدرّج ألوان HSV + عتبة متكيّفة + كشف الانتقالات التدريجية)، انظر scenes.rs
+    if p.id == "detect_scenes" {
+        let t0 = o.start.unwrap_or(0.0);
+        let mut last = std::time::Instant::now() - std::time::Duration::from_secs(1);
+        let path = PathBuf::from(&info.path);
+        let found = crate::scenes::detect_file(
+            c.tools,
+            &path,
+            o.start,
+            o.end,
+            crate::scenes::Params::default(),
+            |t| {
+                if dur > 0.0 && last.elapsed() >= std::time::Duration::from_millis(250) {
+                    last = std::time::Instant::now();
+                    let pct = ((t - t0) / dur * 100.0).clamp(0.0, 100.0);
+                    emit(
+                        c.app,
+                        JobUpdate {
+                            id: c.id,
+                            state: "analyzing",
+                            percent: Some(pct),
+                            ..Default::default()
+                        },
+                    );
+                }
+            },
+            cancel,
+        )
+        .await?;
+        let Some(found) = found else { return Ok(None) };
+        return Ok(Some((path, Some(found.iter().map(|b| b.marker()).collect()))));
+    }
+    let args = detect_args(p.id, &info.path, o);
     let Some(log) = run_ffmpeg(c.app, c.id, c.tools, &args, c.work, dur, "analyzing", cancel).await? else {
         return Ok(None);
     };

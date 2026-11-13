@@ -198,7 +198,15 @@ pub(super) async fn grab_stills(
 ) -> Result<Option<PathBuf>, AppError> {
     std::fs::create_dir_all(dir)?;
     let filter = match mode {
-        "scene" => "select='eq(n\\,0)+gt(scene\\,0.3)'".to_string(),
+        // أول إطار + أول إطار نظيف بعد كل انتقال تكشفه خوارزمية خامة (scenes.rs)
+        "scene" => {
+            let Some(found) = crate::scenes::detect_file(tools, file, None, None, crate::scenes::Params::default(), |_| {}, cancel).await?
+            else {
+                return Ok(None);
+            };
+            let picks: String = found.iter().map(|b| format!("+eq(n\\,{})", b.end)).collect();
+            format!("select='eq(n\\,0){picks}'")
+        }
         n => format!("fps=1/{}", n.parse::<u32>().unwrap_or(5).clamp(1, 600)),
     };
     let mut cmd = tools::ffmpeg_command(tools);

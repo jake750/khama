@@ -7,11 +7,22 @@ license = "MIT"
 edition = "2024"
 # let-chains (if let ... && ...) تحتاج 1.88
 rust-version = "1.88"
+default-run = "khama"
 
 [lib]
 # اللاحقة _lib ضرورية على Windows حتى لا يتعارض اسم المكتبة مع اسم البرنامج
 name = "khama_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+# أداة القياس لمشروع التخرّج (bench/): تشغّل كود التطبيق نفسه على مجموعات الاختبار.
+# لا تُبنى مع التطبيق: cargo run --release --features bench --bin khama-bench -- ...
+[features]
+bench = []
+
+[[bin]]
+name = "khama-bench"
+path = "src/bin/khama-bench.rs"
+required-features = ["bench"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
