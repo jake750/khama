@@ -549,8 +549,34 @@ fn no_window(cmd: &mut std::process::Command) {
 #[cfg(not(windows))]
 fn no_window(_: &mut std::process::Command) {}
 
+/// How the chunks are processed and how the stems are derived (studied in bench/separation)
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct SepOptions {
+    /// Samples discarded at each edge of a chunk (the model sees them as context only)
+    pub margin: usize,
+    /// Samples shared by two successive chunks, cross-faded with a raised-cosine window (0 = hard joins)
+    pub overlap: usize,
+    /// Gain applied to the predicted voice
+    pub compensate: f32,
+    /// "subtract": music = mix - voice. "mask": Wiener-like soft mask M = |V|^2 / (|V|^2 + |X - V|^2),
+    /// voice = M X and music = (1 - M) X in the STFT domain.
+    pub derive: String,
+}
+
+impl Default for SepOptions {
+    fn default() -> Self {
+        Self {
+            margin: VOC_FT.n_fft / 2,
+            overlap: 0,
+            compensate: VOC_FT.compensate,
+            derive: "subtract".into(),
+        }
+    }
+}
+
 /// المعالجة الفعلية (متزامنة: تعمل في خيط منفصل). تكتب WAV ستيريو 44.1kHz.
-#[allow(clippy::too_many_arguments)] // تُجمع في struct ضمن إعادة الهيكلة (T-11)
+#[allow(clippy::too_many_arguments)]
 pub fn separate_blocking(
     ffmpeg: &Path,
     lib: &Path,
@@ -560,6 +586,63 @@ pub fn separate_blocking(
     end: Option<f64>,
     keep: Keep,
     out_wav: &Path,
+    progress: &AtomicU64,
+    cancel: &AtomicBool,
+) -> Result<bool, AppError> {
+    let (voice, music) = match keep {
+        Keep::Voice => (Some(out_wav), None),
+        Keep::Music => (None, Some(out_wav)),
+    };
+    separate_stems(
+        ffmpeg,
+        lib,
+        model,
+        input,
+        start,
+        end,
+        &SepOptions::default(),
+        voice,
+        music,
+        progress,
+        cancel,
+    )
+}
+
+fn wav_writer(ffmpeg: &Path, out: &Path) -> std::io::Result<std::process::Child> {
+    let mut enc = std::process::Command::new(ffmpeg);
+    enc.args([
+        "-v",
+        "error",
+        "-y",
+        "-f",
+        "f32le",
+        "-ar",
+        &SR.to_string(),
+        "-ac",
+        "2",
+        "-i",
+        "-",
+        "-c:a",
+        "pcm_s16le",
+    ]);
+    enc.arg(out);
+    enc.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::piped());
+    no_window(&mut enc);
+    enc.spawn()
+}
+
+/// Separates the voice (and/or the music) in one pass of the model. Each output is optional.
+#[allow(clippy::too_many_arguments)]
+pub fn separate_stems(
+    ffmpeg: &Path,
+    lib: &Path,
+    model: &Path,
+    input: &Path,
+    start: Option<f64>,
+    end: Option<f64>,
+    opts: &SepOptions,
+    out_voice: Option<&Path>,
+    out_music: Option<&Path>,
     progress: &AtomicU64,
     cancel: &AtomicBool,
 ) -> Result<bool, AppError> {
@@ -582,8 +665,16 @@ pub fn separate_blocking(
     let sp = Spectral::new(VOC_FT);
     let cfg = &sp.cfg;
     let chunk = sp.chunk();
-    let trim = cfg.n_fft / 2;
-    let step = chunk - 2 * trim;
+    // margin: context on each side; overlap: cross-faded part of the kept region
+    let margin = opts.margin.min(chunk / 2 - 1024);
+    let kept = chunk - 2 * margin;
+    let overlap = opts.overlap.min(kept / 2);
+    let step = kept - overlap;
+    let mask = opts.derive == "mask";
+    // raised-cosine fade-in over the overlap; the fade-out is 1 - fade-in, so the weights always sum to 1
+    let fade: Vec<f32> = (0..overlap)
+        .map(|i| (std::f32::consts::FRAC_PI_2 * (i as f32 + 0.5) / overlap as f32).sin().powi(2))
+        .collect();
 
     // فك الصوت: ستيريو 44.1kHz أرقام عشرية
     let mut dec = std::process::Command::new(ffmpeg);
@@ -600,39 +691,41 @@ pub fn separate_blocking(
     no_window(&mut dec);
     let mut dec = dec.spawn()?;
 
-    let mut enc = std::process::Command::new(ffmpeg);
-    enc.args([
-        "-v",
-        "error",
-        "-y",
-        "-f",
-        "f32le",
-        "-ar",
-        &SR.to_string(),
-        "-ac",
-        "2",
-        "-i",
-        "-",
-        "-c:a",
-        "pcm_s16le",
-    ]);
-    enc.arg(out_wav);
-    enc.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::piped());
-    no_window(&mut enc);
-    let mut enc = enc.spawn()?;
+    let mut encs: Vec<(bool, std::process::Child)> = Vec::new();
+    if let Some(p) = out_voice {
+        encs.push((false, wav_writer(ffmpeg, p)?));
+    }
+    if let Some(p) = out_music {
+        encs.push((true, wav_writer(ffmpeg, p)?));
+    }
 
     let result = (|| -> Result<bool, AppError> {
         let mut src = dec.stdout.take().expect("piped");
-        let mut sink = enc.stdin.take().expect("piped");
-        // نبدأ بصمت بطول trim، كما في طريقة MDX الأصلية
-        let mut left: Vec<f32> = vec![0.0; trim];
-        let mut right: Vec<f32> = vec![0.0; trim];
+        let mut sinks: Vec<(bool, std::process::ChildStdin)> = encs.iter_mut().map(|(m, c)| (*m, c.stdin.take().expect("piped"))).collect();
+        // نبدأ بصمت بطول الهامش، كما في طريقة MDX الأصلية
+        let mut left: Vec<f32> = vec![0.0; margin];
+        let mut right: Vec<f32> = vec![0.0; margin];
         let mut eof = false;
         let mut read_total: u64 = 0;
         let mut written: u64 = 0;
         let mut raw = vec![0u8; 8 * 16384];
         let mut carry: Vec<u8> = Vec::new();
         let plane = cfg.dim_f * cfg.dim_t;
+        // end of the previous kept region, waiting to be cross-faded: [voice L, voice R, mix L, mix R]
+        let mut tail: Vec<[f32; 4]> = Vec::new();
+
+        let emit = |sinks: &mut Vec<(bool, std::process::ChildStdin)>, frames: &[[f32; 4]]| -> std::io::Result<()> {
+            for (is_music, sink) in sinks.iter_mut() {
+                let mut bytes = Vec::with_capacity(frames.len() * 8);
+                for f in frames {
+                    let (a, b) = if *is_music { (f[2] - f[0], f[3] - f[1]) } else { (f[0], f[1]) };
+                    bytes.extend_from_slice(&a.to_le_bytes());
+                    bytes.extend_from_slice(&b.to_le_bytes());
+                }
+                sink.write_all(&bytes)?;
+            }
+            Ok(())
+        };
 
         loop {
             // املأ المخزن حتى طول قطعة كاملة
@@ -680,37 +773,53 @@ pub fn separate_blocking(
             let (_, pred) = outputs[0]
                 .try_extract_tensor::<f32>()
                 .map_err(|e| AppError::with_detail("aiRun", e.to_string()))?;
-            let to_complex = |re: usize, im: usize| -> Vec<Complex<f32>> {
-                (0..plane)
-                    .map(|i| Complex::new(pred[re * plane + i], pred[im * plane + i]))
-                    .collect()
-            };
-            let vl = sp.istft(&to_complex(0, 1));
-            let vr = sp.istft(&to_complex(2, 3));
-
-            let take = (step as u64).min(remaining) as usize;
-            let mut bytes = Vec::with_capacity(take * 8);
-            for i in trim..trim + take {
-                let (mut a, mut b) = (vl[i] * cfg.compensate, vr[i] * cfg.compensate);
-                if keep == Keep::Music {
-                    a = left[i] - a;
-                    b = right[i] - b;
+            let g = opts.compensate;
+            let voice_of = |re: usize, im: usize, mix: &[Complex<f32>]| -> Vec<f32> {
+                let v: Vec<Complex<f32>> = (0..plane)
+                    .map(|i| Complex::new(pred[re * plane + i], pred[im * plane + i]) * g)
+                    .collect();
+                if !mask {
+                    return sp.istft(&v);
                 }
-                bytes.extend_from_slice(&a.to_le_bytes());
-                bytes.extend_from_slice(&b.to_le_bytes());
+                // Wiener-like soft mask applied to the mixture
+                let m: Vec<Complex<f32>> = (0..plane)
+                    .map(|i| {
+                        let pv = v[i].norm_sqr();
+                        let pm = (mix[i] - v[i]).norm_sqr();
+                        mix[i] * (pv / (pv + pm + 1e-10))
+                    })
+                    .collect();
+                sp.istft(&m)
+            };
+            let vl = voice_of(0, 1, &sl);
+            let vr = voice_of(2, 3, &sr);
+
+            // the kept region of this chunk, in output order
+            let region: Vec<[f32; 4]> = (margin..margin + kept).map(|i| [vl[i], vr[i], left[i], right[i]]).collect();
+            // cross-fade its head with the previous tail (the mixture is the same in both chunks)
+            let mut out: Vec<[f32; 4]> = Vec::with_capacity(step);
+            for (i, f) in region.iter().enumerate().take(step) {
+                if i < tail.len() {
+                    let (w, p) = (fade[i], tail[i]);
+                    out.push([p[0] * (1.0 - w) + f[0] * w, p[1] * (1.0 - w) + f[1] * w, f[2], f[3]]);
+                } else {
+                    out.push(*f);
+                }
             }
-            sink.write_all(&bytes)?;
+            tail = region[step..].to_vec();
+            let take = (out.len() as u64).min(remaining) as usize;
+            emit(&mut sinks, &out[..take])?;
             written += take as u64;
             progress.store(written, Ordering::Relaxed);
 
-            // القطعة التالية تبدأ بعد step عينة (مع trim من السياق قبلها)
+            // القطعة التالية تبدأ بعد step عينة (مع الهامش من السياق قبلها)
             left.drain(..step.min(left.len()));
             right.drain(..step.min(right.len()));
             if eof && written >= read_total {
                 break;
             }
         }
-        drop(sink);
+        drop(sinks);
         Ok(true)
     })();
 
@@ -724,21 +833,27 @@ pub fn separate_blocking(
     match result {
         Ok(true) => {
             let (dok, derr) = finish(&mut dec);
-            let (eok, eerr) = finish(&mut enc);
             if !dok {
                 return Err(AppError::with_detail("noAudioStream", tail(&derr, 6)));
             }
-            if !eok {
-                return Err(AppError::with_detail("encodeFailed", tail(&eerr, 6)));
+            for (_, c) in encs.iter_mut() {
+                let (eok, eerr) = finish(c);
+                if !eok {
+                    return Err(AppError::with_detail("encodeFailed", tail(&eerr, 6)));
+                }
             }
             Ok(true)
         }
         other => {
             let _ = dec.kill();
-            let _ = enc.kill();
             let _ = dec.wait();
-            let _ = enc.wait();
-            let _ = std::fs::remove_file(out_wav);
+            for (_, c) in encs.iter_mut() {
+                let _ = c.kill();
+                let _ = c.wait();
+            }
+            for p in [out_voice, out_music].into_iter().flatten() {
+                let _ = std::fs::remove_file(p);
+            }
             other
         }
     }

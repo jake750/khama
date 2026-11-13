@@ -4,6 +4,10 @@
 //!       Decodes the video once, then runs the shot-boundary detector with one parameter set
 //!       (or every set of a JSON array in --grid). Prints JSON to stdout.
 //!
+//!   khama-bench separate <audio> [--voice v.wav] [--music m.wav] [--opts '<json>'] [--ai <dir>]
+//!       Runs the voice/music separation (one model pass) with the given SepOptions. Prints JSON timings.
+//!       --ai: folder with onnxruntime and UVR-MDX-NET-Voc_FT.onnx (default: the app's own data folder).
+//!
 //! FFmpeg: --ffmpeg <path>, else $KHAMA_FFMPEG, else src-tauri/binaries/ffmpeg/bin.
 
 use std::{path::PathBuf, process::Command, sync::atomic::AtomicBool, time::Instant};
@@ -37,8 +41,10 @@ fn main() {
     let ff = ffmpeg(&mut args);
     match args.first().map(String::as_str) {
         Some("scenes") => scenes_cmd(ff, args.split_off(1)),
+        Some("separate") => separate_cmd(ff, args.split_off(1)),
         _ => {
             eprintln!("usage: khama-bench scenes <video> [--params json] [--grid file.json] [--dump d.csv]");
+            eprintln!("       khama-bench separate <audio> [--voice v.wav] [--music m.wav] [--opts json] [--ai dir]");
             std::process::exit(2);
         }
     }
@@ -80,4 +86,51 @@ fn scenes_cmd(ff: PathBuf, mut args: Vec<String>) {
     }
     let out = json!({ "frames": a.frames.len(), "decode_s": decode_s, "results": results });
     println!("{out}");
+}
+
+fn separate_cmd(ff: PathBuf, mut args: Vec<String>) {
+    use khama_lib::separate::{self, SepOptions};
+    use std::sync::atomic::AtomicU64;
+    let opts: SepOptions = take(&mut args, "--opts")
+        .map(|j| serde_json::from_str(&j).expect("opts json"))
+        .unwrap_or_default();
+    let voice = take(&mut args, "--voice").map(PathBuf::from);
+    let music = take(&mut args, "--music").map(PathBuf::from);
+    let ai = take(&mut args, "--ai").map(PathBuf::from).unwrap_or_else(|| {
+        PathBuf::from(std::env::var("LOCALAPPDATA").expect("LOCALAPPDATA"))
+            .join("com.jake750.khama")
+            .join("ai")
+    });
+    let input = PathBuf::from(args.first().expect("audio path"));
+    let lib = ai.join(if cfg!(windows) {
+        "onnxruntime.dll"
+    } else if cfg!(target_os = "macos") {
+        "libonnxruntime.dylib"
+    } else {
+        "libonnxruntime.so"
+    });
+    let model = ai.join("UVR-MDX-NET-Voc_FT.onnx");
+    let progress = AtomicU64::new(0);
+    let cancel = AtomicBool::new(false);
+    let t0 = Instant::now();
+    let ok = separate::separate_stems(
+        &ff,
+        &lib,
+        &model,
+        &input,
+        None,
+        None,
+        &opts,
+        voice.as_deref(),
+        music.as_deref(),
+        &progress,
+        &cancel,
+    )
+    .unwrap_or_else(|e| panic!("separation failed: {e:?}"));
+    let secs = t0.elapsed().as_secs_f64();
+    let audio = progress.load(std::sync::atomic::Ordering::Relaxed) as f64 / 44_100.0;
+    println!(
+        "{}",
+        json!({ "ok": ok, "seconds": secs, "audio_seconds": audio, "rtf": secs / audio.max(1e-9), "opts": opts })
+    );
 }
