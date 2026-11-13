@@ -1,0 +1,490 @@
+/* =====================================================================
+   خامة على الكمبيوتر: تطبيق كمبيوتر لا صفحة هاتف مكبّرة.
+   شريط عنوان خاص + شريط جانبي + مساحة عمل بلوحتين + شريط حالة.
+   كل شيء هنا تحت .app.desktop فقط، فالهاتف والنافذة المصغّرة لا يتأثران.
+   ===================================================================== */
+
+.app.desktop {
+  /* كثافة الكمبيوتر: خط أصغر قليلًا، وعناصر أقل ارتفاعًا من أهداف اللمس */
+  --fs-body: 14px;
+  --fs-meta: 12.5px;
+  --fs-cap: 11.5px;
+  --side-w: 212px;
+  --chrome: var(--bg);
+  --workspace: var(--surface);
+  --queue: color-mix(in srgb, var(--surface) 55%, var(--bg));
+  --hover: color-mix(in srgb, var(--text) 7%, transparent);
+
+  display: grid;
+  grid-template-columns: var(--side-w) minmax(0, 1fr);
+  grid-template-rows: 40px minmax(0, 1fr) 28px;
+  grid-template-areas:
+    "title title"
+    "side work"
+    "status status";
+  height: 100%;
+  background: var(--chrome);
+  font-size: var(--fs-body);
+}
+
+/* أزرار سطح المكتب: مؤشر السهم العادي، وبلا «انضغاط» الإصبع */
+.app.desktop button,
+.app.desktop summary,
+.app.desktop label {
+  cursor: default;
+}
+
+.app.desktop .btn:active:not(:disabled),
+.app.desktop .icon-btn:active,
+.app.desktop .tab:active,
+.app.desktop .segmented button:active:not(:disabled) {
+  transform: none;
+}
+
+.app.desktop .btn {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--r-xs);
+}
+
+.app.desktop .btn-sm {
+  height: 28px;
+  padding: 0 10px;
+}
+
+.app.desktop .btn-lg {
+  height: 40px;
+}
+
+.app.desktop .icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-xs);
+}
+
+.app.desktop .segmented button {
+  padding: 6px 12px;
+}
+
+.app.desktop .input,
+.app.desktop .select {
+  border-radius: var(--r-xs);
+}
+
+/* ---------- شريط العنوان ---------- */
+.titlebar {
+  --hover: color-mix(in srgb, var(--text) 7%, transparent);
+  grid-area: title;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 40px;
+  padding-inline-start: var(--s-4);
+  background: var(--chrome, var(--surface));
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* macOS: الإشارات الثلاث الأصلية فوق اليسار دائمًا (حتى بالعربية)، نترك لها مكانها */
+.titlebar.mac {
+  padding-left: 80px;
+  padding-right: var(--s-3);
+}
+
+.titlebar .brand {
+  gap: var(--s-2);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-bold);
+}
+
+.titlebar .brand-mark {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+}
+
+.titlebar .brand-name {
+  font-size: var(--fs-body);
+}
+
+.titlebar-tools {
+  display: flex;
+  gap: 2px;
+  margin-inline-end: var(--s-2);
+}
+
+.titlebar-tools .icon-btn {
+  width: 32px;
+  height: 28px;
+  border: 0;
+  color: var(--text-faint);
+}
+
+.titlebar-tools .icon-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* أزرار النافذة بمقاس Windows 11: 46×40، والإغلاق أحمر عند المرور */
+.window-controls {
+  display: flex;
+  align-self: stretch;
+}
+
+.wc {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  transition: background-color 0.12s linear, color 0.12s linear;
+}
+
+.wc:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.wc:active {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.wc.close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
+.wc.close:active {
+  background: #b22a1b;
+  color: #fff;
+}
+
+.wc:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ---------- الشريط الجانبي ---------- */
+.app.desktop .sidebar {
+  grid-area: side;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: var(--s-2) var(--s-3) var(--s-3);
+  background: var(--chrome);
+  user-select: none;
+}
+
+.app.desktop .side-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  height: 36px;
+  padding: 0 var(--s-3);
+  border-radius: var(--r-xs);
+  color: var(--text-dim);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+}
+
+.app.desktop .side-item:hover:not([aria-current="page"]) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.app.desktop .side-item[aria-current="page"] {
+  color: var(--text);
+}
+
+.app.desktop .side-item[aria-current="page"] svg {
+  color: var(--accent);
+}
+
+.app.desktop .side-bottom {
+  margin-top: auto;
+}
+
+.side-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: start;
+}
+
+.side-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--fs-cap);
+  font-weight: var(--fw-bold);
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* المؤشر المنزلق بين الأقسام (نفس حبّة التبويبات، عموديًّا هنا) */
+.app.desktop .sidebar .tab-pill {
+  border-radius: var(--r-xs);
+  background: var(--workspace);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+/* ---------- مساحة العمل: لوحة مرفوعة بزاوية هادئة داخل إطار النافذة ---------- */
+.workspace {
+  grid-area: work;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+  margin-inline-end: var(--s-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--workspace);
+  overflow: hidden;
+}
+
+.workspace.split {
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 36%, 420px);
+}
+
+.pane {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.form-pane {
+  padding: var(--s-6) var(--s-6) var(--s-8);
+}
+
+.pane-inner {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.pane-inner.wide {
+  max-width: 1040px;
+}
+
+/* البطاقات داخل مساحة العمل: حدّ رفيع فقط، بلا ظلّ عائم ولا زوايا هاتف كبيرة */
+.app.desktop .card {
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+/* بطاقة التنزيل تذوب في اللوحة: البطل شريط مستقل، والخيارات على سطح اللوحة نفسه */
+.app.desktop .download-card {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.app.desktop .download-card .hero {
+  margin: 0 0 var(--s-5);
+  border-radius: 12px;
+}
+
+/* ---------- لوحة الطابور: التنزيلات/التحويلات دائمًا ظاهرة ---------- */
+.queue-pane {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--s-3) var(--s-4);
+  border-inline-start: 1px solid var(--border);
+  background: var(--queue);
+}
+
+.queue-pane .jobs-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  min-height: 52px;
+  margin: 0 calc(var(--s-3) * -1);
+  padding: var(--s-2) var(--s-4);
+  background: var(--queue);
+  border-bottom: 1px solid var(--line);
+}
+
+.queue-pane .jobs-header h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-body);
+}
+
+.jobs-header .count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: var(--fs-cap);
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.queue-pane .empty-state {
+  flex: 1;
+  display: grid;
+  align-content: center;
+  margin: 0;
+  padding: var(--s-6) var(--s-4);
+  border: 0;
+}
+
+.queue-pane .job-list > .li > .card {
+  margin-top: var(--s-2);
+}
+
+/* البطاقة في لوحة ضيقة: الصورة والعنوان في سطر، والأزرار في سطر تحته */
+.queue-pane .job {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--s-2) var(--s-3);
+  padding: var(--s-3);
+  background: var(--workspace);
+}
+
+.queue-pane .job:hover {
+  border-color: color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+.queue-pane .job-actions {
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.queue-pane .job-actions:empty {
+  display: none;
+}
+
+.queue-pane .job-meta {
+  gap: 4px 10px;
+}
+
+/* ---------- شريط الحالة ---------- */
+.statusbar {
+  grid-area: status;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 0 var(--s-4);
+  background: var(--chrome);
+  color: var(--text-faint);
+  font-size: var(--fs-cap);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.status-dot.busy {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  animation: status-pulse 1.6s var(--ease-io) infinite;
+}
+
+@keyframes status-pulse {
+  50% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+.status-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 40ch;
+  height: 22px;
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-link:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-dot.busy {
+    animation: none;
+  }
+}
+
+/* ---------- نافذة أضيق ---------- */
+/* الشريط الجانبي يصير أيقونات فقط، والعدد نقطة صغيرة */
+@media (max-width: 1100px) {
+  .app.desktop {
+    --side-w: 60px;
+  }
+  .app.desktop .sidebar {
+    padding-inline: var(--s-2);
+  }
+  .app.desktop .side-item {
+    position: relative;
+    justify-content: center;
+    padding: 0;
+  }
+  .app.desktop .side-label {
+    display: none;
+  }
+  .app.desktop .side-badge {
+    position: absolute;
+    top: 3px;
+    inset-inline-end: 3px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-size: 10px;
+    line-height: 16px;
+  }
+}
+
+/* أضيق من ذلك: الطابور تحت النموذج في عمود واحد يُمرَّر كله */
+@media (max-width: 900px) {
+  .workspace.split {
+    display: block;
+    overflow-y: auto;
+  }
+  .workspace.split .pane {
+    overflow: visible;
+  }
+  .workspace.split .queue-pane {
+    border-inline-start: 0;
+    border-top: 1px solid var(--border);
+    min-height: 240px;
+  }
+}
+
+/* النافذة المصغّرة (420×640 فوق البرامج): شريط عنوان رفيع فوق التصميم المضغوط */
+.app.compact {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.app.compact .titlebar {
+  grid-area: auto;
+  height: 32px;
+  border-bottom: 1px solid var(--line);
+}

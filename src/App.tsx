@@ -3,15 +3,16 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, asAppError, type ConvertRequest, type DownloadRequest, type JobUpdate, type Settings } from "./api";
+import { api, asAppError, type ConvertRequest, type DownloadRequest, type JobUpdate, type Settings, type ToolsInfo } from "./api";
 import { ConvertView, defaultOptions, MEDIA_FILTER, type SourceFile } from "./components/ConvertView";
 import { DownloadView, type StartMeta } from "./components/DownloadView";
 import { HistoryView } from "./components/HistoryView";
 import { Icon, type IconName } from "./components/Icon";
 import { isActive, JobCard, type Job } from "./components/JobCard";
 import { SettingsView } from "./components/SettingsView";
+import { TitleBar } from "./components/TitleBar";
 import { UpdateDialog } from "./components/UpdateDialog";
-import { formatTimecode } from "./format";
+import { formatSpeed, formatTimecode } from "./format";
 import { dictionaries, I18n, type Dict } from "./i18n";
 import { AnimatedList, reducedMotion, SlideSwitch, usePresence, useSlidingIndicator } from "./motion";
 import { isMobile } from "./platform";
@@ -98,6 +99,8 @@ export default function App() {
   const [settingsSection, setSettingsSection] = useState<{ id: string; n: number } | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [compact, setCompact] = useState(false);
+  const compactRef = useRef(false);
+  compactRef.current = compact;
   // تحديثات وصلت قبل أن نضيف العملية للقائمة (Rust أسرع أحيانًا من الرد)
   const pending = useRef(new Map<number, JobUpdate>());
   const jobsRef = useRef<Job[]>([]);
@@ -349,6 +352,50 @@ export default function App() {
       .catch(() => {});
   }, [compact]);
 
+  // الكمبيوتر بنافذة عادية (لا هاتف ولا نافذة مصغّرة)
+  const desktop = !isMobile && !compact;
+
+  // إصدار yt-dlp لشريط الحالة
+  const [tools, setTools] = useState<ToolsInfo | null>(null);
+  useEffect(() => {
+    if (desktop && !tools) api.toolsInfo().then(setTools).catch(() => {});
+  }, [desktop, tools]);
+
+  // سلوك تطبيق كمبيوتر لا صفحة ويب: لا قائمة المتصفح عند النقر بالزر الأيمن، ولا إعادة تحميل
+  // أو طباعة من لوحة المفاتيح، واختصارات للتنقّل (Ctrl+1..3 والإعدادات Ctrl+,)
+  useEffect(() => {
+    if (isMobile) return;
+    const order: Tab[] = ["download", "convert", "history"];
+    const onMenu = (e: MouseEvent) => {
+      const el = e.target as HTMLElement | null;
+      const editable = el?.closest("input, textarea, [contenteditable]");
+      const selected = !!window.getSelection()?.toString();
+      if (!editable && !selected) e.preventDefault();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      const k = e.key.toLowerCase();
+      if (import.meta.env.PROD && (k === "f5" || (mod && (k === "r" || k === "p")))) {
+        e.preventDefault();
+        return;
+      }
+      if (!mod || e.altKey || compactRef.current) return;
+      if (k >= "1" && k <= "3") {
+        e.preventDefault();
+        setTab(order[Number(k) - 1]);
+      } else if (k === ",") {
+        e.preventDefault();
+        setTab("settings");
+      }
+    };
+    document.addEventListener("contextmenu", onMenu);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("contextmenu", onMenu);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
   if (!settings) return null;
 
   const outputDir = settings.outputDir || defaultDir;
@@ -387,9 +434,221 @@ export default function App() {
     { id: "settings", icon: "settings", label: t.tabSettings },
   ];
 
+  // الكمبيوتر بنافذة عادية: شريط جانبي ولوحتان وشريط حالة. الهاتف والنافذة المصغّرة: التصميم المضغوط
+  const twoPanes = desktop && (tab === "download" || tab === "convert");
+  const running = jobs.filter(isActive);
+  const runningOf = (type: Job["type"]) => running.filter((j) => j.type === type).length;
+  const totalSpeed = running.reduce((sum, j) => sum + (j.state === "downloading" && j.speed ? j.speed : 0), 0);
+
+  const toolButtons = (
+    <>
+      {!isMobile && (
+        <button className="icon-btn ghost" title={compact ? t.compactOff : t.compactOn} aria-label={compact ? t.compactOff : t.compactOn} onClick={toggleCompact}>
+          <Icon name={compact ? "maximize" : "minimize"} size={desktop ? 16 : 20} />
+        </button>
+      )}
+      <button
+        className="icon-btn ghost"
+        title={t.toggleTheme}
+        aria-label={t.toggleTheme}
+        onClick={() => update({ theme: resolvedTheme === "light" ? "dark" : "light" })}
+      >
+        <Icon name={resolvedTheme === "light" ? "moon" : "sun"} size={desktop ? 16 : 20} />
+      </button>
+    </>
+  );
+
+  const notice = !settings.acceptedNotice && (
+    <div className="alert info notice-bar">
+      <Icon name="alert" size={16} />
+      <span style={{ flex: 1 }}>{t.notice}</span>
+      <button className="btn btn-sm" onClick={() => update({ acceptedNotice: true })}>{t.gotIt}</button>
+    </div>
+  );
+
+  const screen = (
+    <>
+      {tab === "download" && (
+        <DownloadView
+          settings={settings}
+          update={update}
+          outputDir={outputDir}
+          onChooseDir={chooseDir}
+          onPickDir={pickDir}
+          onStart={startDownload}
+          clipUrl={clipUrl}
+          onClipDone={() => setClipUrl(null)}
+          inject={inject}
+          onOpenSettings={(id) => {
+            setSettingsSection({ id, n: Date.now() });
+            setTab("settings");
+          }}
+          toast={toast}
+        />
+      )}
+      {tab === "convert" && (
+        <ConvertView settings={settings} update={update} files={files} addFiles={addFiles} setFiles={setFiles} hw={hw} dragging={dragging} onStart={startConvert} />
+      )}
+      {tab === "history" && (
+        <HistoryView
+          version={historyVersion}
+          onDownloadAgain={(url) => {
+            setInject({ url, n: Date.now() });
+            setTab("download");
+          }}
+          onDragOut={isMobile ? undefined : (file) => dragOut(file)}
+          toast={toast}
+        />
+      )}
+      {tab === "settings" && (
+        <SettingsView
+          settings={settings}
+          update={update}
+          outputDir={outputDir}
+          onChooseDir={chooseDir}
+          onOpenDir={() => api.openOutputDir().catch(() => {})}
+          toast={toast}
+          section={settingsSection}
+        />
+      )}
+    </>
+  );
+
+  const queue = (tab === "download" || tab === "convert") && (
+    <>
+      <div className="jobs-header">
+        <h3>
+          {tab === "convert" ? t.convertJobsTitle : t.jobsTitle}
+          {desktop && shown.length > 0 && <span className="count">{shown.length}</span>}
+        </h3>
+        {finished.length > 0 && (
+          <button
+            className="btn btn-sm btn-ghost"
+            onClick={() => setJobs((p) => p.filter((j) => isActive(j) || j.state === "scheduled" || !shown.includes(j)))}
+          >
+            {t.clearFinished}
+          </button>
+        )}
+      </div>
+      {shown.length === 0 && (
+        <div className="empty-state">
+          <div className="empty-art">
+            <Icon name={tab === "convert" ? "convert" : "download"} size={24} />
+          </div>
+          <p>{tab === "convert" ? t.convertJobsEmpty : t.jobsEmpty}</p>
+          {tab === "download" && !isMobile && <p className="faint">{t.jobsEmptyHint}</p>}
+        </div>
+      )}
+      <AnimatedList className="job-list">
+        {shown.map((j) => (
+          <JobCard
+            key={j.id}
+            job={j}
+            onCancel={() => cancel(j)}
+            onReveal={isMobile ? undefined : () => j.file && api.revealFile(j.file)}
+            onRetry={() => retry(j)}
+            onRemove={() => setJobs((p) => p.filter((x) => x.id !== j.id))}
+            onConvert={j.type === "download" && j.file ? () => addFiles([j.file!]) : undefined}
+            onSplit={j.markers?.length ? () => split(j) : undefined}
+            onCopyMarkers={j.markers?.length ? () => copyMarkers(j) : undefined}
+            onDragOut={!isMobile && j.file ? () => dragOut(j.file!) : undefined}
+          />
+        ))}
+      </AnimatedList>
+    </>
+  );
+
+  const overlays = (
+    <>
+      {dragging && tab !== "convert" && (
+        <div className="drop-overlay">
+          <div>
+            <Icon name="convert" size={24} />
+            <b>{t.dropHere}</b>
+          </div>
+        </div>
+      )}
+
+      {toastShown && (
+        <div className={`toast ${toastLeaving ? "leaving" : ""}`} role="status">
+          {toastShown}
+        </div>
+      )}
+
+      {/* تحديثات خامة: الكمبيوتر يثبّتها بنفسه، والهاتف يفتح رابط ملف APK الجديد */}
+      <UpdateDialog />
+    </>
+  );
+
+  if (desktop) {
+    return (
+      <I18n.Provider value={i18n}>
+        <div className="app desktop">
+          <TitleBar tools={toolButtons}>
+            <div className="brand" data-tauri-drag-region>
+              <img className="brand-mark" src="/logo.png" alt="" data-tauri-drag-region />
+              <span className="brand-name" data-tauri-drag-region>
+                {t.appName}
+              </span>
+            </div>
+          </TitleBar>
+
+          <nav className="sidebar tabs" ref={tabsRef} aria-label={t.appName}>
+            <span className="tab-pill" ref={tabPill} aria-hidden="true" />
+            {tabs.map((x, i) => {
+              const busy = x.id === "download" ? runningOf("download") : x.id === "convert" ? runningOf("convert") : 0;
+              return (
+                <button
+                  key={x.id}
+                  className={`tab side-item ${x.id === "settings" ? "side-bottom" : ""}`}
+                  aria-current={tab === x.id ? "page" : undefined}
+                  onClick={() => setTab(x.id)}
+                  title={x.label + t.shortcutHint(x.id === "settings" ? "Ctrl+," : `Ctrl+${i + 1}`)}
+                >
+                  <Icon name={x.icon} size={18} />
+                  <span className="side-label">{x.label}</span>
+                  {busy > 0 && <span className="side-badge">{busy}</span>}
+                </button>
+              );
+            })}
+          </nav>
+
+          <main className={`workspace ${twoPanes ? "split" : ""}`}>
+            <section className="pane form-pane">
+              <div className={`pane-inner ${tab === "settings" ? "wide" : ""}`}>
+                {notice}
+                <SlideSwitch id={tab} index={tabs.findIndex((x) => x.id === tab)}>
+                  <div className="view">{screen}</div>
+                </SlideSwitch>
+              </div>
+            </section>
+            {twoPanes && <aside className="pane queue-pane">{queue}</aside>}
+          </main>
+
+          <footer className="statusbar">
+            <span className={`status-dot ${running.length ? "busy" : ""}`} aria-hidden="true" />
+            <span>{running.length ? t.statusActive(running.length) : t.statusIdle}</span>
+            {totalSpeed > 0 && <span className="ltr">{formatSpeed(t, totalSpeed)}</span>}
+            <span className="spacer" />
+            <button className="status-link" onClick={() => api.openOutputDir().catch(() => {})} title={outputDir}>
+              <Icon name="folder" size={12} />
+              <span>{t.statusSaveTo}:</span>
+              <span className="ltr">{baseName(outputDir) || outputDir}</span>
+            </button>
+            {tools?.ytdlp && <span className="ltr">yt-dlp {tools.ytdlp}</span>}
+          </footer>
+
+          {overlays}
+        </div>
+      </I18n.Provider>
+    );
+  }
+
   return (
     <I18n.Provider value={i18n}>
       <div className={`app ${compact ? "compact" : ""}`}>
+        {/* النافذة المصغّرة على الكمبيوتر بلا شريط النظام: شريطنا يبقى للسحب والإغلاق */}
+        {!isMobile && <TitleBar />}
         <header className="topbar">
           <div className="brand">
             <img className="brand-mark" src="/logo.png" alt="" />
@@ -406,147 +665,27 @@ export default function App() {
                 title={x.label}
               >
                 <Icon name={x.icon} size={16} /> <span>{x.label}</span>
-                {(x.id === "download" || x.id === "convert") &&
-                  jobs.some((j) => isActive(j) && (x.id === "convert") === (j.type === "convert")) && <span className="tab-dot" aria-hidden="true" />}
+                {(x.id === "download" || x.id === "convert") && runningOf(x.id) > 0 && <span className="tab-dot" aria-hidden="true" />}
               </button>
             ))}
           </nav>
           <span className="spacer" />
-          <div className="topbar-tools">
-            {!isMobile && (
-              <button className="icon-btn ghost" title={compact ? t.compactOff : t.compactOn} aria-label={compact ? t.compactOff : t.compactOn} onClick={toggleCompact}>
-                <Icon name={compact ? "maximize" : "minimize"} size={20} />
-              </button>
-            )}
-            <button
-              className="icon-btn ghost"
-              title={t.toggleTheme}
-              aria-label={t.toggleTheme}
-              onClick={() => update({ theme: resolvedTheme === "light" ? "dark" : "light" })}
-            >
-              <Icon name={resolvedTheme === "light" ? "moon" : "sun"} size={20} />
-            </button>
-          </div>
+          <div className="topbar-tools">{toolButtons}</div>
         </header>
 
         <main className="main">
           <div className={`container ${tab === "settings" ? "wide" : ""}`}>
-            {!settings.acceptedNotice && (
-              <div className="alert info notice-bar">
-                <Icon name="alert" size={16} />
-                <span style={{ flex: 1 }}>{t.notice}</span>
-                <button className="btn btn-sm" onClick={() => update({ acceptedNotice: true })}>{t.gotIt}</button>
-              </div>
-            )}
-
+            {notice}
             <SlideSwitch id={tab} index={tabs.findIndex((x) => x.id === tab)}>
               <div className="view">
-                {tab === "download" && (
-                  <DownloadView
-                    settings={settings}
-                    update={update}
-                    outputDir={outputDir}
-                    onChooseDir={chooseDir}
-                    onPickDir={pickDir}
-                    onStart={startDownload}
-                    clipUrl={clipUrl}
-                    onClipDone={() => setClipUrl(null)}
-                    inject={inject}
-                    onOpenSettings={(id) => {
-                      setSettingsSection({ id, n: Date.now() });
-                      setTab("settings");
-                    }}
-                    toast={toast}
-                  />
-                )}
-                {tab === "convert" && (
-                  <ConvertView settings={settings} update={update} files={files} addFiles={addFiles} setFiles={setFiles} hw={hw} dragging={dragging} onStart={startConvert} />
-                )}
-                {tab === "history" && (
-                  <HistoryView
-                    version={historyVersion}
-                    onDownloadAgain={(url) => {
-                      setInject({ url, n: Date.now() });
-                      setTab("download");
-                    }}
-                    onDragOut={isMobile ? undefined : (file) => dragOut(file)}
-                    toast={toast}
-                  />
-                )}
-                {tab === "settings" && (
-                  <SettingsView
-                    settings={settings}
-                    update={update}
-                    outputDir={outputDir}
-                    onChooseDir={chooseDir}
-                    onOpenDir={() => api.openOutputDir().catch(() => {})}
-                    toast={toast}
-                    section={settingsSection}
-                  />
-                )}
-
-                {(tab === "download" || tab === "convert") && (
-                  <>
-                    <div className="jobs-header">
-                      <h3>{tab === "convert" ? t.convertJobsTitle : t.jobsTitle}</h3>
-                      {finished.length > 0 && (
-                        <button
-                          className="btn btn-sm btn-ghost"
-                          onClick={() => setJobs((p) => p.filter((j) => isActive(j) || j.state === "scheduled" || !shown.includes(j)))}
-                        >
-                          {t.clearFinished}
-                        </button>
-                      )}
-                    </div>
-                    {shown.length === 0 && (
-                      <div className="empty-state">
-                        <div className="empty-art">
-                          <Icon name={tab === "convert" ? "convert" : "download"} size={24} />
-                        </div>
-                        <p>{tab === "convert" ? t.convertJobsEmpty : t.jobsEmpty}</p>
-                        {tab === "download" && !isMobile && <p className="faint">{t.jobsEmptyHint}</p>}
-                      </div>
-                    )}
-                    <AnimatedList className="job-list">
-                      {shown.map((j) => (
-                        <JobCard
-                          key={j.id}
-                          job={j}
-                          onCancel={() => cancel(j)}
-                          onReveal={isMobile ? undefined : () => j.file && api.revealFile(j.file)}
-                          onRetry={() => retry(j)}
-                          onRemove={() => setJobs((p) => p.filter((x) => x.id !== j.id))}
-                          onConvert={j.type === "download" && j.file ? () => addFiles([j.file!]) : undefined}
-                          onSplit={j.markers?.length ? () => split(j) : undefined}
-                          onCopyMarkers={j.markers?.length ? () => copyMarkers(j) : undefined}
-                          onDragOut={!isMobile && j.file ? () => dragOut(j.file!) : undefined}
-                        />
-                      ))}
-                    </AnimatedList>
-                  </>
-                )}
+                {screen}
+                {queue}
               </div>
             </SlideSwitch>
           </div>
         </main>
 
-        {dragging && tab !== "convert" && (
-          <div className="drop-overlay">
-            <div>
-              <Icon name="convert" size={24} />
-              <b>{t.dropHere}</b>
-            </div>
-          </div>
-        )}
-
-        {toastShown && (
-          <div className={`toast ${toastLeaving ? "leaving" : ""}`} role="status">
-            {toastShown}
-          </div>
-        )}
-
-        {/* تحديثات خامة: الكمبيوتر يثبّتها بنفسه، والهاتف يفتح رابط ملف APK الجديد */}
-        <UpdateDialog />
+        {overlays}
       </div>
     </I18n.Provider>
   );

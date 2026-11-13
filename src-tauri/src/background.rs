@@ -153,7 +153,7 @@ pub fn set_compact(app: AppHandle, compact: bool) -> Result<(), crate::errors::A
         w.set_always_on_top(true).map_err(err)?;
     } else {
         w.set_always_on_top(false).map_err(err)?;
-        w.set_size(Size::Logical(LogicalSize::new(1040.0, 760.0))).map_err(err)?;
+        w.set_size(Size::Logical(LogicalSize::new(1200.0, 780.0))).map_err(err)?;
         w.set_min_size(Some(Size::Logical(LogicalSize::new(760.0, 560.0)))).map_err(err)?;
         let _ = w.center();
     }

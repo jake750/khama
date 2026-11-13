@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "desktop",
-  "description": "للكمبيوتر فقط: تحديثات خامة وإعادة التشغيل، فتح صفحة الإصدارات، وسحب الملفات المنزّلة إلى برامج أخرى",
+  "description": "للكمبيوتر فقط: تحديثات خامة وإعادة التشغيل، فتح صفحة الإصدارات، وسحب الملفات المنزّلة إلى برامج أخرى، وشريط العنوان الخاص (تصغير، تكبير، إغلاق، سحب النافذة)",
   "platforms": [
     "windows",
     "macOS",
@@ -21,6 +21,11 @@
         }
       ]
     },
-    "drag:default"
+    "drag:default",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-internal-toggle-maximize",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging"
   ]
 }

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "title": "Khama",
+        "width": 1200,
+        "height": 780,
+        "minWidth": 760,
+        "minHeight": 560,
+        "center": true,
+        "decorations": false
+      }
+    ]
+  }
+}

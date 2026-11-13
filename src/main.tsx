@@ -6,6 +6,7 @@ import "@fontsource/ibm-plex-sans-arabic/600.css";
 import "@fontsource/ibm-plex-sans-arabic/700.css";
 import "./styles.css";
 import "./redesign.css";
+import "./desktop.css";
 import App from "./App";
 
 // في المتصفح فقط (npm run dev): بيانات تجريبية بدل Rust لمعاينة التصميم. لا تدخل في نسخة التطبيق.
