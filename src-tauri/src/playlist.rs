@@ -22,6 +22,10 @@ pub struct Entry {
     pub uploader: Option<String>,
     pub duration: Option<f64>,
     pub thumbnail: Option<String>,
+    /// العنوان مأخوذ من الرابط لأن الموقع لم يعطه مع --flat-playlist (ساوندكلاود):
+    /// الواجهة تجلب التفاصيل الحقيقية لاحقًا بـ playlist_details
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub guessed: bool,
 }
 
 /// بحث في أغاني YouTube Music. التنزيل يأخذ أول نتيجة (--playlist-items 1)
@@ -61,6 +65,36 @@ fn str_field(e: &Value, keys: &[&str]) -> Option<String> {
         .map(|s| s.trim().to_string())
 }
 
+/// صورة مصغّرة تكفي للقائمة: أصغر صورة عرضها 64 على الأقل (ساوندكلاود يبدأ بصور 16×16)،
+/// وإلا الأولى، وإلا الصورة الرئيسية
+fn small_thumbnail(e: &Value) -> Option<String> {
+    let list = e["thumbnails"].as_array();
+    list.and_then(|t| {
+        t.iter()
+            .filter(|x| x["width"].as_u64().is_some_and(|w| w >= 64))
+            .min_by_key(|x| x["width"].as_u64().unwrap_or(u64::MAX))
+            .or_else(|| t.first())
+            .and_then(|x| x["url"].as_str())
+    })
+    .or(e["thumbnail"].as_str())
+    .map(String::from)
+}
+
+/// عنصر واحد من JSON الذي يطبعه yt-dlp (مسطّحًا أو كاملًا)
+pub fn entry_from_json(e: &Value) -> Option<Entry> {
+    let url = str_field(e, &["url", "webpage_url", "original_url"])
+        .filter(|u| u.starts_with("http://") || u.starts_with("https://"))?;
+    let title = str_field(e, &["title", "track"]);
+    Some(Entry {
+        uploader: str_field(e, &["uploader", "channel", "artist"]),
+        duration: e["duration"].as_f64().filter(|d| *d > 0.0),
+        thumbnail: small_thumbnail(e),
+        guessed: title.is_none(),
+        title: title.unwrap_or_else(|| title_from_url(&url)),
+        url,
+    })
+}
+
 /// عناصر قائمة من مخرجات `yt-dlp -J --flat-playlist`
 pub fn entries_from_ytdlp(j: &Value) -> Vec<Entry> {
     let Some(list) = j["entries"].as_array() else { return vec![] };
@@ -71,24 +105,21 @@ pub fn entries_from_ytdlp(j: &Value) -> Vec<Entry> {
             e["_type"].as_str() != Some("playlist")
                 && !e["ie_key"].as_str().is_some_and(|k| k.ends_with("Tab") || k.contains("Playlist") || k.ends_with("Folder"))
         })
-        .filter_map(|e| {
-            let url = str_field(e, &["url", "webpage_url", "original_url"])
-                .filter(|u| u.starts_with("http://") || u.starts_with("https://"))?;
-            let title = str_field(e, &["title", "track"]).unwrap_or_else(|| title_from_url(&url));
-            // أصغر صورة مصغّرة تكفي للقائمة
-            let thumbnail = e["thumbnails"]
-                .as_array()
-                .and_then(|t| t.first())
-                .and_then(|t| t["url"].as_str())
-                .or(e["thumbnail"].as_str())
-                .map(String::from);
-            Some(Entry {
-                uploader: str_field(e, &["uploader", "channel", "artist"]),
-                duration: e["duration"].as_f64().filter(|d| *d > 0.0),
-                thumbnail,
-                title,
-                url,
-            })
+        .filter_map(entry_from_json)
+        .collect()
+}
+
+/// تفاصيل عناصر من مخرجات `yt-dlp -j url1 url2 ...` (سطر JSON لكل عنصر نجح).
+/// المفتاح هو الرابط كما أُعطي (original_url)، فالعناصر التي فشلت لا تُفسد الترتيب.
+pub fn details_from_lines(out: &str) -> Vec<(String, Entry)> {
+    out.lines()
+        .filter_map(|l| serde_json::from_str::<Value>(l.trim()).ok())
+        .filter_map(|j| {
+            let key = str_field(&j, &["original_url", "webpage_url"])?;
+            let mut e = entry_from_json(&j)?;
+            // نحتفظ بالرابط الأصلي للتنزيل؛ التفاصيل فقط تتغيّر
+            e.url = key.clone();
+            Some((key, e))
         })
         .collect()
 }
@@ -143,6 +174,7 @@ fn search_entry(title: &str, artists: Option<&str>, duration_ms: Option<f64>) ->
         uploader: artists.map(String::from).filter(|a| !a.is_empty()),
         duration: duration_ms.map(|ms| ms / 1000.0).filter(|d| *d > 0.0),
         thumbnail: None,
+        guessed: false,
     }
 }
 
@@ -244,6 +276,31 @@ mod tests {
         assert_eq!(e[0].uploader.as_deref(), Some("Ch"));
         assert_eq!(e[0].thumbnail.as_deref(), Some("https://i/s.jpg"));
         assert_eq!(e[1].title, "city ports");
+        assert!(!e[0].guessed && e[1].guessed);
+    }
+
+    #[test]
+    fn details_lines() {
+        let out = [
+            json!({ "original_url": "https://api-v2.soundcloud.com/tracks/1", "webpage_url": "https://soundcloud.com/a/x",
+                    "title": "Real name", "uploader": "A", "duration": 42.5,
+                    "thumbnails": [{ "url": "https://i/16.jpg", "width": 16 }, { "url": "https://i/100.jpg", "width": 100 },
+                                   { "url": "https://i/67.jpg", "width": 67 }, { "url": "https://i/o.jpg" }] })
+            .to_string(),
+            "ERROR: something".to_string(),
+            json!({ "original_url": "https://soundcloud.com/b/y", "title": "Second" }).to_string(),
+        ]
+        .join("
+");
+        let d = details_from_lines(&out);
+        assert_eq!(d.len(), 2);
+        assert_eq!(d[0].0, "https://api-v2.soundcloud.com/tracks/1");
+        assert_eq!(d[0].1.url, "https://api-v2.soundcloud.com/tracks/1");
+        assert_eq!(d[0].1.title, "Real name");
+        assert_eq!(d[0].1.duration, Some(42.5));
+        assert_eq!(d[0].1.thumbnail.as_deref(), Some("https://i/67.jpg"));
+        assert!(!d[0].1.guessed);
+        assert_eq!(d[1].1.title, "Second");
     }
 
     #[test]

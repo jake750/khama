@@ -19,7 +19,9 @@ import { Icon } from "./Icon";
 import { Segmented, Toggle } from "./Segmented";
 import { SlideSwitch } from "../motion";
 import { isMobile, MOBILE_SAVE_DIR } from "../platform";
-import { TrimRange, type PreviewLink, type Range } from "./TrimRange";
+import { ClipEditor, isTrimmed } from "./ClipEditor";
+import type { EntryClips } from "./PlaylistPanel";
+import type { Range } from "./TrimRange";
 import { PlaylistPanel } from "./PlaylistPanel";
 import { FolderPicker } from "./FolderPicker";
 
@@ -85,13 +87,14 @@ export function DownloadView(props: {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [stemsScope, setStemsScope] = useState<"all" | "pick">("all");
   const [picked, setPicked] = useState<Set<number>>(new Set());
+  // قائمة التشغيل: المقاطع المقصوصة من كل عنصر (العناصر غير الموجودة هنا تُنزَّل كاملة)
+  const [entryClips, setEntryClips] = useState<Map<number, EntryClips>>(new Map());
   const [when, setWhen] = useState<"now" | "later">("now");
   const [atTime, setAtTime] = useState(() => {
     const d = new Date(Date.now() + 60 * 60 * 1000);
     return `${String(d.getHours()).padStart(2, "0")}:00`;
   });
   const [savingThumb, setSavingThumb] = useState(false);
-  const video = useRef<HTMLVideoElement>(null);
   const input = useRef<HTMLInputElement>(null);
 
   const urls = useMemo(() => extractUrls(url), [url]);
@@ -103,6 +106,7 @@ export function DownloadView(props: {
     const clean = url.trim();
     setStartError(null);
     setClips(null);
+    setEntryClips(new Map());
     if (!isHttpUrl(clean)) {
       probeToken.current++;
       setProbe({ status: "idle" });
@@ -133,6 +137,47 @@ export function DownloadView(props: {
     }, 500);
     return () => clearTimeout(timer);
   }, [url, reprobe]);
+
+  // بعض المواقع (ساوندكلاود) لا تعطي أسماء العناصر مع القراءة السريعة للقائمة:
+  // نجلب التفاصيل الحقيقية على دفعات صغيرة (3 معًا) فتظهر الأسماء تباعًا
+  const detailsKey = probe.status === "ok" && probe.info.entries?.some((e) => e.guessed) ? probeToken.current : null;
+  useEffect(() => {
+    if (detailsKey == null || probe.status !== "ok") return;
+    const listUrl = url.trim();
+    const pending = (probe.info.entries ?? []).filter((e) => e.guessed).map((e) => e.url);
+    const batches: string[][] = [];
+    for (let i = 0; i < pending.length; i += 6) batches.push(pending.slice(i, i + 6));
+    let alive = true;
+    let next = 0;
+    const apply = (batch: string[], found: Map<string, PlaylistEntry>) =>
+      setProbe((p) => {
+        if (!alive || p.status !== "ok" || !p.info.entries) return p;
+        const entries = p.info.entries.map((e) => {
+          if (!batch.includes(e.url)) return e;
+          const d = found.get(e.url);
+          // ما لم نجد تفاصيله (محذوف أو خاص) يبقى باسمه من الرابط، بلا مؤشر انتظار
+          return d ? { ...d, url: e.url, guessed: false } : { ...e, guessed: false };
+        });
+        const info = { ...p.info, entries };
+        if (lastProbe?.url === listUrl) lastProbe = { url: listUrl, info };
+        return { status: "ok", info };
+      });
+    const worker = async () => {
+      while (alive && next < batches.length) {
+        const batch = batches[next++];
+        try {
+          apply(batch, new Map(await api.playlistDetails(batch)));
+        } catch {
+          apply(batch, new Map());
+        }
+      }
+    };
+    void Promise.all([worker(), worker(), worker()]);
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailsKey]);
 
   // رابط من السجلّ
   useEffect(() => {
@@ -218,27 +263,6 @@ export function DownloadView(props: {
   const toggleLang = (code: string) =>
     update({ subLangs: s.subLangs.includes(code) ? s.subLangs.filter((c) => c !== code) : [...s.subLangs, code] });
 
-  const preview: PreviewLink | null =
-    info?.previewUrl && trimOn
-      ? {
-          now: () => video.current?.currentTime ?? null,
-          seek: (v) => {
-            if (video.current) video.current.currentTime = v;
-          },
-        }
-      : null;
-
-  const setClip = (i: number, r: Range) => setClips((activeClips ?? []).map((c, j) => (j === i ? r : c)));
-  const removeClip = (i: number) => setClips((activeClips ?? []).filter((_, j) => j !== i));
-  function addClip() {
-    if (!duration || !activeClips) return;
-    // المقطع الجديد يبدأ بعد آخر مقطع (أو من البداية إن لم يبقَ وقت)، بطول 10% من الفيديو
-    const len = Math.max(Math.min(duration / 10, 60), Math.min(1, duration));
-    const lastEnd = Math.max(...activeClips.map((c) => c.end));
-    const start = lastEnd + len <= duration ? lastEnd : 0;
-    setClips([...activeClips, { start, end: Math.min(start + len, duration) }]);
-  }
-
   async function paste() {
     const found = await clipboardUrl();
     if (found) {
@@ -318,9 +342,21 @@ export function DownloadView(props: {
       const e = list[i];
       if (!e) continue;
       const removeHere = stemsOn && (stemsScope === "all" || picked.has(i));
+      // مقاطع هذا العنصر: جزء واحد = بداية ونهاية، وعدة مقاطع = تُقص ثم تُدمج أو تبقى منفصلة
+      const c = entryClips.get(i);
+      const cut = c && isTrimmed(c.duration, c.clips) ? c.clips : null;
+      const one = cut?.length === 1 ? cut[0] : null;
       try {
         await props.onStart(
-          { ...base(e.url, { original }), stems: removeHere ? (stems as "voice" | "music") : null, subdir: folder },
+          {
+            ...base(e.url, { original }),
+            stems: removeHere ? (stems as "voice" | "music") : null,
+            subdir: folder,
+            start: one ? one.start : null,
+            end: one ? one.end : null,
+            clips: cut && cut.length > 1 ? cut.map((r) => [r.start, r.end] as [number, number]) : [],
+            joinClips: !!cut && cut.length > 1 && c!.join,
+          },
           { title: e.title, thumbnail: e.thumbnail },
           at,
         );
@@ -596,6 +632,15 @@ export function DownloadView(props: {
           pickLabel={stemsOn && stemsScope === "pick" ? stemsLabel : null}
           picked={picked}
           onPicked={setPicked}
+          clips={entryClips}
+          onClips={(i, v) =>
+            setEntryClips((m) => {
+              const next = new Map(m);
+              if (v) next.set(i, v);
+              else next.delete(i);
+              return next;
+            })
+          }
         />
       )}
 
@@ -685,56 +730,16 @@ export function DownloadView(props: {
             <Toggle checked={trimOn && !info.isLive} onChange={setTrimOn} title={t.trimToggle} hint={info.isLive ? t.trimLive : t.trimHint} />
             <div className="collapse" data-open={!!activeClips}>
               <div>
-                {activeClips && info.previewUrl && (
-                  <video
-                    ref={video}
-                    className="trim-video"
-                    src={info.previewUrl}
-                    poster={info.thumbnail ?? undefined}
-                    controls
-                    preload="metadata"
-                    aria-label={t.previewLabel}
-                  />
-                )}
-                {duration &&
-                  (activeClips ?? [{ start: 0, end: duration }]).map((c, i) => (
-                    <div className="clip" key={i}>
-                      {multi && (
-                        <div className="clip-head">
-                          <span className="clip-name">{t.clipN(i + 1)}</span>
-                          <button className="btn btn-sm btn-ghost" onClick={() => removeClip(i)} title={t.removeClip} aria-label={t.removeClip}>
-                            <Icon name="trash" size={16} />
-                          </button>
-                        </div>
-                      )}
-                      <TrimRange duration={duration} value={c} onChange={(r) => setClip(i, r)} preview={preview} />
-                    </div>
-                  ))}
                 {duration && (
-                  <div className="clips-footer">
-                    <button className="btn btn-sm" onClick={addClip}>
-                      <Icon name="plus" size={16} /> {t.addClip}
-                    </button>
-                    {multi && (
-                      <div className="clips-output">
-                        <span className="field-label">{t.clipsOutput}</span>
-                        <Segmented<"join" | "separate">
-                          label={t.clipsOutput}
-                          value={joinClips ? "join" : "separate"}
-                          onChange={(v) => setJoinClips(v === "join")}
-                          options={[
-                            { value: "join", label: t.clipsJoin },
-                            { value: "separate", label: t.clipsSeparate },
-                          ]}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-                {multi && (
-                  <div className="faint" style={{ marginTop: 8 }}>
-                    {willJoin ? t.clipsJoinHint(activeClips!.length) : t.clipsSeparateHint(activeClips!.length)}
-                  </div>
+                  <ClipEditor
+                    duration={duration}
+                    clips={activeClips ?? [{ start: 0, end: duration }]}
+                    onClips={setClips}
+                    join={joinClips}
+                    onJoin={setJoinClips}
+                    previewUrl={activeClips ? info.previewUrl : null}
+                    poster={info.thumbnail}
+                  />
                 )}
                 {multi && !willJoin && !isMobile && s.kind === "video" && (
                   <div style={{ marginTop: 12 }}>

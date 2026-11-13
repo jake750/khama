@@ -81,6 +81,25 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       const url = String(args.url);
       if (url.includes("bad")) throw { code: "unavailable", detail: "ERROR: [youtube] xyz: Video unavailable" };
       await new Promise((r) => setTimeout(r, 700));
+      if (url.includes("/sets/") || url.includes("list=")) {
+        const sc = url.includes("soundcloud");
+        return {
+          title: sc ? "نوم" : "دروس التصوير",
+          thumbnail: thumb("pl"),
+          duration: null,
+          uploader: "jake",
+          site: sc ? "Soundcloud" : "Youtube",
+          heights: [],
+          isLive: false,
+          entries: Array.from({ length: 8 }, (_, i) =>
+            sc
+              ? { url: `https://soundcloud.com/x/slug${i}`, title: `slug${i}`, guessed: true }
+              : { url: `https://youtu.be/v${i}`, title: `الدرس ${i + 1}: الإضاءة والزوايا`, uploader: "استوديو", duration: 300 + i * 41, thumbnail: thumb("v" + i) },
+          ),
+          subtitles: [],
+          original: false,
+        };
+      }
       return {
         title: "كيف تصوّر لقطات سينمائية بهاتفك — دليل كامل للمبتدئين",
         thumbnail: thumb("cine"),
@@ -93,6 +112,11 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         previewUrl: null,
         original: false,
       };
+    }
+    case "playlist_details": {
+      const urls = args.urls as string[];
+      await new Promise((r) => setTimeout(r, 1500));
+      return urls.map((u, i) => [u, { url: u, title: `تلاوة مطمئنة ${u.slice(-1)}`, uploader: "Kholud", duration: 400 + i * 97, thumbnail: thumb("s" + u.slice(-1)) }]);
     }
     case "start_download":
     case "start_convert": {

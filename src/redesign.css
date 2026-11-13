@@ -1349,3 +1349,62 @@ details.extras .schedule-row {
     margin-top: var(--s-3);
   }
 }
+
+/* ---------- قص عناصر قائمة التشغيل ---------- */
+.pl-row {
+  flex-wrap: wrap;
+}
+
+.pl-row .pl-stem + .pl-stem {
+  margin-inline-start: calc(var(--s-2) * -1);
+}
+
+/* المحرّر يأخذ سطرًا كاملًا تحت العنصر */
+.pl-clip {
+  flex-basis: 100%;
+  margin: 0 var(--s-2) var(--s-2);
+  animation: rise-in 0.25s var(--ease-out) backwards;
+}
+
+.pl-row[data-editing] {
+  background: var(--surface-2);
+}
+
+.pl-row[data-editing] .pl-clip {
+  background: var(--surface);
+}
+
+.pl-clip .trim-video {
+  max-height: 220px;
+  margin-top: 0;
+  margin-bottom: var(--s-3);
+}
+
+.pl-clip-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+
+/* أثناء القص: القائمة أطول حتى لا يُحشر المحرّر في 380px */
+.pl-list.editing {
+  max-height: min(680px, 75vh);
+}
+
+/* أسماء عناصر القائمة التي تُجلب الآن */
+.pl-loading {
+  flex: 1;
+  gap: 6px;
+}
+
+.pl-loading .skeleton {
+  display: block;
+  width: min(260px, 70%);
+  height: 12px;
+}
+
+.pl-loading .skeleton + .skeleton {
+  width: min(120px, 40%);
+  height: 10px;
+}

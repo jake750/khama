@@ -178,6 +178,8 @@ export interface PlaylistEntry {
   uploader?: string | null;
   duration?: number | null;
   thumbnail?: string | null;
+  /** الاسم مأخوذ من الرابط (الموقع لم يعطه بعد): التفاصيل الحقيقية تُجلب بـ playlistDetails */
+  guessed?: boolean;
 }
 
 export interface DownloadRequest {
@@ -258,6 +260,8 @@ export const api = {
   toolsInfo: () => invoke<ToolsInfo>("tools_info"),
   updateYtdlp: () => invoke<{ version?: string; updated: boolean }>("update_ytdlp"),
   probe: (url: string) => invoke<ProbeInfo>("probe", { url }),
+  /** التفاصيل الحقيقية لعناصر قائمة (حتى 20 رابطًا): [الرابط كما أُرسل، العنصر] */
+  playlistDetails: (urls: string[]) => invoke<[string, PlaylistEntry][]>("playlist_details", { urls }),
   /** على الهاتف: ينسخ ملفات اختارها المستخدم (content://) داخل التطبيق ويعيد مساراتها */
   importFiles: (paths: string[]) => invoke<string[]>("import_files", { paths }),
   startDownload: (request: DownloadRequest) => invoke<number>("start_download", { request }),

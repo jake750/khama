@@ -1401,6 +1401,33 @@ async fn probe_spotify(tools: &Tools, embed: String) -> Result<ProbeInfo, AppErr
     })
 }
 
+/// تفاصيل عناصر قائمة لم يعطِ الموقع أسماءها مع --flat-playlist (ساوندكلاود):
+/// يفتح yt-dlp كل رابط ويعيد عنوانه الحقيقي ومدته وصورته. الواجهة تطلبها على دفعات صغيرة
+/// فتظهر الأسماء تباعًا بدل انتظار القائمة كلها.
+#[tauri::command]
+pub async fn playlist_details(
+    app: AppHandle,
+    settings: State<'_, SettingsState>,
+    urls: Vec<String>,
+) -> Result<Vec<(String, playlist::Entry)>, AppError> {
+    let urls: Vec<String> = urls.iter().filter_map(|u| validate_url(u).ok()).take(20).collect();
+    if urls.is_empty() {
+        return Ok(vec![]);
+    }
+    let s = settings.0.lock().unwrap().clone();
+    let tools = tools::resolve(&app)?;
+    let mut args = tools::ytdlp_base_args(&tools);
+    args.extend(cookie_args(&app, &s));
+    // --ignore-errors: عنصر محذوف أو خاص لا يُسقط الباقي
+    args.extend(["-j", "--no-playlist", "--ignore-errors", "--"].map(String::from));
+    args.extend(urls);
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    let (_, out, _) = tokio::time::timeout(Duration::from_secs(120), tools::run_ytdlp(&tools, &args))
+        .await
+        .map_err(|_| AppError::new("timeout"))??;
+    Ok(playlist::details_from_lines(&out))
+}
+
 /// يقرأ معلومات الرابط (العنوان، الصورة، الدقات المتاحة) دون تنزيل.
 /// رابط قائمة تشغيل: يعيد عناصرها في entries.
 #[tauri::command]
