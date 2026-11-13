@@ -389,6 +389,72 @@ export function DownloadView(props: {
   const canStart = (multiLinks || isHttpUrl(url)) && !starting && !(entries && selected.size === 0);
   const startCount = multiLinks ? urls.length : entries ? selected.size : 0;
 
+  // ملخّص الإعداد الحالي: يظهر على سطر «الصيغة والجودة» المطويّ وعلى زر التنزيل،
+  // فيعرف المستخدم ما سيحصل عليه دون أن يفتح الخيارات
+  const formatName = s.kind === "video" ? s.videoFormat.toUpperCase() : s.audioFormat === "m4a" ? "AAC" : s.audioFormat.toUpperCase();
+  const optionsSummary = (
+    s.kind === "video" ? [t.video, formatName, qualityLabel(s.quality), s.editorReady && t.editorReady] : [t.audio, formatName]
+  )
+    .filter(Boolean)
+    .join(" · ");
+  const buttonMeta = original
+    ? null
+    : [formatName, s.kind === "video" && qualityLabel(s.quality), when === "later" && atTime].filter(Boolean).join(" · ");
+  const extrasSummary = [
+    s.wantSubs && "SRT",
+    s.wantThumb && "JPG",
+    s.wantInfo && "TXT",
+    stills !== "off" && t.stillsLabel,
+    stemsOn && stemsLabel,
+    when === "later" && atTime,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const destination = (
+    <>
+      {s.projects.length > 0 && (
+        <label className="project-pick" title={t.project}>
+          <Icon name="layers" size={16} />
+          <select
+            className="select select-sm"
+            value={s.activeProject ?? ""}
+            aria-label={t.project}
+            onChange={(e) => {
+              const p = s.projects.find((x) => x.name === e.target.value);
+              if (!p) return update({ activeProject: null });
+              update({
+                activeProject: p.name,
+                outputDir: p.outputDir,
+                kind: p.kind,
+                videoFormat: p.videoFormat,
+                audioFormat: p.audioFormat,
+                quality: p.quality,
+                editorReady: p.editorReady,
+                filenameTemplate: p.filenameTemplate,
+                siteFolders: p.siteFolders,
+              });
+              props.toast(t.toastProject(p.name));
+            }}
+          >
+            <option value="">{t.noProject}</option>
+            {s.projects.map((p) => (
+              <option key={p.name} value={p.name}>{p.name}</option>
+            ))}
+          </select>
+        </label>
+      )}
+      {isMobile ? (
+        <div className="save-to">
+          <Icon name="folder" size={16} />
+          <span className="path ltr">{MOBILE_SAVE_DIR}</span>
+        </div>
+      ) : (
+        <FolderPicker current={props.outputDir} recent={s.recentDirs} onPick={props.onPickDir} onChoose={props.onChooseDir} />
+      )}
+    </>
+  );
+
   return (
     <div className="card download-card">
       <div className="hero motif">
@@ -535,6 +601,12 @@ export function DownloadView(props: {
 
       <div className={`options-wrap ${ready ? "" : "dim"}`}>
         {!original && (
+          <details className="extras options-box">
+            <summary>
+              <Icon name="film" size={16} /> <span className="summary-label">{t.optionsLabel}</span>
+              <span className="extras-count">{optionsSummary}</span>
+              <Icon name="chevron" size={16} />
+            </summary>
           <div className="options">
             <div>
               <span className="field-label">{t.kind}</span>
@@ -593,7 +665,6 @@ export function DownloadView(props: {
                         disabled: q !== "best" && maxHeight != null && Number(q) > maxHeight && s.quality !== q,
                       }))}
                     />
-                    {qualityHint && <div className="faint" style={{ marginTop: 6 }}>{qualityHint}</div>}
                   </div>
                   {(
                     <div>
@@ -604,7 +675,10 @@ export function DownloadView(props: {
               </div>
             </div>
           </div>
+          </details>
         )}
+        {/* التنبيه يبقى ظاهرًا حتى لو كانت الخيارات مطويّة */}
+        {qualityHint && !original && <div className="faint quality-hint">{qualityHint}</div>}
 
         {info && !entries && (
           <div className="trim-box">
@@ -673,12 +747,11 @@ export function DownloadView(props: {
         )}
 
         {/* ---------- إضافات: ترجمة، صورة، معلومات المصدر، لقطات ---------- */}
-        <details className="extras" open={s.wantSubs || s.wantThumb || s.wantInfo || stills !== "off" || undefined}>
+        {/* الإضافات + التنظيف بالذكاء الاصطناعي + الجدولة: كلها اختيارية، فتبقى مطويّة والملخّص يقول ما المفعَّل */}
+        <details className="extras">
           <summary>
             <Icon name="layers" size={16} /> {t.extrasLabel}
-            <span className="extras-count">
-              {[s.wantSubs && "SRT", s.wantThumb && "JPG", s.wantInfo && "TXT", stills !== "off" && t.stillsLabel].filter(Boolean).join(" · ")}
-            </span>
+            <span className="extras-count">{extrasSummary}</span>
             <Icon name="chevron" size={16} />
           </summary>
           <div className="extras-grid">
@@ -719,7 +792,6 @@ export function DownloadView(props: {
               </div>
             )}
           </div>
-        </details>
 
         {!original && (
           <div className="stems-row">
@@ -777,54 +849,22 @@ export function DownloadView(props: {
           </div>
           {when === "later" && <div className="faint" style={{ marginTop: 6 }}>{t.scheduleHint(atTime)}</div>}
         </div>
+        </details>
       </div>
 
       {startError && <ErrorBox error={startError} inline onFix={fix} />}
 
-      <div className="action-row">
-        {s.projects.length > 0 && (
-          <label className="project-pick" title={t.project}>
-            <Icon name="layers" size={16} />
-            <select
-              className="select select-sm"
-              value={s.activeProject ?? ""}
-              aria-label={t.project}
-              onChange={(e) => {
-                const p = s.projects.find((x) => x.name === e.target.value);
-                if (!p) return update({ activeProject: null });
-                update({
-                  activeProject: p.name,
-                  outputDir: p.outputDir,
-                  kind: p.kind,
-                  videoFormat: p.videoFormat,
-                  audioFormat: p.audioFormat,
-                  quality: p.quality,
-                  editorReady: p.editorReady,
-                  filenameTemplate: p.filenameTemplate,
-                  siteFolders: p.siteFolders,
-                });
-                props.toast(t.toastProject(p.name));
-              }}
-            >
-              <option value="">{t.noProject}</option>
-              {s.projects.map((p) => (
-                <option key={p.name} value={p.name}>{p.name}</option>
-              ))}
-            </select>
-          </label>
-        )}
-        {isMobile ? (
-          <div className="save-to">
-            <Icon name="folder" size={16} />
-            <span className="path ltr">{MOBILE_SAVE_DIR}</span>
-          </div>
-        ) : (
-          <FolderPicker current={props.outputDir} recent={s.recentDirs} onPick={props.onPickDir} onChoose={props.onChooseDir} />
-        )}
+      {/* على الهاتف الزر يثبت في أسفل الشاشة، فمكان الحفظ يبقى سطرًا عاديًا فوقه */}
+      {isMobile && <div className="dest-row">{destination}</div>}
+      <div className={`action-row ${isMobile ? "sticky-action" : ""}`}>
+        {!isMobile && destination}
         <span className="spacer" />
         <button className="btn btn-primary btn-lg download-btn" disabled={!canStart} onClick={start}>
           <Icon name={when === "later" ? "clock" : "download"} />
-          {startCount ? t.downloadN(startCount) : t.download}
+          <span className="download-btn-text">
+            <span>{startCount ? t.downloadN(startCount) : t.download}</span>
+            {buttonMeta && <small className="ltr">{buttonMeta}</small>}
+          </span>
         </button>
       </div>
     </div>

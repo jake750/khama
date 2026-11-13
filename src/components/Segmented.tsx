@@ -19,7 +19,8 @@ export function Segmented<T extends string>(props: {
   // «حبّة» واحدة تنزلق إلى الزر المختار
   const pill = useSlidingIndicator(box, 'button[aria-pressed="true"]', `${props.value}|${props.options.length}`);
   return (
-    <div className="segmented" role="group" aria-label={props.label} ref={box}>
+    // أكثر من 3 خيارات: على الهاتف تصير شبكة من 3 أعمدة بدل سطر يخرج من الشاشة
+    <div className={`segmented ${props.options.length > 3 ? "seg-many" : ""}`} role="group" aria-label={props.label} ref={box}>
       <span className="seg-pill" ref={pill} aria-hidden="true" />
       {props.options.map((o) => (
         <button
