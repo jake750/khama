@@ -33,6 +33,7 @@ export function HistoryView(props: {
   const { t, lang } = useI18n();
   const [list, setList] = useState<HistoryEntry[] | null>(null);
   const [q, setQ] = useState("");
+  const [brokenThumbs, setBrokenThumbs] = useState<Set<number>>(() => new Set());
 
   const load = () =>
     api
@@ -123,8 +124,14 @@ export function HistoryView(props: {
                 }
                 title={canDrag ? t.dragHint : undefined}
               >
-                {e.thumbnail ? (
-                  <img className="history-thumb" src={e.thumbnail} alt="" />
+                {e.thumbnail && !brokenThumbs.has(e.id) ? (
+                  <img
+                    className="history-thumb"
+                    src={e.thumbnail}
+                    alt=""
+                    // سجلّات قديمة حفظت رابطًا انتهت صلاحيته: نعرض الأيقونة بدل صورة مكسورة
+                    onError={() => setBrokenThumbs((b) => new Set(b).add(e.id))}
+                  />
                 ) : (
                   <div className="history-thumb">
                     <Icon name={e.kind === "audio" ? "music" : "film"} size={20} />

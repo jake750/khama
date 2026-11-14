@@ -72,13 +72,37 @@ pub fn get_history(app: AppHandle, state: State<'_, HistoryState>) -> Result<Vec
 }
 
 #[tauri::command]
-pub fn add_history(app: AppHandle, state: State<'_, HistoryState>, entry: HistoryEntry) -> Result<(), AppError> {
+pub async fn add_history(app: AppHandle, state: State<'_, HistoryState>, mut entry: HistoryEntry) -> Result<(), AppError> {
+    if let Some(local) = local_thumbnail(&app, &entry).await {
+        entry.thumbnail = Some(local);
+    }
     with_list(&app, &state, |list| {
         list.retain(|e| e.id != entry.id);
         list.insert(0, entry);
         list.truncate(MAX_ENTRIES);
         ((), true)
     })
+}
+
+/// نسخة صغيرة دائمة من الصورة المصغّرة (T-20): روابط صور إنستغرام وتيك توك موقّعة
+/// وتنتهي خلال ساعات، فنحفظ الصورة نفسها (حوالي 4 كيلوبايت) بدل رابطها.
+/// المصدر: رابط الصورة وهو ما زال صالحًا، وإلا إطار من الفيديو المنزَّل.
+async fn local_thumbnail(app: &AppHandle, entry: &HistoryEntry) -> Option<String> {
+    let current = entry.thumbnail.as_deref().unwrap_or_default();
+    if current.starts_with("data:") {
+        return None;
+    }
+    let tools = crate::tools::resolve(app).ok()?;
+    if current.starts_with("https://") || current.starts_with("http://") {
+        if let Some(img) = crate::convert::small_jpeg(&tools, current.as_ref(), 0.0, 160, 6).await {
+            return Some(img);
+        }
+    }
+    let file = std::path::Path::new(&entry.file);
+    if entry.kind == "video" && file.is_file() {
+        return crate::convert::small_jpeg(&tools, file.as_os_str(), 3.0, 160, 6).await;
+    }
+    None
 }
 
 #[tauri::command]

@@ -213,26 +213,35 @@ async fn probe_file(tools: &Tools, path: &Path) -> Result<MediaInfo, AppError> {
 
 /// صورة مصغّرة من منتصف الفيديو تقريبًا
 async fn thumbnail(tools: &Tools, path: &Path, duration: Option<f64>) -> Option<String> {
-    use base64::Engine;
     let at = duration.map(|d| (d * 0.1).min(30.0)).unwrap_or(0.0);
-    let out = tools::command(&tools.ffmpeg)
-        .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-ss", &format!("{at:.2}"), "-i"])
-        .arg(path)
-        .args([
-            "-frames:v",
-            "1",
-            "-vf",
-            "scale=320:-2",
-            "-f",
-            "image2pipe",
-            "-c:v",
-            "mjpeg",
-            "-q:v",
-            "4",
-            "-",
-        ])
-        .output()
+    small_jpeg(tools, path.as_os_str(), at, 320, 4).await
+}
+
+/// إطار واحد من `input` (ملف أو رابط صورة) كـ data URL بعرض `width`.
+/// `quality`: 2 (أفضل) إلى 31 (أصغر حجمًا).
+pub async fn small_jpeg(tools: &Tools, input: &std::ffi::OsStr, seek: f64, width: u32, quality: u8) -> Option<String> {
+    use base64::Engine;
+    let mut cmd = tools::command(&tools.ffmpeg);
+    cmd.args(["-hide_banner", "-loglevel", "error", "-nostdin"]);
+    if seek > 0.0 {
+        cmd.args(["-ss", &format!("{seek:.2}")]);
+    }
+    cmd.arg("-i").arg(input).args([
+        "-frames:v",
+        "1",
+        "-vf",
+        &format!("scale={width}:-2"),
+        "-f",
+        "image2pipe",
+        "-c:v",
+        "mjpeg",
+        "-q:v",
+        &quality.to_string(),
+        "-",
+    ]);
+    let out = tokio::time::timeout(std::time::Duration::from_secs(20), cmd.output())
         .await
+        .ok()?
         .ok()?;
     (out.status.success() && !out.stdout.is_empty()).then(|| {
         format!(
@@ -2176,7 +2185,9 @@ pub fn spawn_watcher(app: AppHandle) {
             known_dirs.retain(|d| active.iter().any(|w| Path::new(&w.dir) == d));
             for w in &active {
                 let dir = PathBuf::from(&w.dir);
-                let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+                let Ok(entries) = std::fs::read_dir(&dir) else {
+                    continue;
+                };
                 let first_scan = known_dirs.insert(dir.clone());
                 for e in entries.flatten() {
                     let path = e.path();
