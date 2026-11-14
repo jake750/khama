@@ -83,6 +83,26 @@ def calibrate(raw: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def check_calibration(raw: pd.DataFrame, cal: pd.DataFrame) -> pd.DataFrame:
+    """Per clip: VMAF error and size ratio vs the software encoder, for the old rule (crf + 1) and the table."""
+    def at(enc, clip, q, col):
+        d = raw[(raw.encoder == enc) & (raw["clip"] == clip)].sort_values("q")
+        return float(np.interp(q, d.q, d[col]))
+
+    rows = []
+    for _, x in cal.iterrows():
+        for clip in raw["clip"].unique():
+            t, tb = at(x.reference, clip, x.crf, "vmaf"), at(x.reference, clip, x.crf, "kbps")
+            rows.append(dict(enc=x.encoder, crf=x.crf,
+                             old=at(x.encoder, clip, x.q_old, "vmaf") - t, new=at(x.encoder, clip, x.q_new, "vmaf") - t,
+                             bo=at(x.encoder, clip, x.q_old, "kbps") / tb, bn=at(x.encoder, clip, x.q_new, "kbps") / tb))
+    d = pd.DataFrame(rows)
+    return d.groupby(["enc", "crf"]).agg(
+        old_med=("old", "median"), new_med=("new", "median"),
+        old_abs=("old", lambda v: v.abs().mean()), new_abs=("new", lambda v: v.abs().mean()),
+        size_old=("bo", "median"), size_new=("bn", "median"))
+
+
 def main() -> None:
     raw = pd.read_csv(RESULTS / "codecs_raw.csv")
     encoders = [e for e in COLORS if e in set(raw.encoder)]
@@ -114,6 +134,7 @@ def main() -> None:
     # ---- calibration ----
     cal = calibrate(raw)
     cal.to_csv(RESULTS / "codecs_calibration.csv", index=False, float_format="%.2f")
+    check_calibration(raw, cal).to_csv(RESULTS / "codecs_calibration_check.csv", float_format="%.3f")
     if not cal.empty:
         print(cal[["encoder", "crf", "vmaf_target", "q_old", "q_new", "q_min", "q_max"]].round(2).to_string(index=False))
 
