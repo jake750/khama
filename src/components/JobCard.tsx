@@ -77,13 +77,17 @@ export function JobCard(props: {
   const active = isActive(j);
   // نسبة مجهولة (انتظار/تحضير/معالجة) ← شريط متحرك بدل رقم
   const indeterminate =
-    active && (j.percent == null || ["queued", "starting", "processing"].includes(j.state) || (j.state === "separating" && !j.percent) || (j.state === "analyzing" && !j.percent));
+    active &&
+    (j.percent == null ||
+      ["queued", "starting", "processing"].includes(j.state) ||
+      (j.state === "separating" && !j.percent) ||
+      (j.state === "analyzing" && !j.percent));
   const fileName = j.file?.split(/[\\/]/).pop();
   const audioOnly = j.request?.kind === "audio" || j.meta.startsWith("WAV") || j.meta.startsWith("MP3");
   const r = j.request;
 
   const draggable = j.state === "done" && !!j.file && !!props.onDragOut;
-  const fill = active && !indeterminate ? j.percent ?? 0 : 0;
+  const fill = active && !indeterminate ? (j.percent ?? 0) : 0;
 
   return (
     <div
@@ -133,7 +137,12 @@ export function JobCard(props: {
           {(j.state === "downloading" || j.state === "converting") && j.eta != null && <span>{formatEta(t, j.eta)}</span>}
           <span className="faint">
             {j.meta}
-            {r?.end != null && <span className="ltr"> · ✂ {formatDuration(r.start ?? 0)}–{formatDuration(r.end)}</span>}
+            {r?.end != null && (
+              <span className="ltr">
+                {" "}
+                · ✂ {formatDuration(r.start ?? 0)}–{formatDuration(r.end)}
+              </span>
+            )}
           </span>
         </div>
 

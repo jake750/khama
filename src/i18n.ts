@@ -49,7 +49,8 @@ const en = {
   stemsVoice: "Remove music",
   stemsMusic: "Remove voice",
   stemsHint: "Uses an AI model (about 140 MB, downloaded once). Takes roughly as long as the audio itself.",
-  stemsHintMobile: "Uses an AI model (about 67 MB, downloaded once). Slow on a phone: several times the length of the audio, and the phone gets warm.",
+  stemsHintMobile:
+    "Uses an AI model (about 67 MB, downloaded once). Slow on a phone: several times the length of the audio, and the phone gets warm.",
   stPreparing: "Downloading the AI model (one time only)",
   stSeparating: "Separating voice and music",
   saveTo: "Save to:",
@@ -135,7 +136,8 @@ const en = {
   updatedTo: (v: string) => `yt-dlp updated to ${v}`,
 
   aboutTitle: "About",
-  aboutBody: "Open source under the MIT license. No analytics, no tracking — Khama only talks to the sites you download from (and GitHub, to check for Khama updates at launch and when you update yt-dlp).",
+  aboutBody:
+    "Open source under the MIT license. No analytics, no tracking — Khama only talks to the sites you download from (and GitHub, to check for Khama updates at launch and when you update yt-dlp).",
   notice: "Download only content you have the right to use. You are responsible for respecting copyright and each site's terms.",
   gotIt: "Got it",
 
@@ -541,7 +543,8 @@ const ar: Dict = {
   updatedTo: (v) => `حُدّث yt-dlp إلى ${v}`,
 
   aboutTitle: "حول",
-  aboutBody: "مفتوح المصدر برخصة MIT. لا تحليلات ولا تتبّع؛ خامة تتصل فقط بالمواقع التي تنزّل منها (وبـ GitHub للبحث عن تحديثات خامة عند فتحها، وعند تحديث yt-dlp).",
+  aboutBody:
+    "مفتوح المصدر برخصة MIT. لا تحليلات ولا تتبّع؛ خامة تتصل فقط بالمواقع التي تنزّل منها (وبـ GitHub للبحث عن تحديثات خامة عند فتحها، وعند تحديث yt-dlp).",
   notice: "نزّل فقط محتوى يحق لك استخدامه. أنت مسؤول عن احترام حقوق النشر وشروط كل موقع.",
   gotIt: "فهمت",
 

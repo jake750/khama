@@ -67,7 +67,8 @@ function getDragIcon(): Promise<string> {
       c.getContext("2d")!.drawImage(img, 0, 0, 64, 64);
       resolve(c.toDataURL("image/png"));
     };
-    img.onerror = () => resolve("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=");
+    img.onerror = () =>
+      resolve("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=");
     img.src = "/logo.png";
   });
   return dragIcon;
@@ -133,7 +134,11 @@ export default function App() {
 
   // مشفّرات كرت الشاشة: نفحصها عند أول فتح للمحوّل (تأخذ ثوانٍ)
   useEffect(() => {
-    if (tab === "convert" && hw == null) api.hwEncoders().then(setHw).catch(() => setHw([]));
+    if (tab === "convert" && hw == null)
+      api
+        .hwEncoders()
+        .then(setHw)
+        .catch(() => setHw([]));
   }, [tab, hw]);
 
   /** عند انتهاء عملية: إشعار (إن كانت النافذة في الخلفية) + إضافتها للسجلّ */
@@ -152,7 +157,10 @@ export default function App() {
       // بدأ التنزيل قبل اكتمال المعاينة (أو عدة روابط): نجلب العنوان والصورة الآن
       const info =
         titleIsUrl || !job.thumbnail
-          ? api.probe(request.url).then((p) => ({ title: p.title, thumbnail: p.thumbnail ?? null })).catch(() => null)
+          ? api
+              .probe(request.url)
+              .then((p) => ({ title: p.title, thumbnail: p.thumbnail ?? null }))
+              .catch(() => null)
           : Promise.resolve(null);
       info
         .then((p) =>
@@ -236,7 +244,13 @@ export default function App() {
 
   const startDownload = useCallback(
     async (request: DownloadRequest, meta: StartMeta, at?: number) => {
-      const base = { type: "download" as const, request, title: meta.title, thumbnail: meta.thumbnail, meta: downloadMeta(tRef.current, request) };
+      const base = {
+        type: "download" as const,
+        request,
+        title: meta.title,
+        thumbnail: meta.thumbnail,
+        meta: downloadMeta(tRef.current, request),
+      };
       if (at && at > Date.now()) {
         // مجدول: بطاقة محلية تنتظر، ثم يبدأ التنزيل الحقيقي في وقته
         const localId = nextLocalId.current--;
@@ -369,7 +383,18 @@ export default function App() {
     const preset = "edit_h264";
     const splitAt = j.markers.map(([s, e]) => (s === e ? s : (s + e) / 2));
     startConvert(
-      { inputs: [input], preset, options: { ...defaultOptions(), quality: "high", hw: settings.convertHw, start: j.convert.options.start, end: j.convert.options.end, splitAt } },
+      {
+        inputs: [input],
+        preset,
+        options: {
+          ...defaultOptions(),
+          quality: "high",
+          hw: settings.convertHw,
+          start: j.convert.options.start,
+          end: j.convert.options.end,
+          splitAt,
+        },
+      },
       baseName(input),
       t.splitHere,
     ).catch(() => {});
@@ -377,7 +402,10 @@ export default function App() {
 
   const copyMarkers = (j: Job) => {
     const text = (j.markers ?? []).map(([s, e]) => (s === e ? formatTimecode(s) : `${formatTimecode(s)}\t${formatTimecode(e)}`)).join("\n");
-    navigator.clipboard.writeText(text).then(() => toast(t.toastCopied)).catch(() => {});
+    navigator.clipboard
+      .writeText(text)
+      .then(() => toast(t.toastCopied))
+      .catch(() => {});
   };
 
   const tabs: { id: Tab; icon: IconName; label: string }[] = [
@@ -407,14 +435,21 @@ export default function App() {
               >
                 <Icon name={x.icon} size={16} /> <span>{x.label}</span>
                 {(x.id === "download" || x.id === "convert") &&
-                  jobs.some((j) => isActive(j) && (x.id === "convert") === (j.type === "convert")) && <span className="tab-dot" aria-hidden="true" />}
+                  jobs.some((j) => isActive(j) && (x.id === "convert") === (j.type === "convert")) && (
+                    <span className="tab-dot" aria-hidden="true" />
+                  )}
               </button>
             ))}
           </nav>
           <span className="spacer" />
           <div className="topbar-tools">
             {!isMobile && (
-              <button className="icon-btn ghost" title={compact ? t.compactOff : t.compactOn} aria-label={compact ? t.compactOff : t.compactOn} onClick={toggleCompact}>
+              <button
+                className="icon-btn ghost"
+                title={compact ? t.compactOff : t.compactOn}
+                aria-label={compact ? t.compactOff : t.compactOn}
+                onClick={toggleCompact}
+              >
                 <Icon name={compact ? "maximize" : "minimize"} size={20} />
               </button>
             )}
@@ -435,7 +470,9 @@ export default function App() {
               <div className="alert info notice-bar">
                 <Icon name="alert" size={16} />
                 <span style={{ flex: 1 }}>{t.notice}</span>
-                <button className="btn btn-sm" onClick={() => update({ acceptedNotice: true })}>{t.gotIt}</button>
+                <button className="btn btn-sm" onClick={() => update({ acceptedNotice: true })}>
+                  {t.gotIt}
+                </button>
               </div>
             )}
 
@@ -460,7 +497,16 @@ export default function App() {
                   />
                 )}
                 {tab === "convert" && (
-                  <ConvertView settings={settings} update={update} files={files} addFiles={addFiles} setFiles={setFiles} hw={hw} dragging={dragging} onStart={startConvert} />
+                  <ConvertView
+                    settings={settings}
+                    update={update}
+                    files={files}
+                    addFiles={addFiles}
+                    setFiles={setFiles}
+                    hw={hw}
+                    dragging={dragging}
+                    onStart={startConvert}
+                  />
                 )}
                 {tab === "history" && (
                   <HistoryView

@@ -61,7 +61,9 @@
   border-radius: var(--r-md);
   background: var(--bg);
   color: var(--text-faint);
-  transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+  transition:
+    border-color 0.2s var(--ease-out),
+    box-shadow 0.2s var(--ease-out);
 }
 
 .url-field:focus-within {
@@ -156,7 +158,9 @@
   padding-inline: 16px 8px;
   border-radius: var(--r-sm);
   background: var(--surface);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--spark) 45%, transparent), var(--shadow);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--spark) 45%, transparent),
+    var(--shadow);
   animation: rise-in 0.35s var(--ease-out);
 }
 
@@ -692,11 +696,15 @@ button.menu-item:hover {
 .settings-nav button[aria-current="true"] {
   color: var(--text);
   background: var(--surface);
-  box-shadow: inset 3px 0 0 var(--accent), var(--shadow);
+  box-shadow:
+    inset 3px 0 0 var(--accent),
+    var(--shadow);
 }
 
 [dir="rtl"] .settings-nav button[aria-current="true"] {
-  box-shadow: inset -3px 0 0 var(--accent), var(--shadow);
+  box-shadow:
+    inset -3px 0 0 var(--accent),
+    var(--shadow);
 }
 
 .settings-content {

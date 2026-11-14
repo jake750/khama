@@ -23,7 +23,12 @@ type Available = { version: string; current: string; notes?: string; native?: Up
 
 /** "v1.2.10" > "1.2.9"؟ نقارن الأرقام فقط ونتجاهل لاحقة مثل -beta */
 export function isNewer(latest: string, current: string): boolean {
-  const parts = (v: string) => v.replace(/^v/i, "").split("-")[0].split(".").map((n) => parseInt(n, 10) || 0);
+  const parts = (v: string) =>
+    v
+      .replace(/^v/i, "")
+      .split("-")[0]
+      .split(".")
+      .map((n) => parseInt(n, 10) || 0);
   const a = parts(latest);
   const b = parts(current);
   for (let i = 0; i < Math.max(a.length, b.length); i++) {
@@ -79,9 +84,7 @@ export function UpdateDialog() {
     if (started.current) return;
     const timer = window.setTimeout(() => {
       started.current = true;
-      (isMobile ? checkMobile() : checkDesktop())
-        .then((u) => u && setUpdate(u))
-        .catch(() => {}); // بلا اتصال، أو لا يوجد إصدار منشور بعد
+      (isMobile ? checkMobile() : checkDesktop()).then((u) => u && setUpdate(u)).catch(() => {}); // بلا اتصال، أو لا يوجد إصدار منشور بعد
     }, CHECK_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, []);
@@ -156,11 +159,17 @@ export function UpdateDialog() {
       );
     } else if (leaving && !still) {
       b.animate([{ opacity: 1 }, { opacity: 0 }], { duration: EXIT_MS, easing: EASE_IN, fill: "forwards" });
-      c.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(8px) scale(0.97)" }], {
-        duration: EXIT_MS,
-        easing: EASE_IN,
-        fill: "forwards",
-      });
+      c.animate(
+        [
+          { opacity: 1, transform: "none" },
+          { opacity: 0, transform: "translateY(8px) scale(0.97)" },
+        ],
+        {
+          duration: EXIT_MS,
+          easing: EASE_IN,
+          fill: "forwards",
+        },
+      );
     }
   }, [shown, leaving]);
 
@@ -171,7 +180,14 @@ export function UpdateDialog() {
 
   return (
     <div className="update-backdrop" ref={backdrop} onClick={(e) => e.target === e.currentTarget && close()}>
-      <div className="update-card motif" ref={card} role="dialog" aria-modal="true" aria-labelledby="update-title" aria-describedby="update-body">
+      <div
+        className="update-card motif"
+        ref={card}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="update-title"
+        aria-describedby="update-body"
+      >
         <div className="update-head">
           <span className="update-icon" aria-hidden="true">
             <Icon name="download" size={20} />

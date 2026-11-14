@@ -32,10 +32,7 @@ export function PlaylistPanel(props: {
       <div className="pl-head">
         <span className="pl-count">{t.plSelected(selected.size, entries.length)}</span>
         <span className="spacer" />
-        <button
-          className="btn btn-sm btn-ghost"
-          onClick={() => props.onSelected(all ? new Set() : new Set(entries.map((_, i) => i)))}
-        >
+        <button className="btn btn-sm btn-ghost" onClick={() => props.onSelected(all ? new Set() : new Set(entries.map((_, i) => i)))}>
           {all ? t.selectNone : t.selectAll}
         </button>
       </div>
@@ -51,10 +48,14 @@ export function PlaylistPanel(props: {
                 {e.thumbnail ? (
                   <img className="pl-thumb" src={e.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" />
                 ) : (
-                  <span className="pl-thumb pl-thumb-empty"><Icon name="music" size={16} /></span>
+                  <span className="pl-thumb pl-thumb-empty">
+                    <Icon name="music" size={16} />
+                  </span>
                 )}
                 <span className="pl-text">
-                  <span className="pl-title" title={e.title}>{e.title}</span>
+                  <span className="pl-title" title={e.title}>
+                    {e.title}
+                  </span>
                   {sub && <span className="pl-sub faint">{sub}</span>}
                 </span>
               </label>

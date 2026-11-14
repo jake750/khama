@@ -33,8 +33,31 @@ export interface SourceFile {
 export const MEDIA_FILTER = {
   name: "Media",
   extensions: [
-    "mp4", "mov", "mkv", "avi", "mxf", "m4v", "webm", "mts", "m2ts", "wmv", "flv", "3gp", "mpg", "mpeg", "ts",
-    "wav", "mp3", "m4a", "aac", "flac", "ogg", "opus", "aiff", "aif", "wma",
+    "mp4",
+    "mov",
+    "mkv",
+    "avi",
+    "mxf",
+    "m4v",
+    "webm",
+    "mts",
+    "m2ts",
+    "wmv",
+    "flv",
+    "3gp",
+    "mpg",
+    "mpeg",
+    "ts",
+    "wav",
+    "mp3",
+    "m4a",
+    "aac",
+    "flac",
+    "ogg",
+    "opus",
+    "aiff",
+    "aif",
+    "wma",
   ],
 };
 
@@ -71,12 +94,7 @@ function groupName(t: Dict, g: PresetGroup) {
 }
 
 /** حقل لاختيار ملف مساعد (LUT، ترجمة، شعار، صوت) */
-function FilePick(props: {
-  label: string;
-  value?: string | null;
-  extensions: string[];
-  onChange: (path: string | null) => void;
-}) {
+function FilePick(props: { label: string; value?: string | null; extensions: string[]; onChange: (path: string | null) => void }) {
   const { t } = useI18n();
   const [copying, setCopying] = useState(false);
   const pick = async () => {
@@ -98,7 +116,13 @@ function FilePick(props: {
           <Icon name="file" size={16} /> {copying ? t.importing : props.value ? baseName(props.value) : t.pick}
         </button>
         {props.value && (
-          <button className="icon-btn" style={{ width: 30, height: 30 }} title={t.unpick} aria-label={t.unpick} onClick={() => props.onChange(null)}>
+          <button
+            className="icon-btn"
+            style={{ width: 30, height: 30 }}
+            title={t.unpick}
+            aria-label={t.unpick}
+            onClick={() => props.onChange(null)}
+          >
             <Icon name="x" size={16} />
           </button>
         )}
@@ -174,13 +198,24 @@ export function ConvertView(props: {
     if (kind === "stems") return o;
     if (showPicture) {
       Object.assign(o, {
-        size: opts.size, aspect: opts.aspect, fps: kind === "frame" ? null : opts.fps, rotate: opts.rotate,
-        deinterlace: opts.deinterlace, denoise: opts.denoise, tonemap: opts.tonemap, lut: opts.lut,
+        size: opts.size,
+        aspect: opts.aspect,
+        fps: kind === "frame" ? null : opts.fps,
+        rotate: opts.rotate,
+        deinterlace: opts.deinterlace,
+        denoise: opts.denoise,
+        tonemap: opts.tonemap,
+        lut: opts.lut,
       });
       if (kind !== "frame") o.speed = opts.speed;
     }
     if (showAudio) {
-      Object.assign(o, { loudness: opts.loudness, replaceAudio: opts.replaceAudio, mute: kind === "video" && opts.mute, speed: opts.speed });
+      Object.assign(o, {
+        loudness: opts.loudness,
+        replaceAudio: opts.replaceAudio,
+        mute: kind === "video" && opts.mute,
+        speed: opts.speed,
+      });
     }
     if (showBurn) {
       Object.assign(o, { subtitles: opts.subtitles, watermark: opts.watermark, watermarkPos: opts.watermarkPos, timecode: opts.timecode });
@@ -287,7 +322,9 @@ export function ConvertView(props: {
                 </div>
               )}
               <div className="file-body">
-                <div className="file-name" title={f.path}>{baseName(f.path)}</div>
+                <div className="file-name" title={f.path}>
+                  {baseName(f.path)}
+                </div>
                 <div className="faint ltr-num">{f.info ? specLine(t, f.info) : f.error ? null : t.analyzingFile}</div>
                 {f.info && f.info.issues.length > 0 && (
                   <div className="issues">
@@ -340,24 +377,24 @@ export function ConvertView(props: {
           options={GROUPS.map((g) => ({ value: g, label: groupName(t, g) }))}
         />
         <SlideSwitch id={group} index={GROUPS.indexOf(group)} distance={40}>
-        <div className="preset-grid">
-          {PRESETS.filter((p) => p.group === group).map((p) => {
-            const ok = fits(p);
-            return (
-              <button
-                key={p.id}
-                className="preset"
-                aria-pressed={p.id === preset.id}
-                disabled={!ok}
-                title={ok ? undefined : t.notFit}
-                onClick={() => update({ convertPreset: p.id })}
-              >
-                <b>{p.name[lang]}</b>
-                <span>{p.desc[lang]}</span>
-              </button>
-            );
-          })}
-        </div>
+          <div className="preset-grid">
+            {PRESETS.filter((p) => p.group === group).map((p) => {
+              const ok = fits(p);
+              return (
+                <button
+                  key={p.id}
+                  className="preset"
+                  aria-pressed={p.id === preset.id}
+                  disabled={!ok}
+                  title={ok ? undefined : t.notFit}
+                  onClick={() => update({ convertPreset: p.id })}
+                >
+                  <b>{p.name[lang]}</b>
+                  <span>{p.desc[lang]}</span>
+                </button>
+              );
+            })}
+          </div>
         </SlideSwitch>
 
         {(preset.quality || preset.hw) && (
@@ -420,7 +457,10 @@ export function ConvertView(props: {
                       label={t.size}
                       value={opts.size ?? null}
                       onChange={(size) => set({ size })}
-                      options={[null, 2160, 1440, 1080, 720, 540, 480].map((v) => ({ value: v, label: v ? (v === 2160 ? "4K" : `${v}p`) : t.original }))}
+                      options={[null, 2160, 1440, 1080, 720, 540, 480].map((v) => ({
+                        value: v,
+                        label: v ? (v === 2160 ? "4K" : `${v}p`) : t.original,
+                      }))}
                     />
                     <Pick
                       label={t.aspect}
@@ -433,7 +473,10 @@ export function ConvertView(props: {
                         label={t.fps}
                         value={opts.fps ?? null}
                         onChange={(fps) => set({ fps })}
-                        options={[null, "23.976", "24", "25", "29.97", "30", "50", "59.94", "60"].map((v) => ({ value: v, label: v ?? t.original }))}
+                        options={[null, "23.976", "24", "25", "29.97", "30", "50", "59.94", "60"].map((v) => ({
+                          value: v,
+                          label: v ?? t.original,
+                        }))}
                       />
                     )}
                     {kind !== "frame" && (
@@ -459,7 +502,12 @@ export function ConvertView(props: {
                     />
                   </div>
                   <div className="toggle-grid">
-                    <Toggle checked={opts.deinterlace} onChange={(deinterlace) => set({ deinterlace })} title={t.deinterlace} hint={t.deinterlaceHint} />
+                    <Toggle
+                      checked={opts.deinterlace}
+                      onChange={(deinterlace) => set({ deinterlace })}
+                      title={t.deinterlace}
+                      hint={t.deinterlaceHint}
+                    />
                     <Toggle checked={opts.denoise} onChange={(denoise) => set({ denoise })} title={t.denoise} hint={t.denoiseHint} />
                     <Toggle checked={opts.tonemap} onChange={(tonemap) => set({ tonemap })} title={t.tonemap} hint={t.tonemapHint} />
                   </div>
@@ -471,8 +519,18 @@ export function ConvertView(props: {
                 <section>
                   <h4>{t.optBurn}</h4>
                   <div className="pick-grid">
-                    <FilePick label={t.subtitles} value={opts.subtitles} extensions={["srt", "ass", "ssa", "vtt"]} onChange={(subtitles) => set({ subtitles })} />
-                    <FilePick label={t.watermark} value={opts.watermark} extensions={["png", "jpg", "jpeg", "webp"]} onChange={(watermark) => set({ watermark })} />
+                    <FilePick
+                      label={t.subtitles}
+                      value={opts.subtitles}
+                      extensions={["srt", "ass", "ssa", "vtt"]}
+                      onChange={(subtitles) => set({ subtitles })}
+                    />
+                    <FilePick
+                      label={t.watermark}
+                      value={opts.watermark}
+                      extensions={["png", "jpg", "jpeg", "webp"]}
+                      onChange={(watermark) => set({ watermark })}
+                    />
                     {opts.watermark && (
                       <Pick
                         label={t.watermarkPos}
@@ -536,7 +594,9 @@ export function ConvertView(props: {
             </div>
           ) : (
             <div className="dest">
-              <span className="field-label" style={{ margin: 0 }}>{t.saveTo2}</span>
+              <span className="field-label" style={{ margin: 0 }}>
+                {t.saveTo2}
+              </span>
               <Segmented<Settings["convertDest"]>
                 label={t.saveTo2}
                 value={s.convertDest}
@@ -559,7 +619,11 @@ export function ConvertView(props: {
               {t.mergeBtn}
             </button>
           )}
-          <button className="btn btn-primary btn-lg" disabled={busy || loading || ready.length === 0 || !ready.some((f) => presetFits(preset, f.info))} onClick={() => start(false)}>
+          <button
+            className="btn btn-primary btn-lg"
+            disabled={busy || loading || ready.length === 0 || !ready.some((f) => presetFits(preset, f.info))}
+            onClick={() => start(false)}
+          >
             <Icon name="convert" /> {t.convertBtn(ready.length)}
           </button>
         </div>

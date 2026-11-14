@@ -14,7 +14,12 @@ function dayLabel(lang: string, ms: number): string {
     const s = rtf.format(-days, "day");
     return s.charAt(0).toLocaleUpperCase(lang) + s.slice(1);
   }
-  return d.toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long", year: d.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+  return d.toLocaleDateString(lang, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: d.getFullYear() === today.getFullYear() ? undefined : "numeric",
+  });
 }
 
 /** سجلّ التنزيلات: يبقى بعد إغلاق التطبيق، مع بحث وفتح المجلد وإعادة التنزيل */
@@ -29,16 +34,18 @@ export function HistoryView(props: {
   const [list, setList] = useState<HistoryEntry[] | null>(null);
   const [q, setQ] = useState("");
 
-  const load = () => api.getHistory().then(setList).catch(() => setList([]));
+  const load = () =>
+    api
+      .getHistory()
+      .then(setList)
+      .catch(() => setList([]));
   useEffect(() => {
     load();
   }, [props.version]);
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    const items = (list ?? []).filter(
-      (e) => !needle || [e.title, e.url, e.meta, e.file].some((x) => x.toLowerCase().includes(needle)),
-    );
+    const items = (list ?? []).filter((e) => !needle || [e.title, e.url, e.meta, e.file].some((x) => x.toLowerCase().includes(needle)));
     // مجموعات حسب اليوم
     const groups: { label: string; items: HistoryEntry[] }[] = [];
     for (const e of items) {
@@ -90,7 +97,11 @@ export function HistoryView(props: {
           <p>{t.historyEmpty}</p>
         </div>
       )}
-      {list && list.length > 0 && shown.length === 0 && <p className="faint" style={{ textAlign: "center" }}>{t.historyNoMatch}</p>}
+      {list && list.length > 0 && shown.length === 0 && (
+        <p className="faint" style={{ textAlign: "center" }}>
+          {t.historyNoMatch}
+        </p>
+      )}
 
       {shown.map((g) => (
         <section key={g.label} className="history-group">
@@ -112,11 +123,17 @@ export function HistoryView(props: {
                 }
                 title={canDrag ? t.dragHint : undefined}
               >
-                {e.thumbnail ? <img className="history-thumb" src={e.thumbnail} alt="" /> : (
-                  <div className="history-thumb"><Icon name={e.kind === "audio" ? "music" : "film"} size={20} /></div>
+                {e.thumbnail ? (
+                  <img className="history-thumb" src={e.thumbnail} alt="" />
+                ) : (
+                  <div className="history-thumb">
+                    <Icon name={e.kind === "audio" ? "music" : "film"} size={20} />
+                  </div>
                 )}
                 <div className="history-body">
-                  <div className="job-title" title={e.title}>{e.title}</div>
+                  <div className="job-title" title={e.title}>
+                    {e.title}
+                  </div>
                   <div className="job-meta">
                     <span>{new Date(e.date).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" })}</span>
                     <span className="faint">{e.meta}</span>
@@ -136,7 +153,12 @@ export function HistoryView(props: {
                     className="icon-btn sm"
                     title={t.copyLink}
                     aria-label={t.copyLink}
-                    onClick={() => navigator.clipboard.writeText(e.url).then(() => props.toast(t.toastCopied)).catch(() => {})}
+                    onClick={() =>
+                      navigator.clipboard
+                        .writeText(e.url)
+                        .then(() => props.toast(t.toastCopied))
+                        .catch(() => {})
+                    }
                   >
                     <Icon name="copy" size={16} />
                   </button>

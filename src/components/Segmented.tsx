@@ -9,12 +9,7 @@ export interface SegOption<T extends string> {
 }
 
 /** مجموعة أزرار يُختار منها واحد فقط (بديل أوضح من القائمة المنسدلة) */
-export function Segmented<T extends string>(props: {
-  value: T;
-  options: SegOption<T>[];
-  onChange: (v: T) => void;
-  label: string;
-}) {
+export function Segmented<T extends string>(props: { value: T; options: SegOption<T>[]; onChange: (v: T) => void; label: string }) {
   const box = useRef<HTMLDivElement>(null);
   // «حبّة» واحدة تنزلق إلى الزر المختار
   const pill = useSlidingIndicator(box, 'button[aria-pressed="true"]', `${props.value}|${props.options.length}`);
@@ -37,19 +32,18 @@ export function Segmented<T extends string>(props: {
   );
 }
 
-export function Toggle(props: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  title: string;
-  hint?: string;
-}) {
+export function Toggle(props: { checked: boolean; onChange: (v: boolean) => void; title: string; hint?: string }) {
   return (
     <label className="toggle">
       <input type="checkbox" checked={props.checked} onChange={(e) => props.onChange(e.target.checked)} />
       <span className="switch" />
       <span>
         <span>{props.title}</span>
-        {props.hint && <span className="faint" style={{ display: "block" }}>{props.hint}</span>}
+        {props.hint && (
+          <span className="faint" style={{ display: "block" }}>
+            {props.hint}
+          </span>
+        )}
       </span>
     </label>
   );

@@ -270,10 +270,13 @@ export function usePresence<T>(value: T | null, exitMs: number): [T | null, bool
     }
     if (shown == null) return;
     setLeaving(true);
-    const t = setTimeout(() => {
-      setShown(null);
-      setLeaving(false);
-    }, reducedMotion() ? 0 : exitMs);
+    const t = setTimeout(
+      () => {
+        setShown(null);
+        setLeaving(false);
+      },
+      reducedMotion() ? 0 : exitMs,
+    );
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
@@ -392,7 +395,13 @@ function SlidePane(props: { out: boolean; dir: number; distance: number; animate
   }, [props.out]);
 
   return (
-    <div className="slide-pane" ref={ref} data-out={props.out || undefined} inert={props.out || undefined} aria-hidden={props.out || undefined}>
+    <div
+      className="slide-pane"
+      ref={ref}
+      data-out={props.out || undefined}
+      inert={props.out || undefined}
+      aria-hidden={props.out || undefined}
+    >
       {props.children}
     </div>
   );

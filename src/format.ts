@@ -42,7 +42,10 @@ export function extractUrls(text: string): string[] {
 
 /** "1:15" أو "1:02:05" أو "75" أو "1:15.5" ← ثوانٍ. نص غير صالح ← null */
 export function parseTime(text: string): number | null {
-  const parts = text.trim().replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).split(":");
+  const parts = text
+    .trim()
+    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .split(":");
   if (parts.length === 0 || parts.length > 3 || parts.some((p) => !/^\d+(\.\d+)?$/.test(p))) return null;
   return parts.reduce((acc, p) => acc * 60 + Number(p), 0);
 }

@@ -19,12 +19,7 @@ export function suggestedFix(e: AppError): ErrorFix | null {
  * رسالة خطأ مفهومة، وتحتها (مطويّة) التفاصيل التقنية الأصلية.
  * inline = سطر خفيف تحت الحقل بدل صندوق أحمر كبير.
  */
-export function ErrorBox(props: {
-  error: AppError;
-  compact?: boolean;
-  inline?: boolean;
-  onFix?: (fix: ErrorFix) => void;
-}) {
+export function ErrorBox(props: { error: AppError; compact?: boolean; inline?: boolean; onFix?: (fix: ErrorFix) => void }) {
   const { t } = useI18n();
   const { error } = props;
   const fix = props.onFix ? suggestedFix(error) : null;

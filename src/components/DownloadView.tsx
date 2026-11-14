@@ -25,11 +25,7 @@ import { FolderPicker } from "./FolderPicker";
 
 const QUALITIES = ["best", "2160", "1440", "1080", "720", "480"] as const;
 
-type ProbeState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "ok"; info: ProbeInfo }
-  | { status: "error"; error: AppError };
+type ProbeState = { status: "idle" } | { status: "loading" } | { status: "ok"; info: ProbeInfo } | { status: "error"; error: AppError };
 
 type Stills = "off" | "5" | "10" | "scene";
 
@@ -203,9 +199,7 @@ export function DownloadView(props: {
 
   // لغات الترجمة لهذا الفيديو: المختارة سابقًا إن توفرت، وإلا الأولى
   const available = info?.subtitles ?? [];
-  const chosenSubs = info
-    ? available.filter((l) => s.subLangs.includes(l.code)).map((l) => l.code)
-    : s.subLangs;
+  const chosenSubs = info ? available.filter((l) => s.subLangs.includes(l.code)).map((l) => l.code) : s.subLangs;
   const subsForRequest = !s.wantSubs
     ? []
     : info && !entries
@@ -413,7 +407,9 @@ export function DownloadView(props: {
             >
               {t.useLink}
             </button>
-            <button className="btn btn-sm btn-ghost" onClick={props.onClipDone}>{t.dismiss}</button>
+            <button className="btn btn-sm btn-ghost" onClick={props.onClipDone}>
+              {t.dismiss}
+            </button>
           </div>
         )}
 
@@ -452,7 +448,11 @@ export function DownloadView(props: {
             </button>
           )}
         </div>
-        {autoPasted && url && <div className="faint url-note"><Icon name="check" size={16} /> {t.autoPasted}</div>}
+        {autoPasted && url && (
+          <div className="faint url-note">
+            <Icon name="check" size={16} /> {t.autoPasted}
+          </div>
+        )}
       </div>
 
       {probe.status === "error" && !multiLinks && <ErrorBox error={probe.error} inline onFix={fix} />}
@@ -543,8 +543,22 @@ export function DownloadView(props: {
                 value={s.kind}
                 onChange={(kind) => update({ kind })}
                 options={[
-                  { value: "video", label: <><Icon name="film" size={16} /> {t.video}</> },
-                  { value: "audio", label: <><Icon name="music" size={16} /> {t.audio}</> },
+                  {
+                    value: "video",
+                    label: (
+                      <>
+                        <Icon name="film" size={16} /> {t.video}
+                      </>
+                    ),
+                  },
+                  {
+                    value: "audio",
+                    label: (
+                      <>
+                        <Icon name="music" size={16} /> {t.audio}
+                      </>
+                    ),
+                  },
                 ]}
               />
             </div>
@@ -593,13 +607,22 @@ export function DownloadView(props: {
                         disabled: q !== "best" && maxHeight != null && Number(q) > maxHeight && s.quality !== q,
                       }))}
                     />
-                    {qualityHint && <div className="faint" style={{ marginTop: 6 }}>{qualityHint}</div>}
+                    {qualityHint && (
+                      <div className="faint" style={{ marginTop: 6 }}>
+                        {qualityHint}
+                      </div>
+                    )}
                   </div>
-                  {(
+                  {
                     <div>
-                      <Toggle checked={s.editorReady} onChange={(editorReady) => update({ editorReady })} title={t.editorReady} hint={t.editorReadyHint} />
+                      <Toggle
+                        checked={s.editorReady}
+                        onChange={(editorReady) => update({ editorReady })}
+                        title={t.editorReady}
+                        hint={t.editorReadyHint}
+                      />
                     </div>
-                  )}
+                  }
                 </div>
               </div>
             </div>
@@ -608,7 +631,12 @@ export function DownloadView(props: {
 
         {info && !entries && (
           <div className="trim-box">
-            <Toggle checked={trimOn && !info.isLive} onChange={setTrimOn} title={t.trimToggle} hint={info.isLive ? t.trimLive : t.trimHint} />
+            <Toggle
+              checked={trimOn && !info.isLive}
+              onChange={setTrimOn}
+              title={t.trimToggle}
+              hint={info.isLive ? t.trimLive : t.trimHint}
+            />
             <div className="collapse" data-open={!!activeClips}>
               <div>
                 {activeClips && info.previewUrl && (
@@ -628,7 +656,12 @@ export function DownloadView(props: {
                       {multi && (
                         <div className="clip-head">
                           <span className="clip-name">{t.clipN(i + 1)}</span>
-                          <button className="btn btn-sm btn-ghost" onClick={() => removeClip(i)} title={t.removeClip} aria-label={t.removeClip}>
+                          <button
+                            className="btn btn-sm btn-ghost"
+                            onClick={() => removeClip(i)}
+                            title={t.removeClip}
+                            aria-label={t.removeClip}
+                          >
                             <Icon name="trash" size={16} />
                           </button>
                         </div>
@@ -677,7 +710,9 @@ export function DownloadView(props: {
           <summary>
             <Icon name="layers" size={16} /> {t.extrasLabel}
             <span className="extras-count">
-              {[s.wantSubs && "SRT", s.wantThumb && "JPG", s.wantInfo && "TXT", stills !== "off" && t.stillsLabel].filter(Boolean).join(" · ")}
+              {[s.wantSubs && "SRT", s.wantThumb && "JPG", s.wantInfo && "TXT", stills !== "off" && t.stillsLabel]
+                .filter(Boolean)
+                .join(" · ")}
             </span>
             <Icon name="chevron" size={16} />
           </summary>
@@ -715,7 +750,11 @@ export function DownloadView(props: {
                     { value: "scene", label: t.stillsScenes },
                   ]}
                 />
-                {stills !== "off" && <div className="faint" style={{ marginTop: 6 }}>{t.stillsHint}</div>}
+                {stills !== "off" && (
+                  <div className="faint" style={{ marginTop: 6 }}>
+                    {t.stillsHint}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -753,7 +792,9 @@ export function DownloadView(props: {
                     </div>
                   </div>
                 )}
-                <div className="faint" style={{ marginTop: 6 }}>{isMobile ? t.stemsHintMobile : t.stemsHint}</div>
+                <div className="faint" style={{ marginTop: 6 }}>
+                  {isMobile ? t.stemsHintMobile : t.stemsHint}
+                </div>
               </div>
             </div>
           </div>
@@ -768,14 +809,31 @@ export function DownloadView(props: {
               onChange={setWhen}
               options={[
                 { value: "now", label: t.startNow },
-                { value: "later", label: <><Icon name="clock" size={16} /> {t.startLater}</> },
+                {
+                  value: "later",
+                  label: (
+                    <>
+                      <Icon name="clock" size={16} /> {t.startLater}
+                    </>
+                  ),
+                },
               ]}
             />
             {when === "later" && (
-              <input className="input time-input ltr" type="time" value={atTime} onChange={(e) => setAtTime(e.target.value)} aria-label={t.startLater} />
+              <input
+                className="input time-input ltr"
+                type="time"
+                value={atTime}
+                onChange={(e) => setAtTime(e.target.value)}
+                aria-label={t.startLater}
+              />
             )}
           </div>
-          {when === "later" && <div className="faint" style={{ marginTop: 6 }}>{t.scheduleHint(atTime)}</div>}
+          {when === "later" && (
+            <div className="faint" style={{ marginTop: 6 }}>
+              {t.scheduleHint(atTime)}
+            </div>
+          )}
         </div>
       </div>
 
@@ -808,7 +866,9 @@ export function DownloadView(props: {
             >
               <option value="">{t.noProject}</option>
               {s.projects.map((p) => (
-                <option key={p.name} value={p.name}>{p.name}</option>
+                <option key={p.name} value={p.name}>
+                  {p.name}
+                </option>
               ))}
             </select>
           </label>

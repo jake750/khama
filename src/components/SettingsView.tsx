@@ -1,7 +1,18 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PRESETS } from "../presets";
-import { api, asAppError, type AppError, type CookiesMode, type Language, type Project, type Settings, type Theme, type ToolsInfo, type WatchFolder } from "../api";
+import {
+  api,
+  asAppError,
+  type AppError,
+  type CookiesMode,
+  type Language,
+  type Project,
+  type Settings,
+  type Theme,
+  type ToolsInfo,
+  type WatchFolder,
+} from "../api";
 import { useI18n } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
 import { Icon, type IconName } from "./Icon";
@@ -104,14 +115,18 @@ export function SettingsView(props: {
           <div className="setting-row">
             <div style={{ minWidth: 0 }}>
               <div>{t.saveFolder}</div>
-              <div className="faint ltr" style={{ wordBreak: "break-all" }}>{isMobile ? MOBILE_SAVE_DIR : props.outputDir}</div>
+              <div className="faint ltr" style={{ wordBreak: "break-all" }}>
+                {isMobile ? MOBILE_SAVE_DIR : props.outputDir}
+              </div>
             </div>
             {!isMobile && (
               <div style={{ display: "flex", gap: 8 }}>
                 <button className="btn" onClick={props.onOpenDir}>
                   <Icon name="folder" size={16} /> {t.open}
                 </button>
-                <button className="btn" onClick={props.onChooseDir}>{t.choose}</button>
+                <button className="btn" onClick={props.onChooseDir}>
+                  {t.choose}
+                </button>
               </div>
             )}
           </div>
@@ -125,8 +140,12 @@ export function SettingsView(props: {
         <ToolsSection toast={props.toast} />
 
         <Section id="about" title={t.aboutTitle}>
-          <p className="muted" style={{ margin: "4px 0 8px" }}>{t.aboutBody}</p>
-          <p className="faint" style={{ margin: 0 }}>{t.notice}</p>
+          <p className="muted" style={{ margin: "4px 0 8px" }}>
+            {t.aboutBody}
+          </p>
+          <p className="faint" style={{ margin: 0 }}>
+            {t.notice}
+          </p>
         </Section>
       </div>
     </div>
@@ -138,7 +157,11 @@ function Section(props: { id: string; title: string; intro?: string; children: R
     <section className="card settings-section" id={`set-${props.id}`} data-section={props.id}>
       <div>
         <h2>{props.title}</h2>
-        {props.intro && <p className="faint" style={{ margin: 0 }}>{props.intro}</p>}
+        {props.intro && (
+          <p className="faint" style={{ margin: 0 }}>
+            {props.intro}
+          </p>
+        )}
       </div>
       <div>{props.children}</div>
     </section>
@@ -152,14 +175,22 @@ function templateExample(tpl: string, siteFolders: boolean): string {
   let x = (tpl.trim() || "{title}").replace(/[/\\:*?"<>|]/g, "_");
   if (!x.includes("{")) x = `${x} {title}`;
   x = x
-    .split("{title}").join("Big Buck Bunny")
-    .split("{uploader}").join("Blender")
-    .split("{date}").join("2014-11-10")
-    .split("{today}").join(today)
-    .split("{site}").join("Youtube")
-    .split("{id}").join("aqz-KE-bpKQ")
-    .split("{res}").join("1080p")
-    .split("{n}").join("001");
+    .split("{title}")
+    .join("Big Buck Bunny")
+    .split("{uploader}")
+    .join("Blender")
+    .split("{date}")
+    .join("2014-11-10")
+    .split("{today}")
+    .join(today)
+    .split("{site}")
+    .join("Youtube")
+    .split("{id}")
+    .join("aqz-KE-bpKQ")
+    .split("{res}")
+    .join("1080p")
+    .split("{n}")
+    .join("001");
   return `${siteFolders ? "Youtube/" : ""}${x}.mp4`;
 }
 
@@ -209,7 +240,12 @@ function DownloadsSection(props: { settings: Settings; update: (p: Partial<Setti
         </div>
       </div>
       <div className="setting-row">
-        <Toggle checked={s.siteFolders} onChange={(siteFolders) => update({ siteFolders })} title={t.siteFolders} hint={t.siteFoldersHint} />
+        <Toggle
+          checked={s.siteFolders}
+          onChange={(siteFolders) => update({ siteFolders })}
+          title={t.siteFolders}
+          hint={t.siteFoldersHint}
+        />
       </div>
       <div className="setting-row">
         <div>
@@ -238,10 +274,20 @@ function BackgroundSection(props: { settings: Settings; update: (p: Partial<Sett
       {!isMobile && (
         <>
           <div className="setting-row">
-            <Toggle checked={s.closeToTray} onChange={(closeToTray) => update({ closeToTray })} title={t.closeToTray} hint={t.closeToTrayHint} />
+            <Toggle
+              checked={s.closeToTray}
+              onChange={(closeToTray) => update({ closeToTray })}
+              title={t.closeToTray}
+              hint={t.closeToTrayHint}
+            />
           </div>
           <div className="setting-row">
-            <Toggle checked={s.watchClipboard} onChange={(watchClipboard) => update({ watchClipboard })} title={t.watchClipboard} hint={t.watchClipboardHint} />
+            <Toggle
+              checked={s.watchClipboard}
+              onChange={(watchClipboard) => update({ watchClipboard })}
+              title={t.watchClipboard}
+              hint={t.watchClipboardHint}
+            />
           </div>
           <div className="setting-row end">
             <button className="btn btn-danger" onClick={() => api.quitApp()}>
@@ -255,7 +301,12 @@ function BackgroundSection(props: { settings: Settings; update: (p: Partial<Sett
 }
 
 /** المشاريع: لقطة من مجلد الحفظ وخيارات التنزيل، يُبدَّل بينها من شاشة التنزيل */
-function ProjectsSection(props: { settings: Settings; update: (p: Partial<Settings>) => void; outputDir: string; toast: (m: string) => void }) {
+function ProjectsSection(props: {
+  settings: Settings;
+  update: (p: Partial<Settings>) => void;
+  outputDir: string;
+  toast: (m: string) => void;
+}) {
   const { t } = useI18n();
   const { settings: s, update } = props;
   const [name, setName] = useState("");
@@ -283,7 +334,11 @@ function ProjectsSection(props: { settings: Settings; update: (p: Partial<Settin
       {s.projects.map((p) => (
         <div className="watch-row project-row" key={p.name}>
           <b className={s.activeProject === p.name ? "accent" : undefined}>{p.name}</b>
-          {!isMobile && <span className="path ltr faint" title={p.outputDir ?? props.outputDir}>{p.outputDir ?? props.outputDir}</span>}
+          {!isMobile && (
+            <span className="path ltr faint" title={p.outputDir ?? props.outputDir}>
+              {p.outputDir ?? props.outputDir}
+            </span>
+          )}
           <button
             className="btn btn-sm btn-ghost"
             onClick={() => {
@@ -298,7 +353,10 @@ function ProjectsSection(props: { settings: Settings; update: (p: Partial<Settin
             aria-label={t.remove}
             title={t.remove}
             onClick={() =>
-              update({ projects: s.projects.filter((x) => x.name !== p.name), activeProject: s.activeProject === p.name ? null : s.activeProject })
+              update({
+                projects: s.projects.filter((x) => x.name !== p.name),
+                activeProject: s.activeProject === p.name ? null : s.activeProject,
+              })
             }
           >
             <Icon name="x" size={16} />
@@ -306,7 +364,13 @@ function ProjectsSection(props: { settings: Settings; update: (p: Partial<Settin
         </div>
       ))}
       <div className="project-new">
-        <input className="input wide" value={name} placeholder={t.projectName} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
+        <input
+          className="input wide"
+          value={name}
+          placeholder={t.projectName}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && save()}
+        />
         <button className="btn" disabled={!name.trim()} onClick={save}>
           <Icon name="plus" size={16} /> {t.saveProject}
         </button>
@@ -324,7 +388,10 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    api.hasSavedCookies().then(setHasSaved).catch(() => {});
+    api
+      .hasSavedCookies()
+      .then(setHasSaved)
+      .catch(() => {});
   }, []);
 
   async function save() {
@@ -361,7 +428,9 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
               <input type="radio" name="cookies" checked={s.cookiesMode === m.value} onChange={() => update({ cookiesMode: m.value })} />
               <span>
                 <span>{m.title}</span>
-                <span className="faint" style={{ display: "block" }}>{m.hint}</span>
+                <span className="faint" style={{ display: "block" }}>
+                  {m.hint}
+                </span>
               </span>
             </label>
           ))}
@@ -379,7 +448,9 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
               ))}
             </select>
             {s.cookiesBrowser !== "firefox" && s.cookiesBrowser !== "safari" && (
-              <div className="faint" style={{ marginTop: 6 }}>{t.chromeNote}</div>
+              <div className="faint" style={{ marginTop: 6 }}>
+                {t.chromeNote}
+              </div>
             )}
           </div>
         )}
@@ -390,7 +461,13 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
               <Icon name={hasSaved ? "check" : "x"} size={16} />
               {hasSaved ? t.cookiesSaved : t.cookiesNotSaved}
             </div>
-            <textarea className="textarea" placeholder={t.cookiesPlaceholder} value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} />
+            <textarea
+              className="textarea"
+              placeholder={t.cookiesPlaceholder}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              spellCheck={false}
+            />
             <input
               ref={fileInput}
               type="file"
@@ -403,8 +480,12 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
               }}
             />
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button className="btn btn-primary" disabled={!text.trim()} onClick={save}>{t.saveCookies}</button>
-              <button className="btn" onClick={() => fileInput.current?.click()}>{t.importFile}</button>
+              <button className="btn btn-primary" disabled={!text.trim()} onClick={save}>
+                {t.saveCookies}
+              </button>
+              <button className="btn" onClick={() => fileInput.current?.click()}>
+                {t.importFile}
+              </button>
               <span className="spacer" />
               <button className="btn btn-danger" disabled={!hasSaved} onClick={remove}>
                 <Icon name="trash" size={16} /> {t.deleteSaved}
@@ -470,8 +551,11 @@ function ToolsSection(props: { toast: (m: string) => void }) {
             {tools.map(([name, v]) => (
               <div key={name} className="tool">
                 <b>{name}</b>
-                <span className="faint ltr" style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {info ? v ?? "—" : "…"}
+                <span
+                  className="faint ltr"
+                  style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
+                  {info ? (v ?? "—") : "…"}
                 </span>
               </div>
             ))}
@@ -505,13 +589,25 @@ function WatchSection(props: { settings: Settings; update: (p: Partial<Settings>
       {list.map((w, i) => (
         <div className="watch-row" key={w.dir}>
           <label className="toggle" title={w.dir}>
-            <input type="checkbox" checked={w.enabled} onChange={(e) => set(list.map((x, k) => (k === i ? { ...x, enabled: e.target.checked } : x)))} />
+            <input
+              type="checkbox"
+              checked={w.enabled}
+              onChange={(e) => set(list.map((x, k) => (k === i ? { ...x, enabled: e.target.checked } : x)))}
+            />
             <span className="switch" />
           </label>
-          <span className="path ltr" title={w.dir}>{w.dir}</span>
-          <select className="select" value={w.preset} onChange={(e) => set(list.map((x, k) => (k === i ? { ...x, preset: e.target.value } : x)))}>
+          <span className="path ltr" title={w.dir}>
+            {w.dir}
+          </span>
+          <select
+            className="select"
+            value={w.preset}
+            onChange={(e) => set(list.map((x, k) => (k === i ? { ...x, preset: e.target.value } : x)))}
+          >
             {PRESETS.filter((p) => p.kind !== "detect").map((p) => (
-              <option key={p.id} value={p.id}>{p.name[lang]}</option>
+              <option key={p.id} value={p.id}>
+                {p.name[lang]}
+              </option>
             ))}
           </select>
           <button className="icon-btn sm" aria-label={t.remove} title={t.remove} onClick={() => set(list.filter((_, k) => k !== i))}>

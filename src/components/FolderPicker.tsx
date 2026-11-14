@@ -3,7 +3,11 @@ import { useI18n } from "../i18n";
 import { Icon } from "./Icon";
 
 /** "C:\Users\me\Downloads" ← "Downloads" (المسار الكامل يظهر عند الوقوف عليه) */
-export const folderName = (p: string) => p.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || p;
+export const folderName = (p: string) =>
+  p
+    .replace(/[\\/]+$/, "")
+    .split(/[\\/]/)
+    .pop() || p;
 
 /** زر مجلد الحفظ: اسم المجلد فقط، وقائمة بآخر المجلدات المستخدمة */
 export function FolderPicker(props: { current: string; recent: string[]; onPick: (dir: string) => void; onChoose: () => void }) {

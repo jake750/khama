@@ -24,9 +24,7 @@ const FF_DIR = path.join(OUT, "ffmpeg");
 
 const args = process.argv.slice(2);
 const force = args.includes("--force");
-const target =
-  args.find((a) => !a.startsWith("--")) ??
-  execFileSync("rustc", ["-vV"], { encoding: "utf8" }).match(/host: (\S+)/)[1];
+const target = args.find((a) => !a.startsWith("--")) ?? execFileSync("rustc", ["-vV"], { encoding: "utf8" }).match(/host: (\S+)/)[1];
 
 const YTDLP = "https://github.com/yt-dlp/yt-dlp/releases/latest/download";
 // بناءات FFmpeg (GPL، نسخة "shared" لتقليل الحجم):
@@ -113,10 +111,7 @@ function extract(buf, name, dir) {
   } else {
     // tar على Windows 10+ و macOS يفك zip أيضًا.
     // على Windows نستدعي نسخة النظام صراحة، لأن tar الخاص بـ Git Bash لا يفهم مسارات C:\
-    const tar =
-      process.platform === "win32"
-        ? path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe")
-        : "tar";
+    const tar = process.platform === "win32" ? path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe") : "tar";
     execFileSync(tar, ["-xf", file, "-C", dir]);
   }
   fs.rmSync(file);

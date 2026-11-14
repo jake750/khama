@@ -264,8 +264,7 @@ export const api = {
   cancelDownload: (id: number) => invoke<void>("cancel_download", { id }),
   revealFile: (path: string) => invoke<void>("reveal_file", { path }),
   openOutputDir: () => invoke<void>("open_output_dir"),
-  onJobUpdate: (cb: (u: JobUpdate) => void): Promise<UnlistenFn> =>
-    listen<JobUpdate>("job-update", (e) => cb(e.payload)),
+  onJobUpdate: (cb: (u: JobUpdate) => void): Promise<UnlistenFn> => listen<JobUpdate>("job-update", (e) => cb(e.payload)),
   analyzeFile: (path: string) => invoke<MediaInfo>("analyze_file", { path }),
   hwEncoders: () => invoke<string[]>("hw_encoders"),
   startConvert: (request: ConvertRequest) => invoke<number>("start_convert", { request }),

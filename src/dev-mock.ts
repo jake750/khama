@@ -41,9 +41,39 @@ const settings = {
 const thumb = (seed: string) => `https://picsum.photos/seed/${seed}/320/180`;
 
 const history = [
-  { id: 1, title: "لقطات جوية لمدينة الرياض وقت الغروب 4K", url: "https://youtu.be/a", file: "C:\\x\\a.mp4", kind: "video", meta: "MP4 · 4K", thumbnail: thumb("riyadh"), date: Date.now() - 3600e3, exists: true },
-  { id: 2, title: "Ambient drone pad — free for editing", url: "https://soundcloud.com/b", file: "C:\\x\\b.mp3", kind: "audio", meta: "MP3", thumbnail: thumb("pad"), date: Date.now() - 5 * 3600e3, exists: true },
-  { id: 3, title: "مقابلة كاملة: كيف تبني قصة في ٦٠ ثانية", url: "https://x.com/c", file: "C:\\x\\c.mp4", kind: "video", meta: "MP4 · 1080p", thumbnail: thumb("talk"), date: Date.now() - 30 * 3600e3, exists: false },
+  {
+    id: 1,
+    title: "لقطات جوية لمدينة الرياض وقت الغروب 4K",
+    url: "https://youtu.be/a",
+    file: "C:\\x\\a.mp4",
+    kind: "video",
+    meta: "MP4 · 4K",
+    thumbnail: thumb("riyadh"),
+    date: Date.now() - 3600e3,
+    exists: true,
+  },
+  {
+    id: 2,
+    title: "Ambient drone pad — free for editing",
+    url: "https://soundcloud.com/b",
+    file: "C:\\x\\b.mp3",
+    kind: "audio",
+    meta: "MP3",
+    thumbnail: thumb("pad"),
+    date: Date.now() - 5 * 3600e3,
+    exists: true,
+  },
+  {
+    id: 3,
+    title: "مقابلة كاملة: كيف تبني قصة في ٦٠ ثانية",
+    url: "https://x.com/c",
+    file: "C:\\x\\c.mp4",
+    kind: "video",
+    meta: "MP4 · 1080p",
+    thumbnail: thumb("talk"),
+    date: Date.now() - 30 * 3600e3,
+    exists: false,
+  },
 ];
 
 function emit(event: string, payload: unknown) {
@@ -89,7 +119,10 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         site: "YouTube",
         heights: [2160, 1440, 1080, 720, 480],
         isLive: false,
-        subtitles: [{ code: "ar", name: "العربية", auto: false }, { code: "en", name: "English", auto: true }],
+        subtitles: [
+          { code: "ar", name: "العربية", auto: false },
+          { code: "en", name: "English", auto: true },
+        ],
         previewUrl: null,
         original: false,
       };

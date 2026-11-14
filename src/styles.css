@@ -522,7 +522,6 @@ button:disabled {
   background: var(--accent);
 }
 
-
 .toggle input:focus-visible + .switch {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -934,7 +933,9 @@ details.tech pre {
   background: var(--bg);
   font-variant-numeric: tabular-nums;
   user-select: text;
-  transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+  transition:
+    border-color 0.2s var(--ease-out),
+    box-shadow 0.2s var(--ease-out);
 }
 
 .input:focus {
@@ -960,8 +961,71 @@ details.tech pre {
 @supports (transition-timing-function: linear(0, 1)) {
   :root {
     /* انزلاق المؤشّر: يتسارع بلطف (لا يقفز في أول إطار) ويستقر بتجاوز ٢٪ فقط */
-    --ease-glide: linear(0, 0.028, 0.098, 0.193, 0.3, 0.408, 0.513, 0.609, 0.694, 0.767, 0.829, 0.88, 0.92, 0.952, 0.976, 0.993, 1.005, 1.013, 1.017, 1.019, 1.02, 1.019, 1.018, 1.016, 1.014, 1.011, 1.009, 1.007, 1.006, 1.004, 1.003, 1.002, 1 80%, 1);
-    --ease-spring: linear(0, 0.057, 0.185, 0.339, 0.49, 0.625, 0.737, 0.825, 0.89, 0.937, 0.969, 0.989, 1.002, 1.008, 1.011, 1.011, 1.01, 1.009, 1.007, 1.005, 1.004, 1.003, 1.002, 1.001, 1.001, 1 62.5%, 1);
+    --ease-glide: linear(
+      0,
+      0.028,
+      0.098,
+      0.193,
+      0.3,
+      0.408,
+      0.513,
+      0.609,
+      0.694,
+      0.767,
+      0.829,
+      0.88,
+      0.92,
+      0.952,
+      0.976,
+      0.993,
+      1.005,
+      1.013,
+      1.017,
+      1.019,
+      1.02,
+      1.019,
+      1.018,
+      1.016,
+      1.014,
+      1.011,
+      1.009,
+      1.007,
+      1.006,
+      1.004,
+      1.003,
+      1.002,
+      1 80%,
+      1
+    );
+    --ease-spring: linear(
+      0,
+      0.057,
+      0.185,
+      0.339,
+      0.49,
+      0.625,
+      0.737,
+      0.825,
+      0.89,
+      0.937,
+      0.969,
+      0.989,
+      1.002,
+      1.008,
+      1.011,
+      1.011,
+      1.01,
+      1.009,
+      1.007,
+      1.005,
+      1.004,
+      1.003,
+      1.002,
+      1.001,
+      1.001,
+      1 62.5%,
+      1
+    );
   }
 }
 
@@ -1096,7 +1160,9 @@ details.tech pre {
 }
 
 .url-input {
-  transition: border-color 0.2s var(--ease-out), box-shadow 0.25s var(--ease-out);
+  transition:
+    border-color 0.2s var(--ease-out),
+    box-shadow 0.25s var(--ease-out);
 }
 
 /* لوحة قابلة للطي: تنفتح بارتفاعها الحقيقي (grid 0fr ← 1fr) */
@@ -1348,11 +1414,21 @@ img.file-thumb {
     box-shadow 0.25s var(--ease-out);
 }
 
-.preset:nth-child(2) { animation-delay: 0.03s; }
-.preset:nth-child(3) { animation-delay: 0.06s; }
-.preset:nth-child(4) { animation-delay: 0.09s; }
-.preset:nth-child(5) { animation-delay: 0.12s; }
-.preset:nth-child(n + 6) { animation-delay: 0.15s; }
+.preset:nth-child(2) {
+  animation-delay: 0.03s;
+}
+.preset:nth-child(3) {
+  animation-delay: 0.06s;
+}
+.preset:nth-child(4) {
+  animation-delay: 0.09s;
+}
+.preset:nth-child(5) {
+  animation-delay: 0.12s;
+}
+.preset:nth-child(n + 6) {
+  animation-delay: 0.15s;
+}
 
 .preset span {
   color: var(--text-dim);
@@ -1814,7 +1890,9 @@ img.file-thumb {
   align-items: center;
   gap: 8px;
   border-radius: var(--r-xs);
-  transition: background-color 0.15s, opacity 0.15s;
+  transition:
+    background-color 0.15s,
+    opacity 0.15s;
 }
 .pl-row:hover {
   background: var(--surface-2);
@@ -1902,7 +1980,10 @@ img.file-thumb {
   font-size: var(--fs-cap);
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s,
+    border-color 0.15s;
 }
 .pl-stem:hover {
   border-color: var(--accent);
