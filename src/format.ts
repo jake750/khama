@@ -37,7 +37,18 @@ export const isHttpUrl = (s: string) => /^https?:\/\/\S+$/i.test(s.trim());
 
 /** يستخرج كل الروابط من نص ملصوق (قد يحتوي عدة روابط أو نصًا حولها) */
 export function extractUrls(text: string): string[] {
-  return Array.from(new Set(text.match(/https?:\/\/[^\s"'<>]+/gi) ?? []));
+  const found = (text.match(/https?:\/\/[^\s"'<>]+/gi) ?? []).map(trimUrlTail);
+  return Array.from(new Set(found));
+}
+
+/** يحذف علامات الترقيم الملتصقة بآخر الرابط، ويُبقي القوس الختامي إن كان له قوس مفتوح داخل الرابط */
+function trimUrlTail(url: string): string {
+  for (;;) {
+    const last = url.at(-1) ?? "";
+    if (/[.,;:!?،؛؟»'"\]}]/.test(last)) url = url.slice(0, -1);
+    else if (last === ")" && url.split("(").length < url.split(")").length) url = url.slice(0, -1);
+    else return url;
+  }
 }
 
 /** "1:15" أو "1:02:05" أو "75" أو "1:15.5" ← ثوانٍ. نص غير صالح ← null */
@@ -45,14 +56,19 @@ export function parseTime(text: string): number | null {
   const parts = text
     .trim()
     .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
     .split(":");
-  if (parts.length === 0 || parts.length > 3 || parts.some((p) => !/^\d+(\.\d+)?$/.test(p))) return null;
-  return parts.reduce((acc, p) => acc * 60 + Number(p), 0);
+  if (parts.length > 3) return null;
+  const last = parts.length - 1;
+  // الكسر مسموح في الجزء الأخير فقط، والدقائق والثواني بعد الجزء الأول أقل من 60
+  const valid = parts.every((p, i) => (i === last ? /^\d+(\.\d+)?$/ : /^\d+$/).test(p) && (i === 0 || Number(p) < 60));
+  return valid ? parts.reduce((acc, p) => acc * 60 + Number(p), 0) : null;
 }
 
 /** مثل formatDuration لكن يُبقي أجزاء الثانية إن وُجدت: 75.5 ← "1:15.5" */
 export function formatTimecode(sec: number): string {
-  const whole = Math.floor(sec);
-  const frac = Math.round((sec - whole) * 10);
-  return formatDuration(whole) + (frac ? `.${frac}` : "");
+  // التقريب إلى أعشار الثانية أولًا حتى لا يظهر 59.96 كـ "0:59.10"
+  const tenths = Math.max(0, Math.round(sec * 10));
+  const frac = tenths % 10;
+  return formatDuration(Math.floor(tenths / 10)) + (frac ? `.${frac}` : "");
 }
