@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx tsc --noEmit -p .)",
+      "Bash(cargo test *)",
+      "Bash(cargo check *)",
+      "Bash(npx vitest run *)",
+      "Bash(gh run watch *)",
+      "Bash(npm run release -- --dry-run *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-Content *)",
+      "PowerShell(Get-Process *)"
+    ]
+  }
+}

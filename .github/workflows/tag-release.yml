@@ -1,0 +1,35 @@
+# عند الدمج في main: إذا تغيّر رقم الإصدار في tauri.conf.json ولم يوجد وسمه بعد،
+# يُنشئ الوسم vX.Y.Z ويشغّل workflow البناء عليه (الوسم الذي يدفعه GITHUB_TOKEN
+# لا يشغّل workflows أخرى وحده، لذلك نشغّل Build صراحةً).
+name: Tag release
+
+on:
+  push:
+    branches: [main]
+    paths: [src-tauri/tauri.conf.json]
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create tag and start build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v="v$(jq -r .version src-tauri/tauri.conf.json)"
+          if git rev-parse -q --verify "refs/tags/$v" >/dev/null; then
+            echo "الوسم $v موجود بالفعل، لا شيء نفعله"
+            exit 0
+          fi
+          git tag "$v" "$GITHUB_SHA"
+          git push origin "$v"
+          gh workflow run build.yml --ref "$v"
+          echo "أُنشئ الوسم $v وبدأ البناء" >> "$GITHUB_STEP_SUMMARY"

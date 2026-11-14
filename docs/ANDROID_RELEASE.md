@@ -8,8 +8,15 @@ A guide for any new chat that needs to build a new APK. It contains no passwords
 - Every update **must** be signed with this same key. Otherwise Android refuses to install it over the old version, and the user has to uninstall the app and lose their data. Keep a backup of the `.khama` folder outside this PC.
 - Gradle reads the key from `keystore.properties`, or from the `KHAMA_KEYSTORE` environment variables in CI (see `src-tauri/gen/android/app/build.gradle.kts`).
 
+## Building in GitHub Actions (normal releases)
+`build.yml` builds the signed arm64 APK and attaches it to the draft release, but only when these repository secrets exist (Settings → Secrets and variables → Actions):
+- `KHAMA_KEYSTORE_BASE64`: the keystore as base64. In PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("$HOME\.khama\khama-release.jks")) | Set-Clipboard`, then paste it as the value.
+- `KHAMA_KEY_PASSWORD`: the `password` value from `~/.khama/keystore.properties`.
+
+Without them the Android job is skipped and the desktop builds run as before.
+
 ## Version number
-Raise `version` in `src-tauri/tauri.conf.json` (and keep `package.json` and `src-tauri/Cargo.toml` in sync). Tauri derives `versionName` and `versionCode` from it automatically. If the number doesn't go up, Android won't treat the APK as an update.
+Run `npm run release -- patch` (see `CLAUDE.md`). It raises `version` in `tauri.conf.json`, `package.json`, `package-lock.json`, `Cargo.toml` and `Cargo.lock` together. Tauri derives `versionName` and `versionCode` from it automatically. If the number doesn't go up, Android won't treat the APK as an update.
 
 ## The environment on this PC
 - JDK 17: `C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot` (already in `JAVA_HOME`)
