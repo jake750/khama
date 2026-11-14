@@ -3,7 +3,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, asAppError, type ConvertRequest, type DownloadRequest, type JobUpdate, type Settings } from "./api";
+import { api, asAppError, type AppError, type ConvertRequest, type DownloadRequest, type JobUpdate, type Settings } from "./api";
 import { ConvertView, defaultOptions, MEDIA_FILTER, type SourceFile } from "./components/ConvertView";
 import { DownloadView, type StartMeta } from "./components/DownloadView";
 import { HistoryView } from "./components/HistoryView";
@@ -87,6 +87,8 @@ async function notify(title: string, body: string) {
 
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
+  // فشل قراءة الإعدادات عند الفتح: نعرض السبب بدل شاشة فارغة
+  const [bootError, setBootError] = useState<AppError | null>(null);
   const [defaultDir, setDefaultDir] = useState("");
   const [tab, setTab] = useState<Tab>("download");
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -128,7 +130,10 @@ export default function App() {
   }, [lang, t]);
 
   useEffect(() => {
-    api.getSettings().then(setSettings);
+    api
+      .getSettings()
+      .then(setSettings)
+      .catch((e) => setBootError(asAppError(e)));
     api.defaultOutputDir().then((d) => setDefaultDir(d ?? ""));
   }, []);
 
@@ -206,19 +211,28 @@ export default function App() {
     };
   }, []);
 
+  // حفظ الإعدادات: خارج دالة setState (React قد يستدعيها مرتين)، وبالتسلسل حتى لا يكتب
+  // حفظٌ قديم فوق أحدث منه. settingsRef يُحدَّث فورًا فلا يضيع تعديلان في نفس اللحظة.
+  const saveChain = useRef(Promise.resolve());
+  const saveFailed = useRef<(e: unknown) => void>(() => {});
   const update = useCallback((patch: Partial<Settings>) => {
-    setSettings((prev) => {
-      if (!prev) return prev;
-      const next = { ...prev, ...patch };
-      api.saveSettings(next).catch(() => {});
-      return next;
-    });
+    const prev = settingsRef.current;
+    if (!prev) return;
+    const next = { ...prev, ...patch };
+    settingsRef.current = next;
+    setSettings(next);
+    saveChain.current = saveChain.current.then(() => api.saveSettings(next)).catch((e) => saveFailed.current(e));
   }, []);
 
+  // مؤقّت واحد للتنبيه: رسالة جديدة (أو نفس الرسالة مرة ثانية) تبدأ مدتها من جديد
+  const toastTimer = useRef<number | undefined>(undefined);
   const toast = useCallback((msg: string) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg((m) => (m === msg ? null : m)), 2600);
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToastMsg(null), 2600);
   }, []);
+  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
+  saveFailed.current = () => toast(t.settingsSaveFailed);
 
   /** مجلد حفظ جديد، ويُضاف لأعلى قائمة «مجلدات استخدمتها مؤخرًا» */
   const pickDir = useCallback(
@@ -408,6 +422,13 @@ export default function App() {
       .catch(() => {});
   }, [compact]);
 
+  if (bootError)
+    return (
+      <div className="boot-error" role="alert" dir="auto">
+        <p>تعذّر تحميل الإعدادات — Could not load settings</p>
+        <code className="ltr">{bootError.code + (bootError.detail ? `: ${bootError.detail}` : "")}</code>
+      </div>
+    );
   if (!settings) return null;
 
   const outputDir = settings.outputDir || defaultDir;

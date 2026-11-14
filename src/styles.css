@@ -2026,3 +2026,13 @@ img.file-thumb {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+
+/* فشل تحميل الإعدادات عند الفتح */
+.boot-error {
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  min-height: 100vh;
+  padding: 24px;
+  text-align: center;
+}
