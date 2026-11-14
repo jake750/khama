@@ -399,17 +399,18 @@ export default function App() {
   useEffect(() => {
     const un = api.onWatchFile((hit) => {
       const p = presetById(hit.preset);
-      startConvert(
-        { inputs: [hit.path], preset: hit.preset, options: { ...defaultOptions(), hw: true, outDir: hit.outDir } },
-        baseName(hit.path),
-        p?.name[lang] ?? hit.preset,
-      ).catch(() => {});
+      addJob(hit.id, {
+        type: "convert",
+        convert: { inputs: [hit.path], preset: hit.preset, options: defaultOptions() },
+        title: baseName(hit.path),
+        meta: p?.name[lang] ?? hit.preset,
+      });
       toast(tRef.current.toastWatch(baseName(hit.path)));
     });
     return () => {
       un.then((f) => f());
     };
-  }, [startConvert, toast, lang]);
+  }, [addJob, toast, lang]);
 
   const toggleCompact = useCallback(() => {
     const next = !compact;

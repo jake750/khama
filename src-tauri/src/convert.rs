@@ -17,7 +17,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager};
 use tokio::sync::{OnceCell, Semaphore, watch};
 
 use crate::{
@@ -1779,12 +1779,14 @@ pub async fn import_files(app: AppHandle, paths: Vec<String>) -> Result<Vec<Stri
 }
 
 #[tauri::command]
-pub async fn start_convert(
-    app: AppHandle,
-    jobs: State<'_, Jobs>,
-    queue: State<'_, ConvertQueue>,
-    request: ConvertRequest,
-) -> Result<u64, AppError> {
+pub async fn start_convert(app: AppHandle, request: ConvertRequest) -> Result<u64, AppError> {
+    queue_convert(&app, request)
+}
+
+/// يضع تحويلًا في الطابور ويعيد رقمه. تستدعيه الواجهة ومراقبة المجلدات.
+pub fn queue_convert(app: &AppHandle, request: ConvertRequest) -> Result<u64, AppError> {
+    let jobs = app.state::<Jobs>();
+    let queue = app.state::<ConvertQueue>();
     if preset(&request.preset).is_none() {
         return Err(AppError::with_param("unknownPreset", request.preset.clone(), ""));
     }
@@ -2161,9 +2163,10 @@ const MEDIA_EXT: &[&str] = &[
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WatchHit {
+    /// رقم التحويل الذي بدأه Rust (الواجهة تضيف بطاقته فقط)
+    id: u64,
     path: String,
     preset: String,
-    out_dir: String,
 }
 
 /// مجلد فرعي يُكتب فيه الناتج (حتى لا يلتقطه المراقب مرة أخرى)
@@ -2213,14 +2216,25 @@ pub fn spawn_watcher(app: AppHandle) {
                     if entry.1 >= 2 {
                         pending.remove(&path);
                         seen.insert(path.clone());
-                        let _ = app.emit(
-                            "watch-file",
-                            WatchHit {
+                        // التحويل يبدأ هنا في Rust، فلا يضيع الملف إن لم تكن الواجهة جاهزة (T-26)
+                        let hw = app.state::<SettingsState>().0.lock().unwrap().convert_hw;
+                        let request = ConvertRequest {
+                            inputs: vec![path.to_string_lossy().into_owned()],
+                            preset: w.preset.clone(),
+                            options: ConvertOptions {
+                                hw,
+                                out_dir: Some(dir.join(WATCH_OUT).to_string_lossy().into_owned()),
+                                ..Default::default()
+                            },
+                        };
+                        if let Ok(id) = queue_convert(&app, request) {
+                            let hit = WatchHit {
+                                id,
                                 path: path.to_string_lossy().into_owned(),
                                 preset: w.preset.clone(),
-                                out_dir: dir.join(WATCH_OUT).to_string_lossy().into_owned(),
-                            },
-                        );
+                            };
+                            let _ = app.emit("watch-file", hit);
+                        }
                     }
                 }
             }

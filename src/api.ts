@@ -290,6 +290,7 @@ export const api = {
   setCompact: (compact: boolean) => invoke<void>("set_compact", { compact }),
   quitApp: () => invoke<void>("quit_app"),
   onClipboardUrl: (cb: (url: string) => void): Promise<UnlistenFn> => listen<string>("clipboard-url", (e) => cb(e.payload)),
-  onWatchFile: (cb: (hit: { path: string; preset: string; outDir: string }) => void): Promise<UnlistenFn> =>
-    listen<{ path: string; preset: string; outDir: string }>("watch-file", (e) => cb(e.payload)),
+  /** ملف جديد في مجلد مراقَب: Rust بدأ تحويله برقم id */
+  onWatchFile: (cb: (hit: { id: number; path: string; preset: string }) => void): Promise<UnlistenFn> =>
+    listen<{ id: number; path: string; preset: string }>("watch-file", (e) => cb(e.payload)),
 };
