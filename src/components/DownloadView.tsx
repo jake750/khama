@@ -849,10 +849,10 @@ export function DownloadView(props: {
               value={s.activeProject ?? ""}
               aria-label={t.project}
               onChange={(e) => {
-                const p = s.projects.find((x) => x.name === e.target.value);
+                const p = s.projects.find((x) => x.id === e.target.value);
                 if (!p) return update({ activeProject: null });
                 update({
-                  activeProject: p.name,
+                  activeProject: p.id,
                   outputDir: p.outputDir,
                   kind: p.kind,
                   videoFormat: p.videoFormat,
@@ -867,7 +867,7 @@ export function DownloadView(props: {
             >
               <option value="">{t.noProject}</option>
               {s.projects.map((p) => (
-                <option key={p.name} value={p.name}>
+                <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
               ))}

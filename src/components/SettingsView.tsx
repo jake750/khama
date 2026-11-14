@@ -310,7 +310,8 @@ function ProjectsSection(props: {
   const { t } = useI18n();
   const { settings: s, update } = props;
   const [name, setName] = useState("");
-  const snapshot = (n: string): Project => ({
+  const snapshot = (id: string, n: string): Project => ({
+    id,
     name: n,
     outputDir: s.outputDir,
     kind: s.kind,
@@ -324,7 +325,9 @@ function ProjectsSection(props: {
   const save = () => {
     const n = name.trim();
     if (!n) return;
-    update({ projects: [...s.projects.filter((p) => p.name !== n), snapshot(n)], activeProject: n });
+    // نفس الاسم يحدّث المشروع الموجود (ويحتفظ بمعرّفه)، واسم جديد يُنشئ مشروعًا جديدًا
+    const id = s.projects.find((p) => p.name === n)?.id ?? crypto.randomUUID();
+    update({ projects: [...s.projects.filter((p) => p.id !== id), snapshot(id, n)], activeProject: id });
     setName("");
     props.toast(t.toastProject(n));
   };
@@ -332,8 +335,8 @@ function ProjectsSection(props: {
     <Section id="projects" title={t.secProjects} intro={t.projectsIntro}>
       {s.projects.length === 0 && <p className="faint">{t.projectsEmpty}</p>}
       {s.projects.map((p) => (
-        <div className="watch-row project-row" key={p.name}>
-          <b className={s.activeProject === p.name ? "accent" : undefined}>{p.name}</b>
+        <div className="watch-row project-row" key={p.id}>
+          <b className={s.activeProject === p.id ? "accent" : undefined}>{p.name}</b>
           {!isMobile && (
             <span className="path ltr faint" title={p.outputDir ?? props.outputDir}>
               {p.outputDir ?? props.outputDir}
@@ -342,7 +345,7 @@ function ProjectsSection(props: {
           <button
             className="btn btn-sm btn-ghost"
             onClick={() => {
-              update({ projects: s.projects.map((x) => (x.name === p.name ? snapshot(p.name) : x)) });
+              update({ projects: s.projects.map((x) => (x.id === p.id ? snapshot(p.id, p.name) : x)) });
               props.toast(t.toastProject(p.name));
             }}
           >
@@ -354,8 +357,8 @@ function ProjectsSection(props: {
             title={t.remove}
             onClick={() =>
               update({
-                projects: s.projects.filter((x) => x.name !== p.name),
-                activeProject: s.activeProject === p.name ? null : s.activeProject,
+                projects: s.projects.filter((x) => x.id !== p.id),
+                activeProject: s.activeProject === p.id ? null : s.activeProject,
               })
             }
           >

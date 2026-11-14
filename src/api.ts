@@ -41,11 +41,14 @@ export interface Settings {
   wantThumb: boolean;
   wantInfo: boolean;
   projects: Project[];
+  /** معرّف المشروع النشط */
   activeProject: string | null;
 }
 
 /** مشروع: مجلد حفظ وإعدادات تنزيل خاصة به */
 export interface Project {
+  /** معرّف ثابت (لا يتغيّر بتغيّر الاسم) */
+  id: string;
   name: string;
   outputDir: string | null;
   kind: Kind;

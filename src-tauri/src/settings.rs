@@ -68,6 +68,9 @@ pub struct Settings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
+    /// معرّف ثابت لا يتغيّر بتغيّر الاسم. الإعدادات القديمة بلا معرّف: يُستخدم الاسم (انظر migrate)
+    #[serde(default)]
+    pub id: String,
     pub name: String,
     pub output_dir: Option<String>,
     pub kind: String,
@@ -157,9 +160,21 @@ pub fn cookies_path(app: &AppHandle) -> Result<PathBuf, AppError> {
 
 pub fn load(app: &AppHandle) -> Settings {
     match settings_path(app) {
-        Ok(p) => crate::persist::read_json(&p).or_default_logged("settings.json"),
+        Ok(p) => migrate(crate::persist::read_json(&p).or_default_logged("settings.json")),
         Err(_) => Settings::default(),
     }
+}
+
+/// ترقية إعدادات الإصدارات السابقة
+fn migrate(mut s: Settings) -> Settings {
+    // 0.3.1 وما قبله: المشروع يُعرَّف باسمه، وactive_project يحمل الاسم.
+    // نجعل المعرّف = الاسم فيبقى المشروع النشط مختارًا كما هو.
+    for p in &mut s.projects {
+        if p.id.is_empty() {
+            p.id = p.name.clone();
+        }
+    }
+    s
 }
 
 /// المجلد الفعلي للحفظ: ما اختاره المستخدم، وإلا مجلد التنزيلات
@@ -222,4 +237,19 @@ pub fn delete_cookies(app: AppHandle) -> Result<(), AppError> {
         fs::remove_file(p)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn migrate_gives_old_projects_their_name_as_id() {
+        let json = r#"{"projects":[{"name":"قناتي","outputDir":null,"kind":"video","videoFormat":"mp4",
+            "audioFormat":"mp3","quality":"1080","editorReady":true,"filenameTemplate":"{title}"}],
+            "activeProject":"قناتي"}"#;
+        let s = migrate(serde_json::from_str(json).unwrap());
+        assert_eq!(s.projects[0].id, "قناتي");
+        assert_eq!(s.active_project.as_deref(), Some(s.projects[0].id.as_str()));
+    }
 }
