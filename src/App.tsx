@@ -105,9 +105,9 @@ export default function App() {
   jobsRef.current = jobs;
   const settingsRef = useRef<Settings | null>(null);
   settingsRef.current = settings;
-  // التنزيلات المجدولة: id سالب (محلي) ← مؤقّت البدء
-  const timers = useRef(new Map<number, number>());
+  // التنزيلات المجدولة: بطاقات بـ id سالب (محلي)، تُحفظ في scheduled.json
   const nextLocalId = useRef(-1);
+  const [scheduledLoaded, setScheduledLoaded] = useState(false);
 
   const lang = settings?.language ?? "en";
   const i18n = useMemo(() => ({ lang, t: dictionaries[lang] }), [lang]);
@@ -252,20 +252,9 @@ export default function App() {
         meta: downloadMeta(tRef.current, request),
       };
       if (at && at > Date.now()) {
-        // مجدول: بطاقة محلية تنتظر، ثم يبدأ التنزيل الحقيقي في وقته
+        // مجدول: بطاقة تنتظر؛ يبدؤها فاحص المواعيد أدناه في وقتها
         const localId = nextLocalId.current--;
         setJobs((prev) => [{ id: localId, state: "scheduled", at, ...base } as Job, ...prev]);
-        const timer = window.setTimeout(async () => {
-          timers.current.delete(localId);
-          setJobs((prev) => prev.filter((j) => j.id !== localId));
-          try {
-            const id = await api.startDownload(request);
-            addJob(id, base);
-          } catch (e) {
-            setJobs((prev) => [{ id: localId, state: "error", error: asAppError(e), ...base } as Job, ...prev]);
-          }
-        }, at - Date.now());
-        timers.current.set(localId, timer);
         return;
       }
       const id = await api.startDownload(request);
@@ -275,15 +264,71 @@ export default function App() {
   );
 
   const cancel = useCallback((j: Job) => {
-    const timer = timers.current.get(j.id);
-    if (timer != null) {
-      window.clearTimeout(timer);
-      timers.current.delete(j.id);
+    if (j.state === "scheduled") {
       setJobs((prev) => prev.map((x) => (x.id === j.id ? { ...x, state: "canceled" } : x)));
       return;
     }
     api.cancelDownload(j.id);
   }, []);
+
+  // استرجاع المجدولة المحفوظة عند الفتح (ما فات وقته يبدأ فورًا عبر الفاحص)
+  useEffect(() => {
+    let alive = true;
+    api
+      .getScheduled()
+      .then((items) => {
+        if (!alive) return;
+        const restored = (items ?? []).map((it) => ({ ...it, id: nextLocalId.current--, type: "download", state: "scheduled" }) as Job);
+        setJobs((prev) => [...prev, ...restored]);
+      })
+      .catch(() => {})
+      .finally(() => alive && setScheduledLoaded(true));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // حفظ المجدولة كلما تغيّرت (بعد الاسترجاع حتى لا نمحو الملف قبل قراءته)
+  const scheduledJson = JSON.stringify(
+    jobs
+      .filter((j) => j.state === "scheduled" && j.request && j.at)
+      .map((j) => ({ at: j.at, request: j.request, title: j.title, meta: j.meta, thumbnail: j.thumbnail })),
+  );
+  const savedScheduled = useRef(scheduledJson);
+  useEffect(() => {
+    if (!scheduledLoaded || savedScheduled.current === scheduledJson) return;
+    savedScheduled.current = scheduledJson;
+    api.saveScheduled(JSON.parse(scheduledJson)).catch(() => {});
+  }, [scheduledLoaded, scheduledJson]);
+
+  // فاحص المواعيد: كل 15 ثانية وعند عودة النافذة. لا يعتمد على مؤقّت واحد طويل
+  // (setTimeout يتعطل فوق 24.8 يومًا وينحرف بعد سكون الجهاز)
+  useEffect(() => {
+    const tick = () => {
+      const due = jobsRef.current.filter((j) => j.state === "scheduled" && j.request && (j.at ?? 0) <= Date.now());
+      if (!due.length) return;
+      const ids = new Set(due.map((j) => j.id));
+      jobsRef.current = jobsRef.current.filter((j) => !ids.has(j.id));
+      setJobs((prev) => prev.filter((j) => !ids.has(j.id)));
+      for (const j of due) {
+        const { request, title, meta, thumbnail } = j;
+        const base = { type: "download" as const, request, title, meta, thumbnail };
+        api
+          .startDownload(request!)
+          .then((id) => addJob(id, base))
+          .catch((e) => setJobs((prev) => [{ id: j.id, state: "error", error: asAppError(e), ...base } as Job, ...prev]));
+      }
+    };
+    if (!scheduledLoaded) return;
+    const iv = window.setInterval(tick, 15_000);
+    const onVisible = () => document.visibilityState === "visible" && tick();
+    document.addEventListener("visibilitychange", onVisible);
+    tick();
+    return () => {
+      window.clearInterval(iv);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [addJob, scheduledLoaded]);
 
   const startConvert = useCallback(
     async (convert: ConvertRequest, title: string, meta: string) => {

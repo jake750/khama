@@ -224,6 +224,15 @@ export type JobState =
   | "error"
   | "canceled";
 
+/** تنزيل مجدول محفوظ في scheduled.json */
+export interface ScheduledItem {
+  at: number;
+  request: DownloadRequest;
+  title: string;
+  meta: string;
+  thumbnail?: string | null;
+}
+
 export interface JobUpdate {
   id: number;
   state: JobState;
@@ -255,6 +264,8 @@ export const api = {
   hasSavedCookies: () => invoke<boolean>("has_saved_cookies"),
   saveCookies: (content: string) => invoke<void>("save_cookies", { content }),
   deleteCookies: () => invoke<void>("delete_cookies"),
+  getScheduled: () => invoke<ScheduledItem[]>("get_scheduled"),
+  saveScheduled: (items: ScheduledItem[]) => invoke<void>("save_scheduled", { items }),
   toolsInfo: () => invoke<ToolsInfo>("tools_info"),
   updateYtdlp: () => invoke<{ version?: string; updated: boolean }>("update_ytdlp"),
   probe: (url: string) => invoke<ProbeInfo>("probe", { url }),

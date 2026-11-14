@@ -96,3 +96,23 @@ pub fn clear_history(app: AppHandle, state: State<'_, HistoryState>) -> Result<(
         ((), true)
     })
 }
+
+// ---------------- التنزيلات المجدولة ----------------
+// تُحفظ في scheduled.json حتى تبقى بعد إغلاق التطبيق. محتواها تملكه الواجهة (قائمة JSON).
+
+fn scheduled_path(app: &AppHandle) -> Result<PathBuf, AppError> {
+    Ok(path(app)?.with_file_name("scheduled.json"))
+}
+
+#[tauri::command]
+pub fn get_scheduled(app: AppHandle) -> Result<serde_json::Value, AppError> {
+    let list: serde_json::Value = crate::persist::read_json(&scheduled_path(&app)?).or_default_logged("scheduled.json");
+    Ok(if list.is_array() { list } else { serde_json::Value::Array(Vec::new()) })
+}
+
+#[tauri::command]
+pub fn save_scheduled(app: AppHandle, items: serde_json::Value) -> Result<(), AppError> {
+    let json = serde_json::to_string(&items).expect("scheduled serialize");
+    crate::persist::write_atomic(&scheduled_path(&app)?, json.as_bytes())?;
+    Ok(())
+}

@@ -101,6 +101,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return "C:\\Users\\me\\Downloads";
     case "get_history":
       return history;
+    case "get_scheduled":
+      return [];
     case "tools_info":
       return { ytdlp: "2026.10.22", ffmpeg: "7.1", deno: "2.4" };
     case "hw_encoders":
