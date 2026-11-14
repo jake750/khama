@@ -142,6 +142,7 @@ def main() -> None:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    import matplotlib.ticker  # noqa: F401
 
     for metric, label in (("vmaf", "VMAF"), ("psnr_yuv", "PSNR-YUV (dB)"), ("ssim", "SSIM")):
         clips = sorted(raw["clip"].unique())
@@ -154,6 +155,7 @@ def main() -> None:
                 d = g[g.encoder == e].sort_values("kbps")
                 ax.plot(d.kbps, d[metric], "o-", ms=2.5, lw=1.2, color=COLORS[e], label=e)
             ax.set_xscale("log")
+            ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
             ax.set_title(clip, fontsize=9)
             ax.grid(alpha=0.3, which="both")
             ax.tick_params(labelsize=7)
