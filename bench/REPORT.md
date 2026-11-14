@@ -114,9 +114,62 @@ Fades through black: the fade-out and fade-in are merged into one transition whe
   with $T$ swept from 0.05 to 0.6.
 - **Real editing:** the Sintel trailer (CC-BY), labelled by hand.
 
-### 2.5 Results *(results)*
+### 2.5 Results
 
-See `results/scenes_test.csv`, `results/scenes_pr.png`, `results/scenes_speed.csv`.
+**Synthetic set, test half** (12 videos, 204 transitions: 125 cuts, 79 gradual; 48 flashes).
+Source: `results/scenes_test.csv`; figure `results/scenes_pr.png`.
+
+| Method | P | R | $F_1$ | Cut recall | Gradual recall | False alarms on flashes |
+|---|---|---|---|---|---|---|
+| FFmpeg `scene > 0.30` (old stills) | 0.638 | 0.475 | 0.545 | 0.680 | 0.152 | 55 |
+| FFmpeg `scene > 0.32` (old scene detection) | 0.623 | 0.446 | 0.520 | 0.640 | 0.139 | 55 |
+| FFmpeg `scene > 0.175` (best threshold on dev) | 0.680 | 0.667 | 0.673 | 0.896 | 0.304 | 58 |
+| Khama, colour only, cuts only | 0.987 | 0.745 | 0.849 | 0.888 | 0.519 | 0 |
+| Khama, colour + structure, cuts only | 0.964 | 0.789 | 0.868 | 0.968 | 0.506 | 0 |
+| **Khama, full detector (tuned on dev, now the default)** | **0.951** | **0.951** | **0.951** | **0.968** | **0.924** | **0** |
+| Khama, previous defaults (before the structural signal) | 0.978 | 0.877 | 0.925 | 0.872 | 0.886 | 0 |
+
+Even with its threshold tuned on the same data, FFmpeg's score stays below 0.68: one fixed threshold
+cannot separate dissolves (small per-frame changes) from flashes and fast motion (large ones).
+
+**Ablation** (test half, one component removed from the final detector; `results/scenes_ablation.csv`):
+
+| Variant | P | R | $F_1$ | Cut recall | Gradual recall | Flash false alarms |
+|---|---|---|---|---|---|---|
+| Full detector | 0.951 | 0.951 | 0.951 | 0.968 | 0.924 | 0 |
+| Without the structural signal | 0.957 | 0.868 | 0.910 | 0.840 | 0.911 | 0 |
+| Without flash rejection | 0.802 | 0.951 | 0.870 | 0.968 | 0.924 | 38 |
+| Mean/std instead of median/MAD | 1.000 | 0.799 | 0.888 | 0.872 | 0.684 | 0 |
+| Global histogram only ($\alpha = 1$) | 0.959 | 0.926 | 0.943 | 0.968 | 0.861 | 0 |
+| Fixed thresholds ($k = k_{pix} = k_{low} = 0$, floors only) | 0.942 | 0.956 | 0.949 | 0.968 | 0.937 | 0 |
+
+Reading:
+- Flash rejection is the largest single gain: without it, 38 flashes are reported as cuts.
+- The structural signal is what finds cuts between two parts of the same clip (cut recall 0.84 → 0.97).
+- The robust median/MAD estimator matters most for gradual transitions. With mean/std, nearby cuts
+  inflate $\sigma$ and the low threshold misses dissolves.
+- With the tuned floors, the adaptive term adds little on this synthetic set: $F_1$ is 0.951 against 0.949.
+  The floors were themselves tuned on the same kind of material (one encoder setting, 25 fps, similar
+  clip statistics). The adaptive term is kept because it costs nothing here and protects against content
+  whose level of change differs from the tuning set. This is stated as a limitation and not claimed as a gain.
+
+**Real editing: Sintel trailer** (hand-labelled, 18 transitions: 7 cuts, 11 gradual; `results/scenes_films.csv`):
+
+| Method | P | R | $F_1$ | TP / FP / FN |
+|---|---|---|---|---|
+| FFmpeg `scene > 0.30` | 1.00 | 0.33 | 0.50 | 6 / 0 / 12 |
+| FFmpeg `scene > 0.175` | 1.00 | 0.33 | 0.50 | 6 / 0 / 12 |
+| Khama, colour only, cuts only | 1.00 | 0.56 | 0.71 | 10 / 0 / 8 |
+| Khama, full detector (default) | 0.86 | 0.67 | 0.75 | 12 / 2 / 6 |
+| Khama, previous defaults | 0.92 | 0.61 | 0.73 | 11 / 1 / 7 |
+
+On a single 52-second trailer the differences between the Khama variants are within one or two
+transitions, so only the gap to FFmpeg should be read as significant.
+
+**Speed** (`results/scenes_speed.csv`, 22 200 frames): Khama decodes and computes all features at
+802 frames/s (160×90 analysis), against 977 frames/s for FFmpeg's scene score at 320 px. Detection on the
+stored features takes 2.2 ms on average per configuration for a ~925-frame video (at most 8.6 ms), so the
+detector costs about the same as the filter it replaces and a parameter grid is cheap to search.
 
 ---
 
@@ -219,9 +272,52 @@ use only. Every configuration is run by the app's own Rust code through `khama-b
 produces both stems in a single model pass. Processing time is reported as the real-time factor
 (RTF = processing time / audio duration), with the peak memory of the process.
 
-### 4.5 Results *(results)*
+### 4.5 Results
 
-See `results/separation.csv`, `results/separation.png`.
+Median over the 50 MUSDB18 test tracks (dB; `results/separation.csv`, per-track values in
+`results/separation_tracks.csv`, figure `results/separation.png`):
+
+| Configuration | SDR voc. | SIR voc. | SAR voc. | SDR acc. | SIR acc. | SAR acc. | Join SNR voc. |
+|---|---|---|---|---|---|---|---|
+| **default** (margin 87 ms, no overlap, compensation 1.021, subtraction) | **10.80** | 18.39 | 11.32 | **15.05** | 21.06 | 16.50 | 9.61 |
+| margin 0.25 s | 10.81 | 18.45 | 11.36 | 15.09 | 21.26 | 16.31 | 8.83 |
+| margin 0.5 s | 10.86 | 18.71 | 11.30 | 15.03 | 20.85 | 16.30 | 10.03 |
+| margin 1 s | 10.76 | 18.74 | 11.24 | 15.16 | 20.72 | 16.29 | 10.71 |
+| overlap 0.25 s | 10.83 | 18.21 | 11.37 | 15.05 | 20.86 | 16.48 | 10.14 |
+| overlap 0.5 s | 10.82 | 18.27 | 11.36 | 15.13 | 20.98 | 16.35 | 9.62 |
+| overlap 1 s | 10.86 | 18.41 | 11.37 | 15.12 | 21.17 | 16.31 | 9.57 |
+| compensation 1.0 | 10.82 | 18.39 | 11.32 | 15.05 | 20.32 | 16.65 | 9.57 |
+| compensation 1.05 | 10.71 | 18.39 | 11.32 | 15.02 | 21.66 | 16.27 | 9.57 |
+| soft mask | 8.66 | 15.35 | 9.38 | 13.34 | 16.43 | 15.80 | 7.74 |
+| soft mask + overlap 0.5 s | 8.66 | 15.38 | 9.40 | 13.34 | 16.39 | 15.80 | 8.12 |
+
+**Paired comparison with the default** (Wilcoxon signed-rank test over the 50 tracks, median of the
+per-track difference):
+
+| Variant | ΔSDR vocals | p | ΔJoin SNR | p |
+|---|---|---|---|---|
+| margin 0.5 s | +0.010 dB | 0.18 | +0.14 dB | 0.94 |
+| margin 1 s | +0.008 dB | 0.51 | +1.19 dB | 0.38 |
+| overlap 0.5 s | +0.000 dB | 0.003 | +0.44 dB | 0.53 |
+| overlap 1 s | +0.001 dB | 0.003 | −0.45 dB | 0.90 |
+| soft mask | −2.03 dB | $4\times10^{-15}$ | −1.67 dB | $4\times10^{-11}$ |
+
+Conclusions:
+- **Chunking settings do not matter at this scale.** The overlap's effect is statistically detectable but
+  a thousandth of a decibel, far below audibility. Larger margins do not significantly improve the joins,
+  while a 1 s margin would need about 50 % more model runs (the kept part of each 5.92 s chunk falls from
+  5.75 s to 3.92 s). The 7-second previews contain only one or two joins each, so the join SNR is noisy.
+- **The soft mask is clearly worse** (−2 dB on both stems, every track affected). The model is trained to
+  output the vocal spectrogram directly. Re-deriving it through a ratio mask applied to the mixture brings
+  back mixture energy that the model had removed (lower SIR) and smears transients (lower SAR).
+- **Compensation** (the 1.021 gain from the model card) trades accompaniment SIR against SAR and has no
+  effect on vocals. 1.021 sits between the two extremes and is kept.
+- The app therefore keeps its settings. This is a measured confirmation, not an assumption.
+
+**Resources:** the peak working set is about 2.55 GB for every configuration; it is dominated by the ONNX
+model and its buffers, not by the audio length. The RTF in the table, about 2.2 on 7-second clips, includes
+loading the model and is inflated by experiments running in parallel. Earlier, with nothing else running,
+the measured RTF was 1.37.
 
 ---
 

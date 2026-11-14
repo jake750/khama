@@ -161,7 +161,7 @@ def main() -> None:
     order = summary.config.tolist()
     for ax, col, title in ((axes[0], "sdr_vocals", "Vocals SDR (dB)"), (axes[1], "sdr_accomp", "Accompaniment SDR (dB)")):
         data = [df[df.config == c][col].dropna().to_numpy() for c in order]
-        ax.boxplot(data, vert=False, tick_labels=order, showfliers=False)
+        ax.boxplot(data, orientation="horizontal", tick_labels=order, showfliers=False)
         ax.set_title(title, fontsize=10)
         ax.grid(alpha=0.3, axis="x")
     fig.tight_layout()
