@@ -33,6 +33,8 @@ pub struct Settings {
     pub cookies_browser: String,
     /// هل قرأ المستخدم تنبيه حقوق المحتوى
     pub accepted_notice: bool,
+    /// هل رأى المستخدم ترحيب أول فتح (وعرض جولة الخصائص)
+    pub seen_tour: bool,
     /// أين يُحفظ ناتج التحويل: "source" (بجانب الملف الأصلي) | "output" (مجلد الحفظ)
     pub convert_dest: String,
     /// آخر Preset استُخدم في المحوّل
@@ -103,6 +105,7 @@ impl Default for Settings {
             cookies_mode: "none".into(),
             cookies_browser: "firefox".into(),
             accepted_notice: false,
+            seen_tour: false,
             convert_dest: "source".into(),
             convert_preset: "edit_h264".into(),
             convert_hw: true,
