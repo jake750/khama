@@ -174,7 +174,7 @@ pub fn section(req: &DownloadRequest) -> Option<(f64, f64)> {
     let s = req.start.filter(|v| v.is_finite() && *v >= 0.0).unwrap_or(0.0);
     let e = req.end.filter(|v| v.is_finite() && *v > s)?;
     // جزء يبدأ من الصفر بدون نهاية محددة = الملف كاملًا
-    Some((s, e)).filter(|_| req.start.is_some() || req.end.is_some())
+    (req.start.is_some() || req.end.is_some()).then_some((s, e))
 }
 
 /// كل المقاطع المطلوبة بعد التحقق، مرتّبة حسب البداية. فارغة = الملف كاملًا
@@ -469,10 +469,10 @@ fn parse_dl_line(rest: &str) -> Option<DlProgress> {
     };
     if percent.is_none() {
         // بث مقسّم إلى أجزاء (HLS/DASH): نحسب بعدد الأجزاء
-        if let (Some(i), Some(c)) = (num(f[8]), num(f[9])) {
-            if c > 0.0 {
-                percent = Some(i / c * 100.0);
-            }
+        if let (Some(i), Some(c)) = (num(f[8]), num(f[9]))
+            && c > 0.0
+        {
+            percent = Some(i / c * 100.0);
         }
     }
     let (v, a) = (f[6], f[7]);
@@ -597,19 +597,20 @@ async fn convert_for_editing(
     let duration = check.duration.unwrap_or(0.0);
     let mut last = Instant::now() - Duration::from_secs(1);
     let outcome = run_streaming(cmd, cancel, |line| {
-        if let Some(us) = line.strip_prefix("out_time_us=").and_then(num) {
-            if duration > 0.0 && last.elapsed() >= Duration::from_millis(200) {
-                last = Instant::now();
-                emit(
-                    app,
-                    JobUpdate {
-                        id,
-                        state: "converting",
-                        percent: Some((us / 1e6 / duration * 100.0).clamp(0.0, 100.0)),
-                        ..Default::default()
-                    },
-                );
-            }
+        if let Some(us) = line.strip_prefix("out_time_us=").and_then(num)
+            && duration > 0.0
+            && last.elapsed() >= Duration::from_millis(200)
+        {
+            last = Instant::now();
+            emit(
+                app,
+                JobUpdate {
+                    id,
+                    state: "converting",
+                    percent: Some((us / 1e6 / duration * 100.0).clamp(0.0, 100.0)),
+                    ..Default::default()
+                },
+            );
         }
     })
     .await?;
@@ -766,10 +767,11 @@ async fn run_job(
         first.get_or_insert(done);
     }
     #[cfg(desktop)]
-    if req.timeline && req.kind == "video" {
-        if let Err(e) = write_timeline(&tools, &delivered).await {
-            eprintln!("timeline: {e:?}");
-        }
+    if req.timeline
+        && req.kind == "video"
+        && let Err(e) = write_timeline(&tools, &delivered).await
+    {
+        eprintln!("timeline: {e:?}");
     }
     Ok(first)
 }

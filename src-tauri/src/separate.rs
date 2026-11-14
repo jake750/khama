@@ -480,6 +480,7 @@ fn no_window(cmd: &mut std::process::Command) {
 fn no_window(_: &mut std::process::Command) {}
 
 /// المعالجة الفعلية (متزامنة: تعمل في خيط منفصل). تكتب WAV ستيريو 44.1kHz.
+#[allow(clippy::too_many_arguments)] // تُجمع في struct ضمن إعادة الهيكلة (T-8)
 pub fn separate_blocking(
     ffmpeg: &Path,
     lib: &Path,

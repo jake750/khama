@@ -93,10 +93,10 @@ async fn local_thumbnail(app: &AppHandle, entry: &HistoryEntry) -> Option<String
         return None;
     }
     let tools = crate::tools::resolve(app).ok()?;
-    if current.starts_with("https://") || current.starts_with("http://") {
-        if let Some(img) = crate::convert::small_jpeg(&tools, current.as_ref(), 0.0, 160, 6).await {
-            return Some(img);
-        }
+    if (current.starts_with("https://") || current.starts_with("http://"))
+        && let Some(img) = crate::convert::small_jpeg(&tools, current.as_ref(), 0.0, 160, 6).await
+    {
+        return Some(img);
     }
     let file = std::path::Path::new(&entry.file);
     if entry.kind == "video" && file.is_file() {

@@ -306,10 +306,11 @@ async fn detect_hw(tools: &Tools) -> Vec<String> {
             ])
             .arg(&out)
             .output();
-        if let Ok(Ok(o)) = tokio::time::timeout(Duration::from_secs(20), ok).await {
-            if o.status.success() && video_packets(tools, &out).await > 0 {
-                found.push(enc.to_string());
-            }
+        if let Ok(Ok(o)) = tokio::time::timeout(Duration::from_secs(20), ok).await
+            && o.status.success()
+            && video_packets(tools, &out).await > 0
+        {
+            found.push(enc.to_string());
         }
         let _ = std::fs::remove_file(&out);
     }
@@ -927,7 +928,7 @@ fn codec_args(p: &Preset, o: &ConvertOptions, hw: &[String], src: Option<&VideoI
             .concat()
         }
         id if id.starts_with("dnxhr_") => {
-            let profile = &id[..];
+            let profile = id;
             // HQX هو الوحيد بـ 10-bit
             let pix = if id == "dnxhr_hqx" { "yuv422p10le" } else { "yuv422p" };
             [s(&["-c:v", "dnxhd", "-profile:v", profile, "-pix_fmt", pix]), pcm()].concat()
@@ -1466,6 +1467,7 @@ fn output_dir_for(app: &AppHandle, o: &ConvertOptions, input: &Path) -> Result<P
 }
 
 /// يشغّل ffmpeg ويرسل النسبة والوقت المتبقي
+#[allow(clippy::too_many_arguments)] // تُجمع في struct ضمن إعادة الهيكلة (T-8)
 async fn run_ffmpeg(
     app: &AppHandle,
     id: u64,
@@ -1483,21 +1485,22 @@ async fn run_ffmpeg(
     let outcome = run_streaming(cmd, cancel, |line| {
         if let Some(v) = line.strip_prefix("speed=") {
             speed = num(v.trim().trim_end_matches('x')).filter(|s| *s > 0.0);
-        } else if let Some(us) = line.strip_prefix("out_time_us=").and_then(num) {
-            if duration > 0.0 && last.elapsed() >= Duration::from_millis(250) {
-                last = Instant::now();
-                let done = (us / 1e6).max(0.0);
-                emit(
-                    app,
-                    JobUpdate {
-                        id,
-                        state,
-                        percent: Some((done / duration * 100.0).clamp(0.0, 100.0)),
-                        eta: speed.map(|s| ((duration - done) / s).max(0.0)),
-                        ..Default::default()
-                    },
-                );
-            }
+        } else if let Some(us) = line.strip_prefix("out_time_us=").and_then(num)
+            && duration > 0.0
+            && last.elapsed() >= Duration::from_millis(250)
+        {
+            last = Instant::now();
+            let done = (us / 1e6).max(0.0);
+            emit(
+                app,
+                JobUpdate {
+                    id,
+                    state,
+                    percent: Some((done / duration * 100.0).clamp(0.0, 100.0)),
+                    eta: speed.map(|s| ((duration - done) / s).max(0.0)),
+                    ..Default::default()
+                },
+            );
         }
     })
     .await?;
@@ -2099,7 +2102,7 @@ mod real {
             } else {
                 out.join(format!("{i:02}_{id}_%03d.{}", p.ext))
             };
-            let plan = build_plan(&p, opts, &[info.clone()], &hw, &target, None).unwrap();
+            let plan = build_plan(&p, opts, std::slice::from_ref(&info), &hw, &target, None).unwrap();
             let mut args = plan.args.clone();
             if let Some(t) = opts.loudness {
                 // مرور القياس مختصر هنا: نستخدم loudnorm بمرور واحد
