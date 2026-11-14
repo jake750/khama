@@ -221,9 +221,65 @@ The test machine is an i5-1135G7 with Iris Xe. Only Quick Sync H.264 and HEVC ca
 - NVENC is unavailable (driver API 13.0 < required 13.1; the MX350 has no NVENC block).
 - Tiger Lake cannot encode AV1 in hardware.
 
-### 3.5 Results *(results)*
+### 3.5 Results
 
-See `results/codecs_bdrate.csv`, `results/codecs_calibration.csv`, `results/codecs_rd_vmaf.png`, `results/codecs_calibration.png`.
+636 encodes: 12 clips × (11 x264 + 8 x265 + 9 SVT-AV1 + 12 h264_qsv + 13 hevc_qsv quality values),
+each scored with VMAF, PSNR and SSIM against the lossless source (`results/codecs_raw.csv`).
+Figures: `results/codecs_rd_vmaf.png`, `codecs_rd_psnr_yuv.png`, `codecs_rd_ssim.png`, `codecs_calibration.png`.
+
+**Encoders available on the test machine** (`results/codecs_hw.csv`): x264, x265, SVT-AV1, h264_qsv and
+hevc_qsv work. NVENC fails because the driver exposes API 13.0 and FFmpeg needs 13.1; the MX350 has no
+NVENC unit anyway. av1_qsv fails because Tiger Lake cannot encode AV1.
+
+**BD-rate against x264** (median over the 12 clips, range in brackets; negative = fewer bits for the
+same quality; `results/codecs_bdrate.csv`):
+
+| Encoder | VMAF | PSNR-YUV | SSIM |
+|---|---|---|---|
+| x265 (preset fast) | −22.2 % [−58.6, +8.1] | −26.4 % [−54.0, +2.2] | −20.8 % [−45.5, +5.3] |
+| SVT-AV1 (preset 8) | **−41.8 %** [−71.0, −5.4] | −45.2 % [−67.9, +10.0] | −30.6 % [−54.8, +7.5] |
+| h264_qsv (medium) | +36.1 % [+7.8, +70.9] | +29.3 % [+12.6, +81.3] | +22.9 % [+5.4, +31.4] |
+| hevc_qsv (medium) | −21.0 % [−51.3, −1.6] | −27.0 % [−43.1, +0.8] | −16.9 % [−36.1, +9.8] |
+
+**Speed** (720p, encode frames/s, mean over all encodes; `results/codecs_summary.csv`): h264_qsv 62.9,
+hevc_qsv 51.9, SVT-AV1 49.8, x264 44.8, x265 27.0.
+
+Reading:
+- Quick Sync H.264 is the fastest encoder but needs about a third more bits than x264 for the same VMAF.
+- Quick Sync HEVC gives about x265's compression at nearly twice x265's speed. On this machine it is the
+  best size/speed trade-off for H.265.
+- SVT-AV1 at preset 8 saves about 40 % over x264 and is faster than x264 here.
+- The spread across clips is large: static talking heads gain much more from HEVC/AV1 than grainy,
+  high-motion content. A single "x % smaller" figure only holds as a median.
+
+**Calibration of the hardware quality value** (`results/codecs_calibration.csv`, check in
+`results/codecs_calibration_check.csv`). For each CRF the app uses, the target is the VMAF that x264
+(or x265) reaches on each clip. The hardware value that reaches the same VMAF is found by inverting that
+clip's VMAF curve (linear interpolation), and the median over clips goes into the table in `convert.rs`
+(`calibrated_quality`):
+
+| App CRF (x264) | Target VMAF (median) | Old `global_quality` = CRF + 1 | Calibrated value |
+|---|---|---|---|
+| 16 | 98.3 | 17 | 17.9 |
+| 18 | 97.6 | 19 | 20.3 |
+| 21 | 95.9 | 22 | 22.7 |
+| 23 | 94.3 | 24 | 24.7 |
+| 26 | 90.2 | 27 | 28.0 |
+| 30 | 80.9 | 31 | 33.0 |
+| HEVC: 19 / 23 / 28 (x265) | 97.2 / 94.6 / 88.2 | 20 / 24 / 29 | 22.3 / 25.3 / 29.8 |
+
+Effect, measured on the same clips (VMAF difference from the software encoder, file size relative to it):
+
+| Encoder | Median VMAF error, old rule | Median VMAF error, calibrated | Median size vs software, old | Median size vs software, calibrated |
+|---|---|---|---|---|
+| h264_qsv | +0.02 … +3.9 (grows with CRF) | −0.4 … +0.2 | 1.51× | 1.30× |
+| hevc_qsv | +0.4 … +0.8 | −0.2 … +0.2 | 1.15× | 0.95× |
+
+The old rule gave the hardware encoders *more* quality than the user chose, especially at the "small"
+setting (+3.9 VMAF at CRF 30), so their files were larger than needed. The calibrated values hit the
+requested quality in the median and cut the hardware files by 14 % (H.264) and 17 % (HEVC). The mean
+absolute per-clip error is unchanged (1.3 and 2.2 VMAF), because it comes from content: no single mapping
+can follow every clip. Removing it would need a per-file quality search, which is too slow for the app.
 
 ---
 

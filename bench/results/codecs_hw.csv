@@ -1,0 +1,9 @@
+encoder,works,error
+libx264,True,
+libx265,True,
+libsvtav1,True,
+h264_qsv,True,
+hevc_qsv,True,
+h264_nvenc,False,ffmpeg.exe failed (4294967256): [h264_nvenc @ 000002bfae981b80] Driver does not support the required nvenc API version. Required: 13.1 Found: 13.0 | [h264_nvenc @ 000002bfae981b80] The minimum require
+hevc_nvenc,False,ffmpeg.exe failed (4294967256): [hevc_nvenc @ 0000019b644b10c0] Driver does not support the required nvenc API version. Required: 13.1 Found: 13.0 | [hevc_nvenc @ 0000019b644b10c0] The minimum require
+av1_qsv,False,ffmpeg.exe failed (4294967256): [av1_qsv @ 000002c42f091c00] Current codec type is unsupported | [av1_qsv @ 000002c42f091c00] Selected ratecontrol mode is unsupported | [av1_qsv @ 000002c42f091c00] so
