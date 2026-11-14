@@ -144,7 +144,7 @@ function Pick<T extends string | number | null>(props: {
       <span className="field-label">{props.label}</span>
       <select className="select" value={idx} onChange={(e) => props.onChange(props.options[Number(e.target.value)].value)}>
         {props.options.map((o, i) => (
-          <option key={i} value={i}>
+          <option key={String(o.value)} value={i}>
             {o.label}
           </option>
         ))}
@@ -256,7 +256,7 @@ export function ConvertView(props: {
         }
       }
     } catch (e) {
-      setError(e as AppError);
+      setError(asAppError(e));
     } finally {
       setBusy(false);
     }
