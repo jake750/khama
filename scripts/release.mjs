@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 // رفع رقم الإصدار بأمر واحد:
-//   npm run release -- patch|minor|major|X.Y.Z [--no-git] [--dry-run]
-// يغيّر الرقم في الملفات الخمسة فقط (بلا مساس بنهايات الأسطر)، ثم:
-// - على main: ينشئ فرع release/vX.Y.Z ويعمل commit ودفعًا و PR
-// - على أي فرع آخر (فرع الميزة): commit ودفع على الفرع نفسه، و PR إن لم يوجد
-// بعد الدمج في main يُنشئ workflow "Tag release" الوسم ويشغّل البناء والنشر تلقائيًا.
+//   npm run release -- [patch|minor|major|X.Y.Z] [--no-git] [--dry-run]
+// يغيّر الرقم في الملفات الخمسة فقط (بلا مساس بنهايات الأسطر)، ثم commit فوق HEAD الحالي
+// (الذي يجب أن يحتوي origin/main) ودفع مباشر إلى main. يعمل من worktree أيضًا.
+// بعدها يبني workflow "Build" كل الأنظمة والـ APK وينشر الإصدار وينشئ الوسم vX.Y.Z.
 import { readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -12,7 +11,7 @@ import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
-const bump = args.find((a) => !a.startsWith("--"));
+const bump = args.find((a) => !a.startsWith("--")) ?? "patch";
 const noGit = args.includes("--no-git");
 const dryRun = args.includes("--dry-run");
 
@@ -21,9 +20,7 @@ const die = (msg) => {
   process.exit(1);
 };
 const sh = (cmd, cmdArgs, opts = {}) =>
-  execFileSync(cmd, cmdArgs, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], ...opts }).trim();
-
-if (!bump) die("الاستخدام: npm run release -- patch|minor|major|X.Y.Z [--no-git] [--dry-run]");
+  execFileSync(cmd, cmdArgs, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], ...opts })?.trim() ?? "";
 
 const read = (f) => readFileSync(join(root, f), "utf8");
 const current = JSON.parse(read("src-tauri/tauri.conf.json")).version;
@@ -59,15 +56,15 @@ const files = targets.map(([file, re, expected]) => {
 console.log(`${current} → ${next}`);
 if (dryRun) process.exit(0);
 
-let branch;
 if (!noGit) {
-  branch = sh("git", ["branch", "--show-current"]);
-  const dirty = sh("git", ["status", "--porcelain", "--", ...files.map(([f]) => f)]);
-  if (dirty) die(`ملفات الإصدار فيها تعديلات غير محفوظة:\n${dirty}`);
-  if (branch === "main" || branch === "master") {
-    branch = `release/v${next}`;
-    sh("git", ["switch", "-c", branch]);
+  if (sh("git", ["status", "--porcelain"])) die("في الشجرة تعديلات غير محفوظة: اعمل commit أولًا");
+  sh("git", ["fetch", "-q", "origin", "main"]);
+  try {
+    sh("git", ["merge-base", "--is-ancestor", "origin/main", "HEAD"]);
+  } catch {
+    die("HEAD لا يحتوي origin/main: اعمل rebase على origin/main أولًا");
   }
+  if (sh("git", ["ls-remote", "--tags", "origin", `refs/tags/v${next}`])) die(`الوسم v${next} موجود بالفعل`);
 }
 
 for (const [file, text] of files) writeFileSync(join(root, file), text);
@@ -76,18 +73,5 @@ if (noGit) process.exit(0);
 
 sh("git", ["add", "--", ...files.map(([f]) => f)]);
 sh("git", ["commit", "-q", "-m", `الإصدار ${next}`]);
-sh("git", ["push", "-q", "-u", "origin", branch], { stdio: ["ignore", "pipe", "pipe"] });
-console.log(`✓ commit ودفع إلى ${branch}`);
-
-let pr = "";
-try {
-  pr = sh("gh", ["pr", "view", branch, "--json", "url", "-q", ".url"], { stdio: ["ignore", "pipe", "ignore"] });
-} catch {}
-if (!pr) {
-  pr = sh("gh", [
-    "pr", "create", "--base", "main", "--head", branch,
-    "--title", `الإصدار ${next}`,
-    "--body", `رفع رقم الإصدار إلى ${next}. بعد الدمج يُنشأ الوسم v${next} ويُبنى الإصدار ويُنشر تلقائيًا.`,
-  ]);
-}
-console.log(`✓ PR: ${pr}`);
+sh("git", ["push", "-q", "origin", "HEAD:main"], { stdio: "inherit" });
+console.log(`✓ دُفع ${next} إلى main؛ GitHub يبني كل الأنظمة وينشر الإصدار v${next}`);

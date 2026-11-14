@@ -1,9 +1,13 @@
 # Khama
 
-## Release
-- Always release: put the version bump in the feature PR itself. Run `npm run release -- patch` (or `minor`/`major`/`X.Y.Z`) on the feature branch; it bumps the 5 version files, commits, pushes and opens the PR if none exists. Do not open a separate release PR.
-- After merge, GitHub does the rest: `tag-release.yml` tags `vX.Y.Z` and starts `build.yml`, which builds every installer plus the signed APK into a draft release. The user publishes the draft. For a release, don't tag, build the release APK locally or upload it by hand (local test builds for the user are still fine). If you need to wait for CI, use `gh run watch <id> --exit-status` in the background, not repeated polling.
+Talk to the user in Arabic.
+
+## Releases
+- No PRs: commit finished work and push straight to `main` (from a worktree, rebase on `origin/main` first, then `git push -q origin HEAD:main`). Don't wait for the user to merge.
+- Any change to the app itself (source, native/config, icons, assets, dependencies) ships in a new release without asking: `npm run release` (default `patch`; or `minor`/`major`/`X.Y.Z`). It bumps the 5 version files, commits and pushes to `main`. CI, scripts, tests and docs ride in the next release.
+- `build.yml` sees the new version on `main`, builds every platform plus the signed APK, publishes the release and creates the `vX.Y.Z` tag. Never tag, build release files locally or upload by hand (local test builds for the user are fine).
+- To wait for CI: `gh run watch <id> --exit-status` in the background, never polling.
 
 ## Keep output short
-- Tests: `cargo test -q --manifest-path src-tauri/Cargo.toml`; `npx vitest run --reporter=dot` if vitest is present.
-- Android signing and local builds: `docs/ANDROID_RELEASE.md`.
+- Tests: `cargo test -q --manifest-path src-tauri/Cargo.toml`; `npx tsc --noEmit`; `git push -q`; `npm ci --silent`.
+- Grep or read line ranges instead of whole files. Android signing and local builds: `docs/ANDROID_RELEASE.md`.

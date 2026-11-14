@@ -1,19 +1,54 @@
-# يبني ملفات التثبيت للأنظمة الثلاثة.
-# - يدويًا: من تبويب Actions ← Build ← Run workflow (الملفات تظهر كـ artifacts)
-# - عند رفع وسم مثل v0.1.0 (ينشئه tag-release.yml تلقائيًا بعد دمج رفع الإصدار):
-#   يُنشئ مسودة Release فيها كل ملفات التثبيت مع الـ APK، وتنشرها أنت بنقرة
+# يبني ملفات التثبيت للأنظمة الثلاثة مع الـ APK.
+# - عند دفع إلى main يغيّر رقم الإصدار في tauri.conf.json (npm run release): إذا لم يوجد وسم vX.Y.Z
+#   بعد، يبني كل شيء وينشر الإصدار، وtauri-action تنشئ الوسم. (الفحص هنا لا في workflow منفصل
+#   لأن الوسم الذي يدفعه GITHUB_TOKEN لا يشغّل workflows أخرى.)
+# - دفع وسم v* يدويًا يعمل أيضًا.
+# - يدويًا من Actions ← Build ← Run workflow: يبني فقط، والملفات تظهر كـ artifacts.
 name: Build
 
 on:
   workflow_dispatch:
   push:
+    branches: [main]
+    paths: [src-tauri/tauri.conf.json]
     tags: ["v*"]
 
 permissions:
   contents: write
 
 jobs:
+  # release: هل ننشر إصدارًا؟ has_key: هل أُضيف مفتاح توقيع أندرويد؟ (لا تُقرأ secrets في if الخاصة بالـ job)
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.version.outputs.build }}
+      release: ${{ steps.version.outputs.release }}
+      has_key: ${{ steps.version.outputs.has_key }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        env:
+          KEY: ${{ secrets.KHAMA_KEYSTORE_BASE64 }}
+        run: |
+          echo "has_key=$([ -n "$KEY" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"; echo "release=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"; echo "release=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          v="v$(jq -r .version src-tauri/tauri.conf.json)"
+          if git ls-remote --exit-code --tags origin "refs/tags/$v" > /dev/null; then
+            echo "$v موسوم بالفعل، لا إصدار جديد"
+            echo "build=false" >> "$GITHUB_OUTPUT"; echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "إصدار $v"
+            echo "build=true" >> "$GITHUB_OUTPUT"; echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check
+    if: needs.check.outputs.build == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -84,9 +119,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: --target ${{ matrix.target }} ${{ runner.os == 'Linux' && '--verbose' || '' }} ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' && '--config src-tauri/tauri.updater.conf.json' || '' }}
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
-          releaseName: "Khama ${{ github.ref_name }}"
-          releaseDraft: true
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || (needs.check.outputs.release == 'true' && 'v__VERSION__' || '') }}
+          releaseName: "Khama v__VERSION__"
+          releaseDraft: false
           prerelease: false
 
       - name: Upload installers
@@ -101,30 +136,21 @@ jobs:
             src-tauri/target/${{ matrix.target }}/release/bundle/rpm/*.rpm
           if-no-files-found: ignore
 
-  # فحص صغير: هل أُضيف مفتاح توقيع أندرويد كـ secret؟ (لا تُقرأ secrets في if الخاصة بالـ job)
-  android-check:
-    runs-on: ubuntu-latest
-    outputs:
-      has_key: ${{ steps.check.outputs.has_key }}
-    steps:
-      - id: check
-        env:
-          KEY: ${{ secrets.KHAMA_KEYSTORE_BASE64 }}
-        run: echo "has_key=$([ -n "$KEY" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-
+  # APK موقّع لـ arm64 يُرفع إلى الإصدار نفسه. يحتاج الأسرار KHAMA_KEYSTORE_BASE64 و KHAMA_KEY_PASSWORD
+  # (يقرؤها build.gradle.kts من متغيرات KHAMA_*)، وبدونها تُتخطّى هذه المهمة.
   android:
-    needs: android-check
-    if: needs.android-check.outputs.has_key == 'true'
+    needs: check
+    if: needs.check.outputs.build == 'true' && needs.check.outputs.has_key == 'true'
     runs-on: ubuntu-latest
     env:
-      NDK_VERSION: 29.0.14206865
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
 
       - uses: actions/setup-node@v4
         with:
@@ -140,12 +166,7 @@ jobs:
           workspaces: src-tauri -> target
           key: aarch64-linux-android
 
-      - name: Android NDK
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" > /dev/null
-          echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
-
-      - run: npm ci
+      - run: npm ci --silent
 
       # المفتاح نفسه الذي على جهازك، وإلا رفض أندرويد تثبيت التحديث فوق النسخة القديمة
       - name: Signing key
@@ -154,6 +175,7 @@ jobs:
         run: |
           echo "$KEY" | base64 -d > "$RUNNER_TEMP/khama.jks"
           echo "KHAMA_KEYSTORE=$RUNNER_TEMP/khama.jks" >> "$GITHUB_ENV"
+          echo "NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
 
       - name: Build APK
         env:
@@ -174,18 +196,13 @@ jobs:
           path: out/*.apk
           if-no-files-found: error
 
-  # يرفع الـ APK إلى مسودة الإصدار نفسها (بعد أن تُنشئها مهام البناء أعلاه)
-  attach-apk:
-    needs: [build, android]
-    if: always() && startsWith(github.ref, 'refs/tags/') && needs.android.result == 'success'
-    runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GH_REPO: ${{ github.repository }}
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: khama-android-arm64
-          path: out
-
-      - run: gh release upload "$GITHUB_REF_NAME" out/*.apk --clobber
+      - name: Attach to the release
+        if: needs.check.outputs.release == 'true'
+        run: |
+          v="v$(jq -r .version src-tauri/tauri.conf.json)"
+          # مهام سطح المكتب هي التي تنشئ الإصدار؛ ننتظره حتى 40 دقيقة
+          for i in $(seq 1 80); do
+            gh release view "$v" > /dev/null 2>&1 && break
+            sleep 30
+          done
+          gh release upload "$v" out/*.apk --clobber
