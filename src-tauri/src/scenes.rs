@@ -37,6 +37,9 @@ const SB: usize = 3;
 const VB: usize = 3;
 const GREY: usize = 6;
 pub const BINS: usize = HB * SB * VB + GREY;
+/// Luma thumbnail for the structural (pixel) signal: 32×18, each value the mean of a 5×5 block
+const TW: usize = 32;
+const TH: usize = 18;
 
 /// Features of one frame
 #[derive(Clone, Debug)]
@@ -48,6 +51,8 @@ pub struct Frame {
     /// Mean and standard deviation of the luma (0..255)
     pub luma_mean: f32,
     pub luma_std: f32,
+    /// 32×18 luma thumbnail (0..255)
+    pub thumb: Vec<f32>,
     /// Presentation time in seconds
     pub time: f64,
 }
@@ -118,6 +123,7 @@ pub fn features(rgb: &[u8], time: f64) -> Frame {
     let mut counts = [0f32; GRID * GRID];
     let (mut sum, mut sum2) = (0f64, 0f64);
     let mut bins = [(0usize, 0f32); 10];
+    let mut thumb = vec![0f32; TW * TH];
     for y in 0..H {
         let by = y * GRID / H;
         for x in 0..W {
@@ -131,6 +137,7 @@ pub fn features(rgb: &[u8], time: f64) -> Frame {
             }
             counts[blk] += 1.0;
             let l = 0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64;
+            thumb[(y * TH / H) * TW + x * TW / W] += l as f32;
             sum += l;
             sum2 += l * l;
         }
@@ -142,11 +149,14 @@ pub fn features(rgb: &[u8], time: f64) -> Frame {
     }
     let mean = sum / (W * H) as f64;
     let var = (sum2 / (W * H) as f64 - mean * mean).max(0.0);
+    let per = ((W / TW) * (H / TH)) as f32;
+    thumb.iter_mut().for_each(|v| *v /= per);
     Frame {
         hist,
         blocks,
         luma_mean: mean as f32,
         luma_std: var.sqrt() as f32,
+        thumb,
         time,
     }
 }
@@ -154,6 +164,11 @@ pub fn features(rgb: &[u8], time: f64) -> Frame {
 /// D(p, q) = ½ Σ|p − q| (= 1 − histogram intersection), in [0, 1]
 pub fn hist_dist(p: &[f32], q: &[f32]) -> f32 {
     0.5 * p.iter().zip(q).map(|(a, b)| (a - b).abs()).sum::<f32>()
+}
+
+/// Mean absolute luma difference of two thumbnails, in [0, 1]: sees cuts between shots with the same colours
+pub fn pix_dist(a: &Frame, b: &Frame) -> f32 {
+    a.thumb.iter().zip(&b.thumb).map(|(x, y)| (x - y).abs()).sum::<f32>() / (a.thumb.len() as f32 * 255.0)
 }
 
 /// Detector parameters (defaults chosen by the evaluation in bench/scenes)
@@ -170,8 +185,12 @@ pub struct Params {
     pub min_score: f32,
     /// Robust statistics (median and MAD) instead of mean and standard deviation
     pub robust: bool,
-    /// Reject single-frame flashes
+    /// Reject camera flashes (1-3 frames that differ, between frames that resemble each other)
     pub flash: bool,
+    /// Second cut signal: luma thumbnail difference with its own adaptive threshold (jump cuts with the same colours)
+    pub pixel: bool,
+    pub k_pix: f32,
+    pub min_pix: f32,
     /// Minimum distance between two boundaries, in frames
     pub min_gap: usize,
     /// Detect gradual transitions (dissolves and fades)
@@ -188,19 +207,23 @@ pub struct Params {
 }
 
 impl Default for Params {
+    // Tuned on the dev half of the synthetic set (bench/scenes/evaluate.py, results/scenes_grid_dev.csv).
     fn default() -> Self {
         Self {
-            alpha: 0.5,
+            alpha: 0.0,
             window: 18,
-            k: 4.0,
+            k: 5.0,
             min_score: 0.22,
             robust: true,
             flash: true,
+            pixel: true,
+            k_pix: 4.0,
+            min_pix: 0.04,
             min_gap: 6,
             gradual: true,
-            k_low: 2.0,
-            low_floor: 0.03,
-            grad_min: 0.35,
+            k_low: 1.5,
+            low_floor: 0.05,
+            grad_min: 0.25,
             grad_len: 4,
             flat_std: 6.0,
         }
@@ -295,28 +318,46 @@ pub fn detect(frames: &[Frame], p: &Params) -> Vec<Boundary> {
     let mut buf = Vec::with_capacity(2 * p.window + 1);
     let stats: Vec<(f32, f32)> = (0..n).map(|t| window_stats(&d, t, p.window, p.robust, false, &mut buf)).collect();
     let flat: Vec<bool> = frames.iter().map(|f| f.luma_std < p.flat_std).collect();
+    // structural signal
+    let mut e = vec![0f32; n];
+    for t in 1..n {
+        e[t] = pix_dist(&frames[t - 1], &frames[t]);
+    }
+    let stats_e: Vec<(f32, f32)> = if p.pixel {
+        (0..n).map(|t| window_stats(&e, t, p.window, p.robust, false, &mut buf)).collect()
+    } else {
+        Vec::new()
+    };
+    let local_max = |x: &[f32], t: usize| {
+        let lo = t.saturating_sub(2).max(1);
+        let hi = (t + 2).min(n - 1);
+        !(lo..=hi).any(|i| x[i] > x[t])
+    };
+    let comb =
+        |a: usize, b: usize| pair_dist(&frames[a], &frames[b], p.alpha).max(if p.pixel { pix_dist(&frames[a], &frames[b]) } else { 0.0 });
 
-    // ---- 1. hard cuts ----
+    // ---- 1. hard cuts: a spike of the colour signal OR of the structural signal ----
     let mut cuts: Vec<Boundary> = Vec::new();
     for t in 1..n {
         let (c, s) = stats[t];
-        let thr = p.min_score.max(c + p.k * s);
-        if d[t] < thr {
+        let by_hist = d[t] >= p.min_score.max(c + p.k * s) && local_max(&d, t);
+        let by_pix = p.pixel && {
+            let (ce, se) = stats_e[t];
+            e[t] >= p.min_pix.max(ce + p.k_pix * se) && local_max(&e, t)
+        };
+        if !by_hist && !by_pix {
             continue;
         }
-        // local maximum over ±2 frames
-        let lo = t.saturating_sub(2).max(1);
-        let hi = (t + 2).min(n - 1);
-        if (lo..=hi).any(|i| d[i] > d[t]) {
-            continue;
-        }
-        // flash: frame t differs, but what follows resembles what came before
-        if p.flash && t + 1 < n {
-            let back = (1..=3)
+        let spike = if p.pixel { comb(t - 1, t) } else { d[t] };
+        if p.flash {
+            // start of a flash: frame t differs, but what follows resembles what came before
+            let after = (1..=3)
                 .filter(|j| t + j < n)
-                .map(|j| pair_dist(&frames[t - 1], &frames[t + j], p.alpha))
+                .map(|j| comb(t - 1, t + j))
                 .fold(f32::INFINITY, f32::min);
-            if back < 0.35 * d[t] {
+            // end of a flash: frame t resembles the frames before the flash began
+            let before = (1..=3).filter(|j| t > *j).map(|j| comb(t - 1 - j, t)).fold(f32::INFINITY, f32::min);
+            if after < 0.35 * spike || before < 0.35 * spike {
                 continue;
             }
         }
@@ -324,11 +365,12 @@ pub fn detect(frames: &[Frame], p: &Params) -> Vec<Boundary> {
         if flat[t] && flat[t - 1] {
             continue;
         }
+        let score = if by_hist { d[t] } else { e[t] };
         cuts.push(Boundary {
             kind: Kind::Cut,
             start: t - 1,
             end: t,
-            score: d[t],
+            score,
             time: frames[t].time,
             start_time: frames[t].time,
         });
@@ -592,13 +634,16 @@ mod tests {
     fn frame(rgb: [u8; 3], square: [u8; 3], pos: usize, seed: u32, time: f64) -> Frame {
         let mut img = vec![0u8; W * H * 3];
         let mut s = seed.wrapping_mul(2_654_435_761).wrapping_add(1);
+        // the square bounces between the edges (no wrap-around: a jump across the frame is not motion)
+        let m = pos % (2 * (W - 30));
+        let x0 = if m < W - 30 { m } else { 2 * (W - 30) - m };
         for y in 0..H {
             for x in 0..W {
                 s ^= s << 13;
                 s ^= s >> 17;
                 s ^= s << 5;
                 let noise = (s % 9) as i16 - 4;
-                let c = if x >= pos % (W - 30) && x < pos % (W - 30) + 30 && (30..60).contains(&y) {
+                let c = if x >= x0 && x < x0 + 30 && (30..60).contains(&y) {
                     square
                 } else {
                     rgb
@@ -642,6 +687,42 @@ mod tests {
         assert_eq!(b.len(), 1, "{b:?}");
         assert_eq!(b[0].kind, Kind::Cut);
         assert_eq!(b[0].end, 60);
+    }
+
+    /// A horizontal gradient (left dark, right bright, or reversed): same colours, different layout
+    fn gradient(reverse: bool, seed: u32, time: f64) -> Frame {
+        let mut img = vec![0u8; W * H * 3];
+        let mut s = seed.wrapping_mul(2_654_435_761).wrapping_add(1);
+        for y in 0..H {
+            for x in 0..W {
+                s ^= s << 13;
+                s ^= s >> 17;
+                s ^= s << 5;
+                let v = (x * 255 / (W - 1)) as i16;
+                let v = if reverse { 255 - v } else { v } + (s % 7) as i16 - 3;
+                let i = (y * W + x) * 3;
+                img[i..i + 3].copy_from_slice(&[v.clamp(0, 255) as u8, (v / 2).clamp(0, 255) as u8, 60]);
+            }
+        }
+        features(&img, time)
+    }
+
+    #[test]
+    fn finds_a_jump_cut_with_the_same_colours() {
+        let mut v: Vec<Frame> = (0..50).map(|t| gradient(false, t, t as f64)).collect();
+        v.extend((50..100).map(|t| gradient(true, t, t as f64)));
+        assert!(hist_dist(&v[49].hist, &v[50].hist) < 0.1, "same global colours");
+        let b = detect(&v, &Params::default());
+        assert_eq!(b.len(), 1, "{b:?}");
+        assert_eq!(b[0].end, 50);
+    }
+
+    #[test]
+    fn rejects_a_two_frame_flash() {
+        let mut v: Vec<Frame> = (0..80).map(|t| frame(A, SQ, t, t as u32, t as f64)).collect();
+        v[40] = frame([250, 250, 250], [250, 250, 250], 0, 40, 40.0);
+        v[41] = frame([235, 235, 235], [235, 235, 235], 0, 41, 41.0);
+        assert!(detect(&v, &Params::default()).is_empty());
     }
 
     #[test]

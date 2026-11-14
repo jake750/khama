@@ -62,8 +62,20 @@ and $d(t)$ is the maximum over $t\pm2$. Two estimators were compared:
 - the robust pair median and scaled MAD, $c = \operatorname{med}(d)$, $s = 1.4826\,\operatorname{med}|d - \operatorname{med}(d)|$,
   which is not inflated by other cuts in the window.
 
-**Flash rejection.** A flash changes frame $t$ but the frames after it resemble the frames before it. A
-candidate is rejected when $\min_{j=1..3} D(f_{t-1}, f_{t+j}) < 0.35\, d(t)$.
+**Structural signal.** Histograms ignore spatial layout, so a cut between two shots of the same scene
+(same palette, different framing) is almost invisible to them. Khama also keeps a $32\times18$ luma
+thumbnail $Y_t$ of every frame and measures
+$$e(t) = \frac{1}{|\Omega|}\sum_{x\in\Omega} \frac{|Y_t(x) - Y_{t-1}(x)|}{255},$$
+which is large when the image *structure* changes even if the colours do not. $e$ has its own adaptive
+threshold, $e(t) \ge \max(\epsilon_{min},\; c_e(t) + k_{pix}\, s_e(t))$, computed the same way. A cut is
+reported when either signal fires (and is a local maximum of that signal).
+
+**Flash rejection.** A flash changes frame $t$ but the frames after it resemble the frames before it. With
+$\delta(i,j) = \max\big(D(f_i,f_j),\, e(i,j)\big)$ the combined change between two frames, a candidate at $t$
+with strength $\delta(t-1,t)$ is rejected when
+$$\min_{j=1..3} \delta(t-1, t+j) < 0.35\,\delta(t-1,t) \quad\text{(start of a flash)}$$
+$$\text{or}\quad \min_{j=1..3} \delta(t-1-j, t) < 0.35\,\delta(t-1,t) \quad\text{(end of a flash: frame } t \text{ resembles the frames before the flash)}.$$
+A candidate between two flat frames (a black gap inside a fade) is also rejected.
 
 ### 2.3 Gradual transitions: adaptive twin comparison
 
@@ -93,7 +105,11 @@ Fades through black: the fade-out and fade-in are merged into one transition whe
 - **Matching:** a detection matches a labelled transition when their frame spans overlap within ±2 frames,
   one-to-one. $P = \frac{TP}{TP+FP}$, $R = \frac{TP}{TP+FN}$, $F_1 = \frac{2PR}{P+R}$.
 - **Protocol:** parameters are tuned on the first half of the videos ("dev") and all reported numbers come
-  from the second half ("test").
+  from the second half ("test"). The search has two stages:
+  1. cut settings with gradual detection off: 216 colour-only configurations ($\alpha$, $k$, estimator,
+     $\tau_{min}$, window) and 128 with the structural signal ($k_{pix}$, $\epsilon_{min}$);
+  2. gradual settings ($k_{low}$, $G_{min}$, $\ell_{min}$; 27 configurations) on top of the best stage-1 setting.
+  An ablation study then switches off one component of the final detector at a time.
 - **Baseline:** the app's previous detector, FFmpeg `select='gt(scene,T)'` on frames scaled to 320 px,
   with $T$ swept from 0.05 to 0.6.
 - **Real editing:** the Sintel trailer (CC-BY), labelled by hand.

@@ -1,0 +1,7 @@
+variant,P,R,F1,R_cut,R_grad,flash_fp,n_flash,tp,fp,fn
+full detector,0.9510,0.9510,0.9510,0.9680,0.9241,0,48,194,10,10
+without structural signal,0.9568,0.8676,0.9100,0.8400,0.9114,0,48,177,8,27
+without flash rejection,0.8017,0.9510,0.8700,0.9680,0.9241,38,48,194,48,10
+mean/std instead of median/MAD,1.0000,0.7990,0.8883,0.8720,0.6835,0,48,163,0,41
+global histogram only (alpha = 1),0.9594,0.9265,0.9426,0.9680,0.8608,0,48,189,8,15
+fixed thresholds (k = 0),0.9420,0.9559,0.9489,0.9680,0.9367,0,48,195,12,9
