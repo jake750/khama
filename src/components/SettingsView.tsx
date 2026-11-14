@@ -22,6 +22,8 @@ export function SettingsView(props: {
   toast: (msg: string) => void;
   /** القسم المطلوب عند الفتح (مثلًا "cookies" من رسالة خطأ) */
   section?: { id: string; n: number } | null;
+  onOpenGuide: () => void;
+  onTour: () => void;
 }) {
   const { t } = useI18n();
   const { settings: s, update } = props;
@@ -125,6 +127,20 @@ export function SettingsView(props: {
         <ToolsSection toast={props.toast} />
 
         <Section id="about" title={t.aboutTitle}>
+          <div className="setting-row">
+            <div style={{ minWidth: 0 }}>
+              <div>{t.guideTitle}</div>
+              <div className="faint">{t.guideSub}</div>
+            </div>
+            <div className="guide-settings-actions">
+              <button className="btn" onClick={props.onTour}>
+                <Icon name="eye" size={16} /> {t.tourStart}
+              </button>
+              <button className="btn" onClick={props.onOpenGuide}>
+                <Icon name="help" size={16} /> {t.guideOpen}
+              </button>
+            </div>
+          </div>
           <p className="muted" style={{ margin: "4px 0 8px" }}>{t.aboutBody}</p>
           <p className="faint" style={{ margin: 0 }}>{t.notice}</p>
         </Section>

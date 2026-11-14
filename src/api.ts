@@ -23,6 +23,8 @@ export interface Settings {
   cookiesMode: CookiesMode;
   cookiesBrowser: string;
   acceptedNotice: boolean;
+  /** هل رأى المستخدم الترحيب وعرض الجولة */
+  seenTour: boolean;
   convertDest: "source" | "output";
   convertPreset: string;
   convertHw: boolean;

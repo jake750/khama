@@ -6,10 +6,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, asAppError, type ConvertRequest, type DownloadRequest, type JobUpdate, type Settings } from "./api";
 import { ConvertView, defaultOptions, MEDIA_FILTER, type SourceFile } from "./components/ConvertView";
 import { DownloadView, type StartMeta } from "./components/DownloadView";
+import { GuideView } from "./components/GuideView";
 import { HistoryView } from "./components/HistoryView";
 import { Icon, type IconName } from "./components/Icon";
 import { isActive, JobCard, type Job } from "./components/JobCard";
 import { SettingsView } from "./components/SettingsView";
+import { Tour, Welcome, type TourStep } from "./components/Tour";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { formatTimecode } from "./format";
 import { dictionaries, I18n, type Dict } from "./i18n";
@@ -17,7 +19,7 @@ import { AnimatedList, reducedMotion, SlideSwitch, usePresence, useSlidingIndica
 import { isMobile } from "./platform";
 import { presetById } from "./presets";
 
-type Tab = "download" | "convert" | "history" | "settings";
+type Tab = "download" | "convert" | "history" | "settings" | "guide";
 
 /** يطبّق الثيم ويعيد الثيم الفعلي. "system" يتبع إعداد النظام ويتغيّر معه */
 function useTheme(theme: Settings["theme"] | undefined): "dark" | "light" {
@@ -98,6 +100,7 @@ export default function App() {
   const [settingsSection, setSettingsSection] = useState<{ id: string; n: number } | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [compact, setCompact] = useState(false);
+  const [touring, setTouring] = useState(false);
   // تحديثات وصلت قبل أن نضيف العملية للقائمة (Rust أسرع أحيانًا من الرد)
   const pending = useRef(new Map<number, JobUpdate>());
   const jobsRef = useRef<Job[]>([]);
@@ -349,6 +352,28 @@ export default function App() {
       .catch(() => {});
   }, [compact]);
 
+  /** الجولة تبدّل التبويب بنفسها (دالة ثابتة حتى لا تعيد الخطوة الحالية) */
+  const tourTab = useCallback((x: Tab) => setTab(x), []);
+  const tourSteps = useMemo<TourStep<Tab>[]>(() => {
+    const s = (id: string) => ({ title: t.tourSteps[id][0], body: t.tourSteps[id][1] });
+    return [
+      { target: ".url-field", tab: "download", art: "link", ...s("link") },
+      { target: ".options-box > summary", tab: "download", art: "trim", ...s("format") },
+      { target: "details.extras:not(.options-box) > summary", tab: "download", art: "stems", ...s("extras") },
+      { target: ".download-btn", tab: "download", art: "playlist", ...s("download") },
+      { target: '.tab[data-tab="convert"]', art: "convert", ...s("convert") },
+      { target: '.tab[data-tab="history"]', art: "history", ...s("history") },
+      { target: '.tab[data-tab="settings"]', art: "projects", ...s("settings") },
+      { target: ".guide-btn", art: "guide", ...s("guide") },
+    ];
+  }, [t]);
+
+  const startTour = useCallback(() => {
+    update({ seenTour: true });
+    if (compact) api.setCompact(false).then(() => setCompact(false)).catch(() => {});
+    setTouring(true);
+  }, [update, compact]);
+
   if (!settings) return null;
 
   const outputDir = settings.outputDir || defaultDir;
@@ -401,6 +426,7 @@ export default function App() {
               <button
                 key={x.id}
                 className="tab"
+                data-tab={x.id}
                 aria-current={tab === x.id ? "page" : undefined}
                 onClick={() => setTab(x.id)}
                 title={x.label}
@@ -413,6 +439,17 @@ export default function App() {
           </nav>
           <span className="spacer" />
           <div className="topbar-tools">
+            {!compact && (
+              <button
+                className="icon-btn ghost guide-btn"
+                title={t.guideOpen}
+                aria-label={t.guideOpen}
+                aria-pressed={tab === "guide"}
+                onClick={() => setTab("guide")}
+              >
+                <Icon name="help" size={20} />
+              </button>
+            )}
             {!isMobile && (
               <button className="icon-btn ghost" title={compact ? t.compactOff : t.compactOn} aria-label={compact ? t.compactOff : t.compactOn} onClick={toggleCompact}>
                 <Icon name={compact ? "maximize" : "minimize"} size={20} />
@@ -439,7 +476,7 @@ export default function App() {
               </div>
             )}
 
-            <SlideSwitch id={tab} index={tabs.findIndex((x) => x.id === tab)}>
+            <SlideSwitch id={tab} index={tab === "guide" ? tabs.length : tabs.findIndex((x) => x.id === tab)}>
               <div className="view">
                 {tab === "download" && (
                   <DownloadView
@@ -482,6 +519,17 @@ export default function App() {
                     onOpenDir={() => api.openOutputDir().catch(() => {})}
                     toast={toast}
                     section={settingsSection}
+                    onOpenGuide={() => setTab("guide")}
+                    onTour={startTour}
+                  />
+                )}
+                {tab === "guide" && (
+                  <GuideView
+                    onTour={startTour}
+                    onGo={(to, section) => {
+                      if (section) setSettingsSection({ id: section, n: Date.now() });
+                      setTab(to);
+                    }}
                   />
                 )}
 
@@ -547,6 +595,10 @@ export default function App() {
 
         {/* تحديثات خامة: الكمبيوتر يثبّتها بنفسه، والهاتف يفتح رابط ملف APK الجديد */}
         <UpdateDialog />
+
+        {/* أول فتح: ترحيب يعرض جولة سريعة على الخصائص */}
+        {!settings.seenTour && !touring && !compact && <Welcome onTour={startTour} onLater={() => update({ seenTour: true })} />}
+        {touring && <Tour steps={tourSteps} onTab={tourTab} onClose={() => setTouring(false)} />}
       </div>
     </I18n.Provider>
   );

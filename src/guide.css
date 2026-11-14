@@ -1,0 +1,439 @@
+/* =====================================================================
+   الدليل، والجولة، ورسومهما التوضيحية
+   ===================================================================== */
+
+/* ---------- الرسوم: ألوان الثيم فقط ---------- */
+.guide-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+.guide-art .il-card { fill: var(--surface); }
+.guide-art .il-chip { fill: var(--pill); }
+.guide-art .il-thumb { fill: color-mix(in srgb, var(--accent) 22%, var(--surface-2)); }
+.guide-art .il-on-thumb { fill: var(--on-hero); }
+.guide-art .il-gap { stroke: var(--surface-2); stroke-width: 2; }
+.guide-art .il-acc { fill: var(--accent); }
+.guide-art .il-acc-2 { fill: color-mix(in srgb, var(--accent) 60%, var(--surface)); }
+.guide-art .il-soft { fill: var(--accent-soft); }
+.guide-art .il-select { fill: color-mix(in srgb, var(--accent) 30%, transparent); }
+.guide-art .il-spark { fill: var(--spark); }
+.guide-art .il-spark-soft { fill: var(--spark-soft); }
+.guide-art .il-ok { fill: var(--ok); }
+.guide-art .il-ok-soft { fill: color-mix(in srgb, var(--ok) 16%, transparent); }
+.guide-art .il-warn-soft { fill: color-mix(in srgb, var(--warn) 18%, transparent); }
+.guide-art .il-ink { fill: var(--text-faint); opacity: 0.55; }
+.guide-art .il-ink-soft { fill: var(--text-faint); opacity: 0.35; }
+.guide-art .il-ink-strong { fill: var(--text); opacity: 0.75; }
+.guide-art .il-ink-on { fill: var(--accent-ink); opacity: 0.8; }
+.guide-art .il-stroke { stroke: var(--border); stroke-width: 1.5; }
+.guide-art .il-stroke-acc { stroke: var(--accent); stroke-width: 1.5; }
+.guide-art .il-line,
+.guide-art .il-line-acc,
+.guide-art .il-hand,
+.guide-art .il-tick,
+.guide-art .il-tick-ok,
+.guide-art .il-strike,
+.guide-art .il-marker,
+.guide-art .il-playhead {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.guide-art .il-line { stroke: var(--text-faint); stroke-width: 2; }
+.guide-art .il-line-acc { stroke: var(--accent); stroke-width: 2; }
+.guide-art .il-thick { stroke-width: 5; }
+.guide-art .il-hand { stroke: var(--accent); stroke-width: 3; }
+.guide-art .il-tick { stroke: var(--accent-ink); stroke-width: 2; }
+.guide-art .il-tick-ok { stroke: var(--ok); stroke-width: 2.2; }
+.guide-art .il-strike { stroke: var(--text-faint); stroke-width: 2; stroke-dasharray: 4 5; }
+.guide-art .il-marker { stroke: var(--spark); stroke-width: 2; stroke-dasharray: 3 4; }
+.guide-art .il-playhead { stroke: var(--spark); stroke-width: 2; }
+.guide-art .il-lift { filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.18)); }
+
+.guide-art text {
+  font-family: inherit;
+  direction: ltr;
+}
+.guide-art .il-label { fill: var(--text-dim); font-size: 9px; font-weight: 700; }
+.guide-art .il-label-ink { fill: var(--accent-ink); }
+.guide-art .il-label-acc { fill: var(--accent); }
+.guide-art .il-label-warn { fill: var(--warn); }
+.guide-art .il-big { fill: var(--text); font-size: 17px; font-weight: 700; }
+.guide-art .il-big.il-label-ink { fill: var(--accent-ink); }
+
+/* حركة هادئة: العناصر تصعد مرة، وبعض التفاصيل تتحرك ببطء */
+.guide-art .il-rise {
+  animation: il-rise 0.6s var(--ease-out) backwards;
+}
+@keyframes il-rise {
+  from { opacity: 0; transform: translateY(6px); }
+}
+.guide-art .il-blink { animation: il-blink 1.1s steps(1) infinite; }
+@keyframes il-blink {
+  50% { opacity: 0; }
+}
+.guide-art .il-scan { animation: il-scan 4s var(--ease-io) infinite alternate; }
+@keyframes il-scan {
+  to { transform: translateX(52px); }
+}
+.guide-art .il-drag { animation: il-drag 3.2s var(--ease-io) infinite; }
+@keyframes il-drag {
+  0%, 15% { transform: none; }
+  55%, 80% { transform: translate(120px, 14px) scale(0.86); opacity: 0.9; }
+  100% { transform: none; opacity: 0; }
+}
+.guide-art .il-spin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: il-spin 6s linear infinite;
+}
+@keyframes il-spin {
+  to { transform: rotate(360deg); }
+}
+.guide-art .il-tick-hand {
+  transform-origin: 64px 64px;
+  animation: il-spin 8s linear infinite;
+}
+.guide-art .il-speed { animation: il-speed 1.6s var(--ease-io) infinite alternate; }
+@keyframes il-speed {
+  from { transform: translateX(-6px); opacity: 0.6; }
+}
+.guide-art .il-grow {
+  transform-box: fill-box;
+  animation: il-grow 2.4s var(--ease-io) infinite alternate;
+}
+@keyframes il-grow {
+  from { transform: scaleX(0.3); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-art * {
+    animation: none !important;
+  }
+}
+
+/* ---------- شاشة الدليل ---------- */
+.guide {
+  display: grid;
+  gap: var(--s-6);
+}
+
+.guide-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  align-items: center;
+  gap: var(--s-6);
+}
+
+.guide-hero h2 {
+  margin: 0 0 var(--s-2);
+  font-size: var(--fs-title);
+  line-height: 1.3;
+}
+
+.guide-hero p {
+  margin: 0 0 var(--s-5);
+  max-width: 46ch;
+}
+
+.guide-hero-art {
+  background: transparent;
+}
+
+.guide-group h3 {
+  margin: 0 var(--s-1) var(--s-3);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-bold);
+}
+
+.guide-list {
+  padding: var(--s-2);
+}
+
+.guide-item + .guide-item {
+  border-top: 1px solid var(--line);
+}
+
+.guide-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-4);
+  width: 100%;
+  padding: var(--s-3) var(--s-3);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: background-color 0.2s var(--ease-out);
+}
+
+.guide-row:hover {
+  background: var(--surface-2);
+}
+
+.guide-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.guide-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-xs);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.guide-row-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.guide-row-text b {
+  font-weight: var(--fw-semi);
+  line-height: 1.45;
+}
+
+.guide-row-text .faint {
+  font-size: var(--fs-meta);
+  line-height: 1.55;
+}
+
+.guide-chevron {
+  display: grid;
+  color: var(--text-faint);
+  transition: transform 0.3s var(--ease-out);
+}
+
+.guide-item[data-open="true"] .guide-chevron {
+  transform: rotate(180deg);
+}
+
+.guide-detail {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: var(--s-5);
+  padding: var(--s-2) var(--s-3) var(--s-5);
+  /* بمحاذاة نص العنوان لا الأيقونة */
+  padding-inline-start: calc(var(--s-3) + 36px + var(--s-4));
+}
+
+.guide-when {
+  margin: 0 0 var(--s-4);
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.guide-when .field-label {
+  display: block;
+}
+
+.guide-steps {
+  margin: var(--s-1) 0 var(--s-4);
+  padding-inline-start: 1.3em;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.guide-steps li + li {
+  margin-top: var(--s-1);
+}
+
+.guide-steps li::marker {
+  color: var(--accent);
+  font-weight: var(--fw-bold);
+}
+
+[dir="rtl"] .guide-go-arrow {
+  display: inline-block;
+  transform: scaleX(-1);
+}
+
+.guide-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.guide-btn[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+@media (max-width: 700px) {
+  .guide-detail {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline-start: var(--s-3);
+  }
+  .guide-detail-art {
+    max-width: 320px;
+  }
+}
+
+@media (max-width: 560px) {
+  .guide {
+    gap: var(--s-5);
+  }
+  .guide-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .guide-hero-art {
+    display: none;
+  }
+  .guide-hero h2 {
+    font-size: var(--fs-sec);
+  }
+  .guide-hero .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .guide-list {
+    padding: var(--s-1);
+  }
+  .guide-row {
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-2);
+    min-height: 56px;
+  }
+  .guide-detail {
+    padding: var(--s-1) var(--s-2) var(--s-4);
+  }
+  .guide-detail .btn {
+    min-height: 40px;
+  }
+}
+
+/* ---------- الجولة ---------- */
+.tour {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.tour-block {
+  position: absolute;
+  inset: 0;
+}
+
+.tour-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  animation: fade-in 0.3s var(--ease-out);
+}
+
+/* الإضاءة: ثقب في الظل حول العنصر، ينزلق من خطوة لأخرى */
+.tour-spot {
+  position: absolute;
+  border-radius: var(--r-sm);
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 0 9999px var(--scrim);
+  pointer-events: none;
+  transition:
+    top 0.45s var(--ease-out),
+    left 0.45s var(--ease-out),
+    width 0.45s var(--ease-out),
+    height 0.45s var(--ease-out);
+}
+
+.tour-card {
+  position: absolute;
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+  transition:
+    top 0.45s var(--ease-out),
+    left 0.45s var(--ease-out);
+}
+
+.tour-art {
+  margin-bottom: var(--s-3);
+}
+
+.tour-count {
+  font-size: var(--fs-cap);
+  font-weight: var(--fw-semi);
+}
+
+.tour-card h2 {
+  margin: 2px 0 var(--s-1);
+  font-size: var(--fs-card);
+  line-height: 1.4;
+}
+
+.tour-card p {
+  margin: 0;
+  font-size: var(--fs-meta);
+  line-height: 1.65;
+}
+
+.tour-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.tour-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--border);
+  transition:
+    width 0.3s var(--ease-out),
+    background-color 0.3s var(--ease-out);
+}
+
+.tour-dots span[data-on="true"] {
+  width: 18px;
+  background: var(--accent);
+}
+
+.tour-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+@media (max-width: 560px) {
+  .tour-actions .btn {
+    min-height: 40px;
+  }
+}
+
+/* ---------- ترحيب أول فتح ---------- */
+.welcome-card {
+  width: min(400px, 100%);
+}
+
+.welcome-card h2 {
+  margin: 0 0 var(--s-1);
+  font-size: var(--fs-sec);
+}
+
+.welcome-card p {
+  margin: 0;
+  line-height: 1.65;
+}
+
+.welcome-backdrop {
+  animation: fade-in 0.3s var(--ease-out);
+}
+
+.welcome-card {
+  animation: rise-in 0.45s var(--ease-out) backwards;
+}
