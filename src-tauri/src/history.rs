@@ -45,17 +45,17 @@ fn path(app: &AppHandle) -> Result<PathBuf, AppError> {
 fn with_list<T>(app: &AppHandle, state: &HistoryState, f: impl FnOnce(&mut Vec<HistoryEntry>) -> (T, bool)) -> Result<T, AppError> {
     let mut guard = state.0.lock().unwrap();
     if guard.is_none() {
-        let list = path(app)
-            .ok()
-            .and_then(|p| fs::read_to_string(p).ok())
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default();
+        let list = match path(app) {
+            Ok(p) => crate::persist::read_json(&p).or_default_logged("history.json"),
+            Err(_) => Vec::new(),
+        };
         *guard = Some(list);
     }
     let list = guard.as_mut().expect("loaded above");
     let (out, changed) = f(list);
     if changed {
-        fs::write(path(app)?, serde_json::to_string(list).expect("history serialize"))?;
+        let json = serde_json::to_string(list).expect("history serialize");
+        crate::persist::write_atomic(&path(app)?, json.as_bytes())?;
     }
     Ok(out)
 }

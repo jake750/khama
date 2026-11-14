@@ -11,6 +11,7 @@ mod errors;
 mod history;
 #[cfg(mobile)]
 mod mobile;
+mod persist;
 mod playlist;
 mod separate;
 mod settings;

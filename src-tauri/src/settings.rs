@@ -145,7 +145,7 @@ pub fn next_counter(app: &AppHandle) -> u64 {
     let _g = LOCK.lock().unwrap();
     let Ok(p) = config_dir(app).map(|d| d.join("counter.txt")) else { return 1 };
     let n = fs::read_to_string(&p).ok().and_then(|s| s.trim().parse::<u64>().ok()).unwrap_or(0) + 1;
-    let _ = fs::write(&p, n.to_string());
+    let _ = crate::persist::write_atomic(&p, n.to_string().as_bytes());
     n
 }
 
@@ -154,11 +154,10 @@ pub fn cookies_path(app: &AppHandle) -> Result<PathBuf, AppError> {
 }
 
 pub fn load(app: &AppHandle) -> Settings {
-    settings_path(app)
-        .ok()
-        .and_then(|p| fs::read_to_string(p).ok())
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default()
+    match settings_path(app) {
+        Ok(p) => crate::persist::read_json(&p).or_default_logged("settings.json"),
+        Err(_) => Settings::default(),
+    }
 }
 
 /// المجلد الفعلي للحفظ: ما اختاره المستخدم، وإلا مجلد التنزيلات
@@ -185,7 +184,7 @@ pub fn save_settings(
     settings: Settings,
 ) -> Result<(), AppError> {
     let json = serde_json::to_string_pretty(&settings).expect("settings serialize");
-    fs::write(settings_path(&app)?, json)?;
+    crate::persist::write_atomic(&settings_path(&app)?, json.as_bytes())?;
     *state.0.lock().unwrap() = settings;
     Ok(())
 }
@@ -216,7 +215,7 @@ pub fn save_cookies(app: AppHandle, content: String) -> Result<(), AppError> {
     if !out.ends_with('\n') {
         out.push('\n');
     }
-    fs::write(cookies_path(&app)?, out)?;
+    crate::persist::write_atomic(&cookies_path(&app)?, out.as_bytes())?;
     Ok(())
 }
 
