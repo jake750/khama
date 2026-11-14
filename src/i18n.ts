@@ -6,6 +6,21 @@ import type { AppError } from "./api";
 
 export type Lang = "en" | "ar";
 
+const arRules = new Intl.PluralRules("ar");
+type ArForms = { zero?: string; one: string; two: string; few: string; many: string; other: string };
+
+/**
+ * صيغة العدد العربية الصحيحة (6 صيغ): # يُستبدل بالعدد.
+ * one=1، two=2، few=3–10، many=11–99، other=100، 101، 102… (حسب Intl.PluralRules)
+ */
+export function arCount(n: number, f: ArForms): string {
+  const form = f[arRules.select(n) as keyof ArForms] ?? f.other;
+  return form.replace("#", String(n));
+}
+
+const arFiles: ArForms = { one: "ملف واحد", two: "ملفان", few: "# ملفات", many: "# ملفًا", other: "# ملف" };
+const arItems: ArForms = { one: "عنصر واحد", two: "عنصران", few: "# عناصر", many: "# عنصرًا", other: "# عنصر" };
+
 const en = {
   appName: "Khama",
   tabDownload: "Download",
@@ -453,8 +468,9 @@ const ar: Dict = {
   clipsOutput: "حفظ المقاطع",
   clipsJoin: "فيديو واحد",
   clipsSeparate: "ملفات منفصلة",
-  clipsJoinHint: (n) => `${n} مقاطع تُدمج بالترتيب في ملف واحد.`,
-  clipsSeparateHint: (n) => `${n} ملفات، ملف لكل مقطع.`,
+  clipsJoinHint: (n) =>
+    `${arCount(n, { one: "مقطع واحد", two: "مقطعان", few: "# مقاطع", many: "# مقطعًا", other: "# مقطع" })} تُدمج بالترتيب في ملف واحد.`,
+  clipsSeparateHint: (n) => `${arCount(n, arFiles)}، ملف لكل مقطع.`,
   stemsLabel: "تنظيف بالذكاء الاصطناعي",
   stemsOff: "بدون",
   stemsVoice: "إزالة الموسيقى",
@@ -466,8 +482,8 @@ const ar: Dict = {
   saveTo: "الحفظ في:",
   change: "تغيير",
   download: "تنزيل",
-  downloadN: (n) => (n === 1 ? "تنزيل عنصر واحد" : `تنزيل ${n}`),
-  plItems: (n) => (n === 1 ? "عنصر واحد" : `${n} عنصر`),
+  downloadN: (n) => `تنزيل ${arCount(n, { ...arItems, two: "عنصرين" })}`,
+  plItems: (n) => arCount(n, arItems),
   plSelected: (n, total) => `محدَّد ${n} من ${total}`,
   selectAll: "تحديد الكل",
   selectNone: "إلغاء التحديد",
@@ -567,7 +583,7 @@ const ar: Dict = {
   importing: "جارٍ النسخ…",
   dropSub: "حوّلها للمونتاج أو للنشر، أو استخرج الصوت. الملفات تبقى على جهازك.",
   dropHere: "أفلت الملفات للإضافة",
-  filesTitle: (n: number) => (n === 1 ? "ملف واحد" : n === 2 ? "ملفان" : n <= 10 ? `${n} ملفات` : `${n} ملفًا`),
+  filesTitle: (n: number) => arCount(n, arFiles),
   chooseFiles: "اختر ملفات",
   clearFiles: "مسح القائمة",
   removeFile: "إزالة",
@@ -629,7 +645,7 @@ const ar: Dict = {
   destOutput: "في مجلد الحفظ",
   estimate: (s: string) => `≈ ${s}`,
   estimateHint: "تقدير تقريبي",
-  convertBtn: (n: number) => (n > 1 ? `حوّل ${n} ملفات` : "حوّل"),
+  convertBtn: (n: number) => (n > 1 ? `حوّل ${arCount(n, { ...arFiles, two: "الملفين" })}` : "حوّل"),
   mergeBtn: "ادمجها في ملف واحد",
   mergeHint: "يدمج الملفات بترتيب القائمة. المقاس ومعدل الإطارات يتبعان الملف الأول.",
   notFit: "غير متاح لهذا الملف",
@@ -638,7 +654,8 @@ const ar: Dict = {
   // ---- إضافات (الدفعة الثانية) ----
   tabHistory: "السجلّ",
   urlPlaceholder: "الصق رابطًا أو عدة روابط…",
-  multiLinks: (n: number) => `${n} روابط. كل رابط يُنزَّل بالخيارات التالية.`,
+  multiLinks: (n: number) =>
+    `${arCount(n, { one: "رابط واحد", two: "رابطان", few: "# روابط", many: "# رابطًا", other: "# رابط" })}. كل رابط يُنزَّل بالخيارات التالية.`,
   removeLink: "إزالة الرابط",
   driveFile: "الملف الأصلي",
   autoPasted: "لُصق من الحافظة",
@@ -697,7 +714,8 @@ const ar: Dict = {
   historyMissing: "نُقل الملف أو حُذف",
   downloadAgain: "نزّله مرة أخرى",
   copyLink: "نسخ الرابط",
-  historyCount: (n: number) => `${n} تنزيل`,
+  historyCount: (n: number) =>
+    arCount(n, { zero: "لا تنزيلات", one: "تنزيل واحد", two: "تنزيلان", few: "# تنزيلات", many: "# تنزيلًا", other: "# تنزيل" }),
   secGeneral: "عام",
   secDownloads: "التنزيل",
   secBackground: "الخلفية",
@@ -743,7 +761,7 @@ const ar: Dict = {
   stQueued: "في الانتظار",
   stAnalyzing: "يحلّل…",
   stEncoding: "يحوّل",
-  markersFound: (n: number) => (n === 1 ? "وُجدت نقطة واحدة" : `وُجدت ${n} نقاط`),
+  markersFound: (n: number) => `وُجدت ${arCount(n, { one: "نقطة واحدة", two: "نقطتان", few: "# نقاط", many: "# نقطة", other: "# نقطة" })}`,
   markersNone: "لم يُعثر على شيء.",
   splitHere: "قسّم الملف عند هذه النقاط",
   copyTimes: "نسخ الأوقات",
@@ -757,7 +775,7 @@ const ar: Dict = {
   watchEmpty: "لا توجد مجلدات مراقَبة بعد.",
   mono: "أحادي",
   stereo: "ستيريو",
-  channels: (n: number) => `${n} قنوات`,
+  channels: (n: number) => arCount(n, { one: "قناة واحدة", two: "قناتان", few: "# قنوات", many: "# قناة", other: "# قناة" }),
 
   errors: {
     aiUnsupported: "إزالة الموسيقى غير متاحة على هذا النظام بعد.",
