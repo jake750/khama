@@ -99,11 +99,7 @@ pub fn resolve(app: &AppHandle) -> Result<Tools, AppError> {
         js_runtime: format!("deno:{}", deno.to_string_lossy()),
         ffmpeg_dir,
     };
-    for (name, p) in [
-        ("yt-dlp", &tools.ytdlp),
-        ("FFmpeg", &tools.ffmpeg),
-        ("FFprobe", &tools.ffprobe),
-    ] {
+    for (name, p) in [("yt-dlp", &tools.ytdlp), ("FFmpeg", &tools.ffmpeg), ("FFprobe", &tools.ffprobe)] {
         if !p.exists() {
             return Err(missing(name, p));
         }
@@ -262,7 +258,11 @@ pub async fn tools_info(app: AppHandle) -> Result<ToolsInfo, AppError> {
         // "ffmpeg version N-12345-gabc Copyright..." ← نأخذ رقم الإصدار فقط
         ffmpeg: ffmpeg.and_then(|l| l.split_whitespace().nth(2).map(str::to_string)),
         // "deno 2.x.y" أو "QuickJS version 2025-04-26": نأخذ أول كلمة تبدأ برقم
-        deno: deno.and_then(|l| l.split_whitespace().find(|w| w.starts_with(|c: char| c.is_ascii_digit())).map(str::to_string)),
+        deno: deno.and_then(|l| {
+            l.split_whitespace()
+                .find(|w| w.starts_with(|c: char| c.is_ascii_digit()))
+                .map(str::to_string)
+        }),
     })
 }
 
@@ -280,7 +280,10 @@ pub async fn update_ytdlp(app: AppHandle) -> Result<UpdateResult, AppError> {
     let r = tauri::async_runtime::spawn_blocking(move || crate::mobile::update_ytdlp(&app))
         .await
         .map_err(|e| AppError::with_detail("updateFailed", e.to_string()))??;
-    Ok(UpdateResult { updated: r.updated, version: r.version })
+    Ok(UpdateResult {
+        updated: r.updated,
+        version: r.version,
+    })
 }
 
 /// تحديث yt-dlp: يتصل بـ GitHub فقط عندما يضغط المستخدم الزر
@@ -299,5 +302,8 @@ pub async fn update_ytdlp(app: AppHandle) -> Result<UpdateResult, AppError> {
         return Err(AppError::with_detail("updateFailed", crate::errors::tail(&raw, 12)));
     }
     let after = first_line(&path, "--version").await;
-    Ok(UpdateResult { updated: before != after, version: after })
+    Ok(UpdateResult {
+        updated: before != after,
+        version: after,
+    })
 }

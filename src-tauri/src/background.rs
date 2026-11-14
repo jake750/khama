@@ -49,7 +49,12 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, e| {
-            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = e
+            {
                 show_main(tray.app_handle());
             }
         });
@@ -117,17 +122,21 @@ pub fn spawn_clipboard_watcher(app: AppHandle) {
             }
             last = Some(url.clone());
             let _ = app.emit("clipboard-url", &url);
-            let focused = app
-                .get_webview_window("main")
-                .and_then(|w| w.is_focused().ok())
-                .unwrap_or(false);
+            let focused = app.get_webview_window("main").and_then(|w| w.is_focused().ok()).unwrap_or(false);
             if !focused {
                 let ar = is_ar(&app);
                 let _ = app
                     .notification()
                     .builder()
                     .title(if ar { "رابط منسوخ" } else { "Link copied" })
-                    .body(format!("{}\n{url}", if ar { "افتح خامة لتنزيله:" } else { "Open Khama to download it:" }))
+                    .body(format!(
+                        "{}\n{url}",
+                        if ar {
+                            "افتح خامة لتنزيله:"
+                        } else {
+                            "Open Khama to download it:"
+                        }
+                    ))
                     .show();
             }
         }
@@ -166,7 +175,10 @@ mod tests {
 
     #[test]
     fn finds_urls() {
-        assert_eq!(first_url("look: https://youtu.be/abc123 nice"), Some("https://youtu.be/abc123".into()));
+        assert_eq!(
+            first_url("look: https://youtu.be/abc123 nice"),
+            Some("https://youtu.be/abc123".into())
+        );
         assert_eq!(first_url("\"https://x.com/a/status/1\""), Some("https://x.com/a/status/1".into()));
         assert_eq!(first_url("no link here"), None);
     }

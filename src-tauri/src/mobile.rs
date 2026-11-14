@@ -47,7 +47,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 }
 
 fn bridge(app: &AppHandle) -> Result<tauri::State<'_, Bridge<Wry>>, AppError> {
-    app.try_state::<Bridge<Wry>>().ok_or_else(|| AppError::with_detail("toolMissing", "android bridge"))
+    app.try_state::<Bridge<Wry>>()
+        .ok_or_else(|| AppError::with_detail("toolMissing", "android bridge"))
 }
 
 /// أول استدعاء يفكّ الأدوات (ثوانٍ قليلة في أول تشغيل فقط)، والباقي من الذاكرة
@@ -104,7 +105,13 @@ pub fn publish(app: &AppHandle, file: &Path) -> Result<Published, AppError> {
 pub fn publish_in(app: &AppHandle, file: &Path, subdir: Option<&str>) -> Result<Published, AppError> {
     bridge(app)?
         .0
-        .run_mobile_plugin("publish", PublishArgs { path: &file.to_string_lossy(), subdir })
+        .run_mobile_plugin(
+            "publish",
+            PublishArgs {
+                path: &file.to_string_lossy(),
+                subdir,
+            },
+        )
         .map_err(|e| AppError::with_detail("saveFailed", e.to_string()))
 }
 
@@ -114,7 +121,11 @@ pub async fn publish_any(app: &AppHandle, path: PathBuf) -> Result<PathBuf, AppE
     tauri::async_runtime::spawn_blocking(move || {
         if path.is_dir() {
             let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-            let mut files: Vec<PathBuf> = std::fs::read_dir(&path)?.flatten().map(|e| e.path()).filter(|p| p.is_file()).collect();
+            let mut files: Vec<PathBuf> = std::fs::read_dir(&path)?
+                .flatten()
+                .map(|e| e.path())
+                .filter(|p| p.is_file())
+                .collect();
             files.sort();
             let mut last = None;
             for f in files {
@@ -122,7 +133,9 @@ pub async fn publish_any(app: &AppHandle, path: PathBuf) -> Result<PathBuf, AppE
             }
             let _ = std::fs::remove_dir_all(&path);
             // نعيد مسار المجلد نفسه في Download/Khama
-            Ok(last.map(|p| PathBuf::from(p).parent().map(Path::to_path_buf).unwrap_or_default()).unwrap_or_default())
+            Ok(last
+                .map(|p| PathBuf::from(p).parent().map(Path::to_path_buf).unwrap_or_default())
+                .unwrap_or_default())
         } else {
             Ok(PathBuf::from(publish(&app, &path)?.path))
         }
@@ -149,11 +162,20 @@ pub fn import_file(app: &AppHandle, uri: &str) -> Result<String, AppError> {
         return Ok(uri.to_string());
     }
     // مجلد لكل ملف: ملفان بنفس الاسم من مكانين مختلفين لا يتصادمان
-    let n = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+    let n = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
     let dir = crate::download::jobs_root(app)?.join("import").join(format!("{n:x}"));
     let out: Imported = bridge(app)?
         .0
-        .run_mobile_plugin("importFile", ImportArgs { uri, dir: &dir.to_string_lossy() })
+        .run_mobile_plugin(
+            "importFile",
+            ImportArgs {
+                uri,
+                dir: &dir.to_string_lossy(),
+            },
+        )
         .map_err(|e| AppError::with_detail("badInput", e.to_string()))?;
     Ok(out.path)
 }
@@ -168,7 +190,13 @@ struct FetchArgs<'a> {
 pub fn fetch_file(app: &AppHandle, url: &str, dest: &Path) -> Result<(), AppError> {
     bridge(app)?
         .0
-        .run_mobile_plugin::<serde_json::Value>("fetchFile", FetchArgs { url, dest: &dest.to_string_lossy() })
+        .run_mobile_plugin::<serde_json::Value>(
+            "fetchFile",
+            FetchArgs {
+                url,
+                dest: &dest.to_string_lossy(),
+            },
+        )
         .map(|_| ())
         .map_err(|e| AppError::with_detail("aiDownload", e.to_string()))
 }

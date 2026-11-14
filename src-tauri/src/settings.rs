@@ -143,7 +143,9 @@ fn settings_path(app: &AppHandle) -> Result<PathBuf, AppError> {
 pub fn next_counter(app: &AppHandle) -> u64 {
     static LOCK: Mutex<()> = Mutex::new(());
     let _g = LOCK.lock().unwrap();
-    let Ok(p) = config_dir(app).map(|d| d.join("counter.txt")) else { return 1 };
+    let Ok(p) = config_dir(app).map(|d| d.join("counter.txt")) else {
+        return 1;
+    };
     let n = fs::read_to_string(&p).ok().and_then(|s| s.trim().parse::<u64>().ok()).unwrap_or(0) + 1;
     let _ = crate::persist::write_atomic(&p, n.to_string().as_bytes());
     n
@@ -165,9 +167,7 @@ pub fn resolve_output_dir(app: &AppHandle, s: &Settings) -> Result<PathBuf, AppE
     if let Some(dir) = s.output_dir.as_deref().filter(|d| !d.is_empty()) {
         return Ok(PathBuf::from(dir));
     }
-    app.path()
-        .download_dir()
-        .map_err(|_| AppError::new("noDownloadsDir"))
+    app.path().download_dir().map_err(|_| AppError::new("noDownloadsDir"))
 }
 
 // ---------------- أوامر تستدعيها الواجهة ----------------
@@ -178,11 +178,7 @@ pub fn get_settings(state: tauri::State<SettingsState>) -> Settings {
 }
 
 #[tauri::command]
-pub fn save_settings(
-    app: AppHandle,
-    state: tauri::State<SettingsState>,
-    settings: Settings,
-) -> Result<(), AppError> {
+pub fn save_settings(app: AppHandle, state: tauri::State<SettingsState>, settings: Settings) -> Result<(), AppError> {
     let json = serde_json::to_string_pretty(&settings).expect("settings serialize");
     crate::persist::write_atomic(&settings_path(&app)?, json.as_bytes())?;
     *state.0.lock().unwrap() = settings;

@@ -69,11 +69,13 @@ pub fn entries_from_ytdlp(j: &Value) -> Vec<Entry> {
         // قائمة داخل قائمة (مثل تبويبات قناة) لا تُنزَّل كملف واحد
         .filter(|e| {
             e["_type"].as_str() != Some("playlist")
-                && !e["ie_key"].as_str().is_some_and(|k| k.ends_with("Tab") || k.contains("Playlist") || k.ends_with("Folder"))
+                && !e["ie_key"]
+                    .as_str()
+                    .is_some_and(|k| k.ends_with("Tab") || k.contains("Playlist") || k.ends_with("Folder"))
         })
         .filter_map(|e| {
-            let url = str_field(e, &["url", "webpage_url", "original_url"])
-                .filter(|u| u.starts_with("http://") || u.starts_with("https://"))?;
+            let url =
+                str_field(e, &["url", "webpage_url", "original_url"]).filter(|u| u.starts_with("http://") || u.starts_with("https://"))?;
             let title = str_field(e, &["title", "track"]).unwrap_or_else(|| title_from_url(&url));
             // أصغر صورة مصغّرة تكفي للقائمة
             let thumbnail = e["thumbnails"]
@@ -189,7 +191,12 @@ pub fn parse_spotify_page(html: &str) -> Result<SpotifyList, AppError> {
     if entries.is_empty() {
         return Err(AppError::new("playlistEmpty"));
     }
-    Ok(SpotifyList { title, owner, thumbnail, entries })
+    Ok(SpotifyList {
+        title,
+        owner,
+        thumbnail,
+        entries,
+    })
 }
 
 // ======================= اسم مجلد القائمة =======================
@@ -261,7 +268,10 @@ mod tests {
         assert_eq!(l.title, "Hits");
         assert_eq!(l.entries.len(), 1);
         assert_eq!(l.entries[0].url, "https://music.youtube.com/search?q=Artist%2C+Other+Song#songs");
-        assert_eq!(music_search_url("عمرو"), "https://music.youtube.com/search?q=%D8%B9%D9%85%D8%B1%D9%88#songs");
+        assert_eq!(
+            music_search_url("عمرو"),
+            "https://music.youtube.com/search?q=%D8%B9%D9%85%D8%B1%D9%88#songs"
+        );
         assert_eq!(l.entries[0].duration, Some(198.84));
         assert!(parse_spotify_page("<html></html>").is_err());
     }

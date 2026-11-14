@@ -107,7 +107,11 @@ fn scheduled_path(app: &AppHandle) -> Result<PathBuf, AppError> {
 #[tauri::command]
 pub fn get_scheduled(app: AppHandle) -> Result<serde_json::Value, AppError> {
     let list: serde_json::Value = crate::persist::read_json(&scheduled_path(&app)?).or_default_logged("scheduled.json");
-    Ok(if list.is_array() { list } else { serde_json::Value::Array(Vec::new()) })
+    Ok(if list.is_array() {
+        list
+    } else {
+        serde_json::Value::Array(Vec::new())
+    })
 }
 
 #[tauri::command]

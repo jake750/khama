@@ -20,13 +20,25 @@ pub struct AppError {
 
 impl AppError {
     pub fn new(code: &'static str) -> Self {
-        Self { code, param: None, detail: None }
+        Self {
+            code,
+            param: None,
+            detail: None,
+        }
     }
     pub fn with_detail(code: &'static str, detail: impl Into<String>) -> Self {
-        Self { code, param: None, detail: Some(detail.into()) }
+        Self {
+            code,
+            param: None,
+            detail: Some(detail.into()),
+        }
     }
     pub fn with_param(code: &'static str, param: impl Into<String>, detail: impl Into<String>) -> Self {
-        Self { code, param: Some(param.into()), detail: Some(detail.into()) }
+        Self {
+            code,
+            param: Some(param.into()),
+            detail: Some(detail.into()),
+        }
     }
 }
 
@@ -49,17 +61,41 @@ impl From<std::io::Error> for AppError {
 /// كل قاعدة: إن احتوى نص الخطأ (بأحرف صغيرة) على إحدى العبارات، فهذا هو الرمز.
 /// الترتيب مهم: الأكثر تحديدًا أولًا.
 const RULES: &[(&[&str], &str)] = &[
-    (&["unsupported url", "is not a valid url", "no suitable extractor"], "unsupportedUrl"),
+    (
+        &["unsupported url", "is not a valid url", "no suitable extractor"],
+        "unsupportedUrl",
+    ),
     (&["drm"], "drm"),
     (&["private video", "this video is private"], "privateVideo"),
-    (&["confirm your age", "age-restricted", "inappropriate for some users"], "ageRestricted"),
+    (
+        &["confirm your age", "age-restricted", "inappropriate for some users"],
+        "ageRestricted",
+    ),
     (&["not a bot", "sign in to confirm"], "botCheck"),
-    (&["members-only", "join this channel", "requires payment", "premium", "subscriber"], "membersOnly"),
-    (&["login required", "log in", "login to", "requires authentication", "--cookies"], "loginRequired"),
+    (
+        &["members-only", "join this channel", "requires payment", "premium", "subscriber"],
+        "membersOnly",
+    ),
+    (
+        &["login required", "log in", "login to", "requires authentication", "--cookies"],
+        "loginRequired",
+    ),
     (&["not available in your country", "geo restrict", "geo-restrict"], "geoBlocked"),
-    (&["video unavailable", "has been removed", "no longer available", "does not exist", "http error 404"], "unavailable"),
+    (
+        &[
+            "video unavailable",
+            "has been removed",
+            "no longer available",
+            "does not exist",
+            "http error 404",
+        ],
+        "unavailable",
+    ),
     (&["live event will begin", "premieres in", "this live"], "live"),
-    (&["requested format is not available", "no video formats found"], "formatUnavailable"),
+    (
+        &["requested format is not available", "no video formats found"],
+        "formatUnavailable",
+    ),
     (&["http error 429", "too many requests", "rate-limit", "rate limit"], "rateLimited"),
     (&["http error 403", "forbidden"], "forbidden"),
     (
@@ -92,14 +128,27 @@ const RULES: &[(&[&str], &str)] = &[
     (&["permission denied", "access is denied", "errno 13"], "permission"),
     (&["no space left", "errno 28", "not enough space"], "diskFull"),
     (&["ffmpeg", "postprocessing", "conversion failed"], "postprocess"),
-    (&["unable to extract", "nsig", "signature", "player response", "please report this issue"], "extractorOutdated"),
+    (
+        &[
+            "unable to extract",
+            "nsig",
+            "signature",
+            "player response",
+            "please report this issue",
+        ],
+        "extractorOutdated",
+    ),
 ];
 
 /// يحوّل مخرجات الخطأ الخام من yt-dlp إلى رمز خطأ + التفاصيل.
 pub fn friendly_ytdlp_error(raw: &str) -> AppError {
     // نأخذ سطور ERROR تحديدًا إن وُجدت، فهي الأدق
     let error_lines: Vec<&str> = raw.lines().filter(|l| l.contains("ERROR")).collect();
-    let focus = if error_lines.is_empty() { raw.to_string() } else { error_lines.join("\n") };
+    let focus = if error_lines.is_empty() {
+        raw.to_string()
+    } else {
+        error_lines.join("\n")
+    };
     let lower = focus.to_lowercase();
 
     let code = RULES
@@ -123,7 +172,10 @@ mod tests {
 
     #[test]
     fn maps_unsupported_url() {
-        assert_eq!(friendly_ytdlp_error("ERROR: Unsupported URL: https://example.com/").code, "unsupportedUrl");
+        assert_eq!(
+            friendly_ytdlp_error("ERROR: Unsupported URL: https://example.com/").code,
+            "unsupportedUrl"
+        );
     }
 
     #[test]
@@ -134,7 +186,10 @@ mod tests {
 
     #[test]
     fn maps_bot_check() {
-        assert_eq!(friendly_ytdlp_error("ERROR: [youtube] x: Sign in to confirm you’re not a bot.").code, "botCheck");
+        assert_eq!(
+            friendly_ytdlp_error("ERROR: [youtube] x: Sign in to confirm you’re not a bot.").code,
+            "botCheck"
+        );
     }
 
     #[test]

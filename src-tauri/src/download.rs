@@ -146,7 +146,13 @@ pub fn output_template(user: &str, site_folders: bool, n: u64, today: &str) -> S
         .trim()
         .replace('%', "%%")
         .chars()
-        .map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') { '_' } else { c })
+        .map(|c| {
+            if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') {
+                '_'
+            } else {
+                c
+            }
+        })
         .collect();
     if !t.contains('{') {
         t = if t.is_empty() { "{title}".into() } else { format!("{t} {{title}}") };
@@ -429,7 +435,10 @@ pub(crate) async fn run_streaming(
         }
     };
     let stderr = err_task.await.unwrap_or_default();
-    Ok(RunOutcome::Exited { success: status.success(), stderr })
+    Ok(RunOutcome::Exited {
+        success: status.success(),
+        stderr,
+    })
 }
 
 // ======================= قراءة أسطر التقدّم =======================
@@ -565,7 +574,16 @@ async fn convert_for_editing(
     } else {
         // crf 18 = جودة شبه مطابقة للأصل. veryfast = توازن جيد بين السرعة والحجم.
         cmd.args([
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-fps_mode", "cfr",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            "yuv420p",
+            "-fps_mode",
+            "cfr",
         ]);
     }
     if check.audio_ok {
@@ -573,7 +591,8 @@ async fn convert_for_editing(
     } else {
         cmd.args(["-c:a", "aac", "-b:a", "320k"]);
     }
-    cmd.args(["-movflags", "+faststart", "-progress", "pipe:1", "-nostats"]).arg(&output);
+    cmd.args(["-movflags", "+faststart", "-progress", "pipe:1", "-nostats"])
+        .arg(&output);
 
     let duration = check.duration.unwrap_or(0.0);
     let mut last = Instant::now() - Duration::from_secs(1);
@@ -581,12 +600,15 @@ async fn convert_for_editing(
         if let Some(us) = line.strip_prefix("out_time_us=").and_then(num) {
             if duration > 0.0 && last.elapsed() >= Duration::from_millis(200) {
                 last = Instant::now();
-                emit(app, JobUpdate {
-                    id,
-                    state: "converting",
-                    percent: Some((us / 1e6 / duration * 100.0).clamp(0.0, 100.0)),
-                    ..Default::default()
-                });
+                emit(
+                    app,
+                    JobUpdate {
+                        id,
+                        state: "converting",
+                        percent: Some((us / 1e6 / duration * 100.0).clamp(0.0, 100.0)),
+                        ..Default::default()
+                    },
+                );
             }
         }
     })
@@ -594,10 +616,7 @@ async fn convert_for_editing(
     match outcome {
         RunOutcome::Canceled => Ok(None),
         RunOutcome::Exited { success: true, .. } => Ok(Some(output)),
-        RunOutcome::Exited { stderr, .. } => Err(AppError::with_detail(
-            "convertFailed",
-            tail(&stderr, 10),
-        )),
+        RunOutcome::Exited { stderr, .. } => Err(AppError::with_detail("convertFailed", tail(&stderr, 10))),
     }
 }
 
@@ -611,7 +630,11 @@ pub(crate) fn unique_path(dir: &Path, name: &str) -> PathBuf {
     }
     let path = Path::new(name);
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
-    let ext = path.extension().and_then(|s| s.to_str()).map(|e| format!(".{e}")).unwrap_or_default();
+    let ext = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|e| format!(".{e}"))
+        .unwrap_or_default();
     (1..)
         .map(|i| dir.join(format!("{stem} ({i}){ext}")))
         .find(|p| !p.exists())
@@ -623,9 +646,9 @@ async fn move_into(src: &Path, dir: &Path) -> Result<PathBuf, AppError> {
     let dest = unique_path(dir, name);
     // rename يفشل إن كان المجلدان على قرصين مختلفين، فننسخ ثم نحذف
     if tokio::fs::rename(src, &dest).await.is_err() {
-        tokio::fs::copy(src, &dest).await.map_err(|e| {
-            AppError::with_detail("moveFailed", e.to_string())
-        })?;
+        tokio::fs::copy(src, &dest)
+            .await
+            .map_err(|e| AppError::with_detail("moveFailed", e.to_string()))?;
         let _ = tokio::fs::remove_file(src).await;
     }
     Ok(dest)
@@ -668,9 +691,7 @@ async fn run_job(
             None => base,
         }
     };
-    std::fs::create_dir_all(&final_dir).map_err(|e| {
-        AppError::with_detail("outputDirCreate", e.to_string())
-    })?;
+    std::fs::create_dir_all(&final_dir).map_err(|e| AppError::with_detail("outputDirCreate", e.to_string()))?;
     let cookies = cookie_args(app, &settings);
     let user_tpl = &settings.filename_template;
     let n = if user_tpl.contains("{n}") { settings::next_counter(app) } else { 0 };
@@ -711,7 +732,14 @@ async fn run_job(
     }
 
     if join {
-        emit(app, JobUpdate { id, state: "processing", ..Default::default() });
+        emit(
+            app,
+            JobUpdate {
+                id,
+                state: "processing",
+                ..Default::default()
+            },
+        );
         let inputs: Vec<PathBuf> = files.iter().map(|(f, _, _)| f.clone()).collect();
         let Some(joined) = concat_files(&tools, &req, &inputs, &job_dir.join("joined"), cancel).await? else {
             return Ok(None);
@@ -823,7 +851,10 @@ async fn fetch_sidecars(
         }
     }
     files.sort();
-    Ok(Some(Sidecars { files, info: info.filter(|_| req.info_file) }))
+    Ok(Some(Sidecars {
+        files,
+        info: info.filter(|_| req.info_file),
+    }))
 }
 
 /// "اسم.mp4" ← "اسم"
@@ -845,7 +876,9 @@ fn info_text(info: &Value, sections: &[(f64, f64)]) -> String {
     line("Uploader", s("uploader").or(s("channel")).map(String::from));
     line(
         "Published",
-        s("upload_date").filter(|d| d.len() == 8).map(|d| format!("{}-{}-{}", &d[..4], &d[4..6], &d[6..])),
+        s("upload_date")
+            .filter(|d| d.len() == 8)
+            .map(|d| format!("{}-{}-{}", &d[..4], &d[4..6], &d[6..])),
     );
     line("Site", s("extractor_key").map(String::from));
     line("License", s("license").map(String::from));
@@ -956,7 +989,17 @@ async fn write_timeline(tools: &Tools, clips: &[(PathBuf, (f64, f64))]) -> Resul
     let f = first.to_string_lossy();
     let (_, out, _) = tools::run_capture(
         &tools.ffprobe,
-        &["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,r_frame_rate", "-of", "json", &f],
+        &[
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=width,height,r_frame_rate",
+            "-of",
+            "json",
+            &f,
+        ],
     )
     .await?;
     let j: Value = serde_json::from_str(&out).unwrap_or(Value::Null);
@@ -978,13 +1021,20 @@ async fn write_timeline(tools: &Tools, clips: &[(PathBuf, (f64, f64))]) -> Resul
 }
 
 fn xml_escape(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 /// مسار ملف بصيغة file:// (المسافات والرموز مرمّزة)
 fn file_url(p: &Path) -> String {
     let s = p.to_string_lossy().replace('\\', "/");
-    let mut out = String::from(if s.starts_with('/') { "file://localhost" } else { "file://localhost/" });
+    let mut out = String::from(if s.starts_with('/') {
+        "file://localhost"
+    } else {
+        "file://localhost/"
+    });
     for b in s.bytes() {
         match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' | b':' => out.push(b as char),
@@ -998,7 +1048,10 @@ pub fn timeline_xml(clips: &[(PathBuf, (f64, f64))], durations: &[f64], fps: f64
     // timebase عدد صحيح؛ 29.97 و 23.976 تُكتب 30 و 24 مع ntsc=TRUE
     let ntsc = (fps.round() - fps).abs() > 0.01;
     let tb = fps.round().max(1.0) as u64;
-    let rate = format!("<rate><timebase>{tb}</timebase><ntsc>{}</ntsc></rate>", if ntsc { "TRUE" } else { "FALSE" });
+    let rate = format!(
+        "<rate><timebase>{tb}</timebase><ntsc>{}</ntsc></rate>",
+        if ntsc { "TRUE" } else { "FALSE" }
+    );
     let frames = |sec: f64| (sec * fps).round() as u64;
     let mut video = String::new();
     let mut audio = String::new();
@@ -1046,7 +1099,15 @@ async fn fetch(
 ) -> Result<Option<(PathBuf, PathBuf)>, AppError> {
     let out_dir = dir.join("out");
     let mut cmd = tools::ytdlp_command(tools);
-    cmd.args(download_args(tools, cookies.to_vec(), req, opts, section, &out_dir, &dir.join("work")));
+    cmd.args(download_args(
+        tools,
+        cookies.to_vec(),
+        req,
+        opts,
+        section,
+        &out_dir,
+        &dir.join("work"),
+    ));
 
     let (i, n) = (part.0 as f64, part.1.max(1) as f64);
     let mut file: Option<PathBuf> = None;
@@ -1057,20 +1118,30 @@ async fn fetch(
                 // نحدّث الواجهة 5 مرات في الثانية كحد أقصى
                 if p.finished || last.elapsed() >= Duration::from_millis(200) {
                     last = Instant::now();
-                    emit(app, JobUpdate {
-                        id,
-                        state: "downloading",
-                        stage: Some(p.stage),
-                        percent: p.percent.map(|v| (i * 100.0 + v) / n),
-                        speed: p.speed,
-                        eta: p.eta,
-                        ..Default::default()
-                    });
+                    emit(
+                        app,
+                        JobUpdate {
+                            id,
+                            state: "downloading",
+                            stage: Some(p.stage),
+                            percent: p.percent.map(|v| (i * 100.0 + v) / n),
+                            speed: p.speed,
+                            eta: p.eta,
+                            ..Default::default()
+                        },
+                    );
                 }
             }
         } else if let Some(rest) = line.strip_prefix("KHAMA_PP ") {
             if rest.starts_with("started") && !rest.ends_with("MoveFiles") {
-                emit(app, JobUpdate { id, state: "processing", ..Default::default() });
+                emit(
+                    app,
+                    JobUpdate {
+                        id,
+                        state: "processing",
+                        ..Default::default()
+                    },
+                );
             }
         } else if let Some(path) = line.strip_prefix("KHAMA_FILE ") {
             file = Some(PathBuf::from(path.trim()));
@@ -1110,10 +1181,25 @@ async fn finish(
 ) -> Result<Option<PathBuf>, AppError> {
     // جاهز للمونتاج؟
     if req.kind == "video" && req.editor_ready && !req.original {
-        emit(app, JobUpdate { id, state: "processing", ..Default::default() });
+        emit(
+            app,
+            JobUpdate {
+                id,
+                state: "processing",
+                ..Default::default()
+            },
+        );
         let check = check_media(tools, &file).await?;
         if !(check.video_ok && check.audio_ok) {
-            emit(app, JobUpdate { id, state: "converting", percent: Some(0.0), ..Default::default() });
+            emit(
+                app,
+                JobUpdate {
+                    id,
+                    state: "converting",
+                    percent: Some(0.0),
+                    ..Default::default()
+                },
+            );
             match convert_for_editing(app, id, tools, &file, &dir.join("conv"), &check, cancel).await? {
                 Some(converted) => file = converted,
                 None => return Ok(None),
@@ -1128,15 +1214,39 @@ async fn finish(
         let sep_dir = dir.join("sep");
         std::fs::create_dir_all(&sep_dir)?;
         let stem = file.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-        let ext = file.extension().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "mp4".into());
+        let ext = file
+            .extension()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "mp4".into());
         let tag = if keep == separate::Keep::Voice { "no music" } else { "music only" };
         let out = sep_dir.join(format!("{stem} [{tag}].{ext}"));
-        emit(app, JobUpdate { id, state: "separating", ..Default::default() });
+        emit(
+            app,
+            JobUpdate {
+                id,
+                state: "separating",
+                ..Default::default()
+            },
+        );
         let _turn = tokio::select! {
             g = SEPARATING.lock() => g,
             _ = canceled(cancel) => return Ok(None),
         };
-        if !separate::process_file(app, id, tools, &file, &out, keep, None, None, duration, &dir.join("sepwork"), cancel).await? {
+        if !separate::process_file(
+            app,
+            id,
+            tools,
+            &file,
+            &out,
+            keep,
+            None,
+            None,
+            duration,
+            &dir.join("sepwork"),
+            cancel,
+        )
+        .await?
+        {
             return Ok(None);
         }
         file = out;
@@ -1169,7 +1279,10 @@ fn joined_name(first: &Path, count: usize) -> String {
         Some(i) if stem.ends_with(']') => &stem[..i],
         _ => stem.as_str(),
     };
-    let ext = first.extension().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "mp4".into());
+    let ext = first
+        .extension()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "mp4".into());
     format!("{base} [{count} clips].{ext}")
 }
 
@@ -1197,11 +1310,14 @@ async fn concat_files(
     let mut last_err = String::new();
     for reencode in [false, true] {
         let mut cmd = tools::command(&tools.ffmpeg);
-        cmd.args(["-hide_banner", "-nostdin", "-y", "-f", "concat", "-safe", "0", "-i"]).arg(&list);
+        cmd.args(["-hide_banner", "-nostdin", "-y", "-f", "concat", "-safe", "0", "-i"])
+            .arg(&list);
         if !reencode || is_wav {
             cmd.args(["-c", "copy"]);
         } else if req.kind == "video" {
-            cmd.args(["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "320k"]);
+            cmd.args([
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "320k",
+            ]);
         } else if output.extension().is_some_and(|e| e == "mp3") {
             cmd.args(["-c:a", "libmp3lame", "-q:a", "0"]);
         } else {
@@ -1247,7 +1363,14 @@ pub async fn start_download(
         let _slot = match slots.clone().try_acquire_owned() {
             Ok(p) => p,
             Err(_) => {
-                emit(&app2, JobUpdate { id, state: "queued", ..Default::default() });
+                emit(
+                    &app2,
+                    JobUpdate {
+                        id,
+                        state: "queued",
+                        ..Default::default()
+                    },
+                );
                 tokio::select! {
                     p = slots.acquire_owned() => p.expect("semaphore never closed"),
                     _ = canceled(&mut rx) => {
@@ -1258,7 +1381,14 @@ pub async fn start_download(
                 }
             }
         };
-        emit(&app2, JobUpdate { id, state: "starting", ..Default::default() });
+        emit(
+            &app2,
+            JobUpdate {
+                id,
+                state: "starting",
+                ..Default::default()
+            },
+        );
         let job_dir = jobs_root(&app2).map(|r| r.join(id.to_string()));
         let result = match &job_dir {
             Ok(dir) => run_job(&app2, id, req, settings, dir, &mut rx).await,
@@ -1273,9 +1403,22 @@ pub async fn start_download(
                 ..Default::default()
             },
             // إن فشل شيء بعد ضغط "إلغاء" فهو نتيجة الإلغاء، لا خطأ حقيقي
-            Ok(None) | Err(_) if *rx.borrow() => JobUpdate { id, state: "canceled", ..Default::default() },
-            Ok(None) => JobUpdate { id, state: "canceled", ..Default::default() },
-            Err(e) => JobUpdate { id, state: "error", error: Some(e), ..Default::default() },
+            Ok(None) | Err(_) if *rx.borrow() => JobUpdate {
+                id,
+                state: "canceled",
+                ..Default::default()
+            },
+            Ok(None) => JobUpdate {
+                id,
+                state: "canceled",
+                ..Default::default()
+            },
+            Err(e) => JobUpdate {
+                id,
+                state: "error",
+                error: Some(e),
+                ..Default::default()
+            },
         };
         if let Ok(dir) = job_dir {
             let _ = tokio::fs::remove_dir_all(dir).await;
@@ -1340,7 +1483,11 @@ pub fn sub_langs(j: &Value) -> Vec<SubLang> {
             if code == "live_chat" {
                 continue;
             }
-            out.push(SubLang { code: code.clone(), name: name_of(v, code), auto: false });
+            out.push(SubLang {
+                code: code.clone(),
+                name: name_of(v, code),
+                auto: false,
+            });
         }
     }
     if let Some(m) = j["automatic_captions"].as_object() {
@@ -1349,7 +1496,11 @@ pub fn sub_langs(j: &Value) -> Vec<SubLang> {
             let base = code.trim_end_matches("-orig");
             let useful = code.ends_with("-orig") || code == lang || code == "ar" || code == "en";
             if useful && !out.iter().any(|s| s.code == base || s.code.split('-').next() == Some(base)) {
-                out.push(SubLang { code: code.clone(), name: name_of(v, code), auto: true });
+                out.push(SubLang {
+                    code: code.clone(),
+                    name: name_of(v, code),
+                    auto: true,
+                });
             }
         }
     }
@@ -1424,8 +1575,7 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
     if !ok {
         return Err(friendly_ytdlp_error(&err));
     }
-    let j: Value = serde_json::from_str(&out)
-        .map_err(|e| AppError::with_detail("probeParse", e.to_string()))?;
+    let j: Value = serde_json::from_str(&out).map_err(|e| AppError::with_detail("probeParse", e.to_string()))?;
     if j["_type"].as_str() == Some("playlist") {
         let entries = playlist::entries_from_ytdlp(&j);
         if entries.is_empty() {
@@ -1442,7 +1592,9 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
             thumbnail,
             duration: None,
             uploader: j["uploader"].as_str().or(j["channel"].as_str()).map(String::from),
-            site: j["extractor_key"].as_str().map(|k| k.trim_end_matches("Tab").trim_end_matches("Set").to_string()),
+            site: j["extractor_key"]
+                .as_str()
+                .map(|k| k.trim_end_matches("Tab").trim_end_matches("Set").to_string()),
             heights: vec![],
             is_live: false,
             entries: Some(entries),
@@ -1491,7 +1643,13 @@ pub async fn save_thumbnail(app: AppHandle, settings: State<'_, SettingsState>, 
     a.extend(cookie_args(&app, &s));
     a.extend(["--skip-download", "--write-thumbnail", "--convert-thumbnails", "jpg", "-P"].map(String::from));
     a.push(work.to_string_lossy().into_owned());
-    a.extend(["-o".into(), "%(title).150B.%(ext)s".into(), "--windows-filenames".into(), "--".into(), url]);
+    a.extend([
+        "-o".into(),
+        "%(title).150B.%(ext)s".into(),
+        "--windows-filenames".into(),
+        "--".into(),
+        url,
+    ]);
     let args: Vec<&str> = a.iter().map(String::as_str).collect();
     let (ok, _, err) = tokio::time::timeout(Duration::from_secs(90), tools::run_ytdlp(&tools, &args))
         .await
@@ -1502,7 +1660,11 @@ pub async fn save_thumbnail(app: AppHandle, settings: State<'_, SettingsState>, 
         .find(|p| p.extension().is_some_and(|e| e == "jpg"));
     let Some(jpg) = jpg else {
         let _ = std::fs::remove_dir_all(&work);
-        return Err(if ok { AppError::new("noThumbnail") } else { friendly_ytdlp_error(&err) });
+        return Err(if ok {
+            AppError::new("noThumbnail")
+        } else {
+            friendly_ytdlp_error(&err)
+        });
     };
     #[cfg(mobile)]
     let dir = jobs_root(&app)?.join("ready");
@@ -1567,7 +1729,10 @@ mod tests {
         // نص بلا متغيرات: يُضاف العنوان بعده، والرموز الممنوعة تُستبدل
         assert_eq!(output_template("a/b 100%", false, 0, "x"), "a_b 100%% %(title).120B");
         assert_eq!(output_template("", false, 0, "x"), "%(title).120B");
-        assert_eq!(output_template("{today}_{title}", false, 0, "2026-11-10"), "2026-11-10_%(title).120B");
+        assert_eq!(
+            output_template("{today}_{title}", false, 0, "2026-11-10"),
+            "2026-11-10_%(title).120B"
+        );
     }
 
     #[test]
@@ -1590,7 +1755,10 @@ mod tests {
 
     #[test]
     fn timeline() {
-        let clips = vec![(PathBuf::from("C:/v/a b.mp4"), (0.0, 2.0)), (PathBuf::from("C:/v/c&d.mp4"), (5.0, 6.0))];
+        let clips = vec![
+            (PathBuf::from("C:/v/a b.mp4"), (0.0, 2.0)),
+            (PathBuf::from("C:/v/c&d.mp4"), (5.0, 6.0)),
+        ];
         let x = timeline_xml(&clips, &[2.0, 1.0], 29.97, 1920, 1080);
         assert!(x.contains("<timebase>30</timebase><ntsc>TRUE</ntsc>"));
         assert!(x.contains("<pathurl>file://localhost/C:/v/a%20b.mp4</pathurl>"));
@@ -1600,7 +1768,10 @@ mod tests {
 
     #[test]
     fn info_file_text() {
-        let j: Value = serde_json::from_str(r#"{"title":"T","webpage_url":"https://x","uploader":"U","upload_date":"20141110","extractor_key":"Youtube","license":"NA"}"#).unwrap();
+        let j: Value = serde_json::from_str(
+            r#"{"title":"T","webpage_url":"https://x","uploader":"U","upload_date":"20141110","extractor_key":"Youtube","license":"NA"}"#,
+        )
+        .unwrap();
         let t = info_text(&j, &[(1.0, 2.5)]);
         assert!(t.contains("Source: https://x\n"));
         assert!(t.contains("Published: 2014-11-10\n"));

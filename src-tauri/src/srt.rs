@@ -26,7 +26,13 @@ fn parse_ts(s: &str) -> Option<f64> {
 /// 75.5 ← "00:01:15,500"
 fn fmt_ts(sec: f64) -> String {
     let ms = (sec.max(0.0) * 1000.0).round() as u64;
-    format!("{:02}:{:02}:{:02},{:03}", ms / 3_600_000, ms / 60_000 % 60, ms / 1000 % 60, ms % 1000)
+    format!(
+        "{:02}:{:02}:{:02},{:03}",
+        ms / 3_600_000,
+        ms / 60_000 % 60,
+        ms / 1000 % 60,
+        ms % 1000
+    )
 }
 
 pub fn parse(content: &str) -> Vec<Cue> {
@@ -43,7 +49,9 @@ pub fn parse(content: &str) -> Vec<Cue> {
         let Some((a, b)) = timing.split_once("-->") else { continue };
         // قد يأتي بعد التوقيت إعدادات موضع (X1:... ) فنأخذ أول كلمة فقط
         let b = b.split_whitespace().next().unwrap_or("");
-        let (Some(start), Some(end)) = (parse_ts(a), parse_ts(b)) else { continue };
+        let (Some(start), Some(end)) = (parse_ts(a), parse_ts(b)) else {
+            continue;
+        };
         let text = lines.collect::<Vec<_>>().join("\n");
         if !text.trim().is_empty() {
             cues.push(Cue { start, end, text });
@@ -94,7 +102,14 @@ mod tests {
     fn parses_and_writes() {
         let c = parse(SAMPLE);
         assert_eq!(c.len(), 3);
-        assert_eq!(c[1], Cue { start: 5.5, end: 8.0, text: "World\nline 2".into() });
+        assert_eq!(
+            c[1],
+            Cue {
+                start: 5.5,
+                end: 8.0,
+                text: "World\nline 2".into()
+            }
+        );
         assert!(write(&c).starts_with("1\n00:00:01,000 --> 00:00:04,000\nHello\n\n2\n"));
     }
 

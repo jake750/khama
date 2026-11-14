@@ -89,7 +89,8 @@ pub struct MediaInfo {
 
 fn rotation_of(s: &Value) -> i64 {
     let from_side = s["side_data_list"].as_array().and_then(|l| {
-        l.iter().find_map(|d| d["rotation"].as_f64().or_else(|| d["rotation"].as_str().and_then(num)))
+        l.iter()
+            .find_map(|d| d["rotation"].as_f64().or_else(|| d["rotation"].as_str().and_then(num)))
     });
     let from_tag = s["tags"]["rotate"].as_str().and_then(num);
     (from_side.or(from_tag).unwrap_or(0.0).round() as i64).rem_euclid(360)
@@ -116,7 +117,13 @@ pub fn parse_probe(path: &Path, size: u64, j: &Value) -> MediaInfo {
                 let bit_depth = s["bits_per_raw_sample"]
                     .as_str()
                     .and_then(|b| b.parse().ok())
-                    .unwrap_or(if pix.contains("10") { 10 } else if pix.contains("12") { 12 } else { 8 });
+                    .unwrap_or(if pix.contains("10") {
+                        10
+                    } else if pix.contains("12") {
+                        12
+                    } else {
+                        8
+                    });
                 let transfer = s["color_transfer"].as_str().unwrap_or("");
                 let field = s["field_order"].as_str().unwrap_or("progressive");
                 let (mut w, mut h) = (s["width"].as_u64().unwrap_or(0) as u32, s["height"].as_u64().unwrap_or(0) as u32);
@@ -192,11 +199,7 @@ async fn probe_file(tools: &Tools, path: &Path) -> Result<MediaInfo, AppError> {
         .await
         .map_err(|e| AppError::with_detail("badInput", e.to_string()))?;
     let p = path.to_string_lossy();
-    let (ok, out, err) = tools::run_capture(
-        &tools.ffprobe,
-        &["-v", "error", "-show_format", "-show_streams", "-of", "json", &p],
-    )
-    .await?;
+    let (ok, out, err) = tools::run_capture(&tools.ffprobe, &["-v", "error", "-show_format", "-show_streams", "-of", "json", &p]).await?;
     if !ok {
         return Err(AppError::with_detail("badInput", tail(&err, 6)));
     }
@@ -215,12 +218,28 @@ async fn thumbnail(tools: &Tools, path: &Path, duration: Option<f64>) -> Option<
     let out = tools::command(&tools.ffmpeg)
         .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-ss", &format!("{at:.2}"), "-i"])
         .arg(path)
-        .args(["-frames:v", "1", "-vf", "scale=320:-2", "-f", "image2pipe", "-c:v", "mjpeg", "-q:v", "4", "-"])
+        .args([
+            "-frames:v",
+            "1",
+            "-vf",
+            "scale=320:-2",
+            "-f",
+            "image2pipe",
+            "-c:v",
+            "mjpeg",
+            "-q:v",
+            "4",
+            "-",
+        ])
         .output()
         .await
         .ok()?;
-    (out.status.success() && !out.stdout.is_empty())
-        .then(|| format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(&out.stdout)))
+    (out.status.success() && !out.stdout.is_empty()).then(|| {
+        format!(
+            "data:image/jpeg;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(&out.stdout)
+        )
+    })
 }
 
 #[tauri::command]
@@ -260,8 +279,21 @@ async fn detect_hw(tools: &Tools) -> Vec<String> {
         let out = dir.join(format!("{enc}.mp4"));
         let ok = tools::command(&tools.ffmpeg)
             .args([
-                "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-f", "lavfi", "-i", "testsrc2=s=320x240:r=30:d=0.5",
-                "-pix_fmt", fmt, "-c:v", enc, "-b:v", "1M",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-nostdin",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=s=320x240:r=30:d=0.5",
+                "-pix_fmt",
+                fmt,
+                "-c:v",
+                enc,
+                "-b:v",
+                "1M",
             ])
             .arg(&out)
             .output();
@@ -279,7 +311,18 @@ async fn detect_hw(tools: &Tools) -> Vec<String> {
 /// عدد إطارات الفيديو المرمّزة في ملف (0 = لا فيديو)
 async fn video_packets(tools: &Tools, file: &Path) -> u64 {
     let f = file.to_string_lossy();
-    let args = ["-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", &f];
+    let args = [
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-count_packets",
+        "-show_entries",
+        "stream=nb_read_packets",
+        "-of",
+        "csv=p=0",
+        &f,
+    ];
     match tools::run_capture(&tools.ffprobe, &args).await {
         Ok((true, out, _)) => out.trim().parse().unwrap_or(0),
         _ => 0,
@@ -327,43 +370,208 @@ pub struct Preset {
 
 const PRESETS: &[Preset] = &[
     // للمونتاج
-    Preset { id: "edit_h264", kind: PKind::Video, ext: "mp4", suffix: "edit" },
-    Preset { id: "prores_proxy", kind: PKind::Video, ext: "mov", suffix: "ProRes Proxy" },
-    Preset { id: "prores_lt", kind: PKind::Video, ext: "mov", suffix: "ProRes LT" },
-    Preset { id: "prores_422", kind: PKind::Video, ext: "mov", suffix: "ProRes 422" },
-    Preset { id: "prores_hq", kind: PKind::Video, ext: "mov", suffix: "ProRes HQ" },
-    Preset { id: "prores_4444", kind: PKind::Video, ext: "mov", suffix: "ProRes 4444" },
-    Preset { id: "dnxhr_lb", kind: PKind::Video, ext: "mov", suffix: "DNxHR LB" },
-    Preset { id: "dnxhr_sq", kind: PKind::Video, ext: "mov", suffix: "DNxHR SQ" },
-    Preset { id: "dnxhr_hq", kind: PKind::Video, ext: "mov", suffix: "DNxHR HQ" },
-    Preset { id: "dnxhr_hqx", kind: PKind::Video, ext: "mov", suffix: "DNxHR HQX" },
-    Preset { id: "proxy", kind: PKind::Video, ext: "mp4", suffix: "proxy" },
+    Preset {
+        id: "edit_h264",
+        kind: PKind::Video,
+        ext: "mp4",
+        suffix: "edit",
+    },
+    Preset {
+        id: "prores_proxy",
+        kind: PKind::Video,
+        ext: "mov",
+        suffix: "ProRes Proxy",
+    },
+    Preset {
+        id: "prores_lt",
+        kind: PKind::Video,
+        ext: "mov",
+        suffix: "ProRes LT",
+    },
+    Preset {
+        id: "prores_422",
+        kind: PKind::Video,
+        ext: "mov",
+        suffix: "ProRes 422",
+    },
+    Preset {
+        id: "prores_hq",
+        kind: PKind::Video,
+        ext: "mov",
+        suffix: "ProRes HQ",
+    },
+    Preset {
+        id: "prores_4444",
+        kind: PKind::Video,
+        ext: "mov",
+        suffix: "ProRes 4444",
+    },
+    Preset {
+        id: "dnxhr_lb",
+        kind: PKind::Video,
+        ext: "mov",
+        suffix: "DNxHR LB",
+    },
+    Preset {
+        id: "dnxhr_sq",
+        kind: PKind::Video,
+        ext: "mov",
+        suffix: "DNxHR SQ",
+    },
+    Preset {
+        id: "dnxhr_hq",
+        kind: PKind::Video,
+        ext: "mov",
+        suffix: "DNxHR HQ",
+    },
+    Preset {
+        id: "dnxhr_hqx",
+        kind: PKind::Video,
+        ext: "mov",
+        suffix: "DNxHR HQX",
+    },
+    Preset {
+        id: "proxy",
+        kind: PKind::Video,
+        ext: "mp4",
+        suffix: "proxy",
+    },
     // للنشر
-    Preset { id: "youtube", kind: PKind::Video, ext: "mp4", suffix: "YouTube" },
-    Preset { id: "vertical", kind: PKind::Video, ext: "mp4", suffix: "vertical" },
-    Preset { id: "whatsapp", kind: PKind::Video, ext: "mp4", suffix: "small" },
-    Preset { id: "h265", kind: PKind::Video, ext: "mp4", suffix: "H265" },
-    Preset { id: "av1", kind: PKind::Video, ext: "mp4", suffix: "AV1" },
-    Preset { id: "webm", kind: PKind::Video, ext: "webm", suffix: "VP9" },
-    Preset { id: "gif", kind: PKind::Gif, ext: "gif", suffix: "gif" },
+    Preset {
+        id: "youtube",
+        kind: PKind::Video,
+        ext: "mp4",
+        suffix: "YouTube",
+    },
+    Preset {
+        id: "vertical",
+        kind: PKind::Video,
+        ext: "mp4",
+        suffix: "vertical",
+    },
+    Preset {
+        id: "whatsapp",
+        kind: PKind::Video,
+        ext: "mp4",
+        suffix: "small",
+    },
+    Preset {
+        id: "h265",
+        kind: PKind::Video,
+        ext: "mp4",
+        suffix: "H265",
+    },
+    Preset {
+        id: "av1",
+        kind: PKind::Video,
+        ext: "mp4",
+        suffix: "AV1",
+    },
+    Preset {
+        id: "webm",
+        kind: PKind::Video,
+        ext: "webm",
+        suffix: "VP9",
+    },
+    Preset {
+        id: "gif",
+        kind: PKind::Gif,
+        ext: "gif",
+        suffix: "gif",
+    },
     // صوت
-    Preset { id: "wav", kind: PKind::Audio, ext: "wav", suffix: "audio" },
-    Preset { id: "mp3", kind: PKind::Audio, ext: "mp3", suffix: "audio" },
-    Preset { id: "aac", kind: PKind::Audio, ext: "m4a", suffix: "audio" },
-    Preset { id: "flac", kind: PKind::Audio, ext: "flac", suffix: "audio" },
-    Preset { id: "opus", kind: PKind::Audio, ext: "opus", suffix: "audio" },
+    Preset {
+        id: "wav",
+        kind: PKind::Audio,
+        ext: "wav",
+        suffix: "audio",
+    },
+    Preset {
+        id: "mp3",
+        kind: PKind::Audio,
+        ext: "mp3",
+        suffix: "audio",
+    },
+    Preset {
+        id: "aac",
+        kind: PKind::Audio,
+        ext: "m4a",
+        suffix: "audio",
+    },
+    Preset {
+        id: "flac",
+        kind: PKind::Audio,
+        ext: "flac",
+        suffix: "audio",
+    },
+    Preset {
+        id: "opus",
+        kind: PKind::Audio,
+        ext: "opus",
+        suffix: "audio",
+    },
     // ext هنا افتراضي: الفيديو يبقى بحاويته، والصوت يخرج WAV
-    Preset { id: "stem_voice", kind: PKind::Stems, ext: "wav", suffix: "no music" },
-    Preset { id: "stem_music", kind: PKind::Stems, ext: "wav", suffix: "music only" },
+    Preset {
+        id: "stem_voice",
+        kind: PKind::Stems,
+        ext: "wav",
+        suffix: "no music",
+    },
+    Preset {
+        id: "stem_music",
+        kind: PKind::Stems,
+        ext: "wav",
+        suffix: "music only",
+    },
     // أدوات
-    Preset { id: "rewrap_mp4", kind: PKind::Copy, ext: "mp4", suffix: "rewrap" },
-    Preset { id: "rewrap_mov", kind: PKind::Copy, ext: "mov", suffix: "rewrap" },
-    Preset { id: "rewrap_mkv", kind: PKind::Copy, ext: "mkv", suffix: "rewrap" },
-    Preset { id: "frame_png", kind: PKind::Frame, ext: "png", suffix: "frame" },
-    Preset { id: "sequence_png", kind: PKind::Sequence, ext: "png", suffix: "frames" },
-    Preset { id: "detect_scenes", kind: PKind::Detect, ext: "", suffix: "" },
-    Preset { id: "detect_black", kind: PKind::Detect, ext: "", suffix: "" },
-    Preset { id: "detect_silence", kind: PKind::Detect, ext: "", suffix: "" },
+    Preset {
+        id: "rewrap_mp4",
+        kind: PKind::Copy,
+        ext: "mp4",
+        suffix: "rewrap",
+    },
+    Preset {
+        id: "rewrap_mov",
+        kind: PKind::Copy,
+        ext: "mov",
+        suffix: "rewrap",
+    },
+    Preset {
+        id: "rewrap_mkv",
+        kind: PKind::Copy,
+        ext: "mkv",
+        suffix: "rewrap",
+    },
+    Preset {
+        id: "frame_png",
+        kind: PKind::Frame,
+        ext: "png",
+        suffix: "frame",
+    },
+    Preset {
+        id: "sequence_png",
+        kind: PKind::Sequence,
+        ext: "png",
+        suffix: "frames",
+    },
+    Preset {
+        id: "detect_scenes",
+        kind: PKind::Detect,
+        ext: "",
+        suffix: "",
+    },
+    Preset {
+        id: "detect_black",
+        kind: PKind::Detect,
+        ext: "",
+        suffix: "",
+    },
+    Preset {
+        id: "detect_silence",
+        kind: PKind::Detect,
+        ext: "",
+        suffix: "",
+    },
 ];
 
 pub fn preset(id: &str) -> Option<Preset> {
@@ -497,11 +705,23 @@ fn atempo_chain(speed: f64) -> Vec<String> {
 /// مسار خط للتايم كود المحروق (خط بعرض ثابت من النظام)
 fn timecode_font() -> Option<String> {
     let candidates: &[&str] = if cfg!(windows) {
-        &["C:/Windows/Fonts/consola.ttf", "C:/Windows/Fonts/cour.ttf", "C:/Windows/Fonts/arial.ttf"]
+        &[
+            "C:/Windows/Fonts/consola.ttf",
+            "C:/Windows/Fonts/cour.ttf",
+            "C:/Windows/Fonts/arial.ttf",
+        ]
     } else if cfg!(target_os = "android") {
-        &["/system/fonts/DroidSansMono.ttf", "/system/fonts/CutiveMono.ttf", "/system/fonts/Roboto-Regular.ttf"]
+        &[
+            "/system/fonts/DroidSansMono.ttf",
+            "/system/fonts/CutiveMono.ttf",
+            "/system/fonts/Roboto-Regular.ttf",
+        ]
     } else if cfg!(target_os = "macos") {
-        &["/System/Library/Fonts/Menlo.ttc", "/System/Library/Fonts/Monaco.ttf", "/Library/Fonts/Arial.ttf"]
+        &[
+            "/System/Library/Fonts/Menlo.ttc",
+            "/System/Library/Fonts/Monaco.ttf",
+            "/Library/Fonts/Arial.ttf",
+        ]
     } else {
         &[
             "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
@@ -541,7 +761,9 @@ pub fn output_dims(w: u32, h: u32, o: &ConvertOptions, default_short: Option<u32
 /// إعدادات المشفّر لكل Preset
 /// مشفّر الهاتف لا يفهم CRF: نحسب معدّل بت يقابله من المقاس وعدد الإطارات
 fn mediacodec_bitrate(src: Option<&VideoInfo>, o: &ConvertOptions, crf: u32) -> u64 {
-    let (w, h, fps) = src.map(|v| (v.width, v.height, v.fps.unwrap_or(30.0))).unwrap_or((1920, 1080, 30.0));
+    let (w, h, fps) = src
+        .map(|v| (v.width, v.height, v.fps.unwrap_or(30.0)))
+        .unwrap_or((1920, 1080, 30.0));
     let (w, h) = output_dims(w, h, o, None);
     // بت لكل بكسل: أعلى جودة ← رقم أكبر
     let bpp = match crf {
@@ -566,26 +788,69 @@ fn codec_args(p: &Preset, o: &ConvertOptions, hw: &[String], src: Option<&VideoI
     let avc_hevc = |family: &str, crf: u32| -> Vec<String> {
         let hw_enc = o.hw.then(|| hw.iter().find(|e| e.starts_with(&format!("{family}_")))).flatten();
         let mut a: Vec<String> = match hw_enc.map(String::as_str) {
-            Some(e) if e.ends_with("_nvenc") => {
-                s(&["-c:v", e, "-preset", "p5", "-rc", "vbr", "-cq", &(crf + 1).to_string(), "-b:v", "0", "-pix_fmt", "yuv420p"])
-            }
-            Some(e) if e.ends_with("_qsv") => {
-                s(&["-c:v", e, "-preset", "medium", "-global_quality", &(crf + 1).to_string(), "-pix_fmt", "nv12"])
-            }
+            Some(e) if e.ends_with("_nvenc") => s(&[
+                "-c:v",
+                e,
+                "-preset",
+                "p5",
+                "-rc",
+                "vbr",
+                "-cq",
+                &(crf + 1).to_string(),
+                "-b:v",
+                "0",
+                "-pix_fmt",
+                "yuv420p",
+            ]),
+            Some(e) if e.ends_with("_qsv") => s(&[
+                "-c:v",
+                e,
+                "-preset",
+                "medium",
+                "-global_quality",
+                &(crf + 1).to_string(),
+                "-pix_fmt",
+                "nv12",
+            ]),
             Some(e) if e.ends_with("_amf") => {
                 let qp = (crf + 1).to_string();
-                s(&["-c:v", e, "-rc", "cqp", "-qp_i", &qp, "-qp_p", &qp, "-qp_b", &qp, "-pix_fmt", "yuv420p"])
+                s(&[
+                    "-c:v", e, "-rc", "cqp", "-qp_i", &qp, "-qp_p", &qp, "-qp_b", &qp, "-pix_fmt", "yuv420p",
+                ])
             }
-            Some(e) if e.ends_with("_mediacodec") => {
-                s(&["-c:v", e, "-b:v", &mediacodec_bitrate(src, o, crf).to_string(), "-pix_fmt", "yuv420p"])
-            }
+            Some(e) if e.ends_with("_mediacodec") => s(&[
+                "-c:v",
+                e,
+                "-b:v",
+                &mediacodec_bitrate(src, o, crf).to_string(),
+                "-pix_fmt",
+                "yuv420p",
+            ]),
             Some(e) if e.ends_with("_videotoolbox") => {
                 // مقياس جودة VideoToolbox من 1 إلى 100
                 let vq = 100 - (crf * 2).min(90);
                 s(&["-c:v", e, "-q:v", &vq.to_string(), "-pix_fmt", "yuv420p"])
             }
-            _ if family == "hevc" => s(&["-c:v", "libx265", "-preset", "fast", "-crf", &crf.to_string(), "-pix_fmt", "yuv420p"]),
-            _ => s(&["-c:v", "libx264", "-preset", "fast", "-crf", &crf.to_string(), "-pix_fmt", "yuv420p"]),
+            _ if family == "hevc" => s(&[
+                "-c:v",
+                "libx265",
+                "-preset",
+                "fast",
+                "-crf",
+                &crf.to_string(),
+                "-pix_fmt",
+                "yuv420p",
+            ]),
+            _ => s(&[
+                "-c:v",
+                "libx264",
+                "-preset",
+                "fast",
+                "-crf",
+                &crf.to_string(),
+                "-pix_fmt",
+                "yuv420p",
+            ]),
         };
         if family == "hevc" {
             // hvc1 = حتى تفتحه أجهزة Apple
@@ -605,13 +870,38 @@ fn codec_args(p: &Preset, o: &ConvertOptions, hw: &[String], src: Option<&VideoI
         "whatsapp" => [avc_hevc("h264", pick(23, 26, 30)), aac(128)].concat(),
         "h265" => [avc_hevc("hevc", pick(19, 23, 28)), aac(256)].concat(),
         "av1" => [
-            s(&["-c:v", "libsvtav1", "-preset", "8", "-crf", &pick(24, 32, 40).to_string(), "-pix_fmt", "yuv420p"]),
+            s(&[
+                "-c:v",
+                "libsvtav1",
+                "-preset",
+                "8",
+                "-crf",
+                &pick(24, 32, 40).to_string(),
+                "-pix_fmt",
+                "yuv420p",
+            ]),
             aac(256),
         ]
         .concat(),
         "webm" => s(&[
-            "-c:v", "libvpx-vp9", "-crf", &pick(24, 32, 40).to_string(), "-b:v", "0", "-row-mt", "1", "-deadline", "good",
-            "-cpu-used", "4", "-pix_fmt", "yuv420p", "-c:a", "libopus", "-b:a", "160k",
+            "-c:v",
+            "libvpx-vp9",
+            "-crf",
+            &pick(24, 32, 40).to_string(),
+            "-b:v",
+            "0",
+            "-row-mt",
+            "1",
+            "-deadline",
+            "good",
+            "-cpu-used",
+            "4",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "libopus",
+            "-b:a",
+            "160k",
         ]),
         id if id.starts_with("prores_") => {
             let (profile, pix) = match id {
@@ -621,7 +911,11 @@ fn codec_args(p: &Preset, o: &ConvertOptions, hw: &[String], src: Option<&VideoI
                 "prores_hq" => ("3", "yuv422p10le"),
                 _ => ("4", "yuva444p10le"),
             };
-            [s(&["-c:v", "prores_ks", "-profile:v", profile, "-vendor", "apl0", "-pix_fmt", pix]), pcm()].concat()
+            [
+                s(&["-c:v", "prores_ks", "-profile:v", profile, "-vendor", "apl0", "-pix_fmt", pix]),
+                pcm(),
+            ]
+            .concat()
         }
         id if id.starts_with("dnxhr_") => {
             let profile = &id[..];
@@ -662,10 +956,7 @@ fn video_filters(p: &Preset, o: &ConvertOptions, v: &VideoInfo, keep_ts: bool) -
         f.push("bwdif=mode=send_frame:deint=interlaced".to_string());
     }
     if o.tonemap && v.hdr {
-        f.push(
-            "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv"
-                .to_string(),
-        );
+        f.push("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv".to_string());
     }
     if o.lut.is_some() {
         // نسخنا ملف LUT إلى مجلد العمل باسم بسيط، فلا نحتاج تهريب المسار
@@ -689,12 +980,7 @@ fn video_filters(p: &Preset, o: &ConvertOptions, v: &VideoInfo, keep_ts: bool) -
         _ => {}
     }
     let (ow, oh) = output_dims(v.width, v.height, o, default_short(p));
-    let (cw, ch) = output_dims(
-        v.width,
-        v.height,
-        &ConvertOptions { size: None, ..o.clone() },
-        None,
-    );
+    let (cw, ch) = output_dims(v.width, v.height, &ConvertOptions { size: None, ..o.clone() }, None);
     if (ow, oh) != (cw, ch) || ow % 2 == 1 || oh % 2 == 1 || v.width % 2 == 1 || v.height % 2 == 1 {
         f.push(format!("scale={ow}:{oh}:flags=lanczos"));
     }
@@ -720,7 +1006,13 @@ fn video_filters(p: &Preset, o: &ConvertOptions, v: &VideoInfo, keep_ts: bool) -
 
 fn sub_ext(path: &str) -> &'static str {
     let l = path.to_lowercase();
-    if l.ends_with(".ass") || l.ends_with(".ssa") { "ass" } else if l.ends_with(".vtt") { "vtt" } else { "srt" }
+    if l.ends_with(".ass") || l.ends_with(".ssa") {
+        "ass"
+    } else if l.ends_with(".vtt") {
+        "vtt"
+    } else {
+        "srt"
+    }
 }
 
 fn overlay_pos(pos: Option<&str>) -> &'static str {
@@ -817,7 +1109,14 @@ pub fn build_plan(
     if merging && !o.mute && replace_idx.is_none() {
         for (i, info) in infos.iter().enumerate() {
             if info.audio.is_empty() {
-                a.extend(s(&["-f", "lavfi", "-t", &format!("{:.3}", info.duration.unwrap_or(1.0)), "-i", "anullsrc=r=48000:cl=stereo"]));
+                a.extend(s(&[
+                    "-f",
+                    "lavfi",
+                    "-t",
+                    &format!("{:.3}", info.duration.unwrap_or(1.0)),
+                    "-i",
+                    "anullsrc=r=48000:cl=stereo",
+                ]));
                 silent_idx[i] = Some(next_input);
                 next_input += 1;
             }
@@ -839,7 +1138,16 @@ pub fn build_plan(
         if merging {
             return Err(AppError::new("mergeCopy"));
         }
-        a.extend(s(&["-map", "0:v?", "-map", "0:a?", "-c", "copy", "-avoid_negative_ts", "make_zero"]));
+        a.extend(s(&[
+            "-map",
+            "0:v?",
+            "-map",
+            "0:a?",
+            "-c",
+            "copy",
+            "-avoid_negative_ts",
+            "make_zero",
+        ]));
         if o.mute {
             a.push("-an".into());
         }
@@ -849,7 +1157,10 @@ pub fn build_plan(
         push_split(&mut a, o, false);
         a.extend(s(&["-progress", "pipe:1", "-nostats"]));
         a.push(output.to_string_lossy().into_owned());
-        return Ok(Plan { args: a, duration: span.max(0.0) });
+        return Ok(Plan {
+            args: a,
+            duration: span.max(0.0),
+        });
     }
 
     let codec = codec_args(p, o, hw, first.video.as_ref());
@@ -1047,14 +1358,20 @@ pub fn detect_args(kind: &str, input: &str, o: &ConvertOptions) -> Vec<String> {
     a.extend(["-copyts".into(), "-i".into(), input.to_string()]);
     match kind {
         "detect_silence" => a.extend(
-            ["-map", "0:a:0", "-af", "silencedetect=n=-40dB:d=0.6"].iter().map(|s| s.to_string()),
+            ["-map", "0:a:0", "-af", "silencedetect=n=-40dB:d=0.6"]
+                .iter()
+                .map(|s| s.to_string()),
         ),
         "detect_black" => a.extend(
-            ["-map", "0:v:0", "-vf", "blackdetect=d=0.3:pix_th=0.10"].iter().map(|s| s.to_string()),
+            ["-map", "0:v:0", "-vf", "blackdetect=d=0.3:pix_th=0.10"]
+                .iter()
+                .map(|s| s.to_string()),
         ),
         // تصغير الصورة قبل التحليل = أسرع بكثير وبنفس الدقة تقريبًا
         _ => a.extend(
-            ["-map", "0:v:0", "-vf", "scale=320:-2,select='gt(scene,0.32)',showinfo"].iter().map(|s| s.to_string()),
+            ["-map", "0:v:0", "-vf", "scale=320:-2,select='gt(scene,0.32)',showinfo"]
+                .iter()
+                .map(|s| s.to_string()),
         ),
     }
     a.extend(["-progress", "pipe:1", "-nostats", "-f", "null", "-"].iter().map(|s| s.to_string()));
@@ -1064,7 +1381,9 @@ pub fn detect_args(kind: &str, input: &str, o: &ConvertOptions) -> Vec<String> {
 fn field_after(line: &str, key: &str) -> Option<f64> {
     let i = line.find(key)? + key.len();
     let rest = line[i..].trim_start();
-    let end = rest.find(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-')).unwrap_or(rest.len());
+    let end = rest
+        .find(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-'))
+        .unwrap_or(rest.len());
     num(&rest[..end])
 }
 
@@ -1159,13 +1478,16 @@ async fn run_ffmpeg(
             if duration > 0.0 && last.elapsed() >= Duration::from_millis(250) {
                 last = Instant::now();
                 let done = (us / 1e6).max(0.0);
-                emit(app, JobUpdate {
-                    id,
-                    state,
-                    percent: Some((done / duration * 100.0).clamp(0.0, 100.0)),
-                    eta: speed.map(|s| ((duration - done) / s).max(0.0)),
-                    ..Default::default()
-                });
+                emit(
+                    app,
+                    JobUpdate {
+                        id,
+                        state,
+                        percent: Some((done / duration * 100.0).clamp(0.0, 100.0)),
+                        eta: speed.map(|s| ((duration - done) / s).max(0.0)),
+                        ..Default::default()
+                    },
+                );
             }
         }
     })
@@ -1190,7 +1512,14 @@ async fn run_convert(
     }
     let tools = tools::resolve(app)?;
 
-    emit(app, JobUpdate { id, state: "analyzing", ..Default::default() });
+    emit(
+        app,
+        JobUpdate {
+            id,
+            state: "analyzing",
+            ..Default::default()
+        },
+    );
     let mut infos = Vec::new();
     for i in &req.inputs {
         infos.push(probe_file(&tools, Path::new(i)).await?);
@@ -1235,17 +1564,41 @@ async fn run_convert(
         }
         let src_ext = first_path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
         let ext = if info.video.is_some() {
-            if matches!(src_ext.as_str(), "mp4" | "mov" | "mkv" | "webm") { src_ext.as_str() } else { "mp4" }
+            if matches!(src_ext.as_str(), "mp4" | "mov" | "mkv" | "webm") {
+                src_ext.as_str()
+            } else {
+                "mp4"
+            }
         } else {
             "wav"
         };
-        let keep = if p.id == "stem_music" { separate::Keep::Music } else { separate::Keep::Voice };
+        let keep = if p.id == "stem_music" {
+            separate::Keep::Music
+        } else {
+            separate::Keep::Voice
+        };
         let dir = output_dir_for(app, o, &first_path)?;
         std::fs::create_dir_all(&dir).map_err(|e| AppError::with_detail("outputDirCreate", e.to_string()))?;
-        let stem = first_path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "file".into());
+        let stem = first_path
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "file".into());
         let temp = dir.join(format!(".khama-{id}-part.{ext}"));
         let start = o.start.filter(|v| *v > 0.0);
-        let ok = separate::process_file(app, id, &tools, &first_path, &temp, keep, start, o.end, info.duration, &work, cancel).await;
+        let ok = separate::process_file(
+            app,
+            id,
+            &tools,
+            &first_path,
+            &temp,
+            keep,
+            start,
+            o.end,
+            info.duration,
+            &work,
+            cancel,
+        )
+        .await;
         match ok {
             Ok(true) => {}
             Ok(false) => {
@@ -1268,7 +1621,10 @@ async fn run_convert(
     let mut loudnorm = None;
     if let Some(target) = o.loudness.filter(|_| matches!(p.kind, PKind::Video | PKind::Audio) && !o.mute) {
         let base = format!("loudnorm=I={target:.1}:TP=-1.5:LRA=11");
-        let mut measure = ConvertOptions { split_at: vec![], ..o.clone() };
+        let mut measure = ConvertOptions {
+            split_at: vec![],
+            ..o.clone()
+        };
         measure.subtitles = None;
         measure.timecode = false;
         let probe_plan = build_plan(
@@ -1283,7 +1639,15 @@ async fn run_convert(
         // نستبدل الناتج بـ "لا شيء": نريد القياس فقط
         args.pop();
         args.extend(["-f", "null", "-"].iter().map(|s| s.to_string()));
-        emit(app, JobUpdate { id, state: "analyzing", percent: Some(0.0), ..Default::default() });
+        emit(
+            app,
+            JobUpdate {
+                id,
+                state: "analyzing",
+                percent: Some(0.0),
+                ..Default::default()
+            },
+        );
         let Some(log) = run_ffmpeg(app, id, &tools, &args, &work, probe_plan.duration, "analyzing", cancel).await? else {
             return Ok(None);
         };
@@ -1294,7 +1658,10 @@ async fn run_convert(
     // ---- مكان الناتج ----
     let dir = output_dir_for(app, o, &first_path)?;
     std::fs::create_dir_all(&dir).map_err(|e| AppError::with_detail("outputDirCreate", e.to_string()))?;
-    let stem = first_path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "file".into());
+    let stem = first_path
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "file".into());
     let stem = if infos.len() > 1 { format!("{stem} merged") } else { stem };
     let folder_out = p.kind == PKind::Sequence || !o.split_at.is_empty();
     let final_name = if folder_out {
@@ -1303,17 +1670,32 @@ async fn run_convert(
         format!("{stem} [{}].{}", p.suffix, p.ext)
     };
     // نكتب باسم مخفي مؤقت في نفس المجلد، ثم نعيد التسمية (لحظية) عند النجاح
-    let temp = dir.join(format!(".khama-{id}-part{}", if folder_out { String::new() } else { format!(".{}", p.ext) }));
+    let temp = dir.join(format!(
+        ".khama-{id}-part{}",
+        if folder_out { String::new() } else { format!(".{}", p.ext) }
+    ));
     let target = if folder_out {
         std::fs::create_dir_all(&temp)?;
-        let pattern = if p.kind == PKind::Sequence { format!("{stem}_%05d.{}", p.ext) } else { format!("{stem}_%03d.{}", p.ext) };
+        let pattern = if p.kind == PKind::Sequence {
+            format!("{stem}_%05d.{}", p.ext)
+        } else {
+            format!("{stem}_%03d.{}", p.ext)
+        };
         temp.join(pattern)
     } else {
         temp.clone()
     };
 
     let plan = build_plan(&p, o, &infos, &hw, &target, loudnorm.as_deref())?;
-    emit(app, JobUpdate { id, state: "converting", percent: Some(0.0), ..Default::default() });
+    emit(
+        app,
+        JobUpdate {
+            id,
+            state: "converting",
+            percent: Some(0.0),
+            ..Default::default()
+        },
+    );
     let mut result = run_ffmpeg(app, id, &tools, &plan.args, &work, plan.duration, "converting", cancel).await;
     // مشفّر كرت الشاشة/الهاتف أنهى بلا فيديو (يحدث مع MediaCodec على بعض الأجهزة): نعيد بالمعالج
     let used_hw = plan.args.iter().any(|a| hw.contains(a));
@@ -1321,7 +1703,15 @@ async fn run_convert(
         eprintln!("hw encoder produced no video, retrying on CPU");
         let _ = std::fs::remove_file(&temp);
         let plan = build_plan(&p, o, &infos, &[], &target, loudnorm.as_deref())?;
-        emit(app, JobUpdate { id, state: "converting", percent: Some(0.0), ..Default::default() });
+        emit(
+            app,
+            JobUpdate {
+                id,
+                state: "converting",
+                percent: Some(0.0),
+                ..Default::default()
+            },
+        );
         result = run_ffmpeg(app, id, &tools, &plan.args, &work, plan.duration, "converting", cancel).await;
     }
     let cleanup = || {
@@ -1364,7 +1754,10 @@ pub async fn import_files(app: AppHandle, paths: Vec<String>) -> Result<Vec<Stri
     #[cfg(mobile)]
     {
         return tauri::async_runtime::spawn_blocking(move || {
-            paths.iter().map(|p| crate::mobile::import_file(&app, p)).collect::<Result<Vec<_>, _>>()
+            paths
+                .iter()
+                .map(|p| crate::mobile::import_file(&app, p))
+                .collect::<Result<Vec<_>, _>>()
         })
         .await
         .map_err(|e| AppError::with_detail("badInput", e.to_string()))?;
@@ -1392,7 +1785,14 @@ pub async fn start_convert(
     let sem = queue.0.clone();
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
-        emit(&app2, JobUpdate { id, state: "queued", ..Default::default() });
+        emit(
+            &app2,
+            JobUpdate {
+                id,
+                state: "queued",
+                ..Default::default()
+            },
+        );
         // ننتظر دورنا في الطابور، ويمكن الإلغاء أثناء الانتظار
         let permit = tokio::select! {
             p = sem.acquire_owned() => p.ok(),
@@ -1411,9 +1811,22 @@ pub async fn start_convert(
                 markers,
                 ..Default::default()
             },
-            Ok(None) | Err(_) if *rx.borrow() => JobUpdate { id, state: "canceled", ..Default::default() },
-            Ok(None) => JobUpdate { id, state: "canceled", ..Default::default() },
-            Err(e) => JobUpdate { id, state: "error", error: Some(e), ..Default::default() },
+            Ok(None) | Err(_) if *rx.borrow() => JobUpdate {
+                id,
+                state: "canceled",
+                ..Default::default()
+            },
+            Ok(None) => JobUpdate {
+                id,
+                state: "canceled",
+                ..Default::default()
+            },
+            Err(e) => JobUpdate {
+                id,
+                state: "error",
+                error: Some(e),
+                ..Default::default()
+            },
         };
         if let Ok(root) = download::jobs_root(&app2) {
             let _ = tokio::fs::remove_dir_all(root.join(format!("c{id}"))).await;
@@ -1450,7 +1863,11 @@ mod tests {
                 hdr: false,
                 interlaced: false,
             }),
-            audio: vec![AudioInfo { codec: "aac".into(), channels: 2, sample_rate: 48000 }],
+            audio: vec![AudioInfo {
+                codec: "aac".into(),
+                channels: 2,
+                sample_rate: 48000,
+            }],
             subtitles: 0,
             thumbnail: None,
             issues: vec![],
@@ -1463,9 +1880,16 @@ mod tests {
 
     #[test]
     fn vertical_crop_dims() {
-        let o = ConvertOptions { aspect: Some("9:16".into()), ..Default::default() };
+        let o = ConvertOptions {
+            aspect: Some("9:16".into()),
+            ..Default::default()
+        };
         assert_eq!(output_dims(1920, 1080, &o, Some(1080)), (608, 1080));
-        let o = ConvertOptions { aspect: Some("9:16".into()), size: Some(1080), ..Default::default() };
+        let o = ConvertOptions {
+            aspect: Some("9:16".into()),
+            size: Some(1080),
+            ..Default::default()
+        };
         assert_eq!(output_dims(1920, 1080, &o, None), (1080, 1920));
     }
 
@@ -1483,7 +1907,12 @@ mod tests {
     #[test]
     fn trim_and_speed() {
         let p = preset("edit_h264").unwrap();
-        let o = ConvertOptions { start: Some(10.0), end: Some(30.0), speed: Some(2.0), ..Default::default() };
+        let o = ConvertOptions {
+            start: Some(10.0),
+            end: Some(30.0),
+            speed: Some(2.0),
+            ..Default::default()
+        };
         let plan = build_plan(&p, &o, &[video(1920, 1080)], &[], Path::new("o.mp4"), None).unwrap();
         let s = joined(&plan);
         assert!(s.contains("-ss 10.000 -to 30.000 -i in.mp4"));
@@ -1495,7 +1924,10 @@ mod tests {
     #[test]
     fn hw_encoder_used_when_available() {
         let p = preset("edit_h264").unwrap();
-        let o = ConvertOptions { hw: true, ..Default::default() };
+        let o = ConvertOptions {
+            hw: true,
+            ..Default::default()
+        };
         let plan = build_plan(&p, &o, &[video(1920, 1080)], &["h264_qsv".into()], Path::new("o.mp4"), None).unwrap();
         assert!(joined(&plan).contains("-c:v h264_qsv"));
     }
@@ -1548,7 +1980,9 @@ mod real {
     use std::process::Command as Std;
 
     fn bin(name: &str) -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries/ffmpeg/bin").join(format!("{name}{}", tools::EXE))
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("binaries/ffmpeg/bin")
+            .join(format!("{name}{}", tools::EXE))
     }
 
     fn probe(path: &Path) -> MediaInfo {
@@ -1570,7 +2004,17 @@ mod real {
         std::fs::create_dir_all(&out).unwrap();
         // ملفات مساعدة: علامة مائية، LUT، ترجمة عربية
         Std::new(bin("ffmpeg"))
-            .args(["-v", "error", "-y", "-f", "lavfi", "-i", "color=c=red@0.8:s=400x200,format=rgba", "-frames:v", "1"])
+            .args([
+                "-v",
+                "error",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=red@0.8:s=400x200,format=rgba",
+                "-frames:v",
+                "1",
+            ])
             .arg(out.join("wm.png"))
             .status()
             .unwrap();
@@ -1586,9 +2030,15 @@ mod real {
         std::fs::write(out.join("sub.srt"), "1\n00:00:01,000 --> 00:00:04,000\nمرحبا بالعالم — Hello\n").unwrap();
 
         let info = probe(&sample);
-        let hw: Vec<String> = std::env::var("KHAMA_HW").map(|v| v.split(',').map(String::from).collect()).unwrap_or_default();
+        let hw: Vec<String> = std::env::var("KHAMA_HW")
+            .map(|v| v.split(',').map(String::from).collect())
+            .unwrap_or_default();
         let o = |f: &dyn Fn(&mut ConvertOptions)| {
-            let mut x = ConvertOptions { start: Some(1.0), end: Some(6.0), ..Default::default() };
+            let mut x = ConvertOptions {
+                start: Some(1.0),
+                end: Some(6.0),
+                ..Default::default()
+            };
             f(&mut x);
             x
         };
@@ -1617,14 +2067,17 @@ mod real {
             ("rewrap_mov", o(&|_| {})),
             ("rewrap_mkv", o(&|x| x.split_at = vec![3.0, 4.5])),
             ("frame_png", o(&|_| {})),
-            ("edit_h264", o(&|x| {
-                x.lut = Some("lut.cube".into());
-                x.subtitles = Some("sub.srt".into());
-                x.timecode = true;
-                x.denoise = true;
-                x.rotate = Some("90".into());
-                x.speed = Some(0.5);
-            })),
+            (
+                "edit_h264",
+                o(&|x| {
+                    x.lut = Some("lut.cube".into());
+                    x.subtitles = Some("sub.srt".into());
+                    x.timecode = true;
+                    x.denoise = true;
+                    x.rotate = Some("90".into());
+                    x.speed = Some(0.5);
+                }),
+            ),
             ("edit_h264", o(&|x| x.mute = true)),
         ];
         let mut failures = Vec::new();
@@ -1651,16 +2104,37 @@ mod real {
                 let m = probe(&target);
                 format!(
                     "{:?} {:?} dur={:?}",
-                    m.video.as_ref().map(|v| format!("{} {}x{} {:?}fps {}", v.codec, v.width, v.height, v.fps.map(|f| (f * 100.0).round() / 100.0), v.pix_fmt)),
+                    m.video.as_ref().map(|v| format!(
+                        "{} {}x{} {:?}fps {}",
+                        v.codec,
+                        v.width,
+                        v.height,
+                        v.fps.map(|f| (f * 100.0).round() / 100.0),
+                        v.pix_fmt
+                    )),
                     m.audio.first().map(|a| a.codec.clone()),
                     m.duration.map(|d| (d * 100.0).round() / 100.0)
                 )
             } else {
-                format!("{} parts", std::fs::read_dir(&out).unwrap().filter(|e| e.as_ref().unwrap().file_name().to_string_lossy().starts_with(&format!("{i:02}_"))).count())
+                format!(
+                    "{} parts",
+                    std::fs::read_dir(&out)
+                        .unwrap()
+                        .filter(|e| e.as_ref().unwrap().file_name().to_string_lossy().starts_with(&format!("{i:02}_")))
+                        .count()
+                )
             };
-            println!("{} {i:02} {id:<14} {:>5.1}s  {what}", if ok { "OK  " } else { "FAIL" }, t0.elapsed().as_secs_f64());
+            println!(
+                "{} {i:02} {id:<14} {:>5.1}s  {what}",
+                if ok { "OK  " } else { "FAIL" },
+                t0.elapsed().as_secs_f64()
+            );
             if !ok {
-                println!("     args: {}\n     {}", args.join(" "), tail(&String::from_utf8_lossy(&r.stderr), 6).replace('\n', "\n     "));
+                println!(
+                    "     args: {}\n     {}",
+                    args.join(" "),
+                    tail(&String::from_utf8_lossy(&r.stderr), 6).replace('\n', "\n     ")
+                );
                 failures.push(*id);
             }
         }
@@ -1671,8 +2145,8 @@ mod real {
 // ======================= المجلدات المراقَبة =======================
 
 const MEDIA_EXT: &[&str] = &[
-    "mp4", "mov", "mkv", "avi", "mxf", "m4v", "webm", "mts", "m2ts", "wmv", "flv", "3gp", "mpg", "mpeg", "wav", "mp3",
-    "m4a", "aac", "flac", "ogg", "opus", "aiff", "aif",
+    "mp4", "mov", "mkv", "avi", "mxf", "m4v", "webm", "mts", "m2ts", "wmv", "flv", "3gp", "mpg", "mpeg", "wav", "mp3", "m4a", "aac",
+    "flac", "ogg", "opus", "aiff", "aif",
 ];
 
 #[derive(Clone, Serialize)]
@@ -1728,11 +2202,14 @@ pub fn spawn_watcher(app: AppHandle) {
                     if entry.1 >= 2 {
                         pending.remove(&path);
                         seen.insert(path.clone());
-                        let _ = app.emit("watch-file", WatchHit {
-                            path: path.to_string_lossy().into_owned(),
-                            preset: w.preset.clone(),
-                            out_dir: dir.join(WATCH_OUT).to_string_lossy().into_owned(),
-                        });
+                        let _ = app.emit(
+                            "watch-file",
+                            WatchHit {
+                                path: path.to_string_lossy().into_owned(),
+                                preset: w.preset.clone(),
+                                out_dir: dir.join(WATCH_OUT).to_string_lossy().into_owned(),
+                            },
+                        );
                     }
                 }
             }

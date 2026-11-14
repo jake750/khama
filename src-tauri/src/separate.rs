@@ -222,11 +222,7 @@ async fn fetch(
 
 /// يتأكد أن ONNX Runtime والنموذج موجودان وسليمان، وينزّلهما إن لزم.
 /// يعيد (مسار المكتبة، مسار النموذج)، أو None إن ألغى المستخدم.
-pub async fn ensure_assets(
-    app: &AppHandle,
-    id: u64,
-    cancel: &mut watch::Receiver<bool>,
-) -> Result<Option<(PathBuf, PathBuf)>, AppError> {
+pub async fn ensure_assets(app: &AppHandle, id: u64, cancel: &mut watch::Receiver<bool>) -> Result<Option<(PathBuf, PathBuf)>, AppError> {
     let _guard = SETUP.lock().await;
     let dir = ai_dir(app)?;
     std::fs::create_dir_all(&dir)?;
@@ -240,7 +236,18 @@ pub async fn ensure_assets(
         if !lib.exists() {
             return Err(AppError::with_detail("aiUnsupported", lib.display().to_string()));
         }
-        (Asset { url: "", sha256: "", size: 0, member: None, name: "" }, lib, PathBuf::new(), false)
+        (
+            Asset {
+                url: "",
+                sha256: "",
+                size: 0,
+                member: None,
+                name: "",
+            },
+            lib,
+            PathBuf::new(),
+            false,
+        )
     };
     #[cfg(not(target_os = "android"))]
     let (runtime, lib, lib_ok, need_lib) = {
@@ -259,24 +266,39 @@ pub async fn ensure_assets(
     let total = (if need_lib { runtime.size } else { 0 }) + (if need_model { MODEL.size } else { 0 });
     let mut done_before = 0u64;
     let mut last = std::time::Instant::now() - Duration::from_secs(1);
-    emit(app, JobUpdate { id, state: "preparing", percent: Some(0.0), ..Default::default() });
+    emit(
+        app,
+        JobUpdate {
+            id,
+            state: "preparing",
+            percent: Some(0.0),
+            ..Default::default()
+        },
+    );
 
     for (asset, needed) in [(&runtime, need_lib), (&MODEL, need_model)] {
         if !needed {
             continue;
         }
-        let url = if asset.url.starts_with("http") { asset.url.to_string() } else { format!("{ORT_BASE}{}", asset.url) };
+        let url = if asset.url.starts_with("http") {
+            asset.url.to_string()
+        } else {
+            format!("{ORT_BASE}{}", asset.url)
+        };
         let tmp = dir.join(format!("{}.download", asset.name));
         let base = done_before;
         let mut on_bytes = |b: u64| {
             if last.elapsed() >= Duration::from_millis(250) {
                 last = std::time::Instant::now();
-                emit(app, JobUpdate {
-                    id,
-                    state: "preparing",
-                    percent: Some(((base + b) as f64 / total as f64 * 100.0).min(100.0)),
-                    ..Default::default()
-                });
+                emit(
+                    app,
+                    JobUpdate {
+                        id,
+                        state: "preparing",
+                        percent: Some(((base + b) as f64 / total as f64 * 100.0).min(100.0)),
+                        ..Default::default()
+                    },
+                );
             }
         };
         if !fetch(app, &url, &tmp, &mut on_bytes, cancel).await? {
@@ -301,7 +323,10 @@ pub async fn ensure_assets(
                     .await
                     .map_err(|e| AppError::with_detail("aiDownload", format!("tar: {e}")))?;
                 if !out.status.success() {
-                    return Err(AppError::with_detail("aiDownload", String::from_utf8_lossy(&out.stderr).into_owned()));
+                    return Err(AppError::with_detail(
+                        "aiDownload",
+                        String::from_utf8_lossy(&out.stderr).into_owned(),
+                    ));
                 }
                 let _ = std::fs::remove_file(&dest);
                 std::fs::rename(dir.join(member), &dest)?;
@@ -331,7 +356,13 @@ pub struct MdxConfig {
     pub compensate: f32,
 }
 
-pub const VOC_FT: MdxConfig = MdxConfig { n_fft: 7680, hop: 1024, dim_f: 3072, dim_t: 256, compensate: 1.021 };
+pub const VOC_FT: MdxConfig = MdxConfig {
+    n_fft: 7680,
+    hop: 1024,
+    dim_f: 3072,
+    dim_t: 256,
+    compensate: 1.021,
+};
 
 /// STFT و iSTFT بنفس طريقة PyTorch (center=True، نافذة Hann دورية)
 pub struct Spectral {
@@ -344,9 +375,16 @@ pub struct Spectral {
 impl Spectral {
     pub fn new(cfg: MdxConfig) -> Self {
         let n = cfg.n_fft;
-        let window = (0..n).map(|i| 0.5 - 0.5 * (2.0 * std::f32::consts::PI * i as f32 / n as f32).cos()).collect();
+        let window = (0..n)
+            .map(|i| 0.5 - 0.5 * (2.0 * std::f32::consts::PI * i as f32 / n as f32).cos())
+            .collect();
         let mut planner = FftPlanner::<f32>::new();
-        Self { fwd: planner.plan_fft_forward(n), inv: planner.plan_fft_inverse(n), window, cfg }
+        Self {
+            fwd: planner.plan_fft_forward(n),
+            inv: planner.plan_fft_inverse(n),
+            window,
+            cfg,
+        }
     }
 
     /// طول القطعة بالعينات
@@ -492,7 +530,21 @@ pub fn separate_blocking(
     let mut dec = dec.spawn()?;
 
     let mut enc = std::process::Command::new(ffmpeg);
-    enc.args(["-v", "error", "-y", "-f", "f32le", "-ar", &SR.to_string(), "-ac", "2", "-i", "-", "-c:a", "pcm_s16le"]);
+    enc.args([
+        "-v",
+        "error",
+        "-y",
+        "-f",
+        "f32le",
+        "-ar",
+        &SR.to_string(),
+        "-ac",
+        "2",
+        "-i",
+        "-",
+        "-c:a",
+        "pcm_s16le",
+    ]);
     enc.arg(out_wav);
     enc.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::piped());
     no_window(&mut enc);
@@ -551,12 +603,16 @@ pub fn separate_blocking(
             }
             let tensor = ort::value::Tensor::from_array(([1usize, 4, cfg.dim_f, cfg.dim_t], input))
                 .map_err(|e| AppError::with_detail("aiRun", e.to_string()))?;
-            let outputs = session.run(ort::inputs![tensor]).map_err(|e| AppError::with_detail("aiRun", e.to_string()))?;
+            let outputs = session
+                .run(ort::inputs![tensor])
+                .map_err(|e| AppError::with_detail("aiRun", e.to_string()))?;
             let (_, pred) = outputs[0]
                 .try_extract_tensor::<f32>()
                 .map_err(|e| AppError::with_detail("aiRun", e.to_string()))?;
             let to_complex = |re: usize, im: usize| -> Vec<Complex<f32>> {
-                (0..plane).map(|i| Complex::new(pred[re * plane + i], pred[im * plane + i])).collect()
+                (0..plane)
+                    .map(|i| Complex::new(pred[re * plane + i], pred[im * plane + i]))
+                    .collect()
             };
             let vl = sp.istft(&to_complex(0, 1));
             let vr = sp.istft(&to_complex(2, 3));
@@ -637,13 +693,27 @@ pub async fn process_file(
     let Some((lib, model)) = ensure_assets(app, id, cancel).await? else {
         return Ok(false);
     };
-    emit(app, JobUpdate { id, state: "separating", percent: Some(0.0), ..Default::default() });
+    emit(
+        app,
+        JobUpdate {
+            id,
+            state: "separating",
+            percent: Some(0.0),
+            ..Default::default()
+        },
+    );
     std::fs::create_dir_all(work)?;
     let wav = work.join("stem.wav");
 
     let progress = Arc::new(AtomicU64::new(0));
     let stop = Arc::new(AtomicBool::new(false));
-    let (ffmpeg, input_p, wav_p, p2, s2) = (tools.ffmpeg.clone(), input.to_path_buf(), wav.clone(), progress.clone(), stop.clone());
+    let (ffmpeg, input_p, wav_p, p2, s2) = (
+        tools.ffmpeg.clone(),
+        input.to_path_buf(),
+        wav.clone(),
+        progress.clone(),
+        stop.clone(),
+    );
     let mut handle = tauri::async_runtime::spawn_blocking(move || {
         separate_blocking(&ffmpeg, &lib, &model, &input_p, start, end, keep, &wav_p, &p2, &s2)
     });
@@ -674,7 +744,14 @@ pub async fn process_file(
     }
 
     // ---- الناتج النهائي ----
-    emit(app, JobUpdate { id, state: "processing", ..Default::default() });
+    emit(
+        app,
+        JobUpdate {
+            id,
+            state: "processing",
+            ..Default::default()
+        },
+    );
     let ext = output.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
     let mut cmd = tools::command(&tools.ffmpeg);
     cmd.args(["-hide_banner", "-nostdin", "-y", "-v", "error"]);
@@ -719,7 +796,10 @@ pub async fn process_file(
     let out = cmd.output().await?;
     let _ = std::fs::remove_file(&wav);
     if !out.status.success() {
-        return Err(AppError::with_detail("encodeFailed", tail(&String::from_utf8_lossy(&out.stderr), 10)));
+        return Err(AppError::with_detail(
+            "encodeFailed",
+            tail(&String::from_utf8_lossy(&out.stderr), 10),
+        ));
     }
     Ok(true)
 }
@@ -742,7 +822,13 @@ mod tests {
             })
             .collect();
         let y = sp.istft(&sp.stft(&x));
-        let err: f32 = x.iter().zip(&y).skip(4000).take(n - 8000).map(|(a, b)| (a - b).abs()).fold(0.0, f32::max);
+        let err: f32 = x
+            .iter()
+            .zip(&y)
+            .skip(4000)
+            .take(n - 8000)
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0, f32::max);
         assert!(err < 1e-3, "max error {err}");
     }
 
@@ -752,7 +838,9 @@ mod tests {
     #[ignore]
     fn separates_voice_from_music() {
         let ai = PathBuf::from(std::env::var("KHAMA_AI").unwrap());
-        let ffmpeg = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries/ffmpeg/bin").join(format!("ffmpeg{}", tools::EXE));
+        let ffmpeg = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("binaries/ffmpeg/bin")
+            .join(format!("ffmpeg{}", tools::EXE));
         let voice = PathBuf::from(std::env::var("KHAMA_VOICE").unwrap());
         let music = PathBuf::from(std::env::var("KHAMA_MUSIC").unwrap());
         let tmp = std::env::temp_dir().join("khama-sep");
@@ -768,7 +856,13 @@ mod tests {
             .status()
             .unwrap();
         assert!(st.success());
-        let lib = ai.join(if cfg!(windows) { "onnxruntime.dll" } else if cfg!(target_os = "macos") { "libonnxruntime.dylib" } else { "libonnxruntime.so" });
+        let lib = ai.join(if cfg!(windows) {
+            "onnxruntime.dll"
+        } else if cfg!(target_os = "macos") {
+            "libonnxruntime.dylib"
+        } else {
+            "libonnxruntime.so"
+        });
         let model = ai.join(MODEL.name);
         let p = AtomicU64::new(0);
         let c = AtomicBool::new(false);
