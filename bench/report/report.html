@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Khama PFE: idea, method and results</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 20mm 18mm 20mm 18mm; }
+  :root { --ink:#16201f; --dim:#5a6866; --line:#d5dddb; --acc:#137a70; --accbg:#e8f4f2; --bad:#b4433a; }
+  * { box-sizing: border-box; }
+  body { font-family: "Source Serif 4", Georgia, serif; font-size: 10.2pt; line-height: 1.45; color: var(--ink); margin: 0; }
+  h1, h2, h3, h4, .sans, table, figcaption, .kpi, .tag { font-family: Inter, "Segoe UI", sans-serif; }
+  h2 { font-size: 17pt; margin: 0 0 4mm; color: var(--ink); letter-spacing: -0.01em; break-after: avoid; }
+  h2 .n { color: var(--acc); margin-right: 3mm; }
+  h3 { font-size: 11.5pt; margin: 4.5mm 0 1.6mm; break-after: avoid; }
+  h4 { font-size: 10pt; margin: 4mm 0 1mm; color: var(--dim); text-transform: uppercase; letter-spacing: .05em; break-after: avoid; }
+  p { margin: 0 0 2.6mm; }
+  ul, ol { margin: 0 0 3mm; padding-left: 5.5mm; }
+  li { margin-bottom: 1mm; }
+  .section { break-before: page; }
+  table { border-collapse: collapse; width: 100%; font-size: 8.4pt; margin: 2mm 0 4mm; break-inside: avoid; }
+  th, td { padding: 1.4mm 2mm; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { font-weight: 600; color: var(--dim); border-bottom: 1.5px solid var(--ink); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.hi td { background: var(--accbg); font-weight: 600; }
+  figure { margin: 3mm 0 5mm; break-inside: avoid; }
+  figure img { width: 100%; display: block; border-radius: 2mm; border: 1px solid var(--line); }
+  figcaption { font-size: 8.3pt; color: var(--dim); margin-top: 1.6mm; line-height: 1.4; }
+  figcaption b { color: var(--ink); }
+  .row { display: flex; gap: 5mm; align-items: flex-start; }
+  .row > * { flex: 1; min-width: 0; }
+  .note { border-left: 3px solid var(--acc); background: var(--accbg); padding: 2.5mm 4mm; margin: 3mm 0 4mm; font-size: 9.8pt; break-inside: avoid; }
+  .note.limit { border-color: #b98a2e; background: #fbf4e6; }
+  code { font-family: "Cascadia Mono", Consolas, monospace; font-size: 8.6pt; background: #eef2f1; padding: 0 1mm; border-radius: 1mm; }
+  .katex { font-size: 1.02em; }
+  .katex-display { margin: 1.2mm 0; }
+
+  /* cover */
+  .cover { height: 257mm; display: flex; flex-direction: column; }
+  .cover .top { font-family: Inter, sans-serif; font-size: 9pt; color: var(--dim); letter-spacing: .08em; text-transform: uppercase; }
+  .cover h1 { font-size: 34pt; line-height: 1.08; margin: 40mm 0 6mm; letter-spacing: -0.025em; }
+  .cover h1 span { color: var(--acc); }
+  .cover .sub { font-size: 14pt; color: var(--dim); max-width: 150mm; line-height: 1.4; }
+  .cover .axes { margin-top: 18mm; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+  .cover .axis { border-top: 3px solid var(--acc); padding-top: 3mm; font-family: Inter, sans-serif; font-size: 9pt; color: var(--dim); }
+  .cover .axis b { display: block; color: var(--ink); font-size: 11pt; margin-bottom: 1mm; }
+  .cover .meta { margin-top: auto; font-family: Inter, sans-serif; font-size: 9.5pt; color: var(--dim); display: grid; grid-template-columns: 34mm 1fr; row-gap: 1.5mm; }
+  .cover .meta b { color: var(--ink); font-weight: 600; }
+
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; margin: 4mm 0 6mm; }
+  .kpi { border: 1px solid var(--line); border-radius: 2.5mm; padding: 4mm; break-inside: avoid; }
+  .kpi .big { font-size: 22pt; font-weight: 700; color: var(--acc); letter-spacing: -0.02em; line-height: 1.1; }
+  .kpi .big small { font-size: 11pt; color: var(--dim); font-weight: 500; }
+  .kpi .lbl { font-size: 8.6pt; color: var(--dim); margin-top: 1.5mm; line-height: 1.35; }
+  .kpi .lbl b { color: var(--ink); }
+  .tag { display: inline-block; font-size: 7.5pt; font-weight: 600; padding: .4mm 2mm; border-radius: 5mm; background: var(--accbg); color: var(--acc); margin-right: 1.5mm; }
+  .toc { font-family: Inter, sans-serif; font-size: 10pt; }
+  .toc div { display: flex; border-bottom: 1px dotted var(--line); padding: 1.6mm 0; }
+  .toc div span:first-child { width: 10mm; color: var(--acc); font-weight: 600; }
+  .phone { max-width: 62mm; margin: 0 auto; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<div class="cover">
+  <div class="top">Final-year project (PFE) &middot; proposal and results for supervision</div>
+  <h1>Replacing guesswork with measurement<br>in a <span>media application</span></h1>
+  <div class="sub">Shot-boundary detection, hardware-encoder calibration and the evaluation of voice/music separation in Khama, a desktop and Android app for downloading, converting and preparing media for video editing.</div>
+  <div class="axes">
+    <div class="axis"><b>Axis C: shot detection</b>A new detector for cuts and gradual transitions, replacing a fixed FFmpeg threshold.</div>
+    <div class="axis"><b>Axis A: codecs</b>A rate-distortion study of 5 encoders and a calibrated quality scale for GPU encoding.</div>
+    <div class="axis"><b>Axis B: separation</b>A BSS Eval study on MUSDB18 of how the app chunks and recombines the model output.</div>
+  </div>
+  <div class="meta">
+    <span>Application</span><b>Khama 0.3.3 (Tauri 2, Rust, React; Windows and Android)</b>
+    <span>Status</span><b>Implemented, measured and merged into the app (branch <code>pfe</code>)</b>
+    <span>Date</span><b>November 2026</b>
+    <span>Student</span><b>&nbsp;</b>
+    <span>Supervisor</span><b>&nbsp;</b>
+  </div>
+</div>
+
+<!-- ============ SUMMARY ============ -->
+<div class="section">
+  <h2>Summary</h2>
+  <p><b>The idea.</b> Khama is a working application used by video editors. Several of its technical decisions were constants chosen without measurement: one global FFmpeg threshold to find scene changes, a guessed “+1” to translate the user’s quality setting to the GPU encoder, and separation settings copied from another implementation. The project takes each of these decisions, builds the theory and a reproducible benchmark around it, and replaces the constant with an algorithm or a value that is justified by the measurements. Each result ships in the app, so the work is both a study and an engineering contribution.</p>
+
+  <div class="kpis">
+    <div class="kpi"><div class="big">0.951 <small>vs 0.545</small></div><div class="lbl"><b>Shot detection F1</b> on the held-out test set: the new detector against the app’s old FFmpeg rule (0.673 even with FFmpeg’s threshold tuned).</div></div>
+    <div class="kpi"><div class="big">±0.4 <small>VMAF</small></div><div class="lbl"><b>GPU quality now matches</b> the software encoder (was up to +3.9 off). GPU files are 14 % (H.264) and 17 % (HEVC) smaller.</div></div>
+    <div class="kpi"><div class="big">10.8 <small>dB SDR</small></div><div class="lbl"><b>Separation confirmed</b> on 50 MUSDB18 tracks. The tempting “soft mask” alternative is 2 dB worse (p = 4·10<sup>−15</sup>).</div></div>
+  </div>
+
+  <h3>What was done</h3>
+  <ul>
+    <li><b>Axis C: own shot-boundary detector</b> (Rust, in the app). Soft-binned HSV histograms on a 3×3 grid, a structural luma signal, adaptive thresholds with a robust median/MAD estimator, flash rejection, and an adaptive twin-comparison for dissolves, fades and wipes. Evaluated on a 204-transition synthetic test set with exact labels and on a hand-labelled film trailer, with a dev/test split, a parameter search and an ablation study.</li>
+    <li><b>Axis A: compression study</b> of x264, x265, SVT-AV1 and Intel Quick Sync H.264/HEVC: 636 encodes of 12 open test sequences, each scored with VMAF, PSNR and SSIM, compared by BD-rate. The study gives a calibration table that maps the user’s CRF to the hardware quality value reaching the same VMAF.</li>
+    <li><b>Axis B: separation evaluation</b> of the app’s own STFT and ONNX pipeline on the MUSDB18 test set with BSS Eval v4: 11 configurations of chunk margin, overlap, gain compensation and mask type, compared with paired Wilcoxon tests.</li>
+    <li><b>Tooling:</b> a <code>khama-bench</code> binary that runs the app’s real Rust code, plus Python scripts that rebuild every table and figure in this document from scratch.</li>
+  </ul>
+</div>
+
+<!-- ============ 1 ============ -->
+<div class="section">
+  <h2><span class="n">1</span>The application and the problem</h2>
+  <p>Khama prepares media for video editing. It downloads from video sites (through yt-dlp), converts files to editing formats (ProRes, DNxHR, H.264/H.265 proxies), detects scene changes, silences and black frames, and separates voice from music with a neural network that runs locally. It is written in Rust (back end, FFmpeg orchestration, signal processing, ONNX inference) and React (interface), packaged with Tauri 2 for Windows and Android, and has an Arabic and English interface.</p>
+
+  <h3>Decisions that had no measurement behind them</h3>
+  <table>
+    <tr><th>Where</th><th>Previous constant</th><th>Problem</th><th>Axis</th></tr>
+    <tr><td>Stills at scene changes; “detect scenes” tool</td><td>FFmpeg <code>select='gt(scene,0.3)'</code> (and 0.32)</td><td>One threshold for every video. Dissolves and fades are missed or reported several times; camera flashes are reported as cuts.</td><td>C</td></tr>
+    <tr><td>GPU encoding (<code>codec_args</code>)</td><td><code>global_quality = crf + 1</code> (QSV), <code>cq = crf + 1</code> (NVENC)</td><td>Hardware scales are not the x264 CRF scale. The same preset gives a different quality on each encoder.</td><td>A</td></tr>
+    <tr><td>Voice/music separation</td><td>Margin n_fft/2, hard joins, gain 1.021, music = mix − voice</td><td>Copied from another implementation and never measured on a reference dataset.</td><td>B</td></tr>
+  </table>
+
+  <p>The method is the same on each axis:</p>
+  <ol>
+    <li>state the theory;</li>
+    <li>build a dataset with ground truth;</li>
+    <li>tune on one half of the data and report on the other;</li>
+    <li>compare with the previous behaviour;</li>
+    <li>ship the result in the app and say plainly what the data does not support.</li>
+  </ol>
+
+  <figure style="width:82%;margin-left:auto;margin-right:auto">
+    <img src="img/desktop-download-stills.png">
+    <figcaption><b>Figure 1.</b> Khama on Windows, Download tab. Under Extras → Still frames, the option “at scene change” now uses the new detector (Axis C) instead of FFmpeg’s fixed threshold.</figcaption>
+  </figure>
+</div>
+
+<!-- ============ 2 ============ -->
+<div class="section">
+  <h2><span class="n">2</span>Axis C: shot-boundary detection</h2>
+  <p>A <i>shot</i> is a continuous take. A <i>shot boundary</i> is either a <b>hard cut</b> between two consecutive frames or a <b>gradual transition</b> over several frames (cross-dissolve, fade through black, wipe). The detector compares consecutive frames with features that stay stable within a shot and change across shots.</p>
+
+  <h3>2.1 Frame features</h3>
+  <p><b>Soft-binned HSV histogram.</b> Pixels are converted to HSV. Dark and grey pixels, whose hue is unstable, go into separate grey bins indexed by value, which gives 8×3×3 colour bins plus 6 grey bins (78 in total). To stop a slight colour drift from jumping a pixel into the next bin, each pixel is spread over its two nearest bins on every axis by trilinear interpolation (hue is circular):</p>
+  $$h_b = \frac{1}{N}\sum_p w_b(p),\qquad \sum_b w_b(p) = 1.$$
+  <p><b>Distance.</b> For normalised histograms, $D(p,q) = \tfrac12\sum_b |p_b-q_b| = 1-\sum_b\min(p_b,q_b)\in[0,1]$. A global histogram ignores where colours are, so the detector also compares 3×3 block histograms:</p>
+  $$d(t) = \alpha\,D(H_t,H_{t-1}) + (1-\alpha)\,\frac19\sum_{b=1}^{9} D(H_t^b,H_{t-1}^b).$$
+  <p><b>Structural signal.</b> Two shots of the same scene can share a palette. A 32×18 luma thumbnail $Y_t$ gives a second signal, $e(t) = \frac{1}{|\Omega|}\sum_x |Y_t(x)-Y_{t-1}(x)|/255$, which reacts to a change of layout even when the colours stay the same.</p>
+
+  <h3>2.2 Adaptive threshold for cuts</h3>
+  <p>The typical level of $d(t)$ depends on the content (an action scene against a static interview), so the threshold follows the local statistics. They are computed on a window around $t$ that excludes $t-1..t+1$, so that a cut does not raise its own threshold:</p>
+  $$d(t)\ \ge\ \max\big(\tau_{min},\ c(t)+k\,s(t)\big),\qquad c=\operatorname{med}(d),\quad s = 1.4826\,\operatorname{med}|d-\operatorname{med}(d)|.$$
+  <p>The median and scaled MAD are robust: unlike the mean and standard deviation, other cuts in the window do not inflate them. The structural signal $e$ has its own threshold of the same form, and a cut is reported when either signal fires at a local maximum.</p>
+  <p><b>Flash rejection.</b> After a camera flash, the frames look like the frames before it. With $\delta(i,j)=\max(D(f_i,f_j), e(i,j))$, a candidate at $t$ is rejected when, for some $j\in\{1,2,3\}$, $\delta(t-1,t+j) < 0.35\,\delta(t-1,t)$ (start of a flash) or $\delta(t-1-j,t) < 0.35\,\delta(t-1,t)$ (end of a flash).</p>
+
+  <h3>2.3 Gradual transitions: adaptive twin comparison</h3>
+  <p>During a dissolve each frame-to-frame change is small, but the changes add up. This builds on Zhang et al. (1993):</p>
+  <ol>
+    <li>A run starts when $d(t)$ exceeds a low threshold $T_{low}=\max(\ell_{min}, c_p+k_{low}s_p)$. This threshold is computed on the frames <i>before</i> $t$ only and held fixed during the run, because the transition frames must not raise their own threshold.</li>
+    <li>The run continues while $d$ stays above $T_{low}$ (one quiet frame is tolerated).</li>
+    <li>The run is accepted if it lasts at least $L_{min}$ frames and the accumulated change $D(f_s,f_e)$ exceeds $G_{min}$. This rejects slow camera motion.</li>
+  </ol>
+  <p>A fade-out and a fade-in separated only by flat frames (luma standard deviation below 6/255) are merged into one transition.</p>
+
+  <h3>2.4 Evaluation protocol</h3>
+  <ul>
+    <li><b>Synthetic dataset with exact labels</b>, the approach used to train and test TransNet and DeepSBD.
+      <ul>
+        <li>Open Xiph.org footage is cut into random shots of 1.2–3.4 s.</li>
+        <li>The shots are joined by cuts (55 %), dissolves (16 %), fades (14 %) and wipes (15 %).</li>
+        <li>Hard cases are included: 10 % of cuts join two parts of the same clip, and 25 % of shots contain a 1–2-frame flash that must <i>not</i> be reported.</li>
+      </ul>
+    </li>
+    <li><b>Matching</b> is one-to-one within ±2 frames, giving precision $P$, recall $R$ and $F_1 = 2PR/(P+R)$.</li>
+    <li><b>Dev/test split.</b> Parameters are tuned on the first half of the videos and every number below is from the second half.
+      <ul>
+        <li>Stage 1 searches 344 cut configurations.</li>
+        <li>Stage 2 searches 27 gradual configurations.</li>
+      </ul>
+    </li>
+    <li><b>Baselines:</b> FFmpeg’s scene score with the threshold swept from 0.05 to 0.6, plus a real film trailer (Sintel, CC-BY) labelled by hand.</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3 style="margin-top:0">2.5 Results on the test half</h3>
+  <p>The test half has 12 videos with 204 transitions (125 cuts and 79 gradual) and 48 flashes.</p>
+  <table>
+    <tr><th>Method</th><th class="num">P</th><th class="num">R</th><th class="num">F1</th><th class="num">Cut recall</th><th class="num">Gradual recall</th><th class="num">Flash false alarms</th></tr>
+    <tr><td>FFmpeg <code>scene &gt; 0.30</code> (old stills)</td><td class="num">0.638</td><td class="num">0.475</td><td class="num">0.545</td><td class="num">0.680</td><td class="num">0.152</td><td class="num">55</td></tr>
+    <tr><td>FFmpeg <code>scene &gt; 0.32</code> (old scene tool)</td><td class="num">0.623</td><td class="num">0.446</td><td class="num">0.520</td><td class="num">0.640</td><td class="num">0.139</td><td class="num">55</td></tr>
+    <tr><td>FFmpeg <code>scene &gt; 0.175</code> (best on dev)</td><td class="num">0.680</td><td class="num">0.667</td><td class="num">0.673</td><td class="num">0.896</td><td class="num">0.304</td><td class="num">58</td></tr>
+    <tr><td>Khama, colour only, cuts only</td><td class="num">0.987</td><td class="num">0.745</td><td class="num">0.849</td><td class="num">0.888</td><td class="num">0.519</td><td class="num">0</td></tr>
+    <tr><td>Khama, colour + structure, cuts only</td><td class="num">0.964</td><td class="num">0.789</td><td class="num">0.868</td><td class="num">0.968</td><td class="num">0.506</td><td class="num">0</td></tr>
+    <tr class="hi"><td>Khama, full detector (shipped default)</td><td class="num">0.951</td><td class="num">0.951</td><td class="num">0.951</td><td class="num">0.968</td><td class="num">0.924</td><td class="num">0</td></tr>
+  </table>
+  <p>Even with its threshold tuned on the same data, FFmpeg stays below 0.68. A single fixed threshold cannot separate dissolves, where each frame changes a little, from flashes and fast motion, where it changes a lot.</p>
+
+  <h4>Ablation: one component removed at a time</h4>
+  <table>
+    <tr><th>Variant</th><th class="num">F1</th><th class="num">Cut recall</th><th class="num">Gradual recall</th><th class="num">Flash FA</th><th>Reading</th></tr>
+    <tr class="hi"><td>Full detector</td><td class="num">0.951</td><td class="num">0.968</td><td class="num">0.924</td><td class="num">0</td><td></td></tr>
+    <tr><td>Without flash rejection</td><td class="num">0.870</td><td class="num">0.968</td><td class="num">0.924</td><td class="num">38</td><td>Largest single gain</td></tr>
+    <tr><td>Mean/std instead of median/MAD</td><td class="num">0.888</td><td class="num">0.872</td><td class="num">0.684</td><td class="num">0</td><td>Robust statistics matter most for dissolves</td></tr>
+    <tr><td>Without the structural signal</td><td class="num">0.910</td><td class="num">0.840</td><td class="num">0.911</td><td class="num">0</td><td>Finds cuts within the same palette</td></tr>
+    <tr><td>Global histogram only (α = 1)</td><td class="num">0.943</td><td class="num">0.968</td><td class="num">0.861</td><td class="num">0</td><td>Block histograms help gradual</td></tr>
+    <tr><td>Fixed thresholds (k = 0, floors only)</td><td class="num">0.949</td><td class="num">0.968</td><td class="num">0.937</td><td class="num">0</td><td>See limitation below</td></tr>
+  </table>
+  <div class="note limit"><b>Limitation, stated as such.</b> With tuned floors, the adaptive term adds almost nothing on this synthetic set (0.951 vs 0.949), because the floors were tuned on material of the same kind (one encoder setting, 25 fps). It is kept because it costs nothing and protects content whose level of change differs from the tuning set. It is not claimed as a gain.</div>
+
+  <div class="row">
+    <figure><img src="img/scenes_pr.png"><figcaption><b>Figure 2.</b> Precision and recall on the test half. FFmpeg’s curve comes from sweeping its threshold; the Khama points are the configurations from the search.</figcaption></figure>
+    <div>
+      <h4 style="margin-top:3mm">Real editing: Sintel trailer</h4>
+      <p style="font-size:9.6pt">The trailer has 18 hand-labelled transitions: 7 cuts and 11 gradual.</p>
+      <table>
+        <tr><th>Method</th><th class="num">F1</th><th class="num">TP/FP/FN</th></tr>
+        <tr><td>FFmpeg &gt; 0.30</td><td class="num">0.50</td><td class="num">6 / 0 / 12</td></tr>
+        <tr><td>Khama, colour cuts only</td><td class="num">0.71</td><td class="num">10 / 0 / 8</td></tr>
+        <tr class="hi"><td>Khama, full</td><td class="num">0.75</td><td class="num">12 / 2 / 6</td></tr>
+      </table>
+      <p style="font-size:9.6pt">This is one 52-second trailer, so only the gap to FFmpeg should be read as significant.</p>
+      <p style="font-size:9.6pt"><b>Speed.</b> Over 22 200 frames, feature extraction runs at 802 frames/s, against 977 frames/s for FFmpeg’s scene filter. Detection on the stored features takes 2.2 ms per video. The new detector costs about the same as the filter it replaces.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="row" style="gap:6mm">
+    <figure style="flex:1.15"><img src="img/scenes_film_strip.png" style="border:none"><figcaption><b>Figure 3.</b> Every labelled transition of the Sintel trailer, with the frames around it, and whether each method found it. False alarms are listed at the bottom. This is a visual check that the counts in the table are real.</figcaption></figure>
+    <div style="flex:1">
+      <h3 style="margin-top:0">2.6 In the application</h3>
+      <p>The detector replaces FFmpeg’s rule in two places: “Still frames → at scene change” in the Download tab, and the Convert tab’s tool <b>“Detect scene changes”</b>.</p>
+      <p>The result is a list of time-code chips:</p>
+      <ul>
+        <li>a hard cut is shown as one time;</li>
+        <li>a gradual transition is shown as a start–end range.</li>
+      </ul>
+      <p>From the chips the user can split the file at these points or copy the times into an editor.</p>
+      <figure class="phone"><img src="img/phone-detect-result.png"><figcaption><b>Figure 4.</b> Android: 15 boundaries found in the trailer, with the “Split the file at these points” and “Copy times” actions.</figcaption></figure>
+    </div>
+  </div>
+  <figure><img src="img/desktop-detect-result.png"><figcaption><b>Figure 5.</b> Windows: the same result on the desktop layout. Gradual transitions appear as ranges, for example 0:08–0:09.1, a 1.2 s dissolve.</figcaption></figure>
+</div>
+
+<!-- ============ 3 ============ -->
+<div style="margin-top:9mm">
+  <h2><span class="n">3</span>Axis A: codec study and calibration of hardware encoders</h2>
+
+  <h3>3.1 Quality metrics</h3>
+  <ul>
+    <li><b>PSNR</b> is $10\log_{10}(255^2/\mathrm{MSE})$. For 4:2:0 video the planes are weighted 4:1:1: $\mathrm{PSNR}_{YUV}=(4\,\mathrm{PSNR}_Y+\mathrm{PSNR}_U+\mathrm{PSNR}_V)/6$.</li>
+    <li><b>SSIM</b> (Wang et al., 2004) compares local luminance, contrast and structure.</li>
+    <li><b>VMAF</b> (Netflix, model v0.6.1) is a support-vector regression trained on subjective scores. It fuses visual information fidelity at 4 scales, a detail-loss metric and a motion feature into a 0–100 score; 93–95 is commonly taken as visually transparent.</li>
+  </ul>
+
+  <h3>3.2 BD-rate</h3>
+  <p>Each encoder sweeps its quality parameter, giving a rate-distortion curve. To compare two encoders with one number, the Bjøntegaard delta rate averages the horizontal gap between their curves over the common quality range:</p>
+  $$\Delta R = \exp\!\Big(\frac{1}{Q_{hi}-Q_{lo}}\int_{Q_{lo}}^{Q_{hi}}\big[\ln R_{test}(Q)-\ln R_{ref}(Q)\big]\,dQ\Big)-1.$$
+  <p>$\ln R(Q)$ is interpolated with monotone PCHIP, the current practice, instead of the original cubic polynomial, which can oscillate. BD-rate is computed per clip; the median is reported.</p>
+
+  <h3>3.3 Calibrating the hardware quality scale</h3>
+  <p>The calibration has three steps:</p>
+  <ol>
+    <li>For each CRF $c$ used by an app preset and each clip $k$, the target is $V^*_k(c)=\mathrm{VMAF}_{x264}(c)$.</li>
+    <li>The clip’s monotone hardware curve is inverted to find the value $q_k(c)$ that reaches $V^*_k$.</li>
+    <li>The table value is the median over clips, $q(c) = \operatorname{med}_k q_k(c)$.</li>
+  </ol>
+  <p>H.264 hardware is matched to libx264 and HEVC hardware to libx265. The table replaces <code>crf + 1</code>.</p>
+
+  <h3>3.4 Material and results</h3>
+  <p><b>Material.</b> 12 open Xiph.org sequences of 4 s each, stored losslessly at 720p. They cover fast motion, pans, fine detail and text, water, talking heads and screen content.</p>
+  <p><b>Encodes.</b> 636 in total: 11 x264, 8 x265, 9 SVT-AV1, 12 h264_qsv and 13 hevc_qsv quality values per clip.</p>
+  <p><b>Machine.</b> Intel i5-1135G7 with Iris Xe, so only Quick Sync can be measured. NVENC fails on a driver API mismatch (and the MX350 has no NVENC unit), and Tiger Lake cannot encode AV1.</p>
+  <table>
+    <tr><th>Encoder</th><th class="num">BD-rate vs x264 (VMAF)</th><th class="num">PSNR-YUV</th><th class="num">SSIM</th><th class="num">Speed (fps, 720p)</th></tr>
+    <tr><td>x264 (reference)</td><td class="num">0 %</td><td class="num">0 %</td><td class="num">0 %</td><td class="num">44.8</td></tr>
+    <tr><td>x265 (fast)</td><td class="num">−22.2 %</td><td class="num">−26.4 %</td><td class="num">−20.8 %</td><td class="num">27.0</td></tr>
+    <tr class="hi"><td>SVT-AV1 (preset 8)</td><td class="num">−41.8 %</td><td class="num">−45.2 %</td><td class="num">−30.6 %</td><td class="num">49.8</td></tr>
+    <tr><td>h264_qsv (GPU)</td><td class="num" style="color:var(--bad)">+36.1 %</td><td class="num">+29.3 %</td><td class="num">+22.9 %</td><td class="num">62.9</td></tr>
+    <tr><td>hevc_qsv (GPU)</td><td class="num">−21.0 %</td><td class="num">−27.0 %</td><td class="num">−16.9 %</td><td class="num">51.9</td></tr>
+  </table>
+  <figure><img src="img/codecs_rd_vmaf.png"><figcaption><b>Figure 6.</b> VMAF against bitrate for each clip and encoder (log bitrate axis). The spread between clips is large: static talking heads gain far more from HEVC and AV1 than grainy, high-motion content, so a single “x % smaller” figure only holds as a median.</figcaption></figure>
+  <p><b>Reading.</b></p>
+  <ul>
+    <li>Quick Sync H.264 is the fastest encoder but needs about a third more bits than x264.</li>
+    <li>Quick Sync HEVC reaches about x265’s compression at nearly twice x265’s speed; on this machine it is the best size/speed trade-off.</li>
+    <li>SVT-AV1 saves about 40 % over x264 and is faster than x264 here.</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3 style="margin-top:0">3.5 The calibration table and its effect</h3>
+  <div class="row">
+    <div style="flex:1.3">
+      <table>
+        <tr><th class="num">App CRF</th><th class="num">Target VMAF</th><th class="num">Old (CRF+1)</th><th class="num">Calibrated</th></tr>
+        <tr><td class="num">16</td><td class="num">98.3</td><td class="num">17</td><td class="num">17.9</td></tr>
+        <tr><td class="num">18</td><td class="num">97.6</td><td class="num">19</td><td class="num">20.3</td></tr>
+        <tr><td class="num">21</td><td class="num">95.9</td><td class="num">22</td><td class="num">22.7</td></tr>
+        <tr><td class="num">23</td><td class="num">94.3</td><td class="num">24</td><td class="num">24.7</td></tr>
+        <tr><td class="num">26</td><td class="num">90.2</td><td class="num">27</td><td class="num">28.0</td></tr>
+        <tr><td class="num">30</td><td class="num">80.9</td><td class="num">31</td><td class="num">33.0</td></tr>
+        <tr><td class="num">HEVC 19/23/28</td><td class="num">97.2/94.6/88.2</td><td class="num">20/24/29</td><td class="num">22.3/25.3/29.8</td></tr>
+      </table>
+      <table>
+        <tr><th>Encoder</th><th class="num">VMAF error, old</th><th class="num">calibrated</th><th class="num">Size vs SW, old</th><th class="num">calibrated</th></tr>
+        <tr><td>h264_qsv</td><td class="num">+0.02 … +3.9</td><td class="num">−0.4 … +0.2</td><td class="num">1.51×</td><td class="num">1.30×</td></tr>
+        <tr><td>hevc_qsv</td><td class="num">+0.4 … +0.8</td><td class="num">−0.2 … +0.2</td><td class="num">1.15×</td><td class="num">0.95×</td></tr>
+      </table>
+    </div>
+    <figure style="flex:1"><img src="img/codecs_calibration.png"><figcaption><b>Figure 7.</b> The calibrated hardware value against the app’s CRF (median and spread over clips), next to the old CRF + 1 rule.</figcaption></figure>
+  </div>
+  <p>The old rule gave the GPU encoder <i>more</i> quality than the user asked for, especially at the “small file” setting (+3.9 VMAF at CRF 30), so its files were larger than needed. The calibrated values hit the requested quality in the median and cut hardware files by 14 % (H.264) and 17 % (HEVC).</p>
+  <div class="note limit">The mean absolute per-clip error is unchanged (1.3 and 2.2 VMAF), because it comes from the content: no single mapping can follow every clip. Removing it would need a per-file quality search, which is too slow for the app. Only Intel Quick Sync could be calibrated on the available hardware; NVENC and VideoToolbox keep the old rule until they can be measured.</div>
+  <figure><img src="img/desktop-convert-gpu.png"><figcaption><b>Figure 8.</b> In the app: Convert → “Use the graphics card (QSV)”. The quality presets (High / Balanced / Small) now go through the calibration table.</figcaption></figure>
+</div>
+
+<!-- ============ 4 ============ -->
+<div style="margin-top:9mm">
+  <h2><span class="n">4</span>Axis B: evaluation of voice/music separation</h2>
+  <h3>4.1 Pipeline</h3>
+  <p>Khama implements the STFT and its inverse in Rust to match the model’s PyTorch front end: periodic Hann window, $N=7680$, hop $H=1024$, reflect padding, and the first 3072 bins (up to ≈17.6 kHz). The inverse uses weighted overlap-add,</p>
+  $$\hat x(n) = \frac{\sum_m w(n-mH)\,\mathrm{IDFT}\{Y(m,\cdot)\}(n-mH)}{\sum_m w^2(n-mH)},$$
+  <p>which reconstructs the input exactly when $Y = X$; a unit test checks this to within $10^{-3}$.</p>
+  <p>The model, UVR-MDX-NET-Voc_FT running in ONNX, maps a 5.92 s chunk to the vocal spectrogram. Long signals are processed in chunks:</p>
+  <ul>
+    <li>Each chunk keeps its centre and discards a <b>margin</b> at both edges, where the model lacks context.</li>
+    <li>Neighbouring chunks may share an <b>overlap</b>, cross-faded with complementary raised-cosine weights.</li>
+  </ul>
+  <p>The accompaniment is either the mix minus the voice (<i>subtraction</i>) or a Wiener-like <i>soft mask</i>, $M=|\hat V|^2/(|\hat V|^2+|X-\hat V|^2)$.</p>
+
+  <h3>4.2 Metrics and protocol</h3>
+  <p><b>Metrics.</b> BSS Eval v4 (museval) splits each estimate into $s_{target}+e_{interf}+e_{artif}$ and reports SDR, SIR and SAR. Following SiSEC 2018, each track is summarised by the median over 1 s windows and the dataset by the median over tracks. A <b>join SNR</b> is also measured within ±0.1 s of each chunk boundary, where the margin and overlap settings act.</p>
+  <p><b>Data and runs.</b> The 50 MUSDB18 test tracks (7 s previews, 44.1 kHz stereo). Every configuration runs through the app’s own Rust code.</p>
+
+  <h3>4.3 Results</h3>
+  <table>
+    <tr><th>Configuration</th><th class="num">SDR voc.</th><th class="num">SIR voc.</th><th class="num">SAR voc.</th><th class="num">SDR acc.</th><th class="num">Join SNR</th></tr>
+    <tr class="hi"><td>Default (margin 87 ms, no overlap, gain 1.021, subtraction)</td><td class="num">10.80</td><td class="num">18.39</td><td class="num">11.32</td><td class="num">15.05</td><td class="num">9.61</td></tr>
+    <tr><td>Margin 0.5 s</td><td class="num">10.86</td><td class="num">18.71</td><td class="num">11.30</td><td class="num">15.03</td><td class="num">10.03</td></tr>
+    <tr><td>Margin 1 s</td><td class="num">10.76</td><td class="num">18.74</td><td class="num">11.24</td><td class="num">15.16</td><td class="num">10.71</td></tr>
+    <tr><td>Overlap 0.5 s</td><td class="num">10.82</td><td class="num">18.27</td><td class="num">11.36</td><td class="num">15.13</td><td class="num">9.62</td></tr>
+    <tr><td>Overlap 1 s</td><td class="num">10.86</td><td class="num">18.41</td><td class="num">11.37</td><td class="num">15.12</td><td class="num">9.57</td></tr>
+    <tr><td>Gain 1.0 / 1.05</td><td class="num">10.82 / 10.71</td><td class="num">18.39</td><td class="num">11.32</td><td class="num">15.05 / 15.02</td><td class="num">9.57</td></tr>
+    <tr><td>Soft mask</td><td class="num" style="color:var(--bad)">8.66</td><td class="num">15.35</td><td class="num">9.38</td><td class="num">13.34</td><td class="num">7.74</td></tr>
+  </table>
+  <h4>Paired Wilcoxon signed-rank test against the default (50 tracks)</h4>
+  <table>
+    <tr><th>Variant</th><th class="num">Median ΔSDR voc.</th><th class="num">p</th><th class="num">Median ΔJoin SNR</th><th class="num">p</th></tr>
+    <tr><td>Margin 0.5 s</td><td class="num">+0.010 dB</td><td class="num">0.18</td><td class="num">+0.14 dB</td><td class="num">0.94</td></tr>
+    <tr><td>Margin 1 s</td><td class="num">+0.008 dB</td><td class="num">0.51</td><td class="num">+1.19 dB</td><td class="num">0.38</td></tr>
+    <tr><td>Overlap 0.5 s</td><td class="num">+0.000 dB</td><td class="num">0.003</td><td class="num">+0.44 dB</td><td class="num">0.53</td></tr>
+    <tr><td>Soft mask</td><td class="num">−2.03 dB</td><td class="num">4·10<sup>−15</sup></td><td class="num">−1.67 dB</td><td class="num">4·10<sup>−11</sup></td></tr>
+  </table>
+  <figure><img src="img/separation.png"><figcaption><b>Figure 9.</b> Distribution of vocal SDR over the 50 tracks for each configuration.</figcaption></figure>
+  <p><b>Conclusions.</b></p>
+  <ul>
+    <li><b>Chunking settings do not matter at this scale.</b> The overlap’s effect is statistically detectable but about a thousandth of a decibel. A 1 s margin would need about 50 % more model runs for no significant gain.</li>
+    <li><b>The soft mask is clearly worse</b> on every track. The model already outputs the vocal spectrogram directly; re-deriving it through a ratio mask brings mixture energy back (lower SIR) and smears transients (lower SAR).</li>
+    <li><b>The 1.021 gain</b> trades accompaniment SIR against SAR and sits between the two extremes.</li>
+  </ul>
+  <p>The app therefore keeps its settings, now as a measured result instead of an assumption. The peak memory is about 2.55 GB, dominated by the model, and the real-time factor was 1.37 on an otherwise idle machine.</p>
+</div>
+
+<!-- ============ 5 ============ -->
+<div class="section">
+  <h2><span class="n">5</span>Implementation and reproducibility</h2>
+  <ul>
+    <li><b>In the app (Rust):</b>
+      <ul>
+        <li><code>scenes.rs</code>: the detector, with unit tests on synthetic frames (a cut is found; motion, a flash and a fade are handled correctly).</li>
+        <li><code>convert.rs</code>: the calibration tables and their interpolation.</li>
+        <li><code>separate.rs</code>: parameterised chunking.</li>
+      </ul>
+    </li>
+    <li><b><code>khama-bench</code></b> is a separate binary, built with a Cargo feature, that runs exactly the app’s code on dataset files and writes JSON. The benchmark therefore measures what users run, not a re-implementation.</li>
+    <li><b>Python scripts</b> (<code>bench/scenes</code>, <code>bench/codecs</code>, <code>bench/separation</code>) build the datasets, run the grids, can resume interrupted runs, and write every CSV and figure in this document. <code>bench/REPORT.md</code> holds the theory, protocols and tables.</li>
+    <li><b>Scale of the work:</b> 22 commits, 73 files changed and about 8 200 lines added on the <code>pfe</code> branch, which is merged with the released version 0.3.3 and builds for Windows and Android.</li>
+  </ul>
+  <figure><img src="img/desktop-convert-detect.png"><figcaption><b>Figure 10.</b> The Convert tab with the analysis tools: detect scene changes (new detector), detect black frames, detect silences.</figcaption></figure>
+
+  <h2 style="margin-top:8mm"><span class="n">6</span>Limitations, future work and proposed plan</h2>
+  <h3>Limitations</h3>
+  <ul>
+    <li><b>Shot detection.</b>
+      <ul>
+        <li>The synthetic set uses one encoder setting and 25 fps.</li>
+        <li>Only one real film is labelled.</li>
+        <li>Wipes and very slow dissolves remain the hardest cases.</li>
+      </ul>
+    </li>
+    <li><b>Codecs.</b>
+      <ul>
+        <li>One machine, and only Intel Quick Sync among the hardware encoders.</li>
+        <li>720p clips of 4 s each.</li>
+        <li>The calibration fixes the median, not the per-clip error.</li>
+      </ul>
+    </li>
+    <li><b>Separation.</b> 7-second previews contain only one or two chunk joins, so the join SNR is noisy.</li>
+  </ul>
+  <h3>Possible extensions</h3>
+  <ul>
+    <li>Label more real material, for example the ClipShots or RAI public benchmarks, and compare with a learned detector such as TransNet V2, for accuracy and for cost on a phone.</li>
+    <li>Calibrate NVENC and Apple VideoToolbox on suitable machines.</li>
+    <li>Add a fast per-file quality search for “exact VMAF” exports.</li>
+    <li>Run full-length MUSDB18 tracks to study the joins with more statistical power.</li>
+  </ul>
+  <h3>Proposed structure of the written report</h3>
+  <ol>
+    <li>General introduction</li>
+    <li>Study and critique of the existing application</li>
+    <li>Theoretical background (video features and shot detection; video quality metrics and RD theory; STFT and source separation)</li>
+    <li>Design of the solution</li>
+    <li>Implementation</li>
+    <li>Experiments and results</li>
+    <li>Conclusion and future work</li>
+  </ol>
+</div>
+
+<!-- ============ 7 ============ -->
+<div class="section">
+  <h2><span class="n">7</span>References</h2>
+  <ol style="font-size:9.6pt">
+    <li>H. Zhang, A. Kankanhalli, S. Smoliar. Automatic partitioning of full-motion video. <i>Multimedia Systems</i>, 1993.</li>
+    <li>A. Hanjalic. Shot-boundary detection: unraveled and resolved? <i>IEEE Trans. Circuits and Systems for Video Technology</i>, 2002.</li>
+    <li>T. Souček, J. Lokoč. TransNet V2: an effective deep network architecture for fast shot transition detection. 2020.</li>
+    <li>M. Gygli. Ridiculously fast shot boundary detection with fully convolutional neural networks. 2018.</li>
+    <li>Z. Wang, A. Bovik, H. Sheikh, E. Simoncelli. Image quality assessment: from error visibility to structural similarity. <i>IEEE Trans. Image Processing</i>, 2004.</li>
+    <li>Z. Li et al. Toward a practical perceptual video quality metric. Netflix Technology Blog, 2016 (VMAF).</li>
+    <li>G. Bjøntegaard. Calculation of average PSNR differences between RD-curves. ITU-T VCEG-M33, 2001.</li>
+    <li>E. Vincent, R. Gribonval, C. Févotte. Performance measurement in blind audio source separation. <i>IEEE Trans. Audio, Speech and Language Processing</i>, 2006.</li>
+    <li>F.-R. Stöter, A. Liutkus, N. Ito. The 2018 signal separation evaluation campaign. LVA/ICA, 2018.</li>
+    <li>Z. Rafii et al. MUSDB18: a corpus for music separation. 2017.</li>
+    <li>Y. Mitsufuji et al. Music Demixing Challenge 2021; D. Kim et al. KUIELab-MDX-Net. 2021.</li>
+  </ol>
+  <h3>Data and licences</h3>
+  <p style="font-size:9.6pt">The test sequences are from the Xiph.org derf collection. Sintel is © Blender Foundation (CC-BY 3.0). MUSDB18 is used for academic evaluation only, under its licence terms.</p>
+</div>
+
+<script>
+renderMathInElement(document.body, { delimiters: [ {left: "$$", right: "$$", display: true}, {left: "$", right: "$", display: false} ], throwOnError: false });
+document.body.dataset.ready = "1";
+</script>
+</body>
+</html>
