@@ -426,7 +426,8 @@ export function DownloadView(props: {
               setUrl(e.target.value);
               setAutoPasted(false);
             }}
-            onKeyDown={(e) => e.key === "Enter" && start()}
+            // Enter يبدأ فقط بعد اكتمال المعاينة: لا تنزيل بخيارات لم يرها المستخدم بعد (U-1)
+            onKeyDown={(e) => e.key === "Enter" && (multiLinks || probe.status === "ok") && start()}
             aria-label={t.urlAria}
           />
           {url ? (
