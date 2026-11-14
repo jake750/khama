@@ -44,7 +44,7 @@ export function extractUrls(text: string): string[] {
 /** يحذف علامات الترقيم الملتصقة بآخر الرابط، ويُبقي القوس الختامي إن كان له قوس مفتوح داخل الرابط */
 function trimUrlTail(url: string): string {
   for (;;) {
-    const last = url.at(-1) ?? "";
+    const last = url[url.length - 1] ?? "";
     if (/[.,;:!?،؛؟»'"\]}]/.test(last)) url = url.slice(0, -1);
     else if (last === ")" && url.split("(").length < url.split(")").length) url = url.slice(0, -1);
     else return url;
