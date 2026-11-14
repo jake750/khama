@@ -1,0 +1,69 @@
+# فحص الجودة مع كل push وكل Pull Request: الأنواع، والفحص، والتنسيق، والاختبارات، وأمان الاعتماديات.
+# الإجراءات مثبّتة على commit محدد (لا وسم يمكن تحريكه)، وDependabot يحدّثها.
+name: Check
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: ESLint
+        run: npx eslint src --max-warnings 25
+      - name: Prettier
+        run: npx prettier --check .
+      - name: Vitest
+        run: npx vitest run --dir src
+      - name: npm audit (production)
+        run: npm audit --omit=dev --audit-level=high
+
+  rust:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Linux system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          components: clippy, rustfmt
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: src-tauri -> target
+      # tauri-build يشترط وجود الأدوات المضمّنة؛ للفحص تكفي ملفات فارغة (الاختبارات التي تحتاج الأدوات الحقيقية معلَّمة ignore)
+      - name: Placeholder bundled tools
+        run: |
+          t=x86_64-unknown-linux-gnu
+          mkdir -p src-tauri/binaries/ffmpeg/bin
+          touch src-tauri/binaries/khama-yt-dlp-$t src-tauri/binaries/khama-deno-$t src-tauri/binaries/ffmpeg/bin/ffmpeg
+          chmod +x src-tauri/binaries/khama-*
+      - name: rustfmt
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - name: clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+      - name: tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: src-tauri
