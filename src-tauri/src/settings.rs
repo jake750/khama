@@ -223,21 +223,52 @@ pub fn has_saved_cookies(app: AppHandle) -> bool {
 /// يحفظ كوكيز ملصوقة يدويًا (صيغة Netscape التي تصدّرها إضافات المتصفح)
 #[tauri::command]
 pub fn save_cookies(app: AppHandle, content: String) -> Result<(), AppError> {
-    let content = content.replace("\r\n", "\n");
-    let valid_lines = content
-        .lines()
-        .filter(|l| !l.starts_with('#') && l.split('\t').count() >= 7)
-        .count();
-    if valid_lines == 0 {
-        return Err(AppError::new("cookiesInvalid"));
-    }
-    let mut out = String::from("# Netscape HTTP Cookie File\n");
-    out.push_str(content.trim_start_matches("# Netscape HTTP Cookie File\n"));
-    if !out.ends_with('\n') {
-        out.push('\n');
-    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let out = clean_cookies(&content, now).map_err(AppError::new)?;
     crate::persist::write_atomic_private(&cookies_path(&app)?, out.as_bytes())?;
     Ok(())
+}
+
+/// سطر كوكيز بصيغة Netscape: نطاق، TRUE/FALSE، مسار، TRUE/FALSE، انتهاء (ثوانٍ، 0 = للجلسة)، اسم، قيمة.
+/// يُرجع وقت الانتهاء إن كان السطر صالحًا.
+fn cookie_expiry(line: &str) -> Option<u64> {
+    let f: Vec<&str> = line.split('\t').collect();
+    let flag = |s: &str| s == "TRUE" || s == "FALSE";
+    let domain = f.first()?.trim_start_matches("#HttpOnly_");
+    let ok = f.len() == 7 && domain.contains('.') && flag(f[1]) && f[2].starts_with('/') && flag(f[3]) && !f[5].is_empty();
+    if !ok {
+        return None;
+    }
+    f[4].parse::<f64>().ok().filter(|e| *e >= 0.0).map(|e| e as u64)
+}
+
+/// يتحقق من ملف الكوكيز الملصوق ويُبقي الأسطر الصالحة فقط (T-59).
+/// "cookiesInvalid" = لا سطر صالح، "cookiesExpired" = كل الكوكيز منتهية.
+fn clean_cookies(content: &str, now: u64) -> Result<String, &'static str> {
+    let mut out = String::from("# Netscape HTTP Cookie File\n");
+    let (mut valid, mut alive) = (0, 0);
+    for line in content.lines().map(|l| l.trim_end_matches('\r')) {
+        // تعليق عادي (لا #HttpOnly_ الذي هو كوكيز حقيقية)
+        if line.is_empty() || (line.starts_with('#') && !line.starts_with("#HttpOnly_")) {
+            continue;
+        }
+        if let Some(exp) = cookie_expiry(line) {
+            valid += 1;
+            if exp == 0 || exp > now {
+                alive += 1;
+            }
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    match (valid, alive) {
+        (0, _) => Err("cookiesInvalid"),
+        (_, 0) => Err("cookiesExpired"),
+        _ => Ok(out),
+    }
 }
 
 #[tauri::command]
@@ -261,6 +292,20 @@ mod tests {
         let s = migrate(serde_json::from_str(json).unwrap());
         assert_eq!(s.projects[0].id, "قناتي");
         assert_eq!(s.active_project.as_deref(), Some(s.projects[0].id.as_str()));
+    }
+
+    #[test]
+    fn cookies_are_validated_line_by_line() {
+        let good = ".youtube.com\tTRUE\t/\tTRUE\t1900000000\tSID\tabc";
+        let http_only = "#HttpOnly_.youtube.com\tTRUE\t/\tTRUE\t0\tHSID\txyz";
+        let old = ".youtube.com\tTRUE\t/\tTRUE\t1000\tOLD\tv";
+        let text = format!("# Netscape HTTP Cookie File\r\n# comment\r\n{good}\r\nnot a cookie\r\n{http_only}\r\n{old}\r\n");
+        let out = clean_cookies(&text, 1_800_000_000).unwrap();
+        assert_eq!(out, format!("# Netscape HTTP Cookie File\n{good}\n{http_only}\n{old}\n"));
+
+        assert_eq!(clean_cookies("hello\tworld", 0), Err("cookiesInvalid"));
+        assert_eq!(clean_cookies("a\tb\tc\td\te\tf\tg", 0), Err("cookiesInvalid"), "7 حقول لا تكفي");
+        assert_eq!(clean_cookies(old, 1_800_000_000), Err("cookiesExpired"));
     }
 
     #[test]
