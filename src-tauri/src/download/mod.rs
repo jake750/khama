@@ -29,6 +29,7 @@ use tokio::{
     sync::{Semaphore, watch},
 };
 
+use crate::errors::LockExt;
 use crate::{
     errors::{AppError, friendly_ytdlp_error, tail},
     playlist::{self, Entry},
@@ -257,5 +258,57 @@ pub struct JobUpdate {
 }
 
 pub(crate) fn emit(app: &AppHandle, u: JobUpdate) {
-    let _ = app.emit("job-update", u);
+    if should_emit(&u, Instant::now()) {
+        let _ = app.emit("job-update", u);
+    }
+}
+
+/// أقل فاصل بين تحديثين للتقدّم في نفس المرحلة (T-82): yt-dlp وFFmpeg يكتبان عدة أسطر
+/// في الثانية، وكل حدث يعيد رسم الواجهة. 5 تحديثات في الثانية تكفي للعين.
+const PROGRESS_EVERY: Duration = Duration::from_millis(200);
+
+/// آخر تحديث أُرسل لعملية: وقته، وحالته، ومرحلته
+type LastEmit = (Instant, &'static str, Option<&'static str>);
+
+/// تغيّر الحالة أو المرحلة يمرّ دائمًا، وكذلك النهاية (done/error/canceled)
+fn should_emit(u: &JobUpdate, now: Instant) -> bool {
+    static LAST: Mutex<Option<HashMap<u64, LastEmit>>> = Mutex::new(None);
+    let mut guard = LAST.lock_ok();
+    let last = guard.get_or_insert_with(HashMap::new);
+    if matches!(u.state, "done" | "error" | "canceled") {
+        last.remove(&u.id);
+        return true;
+    }
+    match last.get(&u.id) {
+        Some(&(at, state, stage)) if state == u.state && stage == u.stage && now.duration_since(at) < PROGRESS_EVERY => false,
+        _ => {
+            last.insert(u.id, (now, u.state, u.stage));
+            true
+        }
+    }
+}
+
+#[cfg(test)]
+mod emit_tests {
+    use super::*;
+
+    fn up(id: u64, state: &'static str) -> JobUpdate {
+        JobUpdate {
+            id,
+            state,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn progress_is_throttled_but_state_changes_and_endings_pass() {
+        let t0 = Instant::now();
+        let ms = |n| t0 + Duration::from_millis(n);
+        assert!(should_emit(&up(900, "downloading"), ms(0)));
+        assert!(!should_emit(&up(900, "downloading"), ms(50)), "تقدّم متقارب يُتخطّى");
+        assert!(should_emit(&up(900, "downloading"), ms(250)), "بعد 200ms يمرّ");
+        assert!(should_emit(&up(900, "processing"), ms(260)), "تغيّر الحالة يمرّ فورًا");
+        assert!(should_emit(&up(900, "done"), ms(270)), "النهاية تمرّ دائمًا");
+        assert!(should_emit(&up(900, "downloading"), ms(280)), "بعد النهاية تبدأ من جديد");
+    }
 }
