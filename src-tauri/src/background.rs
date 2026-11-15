@@ -4,6 +4,7 @@
 //! - مراقبة الحافظة: أي رابط يُنسخ يُقترح تنزيله
 //! - الوضع المصغّر: نافذة صغيرة تبقى فوق البرامج الأخرى
 
+use crate::errors::LockExt;
 use std::{
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
@@ -23,7 +24,7 @@ use crate::settings::SettingsState;
 static TOLD_HIDDEN: AtomicBool = AtomicBool::new(false);
 
 fn is_ar(app: &AppHandle) -> bool {
-    app.state::<SettingsState>().0.lock().unwrap().language == "ar"
+    app.state::<SettingsState>().0.lock_ok().language == "ar"
 }
 
 pub fn show_main(app: &AppHandle) {
@@ -68,7 +69,7 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
 pub fn on_window_event(window: &Window, event: &WindowEvent) {
     if let WindowEvent::CloseRequested { api, .. } = event {
         let app = window.app_handle();
-        if !app.state::<SettingsState>().0.lock().unwrap().close_to_tray {
+        if !app.state::<SettingsState>().0.lock_ok().close_to_tray {
             return;
         }
         api.prevent_close();
@@ -104,7 +105,7 @@ pub fn spawn_clipboard_watcher(app: AppHandle) {
         let mut primed = false;
         loop {
             std::thread::sleep(Duration::from_millis(1000));
-            let enabled = app.state::<SettingsState>().0.lock().unwrap().watch_clipboard;
+            let enabled = app.state::<SettingsState>().0.lock_ok().watch_clipboard;
             if !enabled {
                 primed = false;
                 continue;

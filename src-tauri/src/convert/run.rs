@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::LockExt;
 
 // ======================= تشغيل التحويل =======================
 
@@ -29,7 +30,7 @@ pub(super) fn output_dir_for(app: &AppHandle, o: &ConvertOptions, input: &Path) 
     if let Some(d) = &o.out_dir {
         return Ok(PathBuf::from(d));
     }
-    let s = app.state::<SettingsState>().0.lock().unwrap().clone();
+    let s = app.state::<SettingsState>().0.lock_ok().clone();
     if s.convert_dest == "output" {
         settings::resolve_output_dir(app, &s)
     } else {
@@ -367,7 +368,7 @@ pub fn queue_convert(app: &AppHandle, request: ConvertRequest) -> Result<u64, Ap
     }
     let id = jobs.next_id.fetch_add(1, Ordering::Relaxed) + 1;
     let (tx, mut rx) = watch::channel(false);
-    jobs.cancels.lock().unwrap().insert(id, tx);
+    jobs.cancels.lock_ok().insert(id, tx);
     let sem = queue.0.clone();
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -417,7 +418,7 @@ pub fn queue_convert(app: &AppHandle, request: ConvertRequest) -> Result<u64, Ap
         if let Ok(root) = download::jobs_root(&app2) {
             let _ = tokio::fs::remove_dir_all(root.join(format!("c{id}"))).await;
         }
-        app2.state::<Jobs>().cancels.lock().unwrap().remove(&id);
+        app2.state::<Jobs>().cancels.lock_ok().remove(&id);
         emit(&app2, update);
     });
     Ok(id)

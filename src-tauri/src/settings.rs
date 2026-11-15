@@ -2,6 +2,7 @@
 //! (Windows: %APPDATA%\com.jake750.khama  —  macOS: ~/Library/Application Support/...).
 //! لا شيء يُرسل لأي خادم.
 
+use crate::errors::LockExt;
 use std::{fs, path::PathBuf, sync::Mutex};
 
 use serde::{Deserialize, Serialize};
@@ -145,7 +146,7 @@ fn settings_path(app: &AppHandle) -> Result<PathBuf, AppError> {
 /// عدّاد {n} في قالب اسم الملف: يزيد مع كل تنزيل ويبقى بعد إغلاق التطبيق
 pub fn next_counter(app: &AppHandle) -> u64 {
     static LOCK: Mutex<()> = Mutex::new(());
-    let _g = LOCK.lock().unwrap();
+    let _g = LOCK.lock_ok();
     let Ok(p) = config_dir(app).map(|d| d.join("counter.txt")) else {
         return 1;
     };
@@ -189,14 +190,14 @@ pub fn resolve_output_dir(app: &AppHandle, s: &Settings) -> Result<PathBuf, AppE
 
 #[tauri::command]
 pub fn get_settings(state: tauri::State<SettingsState>) -> Settings {
-    state.0.lock().unwrap().clone()
+    state.0.lock_ok().clone()
 }
 
 #[tauri::command]
 pub fn save_settings(app: AppHandle, state: tauri::State<SettingsState>, settings: Settings) -> Result<(), AppError> {
     let json = serde_json::to_string_pretty(&settings).expect("settings serialize");
     crate::persist::write_atomic(&settings_path(&app)?, json.as_bytes())?;
-    *state.0.lock().unwrap() = settings;
+    *state.0.lock_ok() = settings;
     Ok(())
 }
 

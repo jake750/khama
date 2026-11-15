@@ -199,3 +199,35 @@ mod tests {
         assert_eq!(e.detail.as_deref(), Some("ERROR: something weird"));
     }
 }
+
+/// قفل لا يُسقط التطبيق (T-27): إن انهارت مهمة وهي تمسك القفل نكمل بالقيمة الموجودة
+/// بدل أن ينهار كل من يحاول القفل بعدها.
+pub trait LockExt<T> {
+    fn lock_ok(&self) -> std::sync::MutexGuard<'_, T>;
+}
+
+impl<T> LockExt<T> for std::sync::Mutex<T> {
+    fn lock_ok(&self) -> std::sync::MutexGuard<'_, T> {
+        self.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+}
+
+#[cfg(test)]
+mod lock_tests {
+    use super::LockExt;
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn lock_ok_recovers_after_a_panic_while_locked() {
+        let m = Arc::new(Mutex::new(1));
+        let m2 = m.clone();
+        let _ = std::thread::spawn(move || {
+            let _g = m2.lock().unwrap();
+            panic!("مهمة انهارت وهي تمسك القفل");
+        })
+        .join();
+        assert!(m.is_poisoned());
+        *m.lock_ok() += 1;
+        assert_eq!(*m.lock_ok(), 2);
+    }
+}

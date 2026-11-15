@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::LockExt;
 
 // ======================= المجلدات المراقَبة =======================
 
@@ -34,7 +35,7 @@ pub fn spawn_watcher(app: AppHandle) {
         let mut pending: HashMap<PathBuf, (u64, u8)> = HashMap::new();
         loop {
             tokio::time::sleep(Duration::from_secs(4)).await;
-            let folders = app.state::<SettingsState>().0.lock().unwrap().watch_folders.clone();
+            let folders = app.state::<SettingsState>().0.lock_ok().watch_folders.clone();
             let active: Vec<_> = folders.into_iter().filter(|w| w.enabled && preset(&w.preset).is_some()).collect();
             known_dirs.retain(|d| active.iter().any(|w| Path::new(&w.dir) == d));
             for w in &active {
@@ -68,7 +69,7 @@ pub fn spawn_watcher(app: AppHandle) {
                         pending.remove(&path);
                         seen.insert(path.clone());
                         // التحويل يبدأ هنا في Rust، فلا يضيع الملف إن لم تكن الواجهة جاهزة (T-26)
-                        let hw = app.state::<SettingsState>().0.lock().unwrap().convert_hw;
+                        let hw = app.state::<SettingsState>().0.lock_ok().convert_hw;
                         let request = ConvertRequest {
                             inputs: vec![path.to_string_lossy().into_owned()],
                             preset: w.preset.clone(),

@@ -1,5 +1,6 @@
 //! سجلّ التنزيلات: يبقى بعد إغلاق التطبيق (ملف JSON بجانب الإعدادات، لا يغادر الجهاز).
 
+use crate::errors::LockExt;
 use std::{fs, path::PathBuf, sync::Mutex};
 
 use serde::{Deserialize, Serialize};
@@ -43,7 +44,7 @@ fn path(app: &AppHandle) -> Result<PathBuf, AppError> {
 }
 
 fn with_list<T>(app: &AppHandle, state: &HistoryState, f: impl FnOnce(&mut Vec<HistoryEntry>) -> (T, bool)) -> Result<T, AppError> {
-    let mut guard = state.0.lock().unwrap();
+    let mut guard = state.0.lock_ok();
     if guard.is_none() {
         let list = match path(app) {
             Ok(p) => crate::persist::read_json(&p).or_default_logged("history.json"),

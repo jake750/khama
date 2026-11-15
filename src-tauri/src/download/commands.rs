@@ -1,4 +1,5 @@
 use super::*;
+use crate::errors::LockExt;
 
 // ======================= أوامر تستدعيها الواجهة =======================
 
@@ -12,10 +13,10 @@ pub async fn start_download(
 ) -> Result<u64, AppError> {
     let mut req = request;
     req.url = validate_url(&req.url)?;
-    let settings = settings.0.lock().unwrap().clone();
+    let settings = settings.0.lock_ok().clone();
     let id = jobs.next_id.fetch_add(1, Ordering::Relaxed) + 1;
     let (tx, mut rx) = watch::channel(false);
-    jobs.cancels.lock().unwrap().insert(id, tx);
+    jobs.cancels.lock_ok().insert(id, tx);
     let slots = queue.0.clone();
 
     let app2 = app.clone();
@@ -35,7 +36,7 @@ pub async fn start_download(
                 tokio::select! {
                     p = slots.acquire_owned() => p.expect("semaphore never closed"),
                     _ = canceled(&mut rx) => {
-                        app2.state::<Jobs>().cancels.lock().unwrap().remove(&id);
+                        app2.state::<Jobs>().cancels.lock_ok().remove(&id);
                         emit(&app2, JobUpdate { id, state: "canceled", ..Default::default() });
                         return;
                     }
@@ -84,7 +85,7 @@ pub async fn start_download(
         if let Ok(dir) = job_dir {
             let _ = tokio::fs::remove_dir_all(dir).await;
         }
-        app2.state::<Jobs>().cancels.lock().unwrap().remove(&id);
+        app2.state::<Jobs>().cancels.lock_ok().remove(&id);
         emit(&app2, update);
     });
     Ok(id)
@@ -92,7 +93,7 @@ pub async fn start_download(
 
 #[tauri::command]
 pub fn cancel_download(jobs: State<'_, Jobs>, id: u64) {
-    if let Some(tx) = jobs.cancels.lock().unwrap().get(&id) {
+    if let Some(tx) = jobs.cancels.lock_ok().get(&id) {
         let _ = tx.send(true);
     }
 }
@@ -218,7 +219,7 @@ pub(super) async fn probe_spotify(tools: &Tools, embed: String) -> Result<ProbeI
 #[tauri::command]
 pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: String) -> Result<ProbeInfo, AppError> {
     let url = validate_url(&url)?;
-    let s = settings.0.lock().unwrap().clone();
+    let s = settings.0.lock_ok().clone();
     let tools = tools::resolve(&app)?;
     if let Some(embed) = playlist::spotify_embed_url(&url) {
         return probe_spotify(&tools, embed).await;
@@ -294,7 +295,7 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
 #[tauri::command]
 pub async fn save_thumbnail(app: AppHandle, settings: State<'_, SettingsState>, url: String) -> Result<String, AppError> {
     let url = validate_url(&url)?;
-    let s = settings.0.lock().unwrap().clone();
+    let s = settings.0.lock_ok().clone();
     let tools = tools::resolve(&app)?;
     static N: AtomicU64 = AtomicU64::new(0);
     let work = jobs_root(&app)?.join(format!("thumb-{}", N.fetch_add(1, Ordering::Relaxed)));
@@ -348,7 +349,7 @@ pub fn reveal_file(app: AppHandle, path: String) -> Result<(), AppError> {
 #[tauri::command]
 pub fn open_output_dir(app: AppHandle, settings: State<'_, SettingsState>) -> Result<(), AppError> {
     use tauri_plugin_opener::OpenerExt;
-    let s = settings.0.lock().unwrap().clone();
+    let s = settings.0.lock_ok().clone();
     let dir = settings::resolve_output_dir(&app, &s)?;
     std::fs::create_dir_all(&dir)?;
     app.opener()

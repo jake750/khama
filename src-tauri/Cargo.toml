@@ -48,7 +48,7 @@ tauri-plugin-single-instance = "2"
 codegen-units = 1
 lto = true
 opt-level = 3
-panic = "abort"
+# بلا panic = "abort": انهيار مهمة في الخلفية يبقى داخلها ولا يُغلق التطبيق كله (T-27)
 strip = true
 
 # في وضع التطوير: نحسّن مكتبات الحساب الثقيل فقط (إزالة الموسيقى بطيئة جدًا بدونها)
