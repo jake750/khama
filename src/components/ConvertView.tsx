@@ -5,7 +5,7 @@ import { formatBytes, formatDuration } from "../format";
 import { useI18n, type Dict } from "../i18n";
 import { estimateSize, GROUPS, presetById, presetFits, PRESETS, suggestPreset, type PresetDef, type PresetGroup } from "../presets";
 import { ErrorBox } from "./ErrorBox";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
 import { AnimatedList, SlideSwitch } from "../motion";
 import { Segmented, Toggle } from "./Segmented";
 import { TrimRange } from "./TrimRange";
@@ -74,19 +74,129 @@ export const defaultOptions = (): ConvertOptions => ({
 
 const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p;
 
-function specLine(t: Dict, m: MediaInfo): string {
+/** مواصفات الملف جدولًا صغيرًا: عنوان وقيمة لكل سطر (D-83) */
+function Specs({ m }: { m: MediaInfo }) {
+  const { t } = useI18n();
   const v = m.video;
   const a = m.audio[0];
-  return [
-    v ? `${v.codec.toUpperCase()} ${v.width}×${v.height}` : null,
-    v?.fps ? `${Math.round(v.fps * 100) / 100} fps${v.vfr ? " (VFR)" : ""}` : null,
-    v && v.bitDepth > 8 ? `${v.bitDepth}-bit` : null,
-    a ? `${a.codec.toUpperCase()} ${a.channels === 1 ? t.mono : a.channels === 2 ? t.stereo : t.channels(a.channels)}` : null,
-    formatDuration(m.duration),
-    formatBytes(t, m.size),
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const rows: [string, string | null][] = [
+    [
+      t.specVideo,
+      v
+        ? [
+            `${v.codec.toUpperCase()} ${v.width}×${v.height}`,
+            v.fps ? `${Math.round(v.fps * 100) / 100} fps${v.vfr ? " (VFR)" : ""}` : null,
+            v.bitDepth > 8 ? `${v.bitDepth}-bit` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : null,
+    ],
+    [
+      t.specAudio,
+      a ? `${a.codec.toUpperCase()} ${a.channels === 1 ? t.mono : a.channels === 2 ? t.stereo : t.channels(a.channels)}` : null,
+    ],
+    [t.specLength, m.duration ? formatDuration(m.duration) : null],
+    [t.specSize, formatBytes(t, m.size)],
+  ];
+  return (
+    <dl className="specs">
+      {rows
+        .filter(([, val]) => val)
+        .map(([k, val]) => (
+          <div key={k}>
+            <dt>{k}</dt>
+            <dd className="ltr-num">{val}</dd>
+          </div>
+        ))}
+    </dl>
+  );
+}
+
+/** أيقونة نوع المخرَج على بطاقة الـ Preset (D-21) */
+const KIND_ICON: Record<PresetDef["kind"], IconName> = {
+  video: "film",
+  gif: "film",
+  audio: "music",
+  frame: "image",
+  sequence: "image",
+  copy: "scissors",
+  detect: "search",
+  stems: "layers",
+};
+
+/** «سريع»: نسخ بلا إعادة ترميز أو تحليل فقط. «ثقيل»: نموذج ذكاء اصطناعي يعمل على المعالج */
+function speedTag(p: PresetDef): "fast" | "heavy" | null {
+  if (p.kind === "copy" || p.kind === "detect" || p.kind === "frame") return "fast";
+  if (p.kind === "stems") return "heavy";
+  return null;
+}
+
+type OptTab = "trim" | "picture" | "burn" | "audio";
+
+/** التدوير والقلب بأيقونات مرسومة بدل أسهم نصية (D-54) */
+function RotatePick(props: { value: ConvertOptions["rotate"] | null; onChange: (v: ConvertOptions["rotate"] | null) => void }) {
+  const { t } = useI18n();
+  const opts: { value: string; icon?: IconName; label: string }[] = [
+    { value: "none", label: t.rotateNone },
+    { value: "90", icon: "rotateCw", label: t.rotateCw },
+    { value: "180", icon: "rotate180", label: t.rotate180 },
+    { value: "270", icon: "rotateCcw", label: t.rotateCcw },
+    { value: "hflip", icon: "flipH", label: t.flipH },
+    { value: "vflip", icon: "flipV", label: t.flipV },
+  ];
+  return (
+    <div className="pick">
+      <span className="field-label">{t.rotate}</span>
+      <Segmented<string>
+        label={t.rotate}
+        value={props.value ?? "none"}
+        onChange={(v) => props.onChange(v === "none" ? null : (v as ConvertOptions["rotate"]))}
+        options={opts.map((o) => ({
+          value: o.value,
+          title: o.label,
+          label: o.icon ? (
+            <span className="icon-choice">
+              <Icon name={o.icon} size={18} />
+              <span className="sr-only">{o.label}</span>
+            </span>
+          ) : (
+            o.label
+          ),
+        }))}
+      />
+    </div>
+  );
+}
+
+/** موضع العلامة المائية: شبكة 3×3، الزوايا والوسط فقط قابلة للاختيار (D-53) */
+function PosGrid(props: { value: string; onChange: (v: NonNullable<ConvertOptions["watermarkPos"]>) => void }) {
+  const { t } = useI18n();
+  const cells: (NonNullable<ConvertOptions["watermarkPos"]> | null)[] = ["tl", null, "tr", null, "c", null, "bl", null, "br"];
+  const names: Record<string, string> = { tl: t.posTl, tr: t.posTr, bl: t.posBl, br: t.posBr, c: t.posC };
+  return (
+    <div className="pick">
+      <span className="field-label">{t.watermarkPos}</span>
+      <div className="pos-grid" role="group" aria-label={t.watermarkPos}>
+        {cells.map((c, i) =>
+          c ? (
+            <button
+              key={c}
+              type="button"
+              aria-pressed={props.value === c}
+              title={names[c]}
+              aria-label={names[c]}
+              onClick={() => props.onChange(c)}
+            >
+              <span className="pos-dot" />
+            </button>
+          ) : (
+            <span key={i} aria-hidden="true" />
+          ),
+        )}
+      </div>
+    </div>
+  );
 }
 
 function groupName(t: Dict, g: PresetGroup) {
@@ -180,6 +290,7 @@ export function ConvertView(props: {
   const { settings: s, update, files } = props;
   const [opts, setOpts] = useState<ConvertOptions>(defaultOptions);
   const [more, setMore] = useState(false);
+  const [tabPick, setTab] = useState<OptTab>("picture");
   const [trimOn, setTrimOn] = useState(false);
   const [error, setError] = useState<AppError | null>(null);
   const [busy, setBusy] = useState(false);
@@ -199,6 +310,10 @@ export function ConvertView(props: {
   const showBurn = kind === "video";
   const canTrim = !!single?.duration;
   const canMerge = ready.length > 1 && ["video", "audio", "gif"].includes(kind);
+  const tabs = (
+    [showPicture && "picture", canTrim && "trim", showBurn && "burn", (showAudio || kind === "copy") && "audio"] as (OptTab | false)[]
+  ).filter((x): x is OptTab => !!x);
+  const tab: OptTab | undefined = tabs.includes(tabPick) ? tabPick : tabs[0];
 
   /** نرسل فقط الخيارات المناسبة لنوع الـ Preset (الأقسام المخفية لا تؤثر) */
   const effective = (info?: MediaInfo | null): ConvertOptions => {
@@ -315,7 +430,15 @@ export function ConvertView(props: {
       {/* ============ الملفات ============ */}
       <div className={`card ${props.dragging ? "drop-over" : ""}`}>
         <div className="section-head">
-          <h2>{props.dragging ? t.dropHere : t.filesTitle(files.length)}</h2>
+          <h2>
+            {props.dragging ? (
+              t.dropHere
+            ) : (
+              <>
+                {t.filesHeading} <span className="count-badge ltr-num">{files.length}</span>
+              </>
+            )}
+          </h2>
           <span className="spacer" />
           <button className="btn btn-sm" onClick={chooseFiles}>
             <Icon name="plus" size={16} /> {t.chooseFiles}
@@ -338,7 +461,7 @@ export function ConvertView(props: {
                 <div className="file-name" title={f.path}>
                   {baseName(f.path)}
                 </div>
-                <div className="faint ltr-num">{f.info ? specLine(t, f.info) : f.error ? null : t.analyzingFile}</div>
+                {f.info ? <Specs m={f.info} /> : f.error ? null : <div className="faint">{t.analyzingFile}</div>}
                 {f.info && f.info.issues.length > 0 && (
                   <div className="issues">
                     {f.info.issues.map((i) => (
@@ -362,23 +485,6 @@ export function ConvertView(props: {
             </div>
           ))}
         </AnimatedList>
-        {suggestion && suggestion !== preset.id && (
-          <div className="alert info suggestion">
-            <Icon name="check" size={16} />
-            <span className="grow">
-              {t.suggested}: <b>{presetById(suggestion)!.name[lang]}</b> — {presetById(suggestion)!.desc[lang]}
-            </span>
-            <button
-              className="btn btn-sm"
-              onClick={() => {
-                update({ convertPreset: suggestion });
-                setGroup(presetById(suggestion)!.group);
-              }}
-            >
-              {t.useSuggestion}
-            </button>
-          </div>
-        )}
       </div>
 
       {/* ============ ماذا تريد؟ ============ */}
@@ -387,23 +493,44 @@ export function ConvertView(props: {
           label={t.format}
           value={group}
           onChange={setGroup}
-          options={GROUPS.map((g) => ({ value: g, label: groupName(t, g) }))}
+          options={GROUPS.map((g) => ({
+            value: g,
+            label:
+              suggestion && g !== group && presetById(suggestion)?.group === g ? (
+                <>
+                  {groupName(t, g)} <span className="tab-dot" title={t.suggested} />
+                </>
+              ) : (
+                groupName(t, g)
+              ),
+          }))}
         />
         <SlideSwitch id={group} index={GROUPS.indexOf(group)} distance={40}>
           <div className="preset-grid">
             {PRESETS.filter((p) => p.group === group).map((p) => {
               const ok = fits(p);
+              const tag = speedTag(p);
               return (
                 <button
                   key={p.id}
-                  className="preset"
+                  className={`preset ${p.id === suggestion ? "suggested" : ""}`}
                   aria-pressed={p.id === preset.id}
                   disabled={!ok}
-                  title={ok ? undefined : t.notFit}
                   onClick={() => update({ convertPreset: p.id })}
                 >
-                  <b>{p.name[lang]}</b>
+                  <span className="preset-head">
+                    <Icon name={KIND_ICON[p.kind]} size={18} />
+                    <b>{p.name[lang]}</b>
+                    {tag && <span className={`preset-tag ${tag}`}>{tag === "fast" ? t.tagFast : t.tagHeavy}</span>}
+                  </span>
                   <span>{p.desc[lang]}</span>
+                  {p.id === suggestion && (
+                    <span className="preset-suggested">
+                      <Icon name="check" size={16} /> {t.suggestedFor}
+                    </span>
+                  )}
+                  {/* سبب التعطيل مكتوب لا في title، فيظهر على الهاتف أيضًا (D-86) */}
+                  {!ok && <span className="preset-why">{t.notFit}</span>}
                 </button>
               );
             })}
@@ -440,14 +567,28 @@ export function ConvertView(props: {
           </div>
         )}
 
-        {/* ============ خيارات إضافية ============ */}
-        <button className="more-btn" aria-expanded={more} onClick={() => setMore((m) => !m)}>
-          <Icon name="chevron" size={16} /> {t.moreOptions}
-        </button>
-        <div className="collapse" data-open={more}>
+        {/* ============ خيارات إضافية: تبويب واحد ظاهر في كل مرة (D-22) ============ */}
+        {tabs.length > 0 && (
+          <button className="more-btn" aria-expanded={more} onClick={() => setMore((m) => !m)}>
+            <Icon name="chevron" size={16} /> {t.moreOptions}
+          </button>
+        )}
+        <div className="collapse" data-open={more && tabs.length > 0}>
           <div>
             <div className="more">
-              {canTrim && (
+              {tabs.length > 1 && (
+                <Segmented<OptTab>
+                  label={t.moreOptions}
+                  value={tab!}
+                  onChange={setTab}
+                  options={tabs.map((v) => ({
+                    value: v,
+                    label: { trim: t.optTrim, picture: t.optPicture, burn: t.optBurn, audio: t.optAudio }[v],
+                  }))}
+                />
+              )}
+
+              {tab === "trim" && (
                 <section>
                   <Toggle checked={trimOn} onChange={setTrimOn} title={t.optTrim} />
                   <div className="collapse" data-open={trimOn}>
@@ -462,9 +603,8 @@ export function ConvertView(props: {
                 </section>
               )}
 
-              {showPicture && (
+              {tab === "picture" && (
                 <section>
-                  <h4>{t.optPicture}</h4>
                   <div className="pick-grid">
                     <Pick
                       label={t.size}
@@ -500,20 +640,8 @@ export function ConvertView(props: {
                         options={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4].map((v) => ({ value: v, label: `${v}×` }))}
                       />
                     )}
-                    <Pick
-                      label={t.rotate}
-                      value={opts.rotate ?? null}
-                      onChange={(rotate) => set({ rotate })}
-                      options={[
-                        { value: null, label: "—" },
-                        { value: "90", label: "90° ↻" },
-                        { value: "180", label: "180°" },
-                        { value: "270", label: "90° ↺" },
-                        { value: "hflip", label: t.flipH },
-                        { value: "vflip", label: t.flipV },
-                      ]}
-                    />
                   </div>
+                  <RotatePick value={opts.rotate ?? null} onChange={(rotate) => set({ rotate })} />
                   <div className="toggle-grid">
                     <Toggle
                       checked={opts.deinterlace}
@@ -528,9 +656,8 @@ export function ConvertView(props: {
                 </section>
               )}
 
-              {showBurn && (
+              {tab === "burn" && (
                 <section>
-                  <h4>{t.optBurn}</h4>
                   <div className="pick-grid">
                     <FilePick
                       label={t.subtitles}
@@ -544,28 +671,14 @@ export function ConvertView(props: {
                       extensions={["png", "jpg", "jpeg", "webp"]}
                       onChange={(watermark) => set({ watermark })}
                     />
-                    {opts.watermark && (
-                      <Pick
-                        label={t.watermarkPos}
-                        value={opts.watermarkPos ?? "br"}
-                        onChange={(watermarkPos) => set({ watermarkPos })}
-                        options={[
-                          { value: "tl", label: t.posTl },
-                          { value: "tr", label: t.posTr },
-                          { value: "bl", label: t.posBl },
-                          { value: "br", label: t.posBr },
-                          { value: "c", label: t.posC },
-                        ]}
-                      />
-                    )}
+                    {opts.watermark && <PosGrid value={opts.watermarkPos ?? "br"} onChange={(watermarkPos) => set({ watermarkPos })} />}
                   </div>
                   <Toggle checked={opts.timecode} onChange={(timecode) => set({ timecode })} title={t.timecode} hint={t.timecodeHint} />
                 </section>
               )}
 
-              {showAudio && (
+              {tab === "audio" && showAudio && (
                 <section>
-                  <h4>{t.optAudio}</h4>
                   <div className="pick-grid">
                     <Pick
                       label={t.loudness}
@@ -589,7 +702,7 @@ export function ConvertView(props: {
                 </section>
               )}
 
-              {kind === "copy" && (
+              {tab === "audio" && kind === "copy" && (
                 <section>
                   <Toggle checked={opts.mute} onChange={(mute) => set({ mute })} title={t.mute} />
                 </section>

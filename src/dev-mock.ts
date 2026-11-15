@@ -129,6 +129,33 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         original: false,
       };
     }
+    // المحوّل في المتصفح: اختيار ملف وهمي وتحليله
+    case "plugin:dialog|open":
+      return ["C:\\Users\\me\\Videos\\clip-phone.mp4"];
+    case "analyze_file":
+      return {
+        path: String(args.path),
+        name: "clip-phone.mp4",
+        size: 184_000_000,
+        duration: 95,
+        container: "mp4",
+        bitrate: 15_000_000,
+        video: {
+          codec: "hevc",
+          width: 1920,
+          height: 1080,
+          fps: 29.97,
+          vfr: true,
+          pixFmt: "yuv420p10le",
+          bitDepth: 10,
+          hdr: false,
+          interlaced: false,
+        },
+        audio: [{ codec: "aac", channels: 2, sampleRate: 48000 }],
+        subtitles: 0,
+        thumbnail: null,
+        issues: ["vfr", "tenBit", "heavyCodec"],
+      };
     case "start_download":
     case "start_convert": {
       const id = nextJob++;

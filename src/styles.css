@@ -3070,10 +3070,6 @@ button.menu-item:hover {
 }
 
 /* ---------- الحالات الماضية: شفافية لا لون ---------- */
-.history-item.missing {
-  opacity: 0.5;
-}
-
 /* ---------- الهاتف: حافة 16، وتبويبات سفلية زجاجية ---------- */
 @media (max-width: 560px) {
   :root {
@@ -3416,4 +3412,279 @@ button.menu-item:hover {
   .icon-btn.sm {
     min-width: 44px;
   }
+}
+
+/* =====================================================================
+   المحوّل (القسم 4 من مقترح التصميم)
+   ===================================================================== */
+/* عدد الملفات شارة (D-98) */
+.count-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--s-2);
+  margin-inline-start: var(--s-1);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-semi);
+  vertical-align: middle;
+}
+
+/* المواصفات جدول صغير (D-83) */
+.specs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--s-1) var(--s-4);
+  margin: var(--s-1) 0 0;
+  font-size: var(--fs-meta);
+}
+.specs dt {
+  color: var(--text-faint);
+}
+.specs dd {
+  margin: 0;
+  color: var(--text-dim);
+}
+
+/* بطاقة الـ Preset: أيقونة النوع وشارة السرعة (D-21) */
+.preset-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--text);
+}
+.preset-head svg {
+  flex: none;
+  color: var(--text-faint);
+}
+.preset[aria-pressed="true"] .preset-head svg {
+  color: var(--accent);
+}
+.preset .preset-head b {
+  flex: 1;
+  min-width: 0;
+}
+.preset .preset-tag {
+  flex: none;
+  padding: 0 var(--s-2);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: var(--fw-semi);
+  line-height: 20px;
+}
+.preset-tag.fast {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.preset-tag.heavy {
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  color: var(--warn);
+}
+
+/* المقترح على البطاقة نفسها (D-85) */
+.preset.suggested:not([aria-pressed="true"]) {
+  border-style: dashed;
+  border-color: var(--accent);
+}
+.preset .preset-suggested {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  margin-top: var(--s-1);
+  color: var(--accent);
+  font-weight: var(--fw-semi);
+}
+.tab-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-inline-start: var(--s-1);
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+/* سبب التعطيل مكتوب، والبطاقة مقروءة (D-86) */
+.preset:disabled {
+  opacity: 1;
+  background: var(--surface-2);
+}
+.preset:disabled .preset-head,
+.preset:disabled > span:not(.preset-why) {
+  color: var(--text-faint);
+}
+.preset .preset-why {
+  margin-top: var(--s-1);
+  color: var(--warn);
+  font-weight: var(--fw-semi);
+}
+
+/* التدوير بأيقونات (D-54) */
+.icon-choice {
+  display: inline-grid;
+  place-items: center;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* موضع العلامة المائية شبكة 3×3 (D-53) */
+.pos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 32px);
+  grid-template-rows: repeat(3, 24px);
+  gap: var(--s-1);
+  width: max-content;
+  padding: var(--s-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  direction: ltr;
+}
+.pos-grid button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+.pos-grid .pos-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.pos-grid button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.pos-grid button[aria-pressed="true"] .pos-dot {
+  background: var(--accent);
+}
+
+/* تقدير الحجم بخط عادي بجانب الزر (D-55) */
+.estimate {
+  color: var(--text);
+  font-size: var(--fs-body);
+}
+
+/* =====================================================================
+   بطاقة العملية والسجلّ (القسم 5 من مقترح التصميم)
+   ===================================================================== */
+/* قائمة «⋯» (D-25) */
+.more-menu {
+  position: relative;
+}
+.more-menu-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--s-1));
+  inset-inline-end: 0;
+  display: grid;
+  min-width: 200px;
+  padding: var(--s-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+.more-menu-list button {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 36px;
+  padding: 0 var(--s-3);
+  border: 0;
+  border-radius: var(--r-xs);
+  background: none;
+  color: var(--text);
+  text-align: start;
+  white-space: nowrap;
+}
+.more-menu-list button:hover,
+.more-menu-list button:focus-visible {
+  background: var(--surface-2);
+}
+
+/* مقبض السحب مرئي (D-100) */
+.drag-grip {
+  width: 24px;
+  height: 32px;
+  border-radius: var(--r-xs);
+  color: var(--text-dim);
+  cursor: grab;
+}
+.job.draggable:hover .drag-grip {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* لون المرحلة في شريط التقدّم (D-93) */
+:root {
+  --phase-proc: #5b8def;
+  --phase-ai: #a77bf3;
+}
+:root[data-theme="light"] {
+  --phase-proc: #2f6fd6;
+  --phase-ai: #7c4ad8;
+}
+.progress.phase-proc > div {
+  background: var(--phase-proc);
+}
+.progress.phase-ai > div {
+  background: var(--phase-ai);
+}
+
+/* السجلّ: عناوين الأيام أوضح (D-61) */
+.history-day {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  margin: var(--s-4) 0 var(--s-2);
+  padding-bottom: var(--s-1);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semi);
+}
+.history-day .faint {
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-regular);
+}
+
+/* بلا صورة: أيقونة النوع على خلفية ملوّنة (D-40، D-62) */
+.history-thumb.kind-video {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.history-thumb.kind-audio {
+  background: color-mix(in srgb, var(--phase-ai) 16%, transparent);
+  color: var(--phase-ai);
+}
+
+/* الملف المحذوف (D-42) */
+.missing-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+.history-item.missing .history-thumb,
+.history-item.missing .job-title {
+  opacity: 0.6;
+}
+
+/* «الخروج» آخر الإعدادات (D-15) */
+.settings-quit {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--s-2) 0 var(--s-6);
 }

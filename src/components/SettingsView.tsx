@@ -142,6 +142,14 @@ export function SettingsView(props: {
           <p className="muted mt-1 mb-2">{t.aboutBody}</p>
           <p className="faint m-0">{t.notice}</p>
         </Section>
+
+        {!isMobile && (
+          <div className="settings-quit">
+            <button className="btn btn-danger" onClick={() => window.confirm(t.quitConfirm) && api.quitApp()}>
+              <Icon name="x" size={16} /> {t.quit}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -280,11 +288,6 @@ function BackgroundSection(props: { settings: Settings; update: (p: Partial<Sett
               title={t.watchClipboard}
               hint={t.watchClipboardHint}
             />
-          </div>
-          <div className="setting-row end">
-            <button className="btn btn-danger" onClick={() => api.quitApp()}>
-              <Icon name="x" size={16} /> {t.quit}
-            </button>
           </div>
         </>
       )}

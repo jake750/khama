@@ -79,7 +79,7 @@ export function HistoryView(props: {
           {list && list.length > 0 && <p className="faint">{t.historyCount(list.length)}</p>}
         </div>
         {list && list.length > 0 && (
-          <button className="btn btn-sm btn-ghost" onClick={clear}>
+          <button className="btn btn-sm btn-danger" onClick={clear}>
             <Icon name="trash" size={16} /> {t.historyClear}
           </button>
         )}
@@ -104,7 +104,9 @@ export function HistoryView(props: {
 
       {shown.map((g) => (
         <section key={g.label} className="history-group">
-          <h4>{g.label}</h4>
+          <h3 className="history-day">
+            {g.label} <span className="faint ltr-num">{g.items.length}</span>
+          </h3>
           {g.items.map((e) => {
             const canDrag = e.exists && !!props.onDragOut;
             return (
@@ -131,7 +133,7 @@ export function HistoryView(props: {
                     onError={() => setBrokenThumbs((b) => new Set(b).add(e.id))}
                   />
                 ) : (
-                  <div className="history-thumb">
+                  <div className={`history-thumb kind-${e.kind === "audio" ? "audio" : "video"}`}>
                     <Icon name={e.kind === "audio" ? "music" : "film"} size={20} />
                   </div>
                 )}
@@ -142,7 +144,11 @@ export function HistoryView(props: {
                   <div className="job-meta">
                     <span>{new Date(e.date).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" })}</span>
                     <span className="faint">{e.meta}</span>
-                    {!e.exists && !isMobile && <span className="missing-tag">{t.historyMissing}</span>}
+                    {!e.exists && !isMobile && (
+                      <span className="missing-tag">
+                        <Icon name="alert" size={14} /> {t.historyMissing}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="job-actions">
@@ -151,7 +157,7 @@ export function HistoryView(props: {
                       <Icon name="folder" size={16} /> {t.showInFolder}
                     </button>
                   )}
-                  <button className="btn btn-sm btn-ghost" onClick={() => props.onDownloadAgain(e.url)} title={t.downloadAgain}>
+                  <button className="btn btn-sm" onClick={() => props.onDownloadAgain(e.url)} title={t.downloadAgain}>
                     <Icon name="retry" size={16} /> <span className="hide-sm">{t.downloadAgain}</span>
                   </button>
                   <button

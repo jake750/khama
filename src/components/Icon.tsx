@@ -38,6 +38,12 @@ const paths = {
   bell: "M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2Zm4 4h4",
   copy: "M8 8h12v12H8zM16 8V4H4v12h4",
   eye: "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
+  dots: "M5 12h.01M12 12h.01M19 12h.01",
+  rotateCw: "M20 12a8 8 0 1 1-2.3-5.7L20 8.5M20 3.5v5h-5",
+  rotateCcw: "M4 12a8 8 0 1 0 2.3-5.7L4 8.5M4 3.5v5h5",
+  rotate180: "M5 12a7 7 0 0 1 14 0M19 12l-3-3m3 3 3-3M5 16v4h14v-4",
+  flipH: "M12 3v18M9 7 3 17h6V7Zm6 0 6 10h-6V7Z",
+  flipV: "M3 12h18M7 9 17 3V9H7Zm0 6 10 6v-6H7Z",
 } as const;
 
 export type IconName = keyof typeof paths;

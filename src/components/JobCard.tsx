@@ -4,6 +4,7 @@ import { formatDuration, formatEta, formatSpeed, formatTimecode } from "../forma
 import { useI18n, type Dict } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
 import { Icon } from "./Icon";
+import { MoreMenu, type MenuItem } from "./MoreMenu";
 
 /** عملية (تنزيل أو تحويل) كما تحفظها الواجهة */
 export interface Job {
@@ -99,6 +100,13 @@ export function JobCard(props: {
   const r = j.request;
 
   const draggable = j.state === "done" && !!j.file && !!props.onDragOut;
+  // الأفعال الثانوية في «⋯»، والظاهر: إظهار، وإلغاء أو إعادة (D-25)
+  const extra: MenuItem[] = [];
+  if (j.state === "done" && j.file && props.onConvert) extra.push({ label: t.sendToConvert, icon: "convert", onClick: props.onConvert });
+  if (j.state === "done" && props.onSplit) extra.push({ label: t.splitHere, icon: "scissors", onClick: props.onSplit });
+  if (j.state === "done" && props.onCopyMarkers) extra.push({ label: t.copyTimes, icon: "paste", onClick: props.onCopyMarkers });
+  // مرحلة شريط التقدّم: تنزيل، ثم معالجة، ثم ذكاء اصطناعي (D-93)
+  const phase = j.state === "separating" ? "ai" : ["processing", "preparing", "converting"].includes(j.state) ? "proc" : "dl";
   const fill = active && !indeterminate ? (j.percent ?? 0) : 0;
 
   return (
@@ -159,7 +167,7 @@ export function JobCard(props: {
         </div>
 
         {active && (
-          <div className={`progress ${indeterminate ? "indeterminate" : ""}`}>
+          <div className={`progress phase-${phase} ${indeterminate ? "indeterminate" : ""}`}>
             <div style={{ width: `${j.percent ?? 0}%` }} />
           </div>
         )}
@@ -174,18 +182,6 @@ export function JobCard(props: {
               ))}
               {j.markers.length > 40 && <span className="chip">+{j.markers.length - 40}</span>}
             </div>
-            <div className="marker-actions">
-              {props.onSplit && (
-                <button className="btn btn-sm" onClick={props.onSplit}>
-                  <Icon name="scissors" size={16} /> {t.splitHere}
-                </button>
-              )}
-              {props.onCopyMarkers && (
-                <button className="btn btn-sm btn-ghost" onClick={props.onCopyMarkers}>
-                  <Icon name="paste" size={16} /> {t.copyTimes}
-                </button>
-              )}
-            </div>
           </div>
         )}
 
@@ -194,18 +190,13 @@ export function JobCard(props: {
 
       <div className="job-actions">
         {draggable && (
-          <span className="drag-grip" aria-hidden="true">
-            <Icon name="grip" size={16} />
+          <span className="drag-grip" aria-hidden="true" title={t.dragHint}>
+            <Icon name="grip" size={18} />
           </span>
         )}
         {(active || j.state === "scheduled") && (
           <button className="btn btn-sm btn-danger" onClick={props.onCancel}>
             <Icon name="x" size={16} /> {t.cancel}
-          </button>
-        )}
-        {j.state === "done" && j.file && props.onConvert && (
-          <button className="btn btn-sm btn-ghost" onClick={props.onConvert} title={t.sendToConvert}>
-            <Icon name="convert" size={16} /> {t.sendToConvert}
           </button>
         )}
         {j.state === "done" && j.file && props.onReveal && (
@@ -218,6 +209,7 @@ export function JobCard(props: {
             <Icon name="retry" size={16} /> {t.retry}
           </button>
         )}
+        <MoreMenu label={t.moreActions} items={extra} />
         {!active && j.state !== "scheduled" && (
           <button className="icon-btn sm" title={t.remove} aria-label={t.remove} onClick={props.onRemove}>
             <Icon name="x" size={16} />
