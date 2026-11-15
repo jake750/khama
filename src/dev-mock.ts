@@ -19,6 +19,7 @@ const settings = {
   cookiesMode: "none",
   cookiesBrowser: "chrome",
   acceptedNotice: true,
+  seenTour: false,
   convertDest: "source",
   convertPreset: "editing",
   convertHw: false,

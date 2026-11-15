@@ -7,11 +7,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, asAppError, type AppError, type ConvertRequest, type DownloadRequest, type JobUpdate, type Settings } from "./api";
 import { ConvertView, defaultOptions, MEDIA_FILTER, type SourceFile } from "./components/ConvertView";
 import { DownloadView, newDownloadSession, type StartMeta } from "./components/DownloadView";
+import { GuideView } from "./components/GuideView";
 import { HistoryView } from "./components/HistoryView";
 import { Icon, type IconName } from "./components/Icon";
 import { Dialog } from "./components/Dialog";
 import { isActive, JobCard, mergeUpdate, type Job } from "./components/JobCard";
 import { SettingsView } from "./components/SettingsView";
+import { Tour, Welcome, type TourStep } from "./components/Tour";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { formatTimecode } from "./format";
 import { dictionaries, I18n, type Dict } from "./i18n";
@@ -21,7 +23,7 @@ import type { Toast, ToastAction } from "./toast";
 import { presetById } from "./presets";
 import { logError } from "./log";
 
-type Tab = "download" | "convert" | "history" | "settings";
+type Tab = "download" | "convert" | "history" | "settings" | "guide";
 
 /** يطبّق الثيم ويعيد الثيم الفعلي. "system" يتبع إعداد النظام ويتغيّر معه */
 function useTheme(theme: Settings["theme"] | undefined): "dark" | "light" {
@@ -105,6 +107,7 @@ export default function App() {
   // تحديث خامة متاح: شارة على «الإعدادات» بدل نافذة عند الإقلاع (U-31، U-32)
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   const [updateRequest, setUpdateRequest] = useState(0);
+  const [touring, setTouring] = useState(false);
   // تحديثات وصلت قبل أن نضيف العملية للقائمة (Rust أسرع أحيانًا من الرد)
   const pending = useRef(new Map<number, JobUpdate>());
   const jobsRef = useRef<Job[]>([]);
@@ -481,6 +484,32 @@ export default function App() {
       .catch(logError("setCompact"));
   }, [compact]);
 
+  /** الجولة تبدّل التبويب بنفسها (دالة ثابتة حتى لا تعيد الخطوة الحالية) */
+  const tourTab = useCallback((x: Tab) => setTab(x), []);
+  const tourSteps = useMemo<TourStep<Tab>[]>(() => {
+    const s = (id: string) => ({ title: t.tourSteps[id][0], body: t.tourSteps[id][1] });
+    return [
+      { target: ".url-field", tab: "download", art: "link", ...s("link") },
+      { target: ".options-box > summary", tab: "download", art: "trim", ...s("format") },
+      { target: "details.extras:not(.options-box) > summary", tab: "download", art: "stems", ...s("extras") },
+      { target: ".download-btn", tab: "download", art: "playlist", ...s("download") },
+      { target: '.tab[data-tab="convert"]', art: "convert", ...s("convert") },
+      { target: '.tab[data-tab="history"]', art: "history", ...s("history") },
+      { target: '.tab[data-tab="settings"]', art: "projects", ...s("settings") },
+      { target: ".guide-btn", art: "guide", ...s("guide") },
+    ];
+  }, [t]);
+
+  const startTour = useCallback(() => {
+    update({ seenTour: true });
+    if (compact)
+      api
+        .setCompact(false)
+        .then(() => setCompact(false))
+        .catch(() => {});
+    setTouring(true);
+  }, [update, compact]);
+
   if (bootError)
     return (
       <div className="boot-error" role="alert" dir="auto">
@@ -488,6 +517,7 @@ export default function App() {
         <code className="ltr">{bootError.code + (bootError.detail ? `: ${bootError.detail}` : "")}</code>
       </div>
     );
+
   if (!settings) return null;
 
   const outputDir = settings.outputDir || defaultDir;
@@ -579,6 +609,7 @@ export default function App() {
               <button
                 key={x.id}
                 className="tab"
+                data-tab={x.id}
                 aria-current={tab === x.id ? "page" : undefined}
                 onClick={() => setTab(x.id)}
                 title={x.label}
@@ -594,6 +625,17 @@ export default function App() {
           </nav>
           <span className="spacer" />
           <div className="topbar-tools">
+            {!compact && (
+              <button
+                className="icon-btn ghost guide-btn"
+                title={t.guideOpen}
+                aria-label={t.guideOpen}
+                aria-pressed={tab === "guide"}
+                onClick={() => setTab("guide")}
+              >
+                <Icon name="help" size={20} />
+              </button>
+            )}
             {!isMobile && (
               <button className="btn btn-sm btn-ghost topbar-btn" title={compact ? t.compactOff : t.compactOn} onClick={toggleCompact}>
                 <Icon name={compact ? "maximize" : "minimize"} size={18} />
@@ -618,7 +660,7 @@ export default function App() {
 
         <main className="main">
           <div className={`container ${tab === "settings" ? "wide" : ""}`}>
-            <SlideSwitch id={tab} index={tabs.findIndex((x) => x.id === tab)} fade={!isMobile}>
+            <SlideSwitch id={tab} index={tab === "guide" ? tabs.length : tabs.findIndex((x) => x.id === tab)} fade={!isMobile}>
               <div className="view">
                 {tab === "download" && (
                   <DownloadView
@@ -678,6 +720,17 @@ export default function App() {
                     section={settingsSection}
                     updateVersion={updateVersion}
                     onInstallUpdate={() => setUpdateRequest((n) => n + 1)}
+                    onOpenGuide={() => setTab("guide")}
+                    onTour={startTour}
+                  />
+                )}
+                {tab === "guide" && (
+                  <GuideView
+                    onTour={startTour}
+                    onGo={(to, section) => {
+                      if (section) setSettingsSection({ id: section, n: Date.now() });
+                      setTab(to);
+                    }}
                   />
                 )}
 
@@ -829,6 +882,10 @@ export default function App() {
             </dl>
           </Dialog>
         )}
+
+        {/* أول فتح: ترحيب يعرض جولة سريعة على الخصائص */}
+        {!settings.seenTour && !touring && !compact && <Welcome onTour={startTour} onLater={() => update({ seenTour: true })} />}
+        {touring && <Tour steps={tourSteps} onTab={tourTab} onClose={() => setTouring(false)} />}
       </div>
     </I18n.Provider>
   );

@@ -1,0 +1,1567 @@
+/* =====================================================================
+   الدفعة الثانية: هوية أوضح، سلّم خطوط، حقل رابط أكبر، إضافات، سجلّ، إعدادات بأقسام.
+   يُحمَّل بعد styles.css فيتقدّم عليه عند التعارض.
+   ===================================================================== */
+.card h2 {
+  font-size: var(--fs-card);
+  font-weight: var(--fw-bold);
+}
+
+.card-head h2 {
+  font-size: var(--fs-title);
+  line-height: 1.35;
+}
+
+.card-head p {
+  margin: var(--s-1) 0 var(--s-5);
+}
+
+.jobs-header h3 {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-bold);
+}
+
+.brand-name {
+  font-size: var(--fs-card);
+}
+
+/* ---------- الشريط العلوي ---------- */
+.topbar-tools {
+  display: flex;
+  gap: 2px;
+}
+
+.icon-btn.ghost {
+  border-color: transparent;
+}
+
+.icon-btn.sm {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-xs);
+}
+
+.container.wide {
+  max-width: 1080px;
+}
+
+.notice-bar {
+  margin-top: 0;
+  align-items: center;
+}
+
+/* ---------- حقل الرابط: العنصر الأهم في الشاشة ---------- */
+.url-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 58px;
+  padding-inline: 20px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  color: var(--text-faint);
+  transition:
+    border-color 0.2s var(--ease-out),
+    box-shadow 0.2s var(--ease-out);
+}
+
+.url-field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+  color: var(--accent);
+}
+
+.url-field.has-error {
+  border-color: color-mix(in srgb, var(--danger) 70%, transparent);
+}
+
+.url-field .url-input {
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: var(--fs-body);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.url-field .url-input:focus {
+  box-shadow: none;
+}
+
+.url-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  min-width: 42px;
+  justify-content: center;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-dim);
+  font-weight: var(--fw-semi);
+}
+
+.url-action:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.url-action.paste {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.url-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 4px 0;
+  color: var(--accent);
+}
+
+/* خطأ خفيف: سطر تحت الحقل بدل صندوق أحمر كبير */
+.error-inline {
+  margin-top: 8px;
+}
+
+.alert.inline {
+  margin-top: 0;
+  padding: 4px;
+  align-items: center;
+  background: transparent;
+  font-size: var(--fs-meta);
+}
+
+.alert.inline svg {
+  margin-top: 0;
+}
+
+.alert.inline .btn {
+  color: var(--text);
+}
+
+.error-inline details.tech {
+  margin-inline-start: 4px;
+}
+
+/* اقتراح رابط منسوخ */
+.clip-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-block: 8px;
+  padding-inline: 16px 8px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--spark) 45%, transparent),
+    var(--shadow);
+  animation: rise-in 0.35s var(--ease-out);
+}
+
+.clip-banner > svg {
+  color: var(--spark);
+  flex-shrink: 0;
+}
+
+.clip-banner-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  font-size: var(--fs-meta);
+}
+
+.clip-banner-text .ltr {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+/* عدة روابط */
+.link-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+.link-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-meta);
+  color: var(--text-dim);
+}
+
+.link-item .ltr {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.preview-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.preview-action {
+  margin-top: 8px;
+  margin-inline-start: -12px;
+}
+
+/* الخيارات قبل أن يُلصق رابط: باهتة، وتتضح عند الاقتراب منها */
+.options-wrap {
+  transition: opacity 0.3s var(--ease-out);
+}
+
+.options-wrap.dim {
+  opacity: 0.5;
+}
+
+.options-wrap.dim:hover,
+.options-wrap.dim:focus-within {
+  opacity: 1;
+}
+
+/* ---------- الإضافات ---------- */
+details.extras {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+details.extras > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  cursor: pointer;
+  list-style: none;
+  font-weight: var(--fw-semi);
+}
+
+details.extras > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.extras > summary > svg:last-child {
+  margin-inline-start: auto;
+  color: var(--text-faint);
+  transition: transform 0.25s var(--ease-out);
+}
+
+details.extras[open] > summary > svg:last-child {
+  transform: rotate(180deg);
+}
+
+.extras-count {
+  color: var(--accent);
+  font-size: var(--fs-cap);
+  font-weight: var(--fw-semi);
+}
+
+.extras-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  padding: 4px 16px 16px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--fs-meta);
+}
+
+.chip-btn:hover {
+  color: var(--text);
+  border-color: var(--text-faint);
+}
+
+.chip-btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.chip-btn small {
+  color: var(--text-faint);
+  font-size: var(--fs-cap);
+}
+
+/* ---------- البدء: الآن أو لاحقًا ---------- */
+.schedule-row {
+  margin-top: 16px;
+}
+
+.schedule-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.time-input {
+  max-width: 120px;
+  height: 40px;
+}
+
+/* ---------- معاينة القص ---------- */
+.trim-video {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  aspect-ratio: 16 / 9;
+  margin-top: 16px;
+  border-radius: var(--r-sm);
+  background: var(--bg);
+}
+
+.trim-here {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+/* ---------- سطر الحفظ والزر ---------- */
+.action-row {
+  gap: 12px;
+}
+
+.folder-picker {
+  position: relative;
+  min-width: 0;
+}
+
+.folder-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--fs-meta);
+}
+
+.folder-btn:hover,
+.folder-btn[aria-expanded="true"] {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.folder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: var(--fw-semi);
+}
+
+.menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  inset-inline-start: 0;
+  z-index: 30;
+  display: grid;
+  min-width: 280px;
+  max-width: min(460px, 80vw);
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+  animation: rise-in 0.2s var(--ease-out);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  font-size: var(--fs-meta);
+  text-align: start;
+}
+
+.menu-item .ltr {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.menu-item:hover {
+  background: var(--surface-2);
+}
+
+.menu-item.current {
+  color: var(--accent);
+}
+
+.menu-label {
+  padding: 8px 12px 2px;
+  color: var(--text-faint);
+  font-size: var(--fs-cap);
+}
+
+.menu-sep {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--border);
+}
+
+.project-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-dim);
+}
+
+.select-sm {
+  height: 36px;
+  max-width: 180px;
+}
+
+.download-btn {
+  min-width: 160px;
+  border-radius: var(--r-md);
+}
+
+/* ---------- بطاقات التنزيل: صورة الفيديو، والتقدّم يملأ البطاقة ---------- */
+.job {
+  position: relative;
+  overflow: hidden;
+}
+
+.job::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: var(--fill, 0%);
+  background: linear-gradient(90deg, transparent, var(--accent-soft));
+  transition: width 0.4s var(--ease-out);
+  pointer-events: none;
+}
+
+[dir="rtl"] .job::before {
+  background: linear-gradient(270deg, transparent, var(--accent-soft));
+}
+
+.job > * {
+  position: relative;
+}
+
+.job-icon {
+  position: relative;
+  overflow: hidden;
+}
+
+.job-icon.has-thumb {
+  width: 72px;
+  height: 42px;
+  border-radius: var(--r-xs);
+}
+
+.job-icon.has-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.job-icon.has-thumb .job-badge {
+  position: absolute;
+  inset-inline-end: 3px;
+  bottom: 3px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--scrim);
+  color: var(--on-hero);
+}
+
+.job-icon.has-thumb.done .job-badge {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.job-icon.has-thumb.error .job-badge {
+  background: var(--danger);
+  color: var(--on-hero);
+}
+
+.job-icon:not(.has-thumb) .job-badge {
+  display: contents;
+}
+
+.job.draggable {
+  cursor: grab;
+}
+
+.job.draggable:active {
+  cursor: grabbing;
+}
+
+.drag-grip {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  color: var(--text-faint);
+}
+
+.job.state-scheduled .job-icon {
+  color: var(--spark);
+}
+
+/* ---------- حالة فارغة ---------- */
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 32px 20px 32px;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--r-lg);
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.empty-state p {
+  margin: 0;
+}
+
+.empty-art {
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--s-2);
+  color: var(--text-faint);
+}
+
+/* ---------- السجلّ ---------- */
+.history {
+  display: grid;
+  gap: 16px;
+}
+
+.history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.history-head p {
+  margin: 0;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  color: var(--text-faint);
+}
+
+.search:focus-within {
+  border-color: var(--accent);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  user-select: text;
+}
+
+.history-group h4 {
+  margin: 4px 0 8px;
+  color: var(--text-faint);
+  font-size: var(--fs-cap);
+  font-weight: var(--fw-semi);
+}
+
+.history-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px;
+  border-radius: var(--r-sm);
+}
+
+.history-item:hover {
+  background: var(--surface-2);
+}
+
+.history-item[draggable="true"] {
+  cursor: grab;
+}
+
+.history-item.missing {
+  opacity: 0.6;
+}
+
+.history-thumb {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 36px;
+  border-radius: var(--r-xs);
+  object-fit: cover;
+  background: var(--surface-2);
+  color: var(--text-faint);
+}
+
+.history-body {
+  min-width: 0;
+}
+
+.missing-tag {
+  color: var(--warn);
+}
+
+/* ---------- الإعدادات بأقسام ---------- */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.settings-nav {
+  position: sticky;
+  top: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.settings-nav button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-dim);
+  font-weight: var(--fw-semi);
+  text-align: start;
+}
+
+.settings-nav button:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.settings-nav button[aria-current="true"] {
+  color: var(--text);
+  background: var(--surface);
+  box-shadow:
+    inset 3px 0 0 var(--accent),
+    var(--shadow);
+}
+
+[dir="rtl"] .settings-nav button[aria-current="true"] {
+  box-shadow:
+    inset -3px 0 0 var(--accent),
+    var(--shadow);
+}
+
+.settings-content {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-content > .card {
+  scroll-margin-top: 8px;
+}
+
+.setting-row.column {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.setting-row.end {
+  justify-content: flex-end;
+}
+
+.input.wide {
+  max-width: none;
+  height: 40px;
+}
+
+.code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: var(--fs-cap);
+  color: var(--text);
+}
+
+.stack {
+  display: grid;
+  gap: 16px;
+}
+
+.accent {
+  color: var(--accent);
+}
+
+.project-row b {
+  min-width: 90px;
+}
+
+.project-new {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* ---------- النافذة المصغّرة ---------- */
+.app.compact .topbar {
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.app.compact .brand-name,
+.app.compact .tab span,
+.app.compact .card-head p,
+.app.compact .options-wrap,
+.app.compact .notice-bar,
+.app.compact .project-pick,
+.app.compact .jobs-header .btn,
+.app.compact .empty-state .faint {
+  display: none;
+}
+
+.app.compact .tabs {
+  margin-inline-start: 0;
+}
+
+.app.compact .main {
+  padding: 12px;
+}
+
+.app.compact .card {
+  padding: 16px;
+}
+
+.app.compact .card-head h2 {
+  font-size: var(--fs-body);
+  margin-bottom: 12px;
+}
+
+.app.compact .thumb {
+  width: 96px;
+}
+
+.app.compact .job {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.app.compact .job-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+}
+
+.app.compact .empty-state {
+  padding: 20px;
+}
+
+/* ---------- الشاشات الضيقة (والهاتف) ---------- */
+@media (max-width: 700px) {
+  .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-nav {
+    position: static;
+    display: flex;
+    overflow-x: auto;
+    gap: 4px;
+    padding-bottom: 4px;
+  }
+  .settings-nav button {
+    white-space: nowrap;
+  }
+  .extras-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hide-sm {
+    display: none;
+  }
+  .history-item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .history-item .job-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+  .card-head h2 {
+    font-size: var(--fs-card);
+  }
+  .url-action.paste span {
+    display: none;
+  }
+}
+
+/* =====================================================================
+   قواعد التصميم (DESIGN-RULES): بطل واحد لكل شاشة، زخرفة «خ» واحدة،
+   حافة واحدة، إيقاع أقسام 32/12، وتنقّل سفلي زجاجي على الهاتف.
+   ===================================================================== */
+
+/* ---------- الإيقاع: حواف وأقسام ---------- */
+.main {
+  padding: var(--gutter);
+}
+
+.card {
+  padding: var(--s-6);
+}
+
+.view > .card + .card {
+  margin-top: var(--s-4);
+}
+
+.jobs-header {
+  margin: var(--s-4) 0 0;
+  padding-inline: var(--s-1);
+}
+
+.job-list > .li > .card {
+  margin-top: var(--s-3);
+}
+
+.empty-state {
+  margin-top: var(--title-gap);
+  padding: var(--s-8) var(--s-5);
+  border: 1px dashed var(--border);
+}
+
+.card h2,
+.section-head h2 {
+  font-size: var(--fs-sec);
+  line-height: 1.4;
+}
+
+.faint {
+  font-size: var(--fs-meta);
+  line-height: 1.55;
+}
+
+.field-label {
+  font-size: var(--fs-cap);
+  font-weight: var(--fw-semi);
+  line-height: 16px;
+}
+
+/* ---------- الزخرفة: موجات إشارة تنساب ببطء ----------
+   خطوط جيبية بطبقتين تتحركان بسرعتين واتجاهين (عمق/parallax)، كموجة صوت على شريط المونتاج.
+   ترسمها قناع SVG فيأخذ لونها من --motif-color في كل وضع. تُستعمل في 3 أماكن فقط:
+   بطل التنزيل، ومنطقة الإفلات في المحوّل، ونافذة التحديث. الحركة transform فقط (رخيصة على الهاتف). */
+.motif {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  --wave-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 160' preserveAspectRatio='none'%3E%3Cpath d='M0 80 C50 22 150 22 200 80 S350 138 400 80' fill='none' stroke='black' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M0 92 C60 50 140 50 200 92 S340 134 400 92' fill='none' stroke='black' stroke-width='1.2' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M0 68 C50 48 150 48 200 68 S350 88 400 68' fill='none' stroke='black' stroke-width='1' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --wave-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 160' preserveAspectRatio='none'%3E%3Cpath d='M0 100 C25 76 75 76 100 100 S175 124 200 100 S275 76 300 100 S375 124 400 100' fill='none' stroke='black' stroke-width='1.2' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M0 56 C25 44 75 44 100 56 S175 68 200 56 S275 44 300 56 S375 68 400 56' fill='none' stroke='black' stroke-width='1' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  --wave-a-w: 560px;
+  --wave-b-w: 380px;
+}
+
+.motif::before,
+.motif::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  /* اتجاه فيزيائي عمدًا: الحركة أفقية وتتكرّر، فلا تتأثر بـ RTL */
+  left: 0;
+  /* النصف السفلي: خلف حقل الرابط (زجاجه يُنعّمها)، والعنوان فوقها هادئ */
+  inset-block: 34% -4%;
+  background: var(--motif-color, var(--on-hero));
+  pointer-events: none;
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
+  will-change: transform;
+}
+
+.motif::after {
+  width: calc(100% + var(--wave-a-w));
+  opacity: calc(var(--motif-opacity, 0.11) * 2.4);
+  -webkit-mask-image: var(--wave-a);
+  mask-image: var(--wave-a);
+  -webkit-mask-size: var(--wave-a-w) 100%;
+  mask-size: var(--wave-a-w) 100%;
+  animation: motif-drift-a 26s linear infinite;
+}
+
+.motif::before {
+  width: calc(100% + var(--wave-b-w));
+  opacity: calc(var(--motif-opacity, 0.11) * 1.4);
+  -webkit-mask-image: var(--wave-b);
+  mask-image: var(--wave-b);
+  -webkit-mask-size: var(--wave-b-w) 100%;
+  mask-size: var(--wave-b-w) 100%;
+  transform: translateX(calc(var(--wave-b-w) * -1));
+  animation: motif-drift-b 19s linear infinite;
+}
+
+/* الإزاحة = عرض بلاطة واحدة بالضبط، فلا يظهر أي قفز عند التكرار */
+@keyframes motif-drift-a {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(var(--wave-a-w) * -1));
+  }
+}
+
+@keyframes motif-drift-b {
+  from {
+    transform: translateX(calc(var(--wave-b-w) * -1));
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motif::before,
+  .motif::after {
+    animation: none;
+  }
+}
+
+/* ---------- بطل شاشة التنزيل: الشيء الوحيد المطلوب، الصق الرابط ---------- */
+.download-card {
+  box-shadow: var(--shadow-hero);
+}
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin: calc(var(--s-6) * -1) calc(var(--s-6) * -1) var(--s-6);
+  padding: var(--s-6);
+  border-radius: calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px) 0 0;
+  background: linear-gradient(160deg, var(--hero-1), var(--hero-2) 85%);
+  color: var(--on-hero);
+}
+
+.hero .card-head h2 {
+  color: var(--on-hero);
+}
+
+.hero .card-head p,
+.hero .url-note {
+  color: color-mix(in srgb, var(--on-hero) 78%, transparent);
+}
+
+.hero .url-field {
+  border-color: color-mix(in srgb, var(--on-hero) 20%, transparent);
+  background: rgb(3 22 21 / 0.42);
+  color: color-mix(in srgb, var(--on-hero) 70%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.hero .url-field:focus-within {
+  border-color: color-mix(in srgb, var(--on-hero) 70%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--on-hero) 14%, transparent);
+  color: var(--on-hero);
+}
+
+.hero .url-field.has-error {
+  border-color: var(--spark);
+}
+
+.hero .url-field .url-input {
+  color: var(--on-hero);
+}
+
+.hero .url-field .url-input::placeholder {
+  color: color-mix(in srgb, var(--on-hero) 62%, transparent);
+}
+
+.hero .url-action {
+  color: color-mix(in srgb, var(--on-hero) 80%, transparent);
+}
+
+.hero .url-action:hover,
+.hero .url-action.paste {
+  background: color-mix(in srgb, var(--on-hero) 14%, transparent);
+  color: var(--on-hero);
+}
+
+.hero .clip-banner {
+  color: var(--text);
+}
+
+.url-field {
+  height: 56px;
+  padding-inline: var(--s-4) var(--s-2);
+  border-radius: var(--r-md);
+}
+
+.url-action {
+  height: 40px;
+  min-width: 40px;
+  border-radius: var(--r-xs);
+}
+
+/* ---------- منطقة الإفلات (المحوّل) ---------- */
+.dropzone {
+  --motif-color: var(--accent);
+  --motif-opacity: 0.07;
+  border-style: dashed;
+}
+
+.drop-icon {
+  border-radius: var(--r-md);
+}
+
+/* ---------- نافذة التحديث ---------- */
+.update-card {
+  --motif-color: var(--accent);
+  --motif-opacity: 0.06;
+  border-radius: var(--r-lg);
+  padding: var(--s-6);
+}
+
+/* ---------- الأزرار ---------- */
+.btn {
+  border-radius: var(--r-sm);
+}
+
+.btn-sm {
+  border-radius: var(--r-xs);
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: none;
+  background: color-mix(in srgb, var(--accent) 88%, var(--on-hero));
+}
+
+/* منطقة لمس ≥ 44px للأزرار الصغيرة دون تكبير شكلها */
+.btn-sm,
+.icon-btn,
+.chip-btn,
+.pl-stem {
+  position: relative;
+}
+
+.btn-sm::before,
+.icon-btn::before,
+.chip-btn::before,
+.pl-stem::before {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
+
+/* ---------- الإعدادات: التبويب النشط بخلفية، بلا شريط جانبي ملوّن ---------- */
+.settings-nav button[aria-current="true"],
+[dir="rtl"] .settings-nav button[aria-current="true"] {
+  background: var(--surface-2);
+  box-shadow: none;
+  color: var(--accent);
+}
+
+/* ---------- شريط التمرير: هادئ، ولا يظهر في الحاويات الأفقية ---------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--text-faint) 45%, transparent);
+}
+
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--text-faint);
+}
+
+.settings-nav,
+.marker-list,
+.chips {
+  scrollbar-width: none;
+}
+
+.settings-nav::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- الحالات الماضية: شفافية لا لون ---------- */
+.history-item.missing {
+  opacity: 0.5;
+}
+
+/* ---------- الهاتف: حافة 16، وتبويبات سفلية زجاجية ---------- */
+@media (max-width: 560px) {
+  :root {
+    --gutter: var(--s-4);
+  }
+  .topbar {
+    padding: var(--s-3) var(--gutter);
+  }
+  .main {
+    padding: var(--gutter);
+    padding-bottom: calc(64px + var(--s-6) + env(safe-area-inset-bottom));
+  }
+  .card {
+    padding: var(--s-4);
+  }
+  .hero {
+    margin: calc(var(--s-4) * -1) calc(var(--s-4) * -1) var(--s-5);
+    padding: var(--s-5) var(--s-4);
+  }
+  .card-head h2 {
+    font-size: var(--fs-sec);
+  }
+  .tabs {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 15;
+    justify-content: space-around;
+    margin: 0;
+    padding: var(--s-2) var(--s-3) calc(var(--s-2) + env(safe-area-inset-bottom));
+    min-height: 64px;
+    background: color-mix(in srgb, var(--surface) 72%, transparent);
+    backdrop-filter: blur(24px) saturate(1.8);
+    -webkit-backdrop-filter: blur(24px) saturate(1.8);
+    box-shadow: inset 0 1px 0 var(--border);
+  }
+  .tabs .tab {
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--s-1) 0;
+    color: var(--text-faint);
+    font-size: var(--fs-cap);
+  }
+  .tabs .tab > span:not(.tab-dot) {
+    display: block;
+  }
+  .tabs .tab[aria-current="page"] {
+    color: var(--accent);
+  }
+  .tabs .tab-dot {
+    position: absolute;
+    top: var(--s-1);
+    inset-inline-start: calc(50% + 10px);
+  }
+  .tab-pill {
+    background: transparent;
+  }
+}
+
+/* ---------- جولة المراجعة الأولى ---------- */
+/* التقدّم يظهر مرة واحدة: الشريط فقط، بلا تعبئة خلفية مكرّرة */
+.job::before {
+  content: none;
+}
+
+/* حالة الفراغ: نص هادئ بلا صندوق متقطّع (المتقطّع لمنطقة الإفلات فقط) */
+.empty-state {
+  border: 0;
+  padding: var(--s-8) var(--s-5) var(--s-6);
+}
+
+/* السجلّ: الأفعال الثانوية تظهر عند المرور، فيبقى الصف قابلًا للمسح بالعين */
+@media (hover: hover) {
+  .history-item .job-actions .icon-btn {
+    opacity: 0;
+    transition: opacity var(--t-ui, 0.2s) var(--ease-out);
+  }
+  .history-item:hover .job-actions .icon-btn,
+  .history-item:focus-within .job-actions .icon-btn {
+    opacity: 1;
+  }
+}
+
+/* الهاتف: الخيارات المجزّأة في سطر واحد قابل للتمرير بدل الالتفاف لسطرين */
+@media (max-width: 560px) {
+  .segmented {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .segmented::-webkit-scrollbar {
+    display: none;
+  }
+  .segmented button {
+    flex-shrink: 0;
+  }
+}
+
+/* عناصر الشبكة تنكمش فلا يمدّها شريط خيارات طويل خارج البطاقة */
+.options > *,
+.video-only > *,
+.collapse > div,
+.stems-row,
+.schedule-row {
+  min-width: 0;
+}
+
+/* العناوين الطويلة تُقطع بسطرين لا بسطر واحد (العربي يفقد معناه سريعًا) */
+.job-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+/* =====================================================================
+   شاشة التنزيل بعد المراجعة: الخيارات مطويّة بملخّص، والزر يقول ما سيحدث
+   ===================================================================== */
+details.options-box {
+  margin-top: var(--s-5);
+}
+
+details.options-box .options {
+  margin-top: 0;
+  padding: var(--s-1) var(--s-4) var(--s-4);
+}
+
+/* الملخّص يأخذ ما بقي من السطر ويُقطع بنقاط بدل أن يدفع السهم خارجًا */
+details.extras > summary .extras-count {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quality-hint {
+  margin-top: var(--s-2);
+  padding-inline: var(--s-1);
+}
+
+/* التنظيف بالذكاء الاصطناعي والجدولة صارا داخل «إضافات» */
+details.extras .stems-row,
+details.extras .schedule-row {
+  margin-top: 0;
+  padding: var(--s-2) var(--s-4) var(--s-4);
+  border-top: 1px solid var(--line);
+}
+
+.download-btn-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
+}
+
+.download-btn-text small {
+  font-size: var(--fs-cap);
+  font-weight: var(--fw-regular);
+  opacity: 0.85;
+}
+
+.dest-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-top: var(--s-5);
+}
+
+/* الهاتف */
+@media (max-width: 560px) {
+  /* أكثر من 3 خيارات: شبكة من 3 أعمدة بدل سطر يخرج من الشاشة بلا إشارة */
+  .segmented.seg-many {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    overflow: visible;
+  }
+  /* أربعة خيارات بالضبط: عمودان، فلا يبقى خيار وحيد في سطر */
+  .segmented.seg-many:has(> button:nth-of-type(4):last-of-type) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .segmented.seg-many button {
+    min-width: 0;
+    padding-inline: var(--s-2);
+  }
+  /* في بطاقة التنزيل: كل مجموعة خيارات بعرض البطاقة وأعمدة متساوية (أهداف لمس أكبر، ولا شيء يخرج) */
+  .download-card .segmented {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    width: 100%;
+    overflow: visible;
+  }
+  .download-card .segmented.seg-many {
+    grid-auto-flow: row;
+  }
+  .download-card .segmented button {
+    min-width: 0;
+    padding-inline: var(--s-2);
+    white-space: normal;
+    text-align: center;
+    line-height: 1.35;
+  }
+  /* الملخّص وحده يكفي عنوانًا على الشاشة الضيّقة */
+  details.options-box > summary .summary-label {
+    display: none;
+  }
+
+  /* زر التنزيل ثابت فوق التبويبات السفلية، في متناول الإبهام */
+  .action-row.sticky-action {
+    position: sticky;
+    /* .main محشوّ من الأسفل بارتفاع التبويبات + 24، والالتصاق يُحسب داخل هذا الحشو؛ ننزل 24 حتى يلامس التبويبات */
+    bottom: calc(var(--s-6) * -1);
+    z-index: 5;
+    margin: var(--s-4) calc(var(--s-4) * -1) calc(var(--s-4) * -1);
+    padding: var(--s-3) var(--s-4);
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 var(--r-lg) var(--r-lg);
+    background: var(--surface);
+  }
+  .dest-row + .action-row.sticky-action {
+    margin-top: var(--s-3);
+  }
+}
+
+/* =====================================================================
+   بطاقة التنزيل بصورة: مثل يوتيوب، الصورة كبيرة وواضحة، والعنوان أوضح ما في البطاقة،
+   والحالة والصيغة سطر هادئ تحته، والأزرار في صف خاص فلا تزاحم العنوان.
+   ===================================================================== */
+.job-remove {
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+
+.job.job-media {
+  grid-template-columns: 184px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--s-4);
+  padding: var(--s-3);
+}
+
+.job.job-media::before {
+  content: none;
+}
+
+.job-thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+.job-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* الصيغة والجودة على الصورة، كمدة الفيديو في يوتيوب */
+.job-thumb-chip {
+  position: absolute;
+  bottom: 6px;
+  inset-inline-end: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.74);
+  color: #fff;
+  font-size: var(--fs-cap);
+  font-weight: var(--fw-semi);
+  line-height: 1.6;
+}
+
+.job-thumb-badge {
+  position: absolute;
+  top: 6px;
+  inset-inline-start: 6px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.74);
+  color: #fff;
+}
+
+.job-thumb-badge.done {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.job-thumb-badge.error {
+  background: var(--danger);
+  color: #fff;
+}
+
+.job-thumb-badge.scheduled {
+  background: var(--spark);
+  color: #241a00;
+}
+
+/* التقدّم خط رفيع على حافة الصورة السفلية */
+.job-thumb-progress.progress {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 4px;
+  margin: 0;
+  border-radius: 0;
+  background: rgb(255 255 255 / 0.28);
+}
+
+.job-media.state-canceled .job-thumb img,
+.job-media.state-error .job-thumb img {
+  filter: grayscale(0.7);
+  opacity: 0.7;
+}
+
+.job-media .job-body {
+  padding-top: 2px;
+}
+
+.job-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+}
+
+.job-media .job-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-card);
+  font-weight: var(--fw-semi);
+  line-height: 1.45;
+}
+
+.job-media .job-remove {
+  margin-top: -4px;
+  margin-inline-end: -4px;
+  border-color: transparent;
+  color: var(--text-faint);
+}
+
+.job-media .job-meta {
+  gap: var(--s-1) var(--s-3);
+  margin-top: var(--s-1);
+}
+
+.job-media .job-status {
+  color: var(--text-dim);
+  font-weight: var(--fw-semi);
+}
+
+.job-media.state-done .job-status {
+  color: var(--accent);
+}
+
+.job-media.state-error .job-status {
+  color: var(--danger);
+}
+
+.job-media .job-actions {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+
+.job-media .drag-grip {
+  margin-inline-start: auto;
+}
+
+.app.compact .job.job-media {
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: var(--s-3);
+}
+
+.app.compact .job-media .job-title {
+  font-size: var(--fs-body);
+}
+
+.app.compact .job-media .job-actions {
+  grid-column: auto;
+  justify-content: flex-start;
+}
+
+/* الهاتف: الصورة بعرض البطاقة كاملًا، والعنوان والأزرار تحتها */
+@media (max-width: 560px) {
+  .job.job-media {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 0;
+  }
+  .job-media .job-thumb {
+    border-radius: 0;
+  }
+  .job-media .job-body {
+    padding: var(--s-3) var(--s-4) var(--s-4);
+  }
+  .job-media .job-title {
+    font-size: var(--fs-card);
+  }
+  .job-media .job-actions .btn {
+    min-height: 40px;
+  }
+  .job-media .job-remove {
+    width: 36px;
+    height: 36px;
+  }
+  .job-thumb-chip {
+    bottom: 8px;
+    inset-inline-end: 8px;
+    font-size: var(--fs-meta);
+  }
+  .job-thumb-badge {
+    top: 8px;
+    inset-inline-start: 8px;
+    width: 28px;
+    height: 28px;
+  }
+}

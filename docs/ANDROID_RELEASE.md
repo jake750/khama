@@ -8,8 +8,18 @@ A guide for any new chat that needs to build a new APK. It contains no passwords
 - Every update **must** be signed with this same key. Otherwise Android refuses to install it over the old version, and the user has to uninstall the app and lose their data. Keep a backup of the `.khama` folder outside this PC.
 - Gradle reads the key from `keystore.properties`, or from the `KHAMA_KEYSTORE` environment variables in CI (see `src-tauri/gen/android/app/build.gradle.kts`).
 
+## Building in GitHub Actions (normal releases)
+`build.yml` builds the signed arm64 APK and attaches it to the release, but only when the repository secrets `KHAMA_KEYSTORE_BASE64` and `KHAMA_KEY_PASSWORD` exist. The user sets them once in PowerShell (values read from the files, never typed):
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("$HOME\.khama\khama-release.jks")) | gh secret set KHAMA_KEYSTORE_BASE64 -R jake750/khama
+$p = @{}; Get-Content "$HOME\.khama\keystore.properties" | ForEach-Object { if ($_ -match '^\s*(\w+)\s*=\s*(.*)$') { $p[$matches[1]] = $matches[2].Trim() } }; gh secret set KHAMA_KEY_PASSWORD -R jake750/khama --body $p.password; "alias: " + $p.keyAlias
+```
+The alias must be `khama` (the CI default). Check with `gh secret list -R jake750/khama`.
+
+Without them the Android job is skipped and the desktop builds run as before.
+
 ## Version number
-Raise `version` in `src-tauri/tauri.conf.json` (and keep `package.json` and `src-tauri/Cargo.toml` in sync). Tauri derives `versionName` and `versionCode` from it automatically. If the number doesn't go up, Android won't treat the APK as an update.
+Run `npm run release` (see `CLAUDE.md`). It raises `version` in `tauri.conf.json`, `package.json`, `package-lock.json`, `Cargo.toml` and `Cargo.lock` together. Tauri derives `versionName` and `versionCode` from it automatically. If the number doesn't go up, Android won't treat the APK as an update.
 
 ## The environment on this PC
 - JDK 17: `C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot` (already in `JAVA_HOME`)

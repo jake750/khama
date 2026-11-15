@@ -12,7 +12,7 @@ describe("رقم الإصدار", () => {
     const cargo = read("../src-tauri/Cargo.toml").match(/^version = "(.+)"/m)?.[1];
     expect(cargo).toBe(pkg);
   });
-  it("tauri.conf.json يقرأ الإصدار من package.json", () => {
-    expect(JSON.parse(read("../src-tauri/tauri.conf.json")).version).toBe("../package.json");
+  it("tauri.conf.json يطابق package.json", () => {
+    expect(JSON.parse(read("../src-tauri/tauri.conf.json")).version).toBe(JSON.parse(read("../package.json")).version);
   });
 });

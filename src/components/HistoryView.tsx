@@ -54,6 +54,7 @@ export function HistoryView(props: {
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
+    // eslint-disable-next-line react-hooks/purity -- يكفي حساب الوقت عند تغيّر الفلتر
     const from = since === "all" ? 0 : Date.now() - Number(since) * 86_400_000;
     const items = (list ?? [])
       .filter((e) => !needle || [e.title, e.url, e.meta, e.file].some((x) => x.toLowerCase().includes(needle)))

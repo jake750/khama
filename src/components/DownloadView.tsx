@@ -351,6 +351,18 @@ export function DownloadView(props: {
   const noRoom = expected != null && free != null && expected > free;
   const startCount = multiLinks ? urls.length : entries ? selected.size : 0;
 
+  // ملخّص الإعداد الحالي: يظهر على سطر «الصيغة والجودة» المطويّ وعلى زر التنزيل،
+  // فيعرف المستخدم ما سيحصل عليه دون أن يفتح الخيارات
+  const formatName = s.kind === "video" ? s.videoFormat.toUpperCase() : s.audioFormat === "m4a" ? "AAC" : s.audioFormat.toUpperCase();
+  const optionsSummary = (
+    s.kind === "video" ? [t.video, formatName, qualityLabel(s.quality), s.editorReady && t.editorReady] : [t.audio, formatName]
+  )
+    .filter(Boolean)
+    .join(" · ");
+  const buttonMeta = original
+    ? null
+    : [formatName, s.kind === "video" && qualityLabel(s.quality), when === "later" && atTime].filter(Boolean).join(" · ");
+
   return (
     <div className="card download-card">
       <div className="hero">
@@ -519,95 +531,104 @@ export function DownloadView(props: {
       <div className={`options-wrap ${ready ? "" : "locked"}`} inert={!ready || undefined}>
         {!original && <h3 className="form-section">{t.secFile}</h3>}
         {!original && (
-          <div className="options">
-            <div>
-              <span className="field-label">{t.kind}</span>
-              <Segmented<Kind>
-                label={t.kind}
-                value={s.kind}
-                onChange={(kind) => update({ kind })}
-                options={[
-                  {
-                    value: "video",
-                    label: (
-                      <>
-                        <Icon name="film" size={16} /> {t.video}
-                      </>
-                    ),
-                  },
-                  {
-                    value: "audio",
-                    label: (
-                      <>
-                        <Icon name="music" size={16} /> {t.audio}
-                      </>
-                    ),
-                  },
-                ]}
-              />
-            </div>
-
-            <div>
-              <span className="field-label">{t.format}</span>
-              <SlideSwitch id={s.kind} index={s.kind === "video" ? 0 : 1} distance={28}>
-                {s.kind === "video" ? (
-                  <Segmented<VideoFormat>
-                    label={t.format}
-                    value={s.videoFormat}
-                    onChange={(videoFormat) => update({ videoFormat })}
-                    options={[
-                      { value: "mp4", label: "MP4" },
-                      { value: "mov", label: "MOV" },
-                    ]}
-                  />
-                ) : (
-                  <Segmented<AudioFormat>
-                    label={t.format}
-                    value={s.audioFormat}
-                    onChange={(audioFormat) => update({ audioFormat })}
-                    options={[
-                      { value: "mp3", label: "MP3" },
-                      { value: "m4a", label: "AAC", title: t.aacTooltip },
-                      { value: "wav", label: "WAV" },
-                    ]}
-                  />
-                )}
-              </SlideSwitch>
-            </div>
-
-            <div className="collapse slide-x" data-open={s.kind === "video"} aria-hidden={s.kind !== "video" || undefined}>
+          <details className="extras options-box">
+            <summary>
+              <Icon name="film" size={16} /> <span className="summary-label">{t.optionsLabel}</span>
+              <span className="extras-count">{optionsSummary}</span>
+              <Icon name="chevron" size={16} />
+            </summary>
+            <div className="options">
               <div>
-                <div className="video-only">
-                  <div>
-                    <span className="field-label">{t.quality}</span>
-                    <Segmented<string>
-                      label={t.quality}
-                      value={effQuality}
-                      onChange={(quality) => update({ quality })}
-                      options={QUALITIES.map((q) => ({
-                        value: q,
-                        label: qualityLabel(q),
-                        // بعد جلب معلومات الرابط: نعطّل الدقات الأعلى من المتاح
-                        disabled: q !== "best" && maxHeight != null && Number(q) > maxHeight,
-                      }))}
+                <span className="field-label">{t.kind}</span>
+                <Segmented<Kind>
+                  label={t.kind}
+                  value={s.kind}
+                  onChange={(kind) => update({ kind })}
+                  options={[
+                    {
+                      value: "video",
+                      label: (
+                        <>
+                          <Icon name="film" size={16} /> {t.video}
+                        </>
+                      ),
+                    },
+                    {
+                      value: "audio",
+                      label: (
+                        <>
+                          <Icon name="music" size={16} /> {t.audio}
+                        </>
+                      ),
+                    },
+                  ]}
+                />
+              </div>
+
+              <div>
+                <span className="field-label">{t.format}</span>
+                <SlideSwitch id={s.kind} index={s.kind === "video" ? 0 : 1} distance={28}>
+                  {s.kind === "video" ? (
+                    <Segmented<VideoFormat>
+                      label={t.format}
+                      value={s.videoFormat}
+                      onChange={(videoFormat) => update({ videoFormat })}
+                      options={[
+                        { value: "mp4", label: "MP4" },
+                        { value: "mov", label: "MOV" },
+                      ]}
                     />
-                    {qualityHint && <div className={`mt-2 ${fellBack ? "warn-text" : "faint"}`}>{qualityHint}</div>}
-                  </div>
-                  {
+                  ) : (
+                    <Segmented<AudioFormat>
+                      label={t.format}
+                      value={s.audioFormat}
+                      onChange={(audioFormat) => update({ audioFormat })}
+                      options={[
+                        { value: "mp3", label: "MP3" },
+                        { value: "m4a", label: "AAC", title: t.aacTooltip },
+                        { value: "wav", label: "WAV" },
+                      ]}
+                    />
+                  )}
+                </SlideSwitch>
+              </div>
+
+              <div className="collapse slide-x" data-open={s.kind === "video"} aria-hidden={s.kind !== "video" || undefined}>
+                <div>
+                  <div className="video-only">
                     <div>
-                      <Toggle
-                        checked={s.editorReady}
-                        onChange={(editorReady) => update({ editorReady })}
-                        title={t.editorReady}
-                        hint={t.editorReadyHint}
+                      <span className="field-label">{t.quality}</span>
+                      <Segmented<string>
+                        label={t.quality}
+                        value={effQuality}
+                        onChange={(quality) => update({ quality })}
+                        options={QUALITIES.map((q) => ({
+                          value: q,
+                          label: qualityLabel(q),
+                          // بعد جلب معلومات الرابط: نعطّل الدقات الأعلى من المتاح
+                          disabled: q !== "best" && maxHeight != null && Number(q) > maxHeight,
+                        }))}
                       />
+                      {qualityHint && <div className={`mt-2 ${fellBack ? "warn-text" : "faint"}`}>{qualityHint}</div>}
                     </div>
-                  }
+                    {
+                      <div>
+                        <Toggle
+                          checked={s.editorReady}
+                          onChange={(editorReady) => update({ editorReady })}
+                          title={t.editorReady}
+                          hint={t.editorReadyHint}
+                        />
+                      </div>
+                    }
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </details>
         )}
+        {/* التنبيه يبقى ظاهرًا حتى لو كانت الخيارات مطويّة */}
+        {qualityHint && !original && <div className="faint quality-hint">{qualityHint}</div>}
 
         {info && !entries && <h3 className="form-section">{t.secPart}</h3>}
         {info && !entries && (
@@ -729,7 +750,10 @@ export function DownloadView(props: {
         )}
         <button className="btn btn-primary btn-lg download-btn" disabled={!canStart} onClick={start}>
           <Icon name={when === "later" ? "clock" : "download"} />
-          {startCount ? t.downloadN(startCount) : t.download}
+          <span className="download-btn-text">
+            <span>{startCount ? t.downloadN(startCount) : t.download}</span>
+            {buttonMeta && <small className="ltr">{buttonMeta}</small>}
+          </span>
         </button>
       </div>
     </div>

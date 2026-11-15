@@ -39,6 +39,8 @@ export function SettingsView(props: {
   /** إصدار أحدث من خامة متاح (U-32) */
   updateVersion?: string | null;
   onInstallUpdate?: () => void;
+  onOpenGuide: () => void;
+  onTour: () => void;
 }) {
   const { t } = useI18n();
   const { settings: s, update } = props;
@@ -153,6 +155,20 @@ export function SettingsView(props: {
               </button>
             </div>
           )}
+          <div className="setting-row">
+            <div style={{ minWidth: 0 }}>
+              <div>{t.guideTitle}</div>
+              <div className="faint">{t.guideSub}</div>
+            </div>
+            <div className="guide-settings-actions">
+              <button className="btn" onClick={props.onTour}>
+                <Icon name="eye" size={16} /> {t.tourStart}
+              </button>
+              <button className="btn" onClick={props.onOpenGuide}>
+                <Icon name="help" size={16} /> {t.guideOpen}
+              </button>
+            </div>
+          </div>
           <p className="muted mt-1 mb-2">{t.aboutBody}</p>
           <p className="faint m-0">{t.notice}</p>
         </Section>

@@ -47,7 +47,7 @@
   --line: #b4f0e612;
   --text: #e6f2ef;
   --text-dim: #a4b8b4;
-  --text-faint: #71878a;
+  --text-faint: #7f9592;
   --accent: #2ec4b6;
   --accent-ink: #04211e;
   --accent-soft: rgb(46 196 182 / 0.14);
@@ -80,8 +80,8 @@
   --text-faint: #566d6a;
   --accent: #077a70;
   --accent-ink: #f3fbfa;
-  --accent-soft: rgb(11 143 132 / 0.1);
-  --spark: #b77d0e;
+  --accent-soft: rgb(10 119 110 / 0.1);
+  --spark: #8f6100;
   --spark-soft: rgb(222 160 30 / 0.14);
   --danger: #c93f3a;
   --danger-soft: rgb(201 63 58 / 0.08);
@@ -1358,6 +1358,37 @@ img.file-thumb {
 .issue.warn {
   background: rgb(243 185 80 / 0.12);
   color: var(--warn);
+}
+
+/* الأيقونة لا تصغر حين يلتف النص لعدة أسطر */
+.issue > svg {
+  flex-shrink: 0;
+}
+
+/* الهاتف: العمود ضيق فيلتف التنبيه. نجعله سطرًا كاملًا بزوايا عادية بدل كبسولة منتفخة */
+@media (max-width: 560px) {
+  .file-row {
+    align-items: flex-start;
+  }
+  .file-thumb {
+    width: 64px;
+    height: 36px;
+    margin-top: 2px;
+  }
+  .issues {
+    gap: 6px;
+  }
+  .issue {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: var(--r-xs);
+    line-height: 1.45;
+  }
+  .issue > svg {
+    margin-top: 2px;
+  }
 }
 
 .suggestion {
