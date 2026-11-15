@@ -58,8 +58,9 @@ impl From<std::io::Error> for AppError {
     }
 }
 
-/// كل قاعدة: إن احتوى نص الخطأ (بأحرف صغيرة) على إحدى العبارات، فهذا هو الرمز.
-/// الترتيب مهم: الأكثر تحديدًا أولًا.
+/// كل قاعدة: إن احتوى نص الخطأ (بأحرف صغيرة) على إحدى العبارات ككلمة كاملة، فهذا هو الرمز.
+/// "كلمة كاملة" (T-30): "ssl" لا تطابق "classless" و"drm" لا تطابق جزءًا من كلمة أخرى.
+/// الترتيب مهم: الأكثر تحديدًا أولًا. كل قاعدة لها مثال حقيقي في الاختبارات أسفل الملف.
 const RULES: &[(&[&str], &str)] = &[
     (
         &["unsupported url", "is not a valid url", "no suitable extractor"],
@@ -80,7 +81,7 @@ const RULES: &[(&[&str], &str)] = &[
         &["login required", "log in", "login to", "requires authentication", "--cookies"],
         "loginRequired",
     ),
-    (&["not available in your country", "geo restrict", "geo-restrict"], "geoBlocked"),
+    (&["available in your country", "geo restrict", "geo-restrict"], "geoBlocked"),
     (
         &[
             "video unavailable",
@@ -153,10 +154,22 @@ pub fn friendly_ytdlp_error(raw: &str) -> AppError {
 
     let code = RULES
         .iter()
-        .find(|(needles, _)| needles.iter().any(|n| lower.contains(n)))
+        .find(|(needles, _)| needles.iter().any(|n| contains_word(&lower, n)))
         .map(|(_, code)| *code)
         .unwrap_or("unknown");
     AppError::with_detail(code, tail(&focus, 12))
+}
+
+/// هل في النص العبارة `needle` بحيث لا يلتصق بطرفيها حرف أو رقم؟
+fn contains_word(hay: &str, needle: &str) -> bool {
+    let is_word = |c: Option<char>| c.is_some_and(char::is_alphanumeric);
+    let edge_start = is_word(needle.chars().next());
+    let edge_end = is_word(needle.chars().next_back());
+    hay.match_indices(needle).any(|(i, _)| {
+        let before = hay[..i].chars().next_back();
+        let after = hay[i + needle.len()..].chars().next();
+        !(edge_start && is_word(before)) && !(edge_end && is_word(after))
+    })
 }
 
 /// آخر n سطر من نص (لعرض التفاصيل دون إغراق الواجهة)
@@ -192,6 +205,85 @@ mod tests {
         );
     }
 
+    /// مثال حقيقي (من رسائل yt-dlp) لكل قاعدة، فلا تُضاف قاعدة أو تُغيَّر بلا اختبار (T-30)
+    #[test]
+    fn every_rule_has_a_real_example() {
+        let cases = [
+            ("ERROR: [generic] Unsupported URL: https://example.com/", "unsupportedUrl"),
+            ("ERROR: [generic] x: This video is DRM protected", "drm"),
+            (
+                "ERROR: [youtube] x: Private video. Sign in if you've been granted access",
+                "privateVideo",
+            ),
+            (
+                "ERROR: [youtube] x: Sign in to confirm your age. This video may be inappropriate for some users.",
+                "ageRestricted",
+            ),
+            ("ERROR: [youtube] x: Sign in to confirm you’re not a bot.", "botCheck"),
+            (
+                "ERROR: [youtube] x: Join this channel to get access to members-only content like this video",
+                "membersOnly",
+            ),
+            (
+                "ERROR: [instagram] x: Requested content is not available, rate-limit reached or login required",
+                "loginRequired",
+            ),
+            (
+                "ERROR: [youtube] x: The uploader has not made this video available in your country",
+                "geoBlocked",
+            ),
+            (
+                "ERROR: [youtube] x: Video unavailable. This video has been removed by the uploader",
+                "unavailable",
+            ),
+            ("ERROR: [youtube] x: This live event will begin in 3 hours.", "live"),
+            (
+                "ERROR: [youtube] x: Requested format is not available. Use --list-formats",
+                "formatUnavailable",
+            ),
+            (
+                "ERROR: Unable to download webpage: HTTP Error 429: Too Many Requests",
+                "rateLimited",
+            ),
+            ("ERROR: unable to download video data: HTTP Error 403: Forbidden", "forbidden"),
+            (
+                "ERROR: [youtube] x: Unable to download API page: <urlopen error [Errno 11001] getaddrinfo failed>",
+                "network",
+            ),
+            ("ERROR: [generic] x: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED]>", "network"),
+            (
+                "ERROR: Could not copy Chrome cookie database. See https://github.com/yt-dlp/yt-dlp/issues/7271",
+                "cookiesRead",
+            ),
+            ("ERROR: unable to open for writing: [Errno 13] Permission denied", "permission"),
+            ("ERROR: unable to write data: [Errno 28] No space left on device", "diskFull"),
+            ("ERROR: Postprocessing: Conversion failed!", "postprocess"),
+            (
+                "ERROR: [youtube] x: Unable to extract nsig function code; please report this issue",
+                "extractorOutdated",
+            ),
+        ];
+        for (raw, code) in cases {
+            assert_eq!(friendly_ytdlp_error(raw).code, code, "{raw}");
+        }
+        // كل رمز في الجدول له مثال
+        for (_, code) in RULES {
+            assert!(cases.iter().any(|(_, c)| c == code), "لا مثال لـ {code}");
+        }
+    }
+
+    #[test]
+    fn needles_match_whole_words_only() {
+        assert_eq!(
+            friendly_ytdlp_error("ERROR: [youtube] x: Classless video failed oddly").code,
+            "unknown"
+        );
+        assert_eq!(friendly_ytdlp_error("ERROR: [x] Hydrma premiumness").code, "unknown");
+        assert!(contains_word("errno 13] permission denied", "permission denied"));
+        assert!(contains_word("use --cookies to", "--cookies"));
+        assert!(!contains_word("signatures", "signature"));
+    }
+
     #[test]
     fn unknown_error_has_fallback_and_detail() {
         let e = friendly_ytdlp_error("ERROR: something weird");
@@ -200,7 +292,7 @@ mod tests {
     }
 }
 
-/// قفل لا يُسقط التطبيق (T-27): إن انهارت مهمة وهي تمسك القفل نكمل بالقيمة الموجودة
+/// قفل لا يُسقط التطبيق (T-28): إن انهارت مهمة وهي تمسك القفل نكمل بالقيمة الموجودة
 /// بدل أن ينهار كل من يحاول القفل بعدها.
 pub trait LockExt<T> {
     fn lock_ok(&self) -> std::sync::MutexGuard<'_, T>;
