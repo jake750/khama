@@ -5,7 +5,7 @@ import { isPermissionGranted, requestPermission, sendNotification } from "@tauri
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, asAppError, type AppError, type ConvertRequest, type DownloadRequest, type JobUpdate, type Settings } from "./api";
 import { ConvertView, defaultOptions, MEDIA_FILTER, type SourceFile } from "./components/ConvertView";
-import { DownloadView, type StartMeta } from "./components/DownloadView";
+import { DownloadView, newDownloadSession, type StartMeta } from "./components/DownloadView";
 import { HistoryView } from "./components/HistoryView";
 import { Icon, type IconName } from "./components/Icon";
 import { isActive, JobCard, type Job } from "./components/JobCard";
@@ -109,6 +109,8 @@ export default function App() {
   settingsRef.current = settings;
   // التنزيلات المجدولة: بطاقات بـ id سالب (محلي)، تُحفظ في scheduled.json
   const nextLocalId = useRef(-1);
+  // حالة شاشة التنزيل التي تبقى بين التبويبات (الرابط والمعاينة)
+  const [downloadSession] = useState(newDownloadSession);
   const [scheduledLoaded, setScheduledLoaded] = useState(false);
 
   const lang = settings?.language ?? "en";
@@ -547,6 +549,7 @@ export default function App() {
               <div className="view">
                 {tab === "download" && (
                   <DownloadView
+                    session={downloadSession}
                     settings={settings}
                     update={update}
                     outputDir={outputDir}

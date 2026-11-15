@@ -27,13 +27,22 @@ const QUALITIES = ["best", "2160", "1440", "1080", "720", "480"] as const;
 
 type ProbeState = { status: "idle" } | { status: "loading" } | { status: "ok"; info: ProbeInfo } | { status: "error"; error: AppError };
 
-/** آخر رابط لصقناه تلقائيًا من الحافظة: لا نلصقه مرة ثانية بعد أن يمسحه المستخدم */
-let lastAutoPasted = "";
+/**
+ * ما يجب أن يبقى عند الانتقال لتبويب آخر والعودة (الشاشة تُبنى من جديد).
+ * يملكه App (useRef) ويمرّره صراحة، بدل متغيرات عامة في الوحدة (T-9).
+ */
+export interface DownloadSession {
+  /** النص في حقل الرابط */
+  draftUrl: string;
+  /** آخر معاينة، لعرضها فورًا عند العودة لنفس الرابط */
+  lastProbe: { url: string; info: ProbeInfo } | null;
+  /** آخر رابط من السجلّ عولج (لا يعود بعد الانتقال بين التبويبات) */
+  lastInject: number;
+  /** آخر رابط لُصق تلقائيًا من الحافظة: لا نلصقه مرة ثانية بعد أن يمسحه المستخدم */
+  lastAutoPasted: string;
+}
 
-/** يبقى الرابط ومعاينته عند الانتقال لتبويب آخر والعودة (الشاشة تُبنى من جديد) */
-let draftUrl = "";
-let lastProbe: { url: string; info: ProbeInfo } | null = null;
-let lastInject = 0;
+export const newDownloadSession = (): DownloadSession => ({ draftUrl: "", lastProbe: null, lastInject: 0, lastAutoPasted: "" });
 
 export interface StartMeta {
   title: string;
@@ -55,13 +64,14 @@ export function DownloadView(props: {
   inject: { url: string; n: number } | null;
   onOpenSettings: (section: string) => void;
   toast: (msg: string) => void;
+  session: DownloadSession;
 }) {
   const { t } = useI18n();
-  const { settings: s, update } = props;
-  const [url, setUrl] = useState(() => draftUrl);
+  const { settings: s, update, session } = props;
+  const [url, setUrl] = useState(() => session.draftUrl);
   useEffect(() => {
-    draftUrl = url;
-  }, [url]);
+    session.draftUrl = url;
+  }, [session, url]);
   const [autoPasted, setAutoPasted] = useState(false);
   const [probe, setProbe] = useState<ProbeState>({ status: "idle" });
   const [reprobe, setReprobe] = useState(0);
@@ -104,8 +114,8 @@ export function DownloadView(props: {
     }
     const token = ++probeToken.current;
     // نفس الرابط الذي عاينّاه قبل الانتقال لتبويب آخر: نعرضه فورًا بلا انتظار
-    if (lastProbe?.url === clean && reprobe === 0) {
-      const info = lastProbe.info;
+    if (session.lastProbe?.url === clean && reprobe === 0) {
+      const info = session.lastProbe.info;
       setSelected(new Set(info.entries?.map((_, i) => i) ?? []));
       setPicked(new Set());
       setProbe({ status: "ok", info });
@@ -115,7 +125,7 @@ export function DownloadView(props: {
       setProbe({ status: "loading" });
       try {
         const info = await api.probe(clean);
-        lastProbe = { url: clean, info };
+        session.lastProbe = { url: clean, info };
         if (token === probeToken.current) {
           setSelected(new Set(info.entries?.map((_, i) => i) ?? []));
           setPicked(new Set());
@@ -126,16 +136,16 @@ export function DownloadView(props: {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [url, reprobe]);
+  }, [session, url, reprobe]);
 
   // رابط من السجلّ
   useEffect(() => {
     // نتجاهل رابطًا عالجناه من قبل (لا يعود بعد الانتقال بين التبويبات)
-    if (props.inject && props.inject.n !== lastInject) {
-      lastInject = props.inject.n;
+    if (props.inject && props.inject.n !== session.lastInject) {
+      session.lastInject = props.inject.n;
       setUrl(props.inject.url);
     }
-  }, [props.inject]);
+  }, [session, props.inject]);
 
   /** يقرأ أول رابط في الحافظة (عبر Tauri: يعمل على الكمبيوتر والهاتف) */
   async function clipboardUrl(): Promise<string | null> {
@@ -153,8 +163,8 @@ export function DownloadView(props: {
     const check = async () => {
       if (urlRef.current.trim()) return;
       const found = await clipboardUrl();
-      if (found && found !== lastAutoPasted && !urlRef.current.trim()) {
-        lastAutoPasted = found;
+      if (found && found !== session.lastAutoPasted && !urlRef.current.trim()) {
+        session.lastAutoPasted = found;
         setUrl(found);
         setAutoPasted(true);
       }
@@ -162,7 +172,7 @@ export function DownloadView(props: {
     check();
     window.addEventListener("focus", check);
     return () => window.removeEventListener("focus", check);
-  }, []);
+  }, [session]);
 
   // Ctrl+V في أي مكان من النافذة (خارج حقول الكتابة) يلصق في حقل الرابط
   useEffect(() => {
