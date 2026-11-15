@@ -19,6 +19,28 @@ pub(super) struct WatchHit {
     preset: String,
 }
 
+/// ملفات الوسائط في المجلد (المسار، الحجم). يُستدعى خارج خيوط tokio لأن المجلد قد يكون
+/// على قرص شبكي بطيء (T-22). None = تعذّرت قراءة المجلد.
+#[cfg(desktop)]
+fn list_media(dir: &Path) -> Option<Vec<(PathBuf, u64)>> {
+    let entries = std::fs::read_dir(dir).ok()?;
+    Some(
+        entries
+            .flatten()
+            .filter_map(|e| {
+                let path = e.path();
+                let hidden = e.file_name().to_string_lossy().starts_with('.');
+                let is_media = path
+                    .extension()
+                    .and_then(|x| x.to_str())
+                    .is_some_and(|x| MEDIA_EXT.contains(&x.to_lowercase().as_str()));
+                let meta = e.metadata().ok().filter(|m| m.is_file())?;
+                (is_media && !hidden).then_some((path, meta.len()))
+            })
+            .collect(),
+    )
+}
+
 /// مجلد فرعي يُكتب فيه الناتج (حتى لا يلتقطه المراقب مرة أخرى)
 #[cfg(desktop)]
 pub const WATCH_OUT: &str = "Converted";
@@ -40,25 +62,22 @@ pub fn spawn_watcher(app: AppHandle) {
             known_dirs.retain(|d| active.iter().any(|w| Path::new(&w.dir) == d));
             for w in &active {
                 let dir = PathBuf::from(&w.dir);
-                let Ok(entries) = std::fs::read_dir(&dir) else {
+                let listing = tauri::async_runtime::spawn_blocking({
+                    let dir = dir.clone();
+                    move || list_media(&dir)
+                });
+                let Ok(Some(entries)) = listing.await else {
                     continue;
                 };
                 let first_scan = known_dirs.insert(dir.clone());
-                for e in entries.flatten() {
-                    let path = e.path();
-                    let name = e.file_name().to_string_lossy().into_owned();
-                    let is_media = path
-                        .extension()
-                        .and_then(|x| x.to_str())
-                        .is_some_and(|x| MEDIA_EXT.contains(&x.to_lowercase().as_str()));
-                    if !is_media || name.starts_with('.') || !path.is_file() || seen.contains(&path) {
+                for (path, size) in entries {
+                    if seen.contains(&path) {
                         continue;
                     }
                     if first_scan {
                         seen.insert(path);
                         continue;
                     }
-                    let size = e.metadata().map(|m| m.len()).unwrap_or(0);
                     let entry = pending.entry(path.clone()).or_insert((size, 0));
                     if entry.0 == size && size > 0 {
                         entry.1 += 1;

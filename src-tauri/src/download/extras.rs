@@ -149,10 +149,10 @@ pub(super) async fn deliver_with_extras(
     for (src, suffix) in &side.files {
         let target = extra_dir.join(format!("{stem}{suffix}"));
         if suffix.ends_with(".srt") && !sections.is_empty() {
-            let content = std::fs::read_to_string(src).unwrap_or_default();
-            std::fs::write(&target, crate::srt::for_sections(&content, sections))?;
+            let content = tokio::fs::read_to_string(src).await.unwrap_or_default();
+            tokio::fs::write(&target, crate::srt::for_sections(&content, sections)).await?;
         } else {
-            std::fs::copy(src, &target)?;
+            tokio::fs::copy(src, &target).await?;
         }
         if let Err(e) = deliver(app, &target, final_dir).await {
             log::warn!("deliver extra: {e:?}");
@@ -160,19 +160,25 @@ pub(super) async fn deliver_with_extras(
     }
     if let Some(info) = &side.info {
         let target = extra_dir.join(format!("{stem} - source.txt"));
-        std::fs::write(&target, info_text(info, sections))?;
+        tokio::fs::write(&target, info_text(info, sections)).await?;
         if let Err(e) = deliver(app, &target, final_dir).await {
             log::warn!("deliver info: {e:?}");
         }
     }
     if let Some(dir) = stills_dir {
         let dest = unique_dir(final_dir, &format!("{stem} stills"));
-        if std::fs::rename(&dir, &dest).is_err() {
-            std::fs::create_dir_all(&dest)?;
-            for e in std::fs::read_dir(&dir)?.flatten() {
-                std::fs::copy(e.path(), dest.join(e.file_name()))?;
+        // النسخ (حين يكون مجلد المستخدم على قرص آخر) خارج خيوط tokio (T-22)
+        let (from, to) = (dir.clone(), dest.clone());
+        blocking(move || {
+            if std::fs::rename(&from, &to).is_err() {
+                std::fs::create_dir_all(&to)?;
+                for e in std::fs::read_dir(&from)?.flatten() {
+                    std::fs::copy(e.path(), to.join(e.file_name()))?;
+                }
             }
-        }
+            Ok(())
+        })
+        .await?;
         // الهاتف: المجلد كله إلى Download/Khama/<الاسم> stills
         #[cfg(mobile)]
         if let Err(e) = crate::mobile::publish_any(app, dest).await {
@@ -481,6 +487,14 @@ pub(super) async fn finish(
         file = out;
     }
     Ok(Some(file))
+}
+
+/// يشغّل عملية ملفات طويلة على خيط مخصّص بدل خيوط tokio
+pub(super) async fn blocking(f: impl FnOnce() -> std::io::Result<()> + Send + 'static) -> Result<(), AppError> {
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|e| AppError::with_detail("saveFailed", e.to_string()))??;
+    Ok(())
 }
 
 /// النقل إلى مجلد المستخدم (وعلى الهاتف: إلى Download/Khama العام)

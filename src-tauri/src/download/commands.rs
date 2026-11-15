@@ -296,8 +296,8 @@ pub async fn save_thumbnail(app: AppHandle, settings: State<'_, SettingsState>, 
     let tools = tools::resolve(&app)?;
     static N: AtomicU64 = AtomicU64::new(0);
     let work = jobs_root(&app)?.join(format!("thumb-{}", N.fetch_add(1, Ordering::Relaxed)));
-    let _ = std::fs::remove_dir_all(&work);
-    std::fs::create_dir_all(&work)?;
+    let _ = tokio::fs::remove_dir_all(&work).await;
+    tokio::fs::create_dir_all(&work).await?;
     let mut a = tools::ytdlp_base_args(&tools);
     a.extend(cookie_args(&app, &s));
     a.extend(["--skip-download", "--write-thumbnail", "--convert-thumbnails", "jpg", "-P"].map(String::from));
@@ -329,9 +329,9 @@ pub async fn save_thumbnail(app: AppHandle, settings: State<'_, SettingsState>, 
     let dir = jobs_root(&app)?.join("ready");
     #[cfg(desktop)]
     let dir = settings::resolve_output_dir(&app, &s)?;
-    std::fs::create_dir_all(&dir)?;
+    tokio::fs::create_dir_all(&dir).await?;
     let done = deliver(&app, &jpg, &dir).await;
-    let _ = std::fs::remove_dir_all(&work);
+    let _ = tokio::fs::remove_dir_all(&work).await;
     Ok(done?.to_string_lossy().into_owned())
 }
 
