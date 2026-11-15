@@ -1,6 +1,7 @@
 import type { ProbeInfo, Settings } from "../../api";
 import type { Stills } from "../../downloadPlan";
 import { useI18n } from "../../i18n";
+import type { ReactNode } from "react";
 import { Icon } from "../Icon";
 import { Segmented, Toggle } from "../Segmented";
 
@@ -14,6 +15,10 @@ export function ExtrasPanel(props: {
   original: boolean;
   stills: Stills;
   onStills: (v: Stills) => void;
+  /** الذكاء الاصطناعي والجدولة: نادرة، فتبقى داخل «إضافات» المطوية (D-31، D-32) */
+  children?: ReactNode;
+  /** ما فُعّل منها، ليظهر في السطر المطوي */
+  more?: (string | false)[];
 }) {
   const { t } = useI18n();
   const { settings: s, update, video, stills } = props;
@@ -23,11 +28,16 @@ export function ExtrasPanel(props: {
     update({ subLangs: s.subLangs.includes(code) ? s.subLangs.filter((c) => c !== code) : [...s.subLangs, code] });
 
   return (
-    <details className="extras" open={s.wantSubs || s.wantThumb || s.wantInfo || stills !== "off" || undefined}>
+    <details
+      className="extras"
+      open={s.wantSubs || s.wantThumb || s.wantInfo || stills !== "off" || props.more?.some(Boolean) || undefined}
+    >
       <summary>
         <Icon name="layers" size={16} /> {t.extrasLabel}
         <span className="extras-count">
-          {[s.wantSubs && "SRT", s.wantThumb && "JPG", s.wantInfo && "TXT", stills !== "off" && t.stillsLabel].filter(Boolean).join(" · ")}
+          {[s.wantSubs && "SRT", s.wantThumb && "JPG", s.wantInfo && "TXT", stills !== "off" && t.stillsLabel, ...(props.more ?? [])]
+            .filter(Boolean)
+            .join(" · ")}
         </span>
         <Icon name="chevron" size={16} />
       </summary>
@@ -65,14 +75,11 @@ export function ExtrasPanel(props: {
                 { value: "scene", label: t.stillsScenes },
               ]}
             />
-            {stills !== "off" && (
-              <div className="faint" style={{ marginTop: 6 }}>
-                {t.stillsHint}
-              </div>
-            )}
+            {stills !== "off" && <div className="faint mt-2">{t.stillsHint}</div>}
           </div>
         )}
       </div>
+      {props.children && <div className="extras-more">{props.children}</div>}
     </details>
   );
 }

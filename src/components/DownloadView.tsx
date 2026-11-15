@@ -317,7 +317,7 @@ export function DownloadView(props: {
 
   return (
     <div className="card download-card">
-      <div className="hero motif">
+      <div className="hero">
         <div className="card-head">
           <h2>{t.pasteTitle}</h2>
           <p className="faint">{t.pasteSub}</p>
@@ -389,6 +389,7 @@ export function DownloadView(props: {
       </div>
 
       {probe.status === "error" && !multiLinks && <ErrorBox error={probe.error} inline onFix={fix} />}
+      {startError && <ErrorBox error={startError} inline onFix={fix} />}
 
       {multiLinks && (
         <div className="link-list">
@@ -413,9 +414,9 @@ export function DownloadView(props: {
       {probe.status === "loading" && !multiLinks && (
         <div className="preview" aria-busy="true">
           <div className="thumb skeleton" />
-          <div style={{ flex: 1, display: "grid", gap: 8 }}>
-            <div className="skeleton" style={{ height: 14, width: "70%" }} />
-            <div className="skeleton" style={{ height: 12, width: "40%" }} />
+          <div className="grow stack-2">
+            <div className="skeleton skeleton-title" />
+            <div className="skeleton skeleton-meta" />
           </div>
         </div>
       )}
@@ -466,7 +467,13 @@ export function DownloadView(props: {
         />
       )}
 
-      <div className={`options-wrap ${ready ? "" : "dim"}`}>
+      {!ready && (
+        <div className="faint options-locked">
+          <Icon name="info" size={16} /> {t.pasteFirst}
+        </div>
+      )}
+      <div className={`options-wrap ${ready ? "" : "locked"}`} inert={!ready || undefined}>
+        {!original && <h3 className="form-section">{t.secFile}</h3>}
         {!original && (
           <div className="options">
             <div>
@@ -540,11 +547,7 @@ export function DownloadView(props: {
                         disabled: q !== "best" && maxHeight != null && Number(q) > maxHeight && s.quality !== q,
                       }))}
                     />
-                    {qualityHint && (
-                      <div className="faint" style={{ marginTop: 6 }}>
-                        {qualityHint}
-                      </div>
-                    )}
+                    {qualityHint && <div className="faint mt-2">{qualityHint}</div>}
                   </div>
                   {
                     <div>
@@ -562,6 +565,7 @@ export function DownloadView(props: {
           </div>
         )}
 
+        {info && !entries && <h3 className="form-section">{t.secPart}</h3>}
         {info && !entries && (
           <div className="trim-box">
             <Toggle
@@ -624,12 +628,12 @@ export function DownloadView(props: {
                   </div>
                 )}
                 {multi && (
-                  <div className="faint" style={{ marginTop: 8 }}>
+                  <div className="faint mt-2">
                     {willJoin ? t.clipsJoinHint(activeClips!.length) : t.clipsSeparateHint(activeClips!.length)}
                   </div>
                 )}
                 {multi && !willJoin && !isMobile && s.kind === "video" && (
-                  <div style={{ marginTop: 12 }}>
+                  <div className="mt-3">
                     <Toggle checked={timeline} onChange={setTimeline} title={t.timelineToggle} hint={t.timelineHint} />
                   </div>
                 )}
@@ -646,24 +650,22 @@ export function DownloadView(props: {
           original={original}
           stills={stills}
           onStills={setStills}
-        />
-
-        {!original && (
-          <StemsRow
-            stems={stems}
-            onStems={setStems}
-            playlist={!!entries}
-            scope={stemsScope}
-            onScope={setStemsScope}
-            count={stemsCount}
-            selected={selected.size}
-          />
-        )}
-
-        <ScheduleRow when={when} onWhen={setWhen} atTime={atTime} onAtTime={setAtTime} />
+          more={[stems !== "off" && t.stemsShort, when === "later" && t.scheduleShort]}
+        >
+          {!original && (
+            <StemsRow
+              stems={stems}
+              onStems={setStems}
+              playlist={!!entries}
+              scope={stemsScope}
+              onScope={setStemsScope}
+              count={stemsCount}
+              selected={selected.size}
+            />
+          )}
+          <ScheduleRow when={when} onWhen={setWhen} atTime={atTime} onAtTime={setAtTime} />
+        </ExtrasPanel>
       </div>
-
-      {startError && <ErrorBox error={startError} inline onFix={fix} />}
 
       <div className="action-row">
         <ProjectPicker settings={s} update={update} toast={props.toast} />
