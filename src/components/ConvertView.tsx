@@ -411,7 +411,7 @@ export function ConvertView(props: {
   // ============ بلا ملفات: منطقة الإفلات ============
   if (files.length === 0) {
     return (
-      <div className={`card dropzone motif ${props.dragging ? "over" : ""}`}>
+      <div className={`card dropzone ${props.dragging ? "over" : ""}`}>
         <div className="drop-icon">
           <Icon name="convert" size={24} />
         </div>
@@ -498,7 +498,7 @@ export function ConvertView(props: {
             label:
               suggestion && g !== group && presetById(suggestion)?.group === g ? (
                 <>
-                  {groupName(t, g)} <span className="tab-dot" title={t.suggested} />
+                  {groupName(t, g)} <span className="suggest-dot" title={t.suggested} />
                 </>
               ) : (
                 groupName(t, g)

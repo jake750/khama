@@ -488,12 +488,16 @@ export default function App() {
     { id: "settings", icon: "settings", label: t.tabSettings },
   ];
 
+  // متوسط تقدّم العمليات الجارية، للخط الرفيع تحت الشريط العلوي
+  const running = jobs.filter(isActive);
+  const overall = running.length ? running.reduce((sum, j) => sum + (j.percent ?? 0), 0) / running.length : null;
+
   return (
     <I18n.Provider value={i18n}>
       <div className={`app ${compact ? "compact" : ""}`}>
         <header className="topbar">
           <div className="brand">
-            <img className="brand-mark" src="/logo.png" alt="" />
+            <img className="brand-mark" src="/logo.svg" alt="" />
             <span className="brand-name">{t.appName}</span>
           </div>
           <nav className="tabs" ref={tabsRef}>
@@ -506,7 +510,7 @@ export default function App() {
                 onClick={() => setTab(x.id)}
                 title={x.label}
               >
-                <Icon name={x.icon} size={16} /> <span>{x.label}</span>
+                <Icon name={x.icon} size={20} /> <span>{x.label}</span>
                 {(x.id === "download" || x.id === "convert") &&
                   jobs.some((j) => isActive(j) && (x.id === "convert") === (j.type === "convert")) && (
                     <span className="tab-dot" aria-hidden="true" />
@@ -517,24 +521,25 @@ export default function App() {
           <span className="spacer" />
           <div className="topbar-tools">
             {!isMobile && (
-              <button
-                className="icon-btn ghost"
-                title={compact ? t.compactOff : t.compactOn}
-                aria-label={compact ? t.compactOff : t.compactOn}
-                onClick={toggleCompact}
-              >
-                <Icon name={compact ? "maximize" : "minimize"} size={20} />
+              <button className="btn btn-sm btn-ghost topbar-btn" title={compact ? t.compactOff : t.compactOn} onClick={toggleCompact}>
+                <Icon name={compact ? "maximize" : "minimize"} size={18} />
+                <span className="topbar-btn-label">{compact ? t.compactShortOff : t.compactShort}</span>
               </button>
             )}
             <button
               className="icon-btn ghost"
-              title={t.toggleTheme}
-              aria-label={t.toggleTheme}
+              title={resolvedTheme === "light" ? t.themeNowLight : t.themeNowDark}
+              aria-label={resolvedTheme === "light" ? t.themeNowLight : t.themeNowDark}
               onClick={() => update({ theme: resolvedTheme === "light" ? "dark" : "light" })}
             >
-              <Icon name={resolvedTheme === "light" ? "moon" : "sun"} size={20} />
+              <Icon name={resolvedTheme === "light" ? "sun" : "moon"} size={20} />
             </button>
           </div>
+          {overall != null && (
+            <span className="topbar-progress" aria-hidden="true">
+              <span style={{ width: `${overall}%` }} />
+            </span>
+          )}
         </header>
 
         <main className="main">

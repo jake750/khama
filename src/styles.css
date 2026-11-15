@@ -2878,32 +2878,6 @@ button.menu-item:hover {
   line-height: 16px;
 }
 
-/* ---------- الزخرفة: «خ» مكبّرة ومقصوصة بلون واحد وشفافية منخفضة ----------
-   حرف الشعار نفسه، فهي عربية ومرتبطة بالهوية. تُستعمل في 3 أماكن فقط:
-   بطل التنزيل، ومنطقة الإفلات في المحوّل، ونافذة التحديث. */
-.motif {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-}
-
-.motif::after {
-  content: "خ";
-  position: absolute;
-  z-index: -1;
-  inset-inline-end: -0.06em;
-  top: 50%;
-  font-family: "IBM Plex Sans Arabic", sans-serif;
-  font-size: var(--motif-size, 400px);
-  font-weight: var(--fw-bold);
-  line-height: 1;
-  color: var(--motif-color, var(--on-hero));
-  opacity: var(--motif-opacity, 0.11);
-  transform: translateY(-62%);
-  pointer-events: none;
-  user-select: none;
-}
-
 /* ---------- بطل شاشة التنزيل: الشيء الوحيد المطلوب، الصق الرابط ---------- */
 .download-card {
   box-shadow: var(--shadow-hero);
@@ -2918,7 +2892,6 @@ button.menu-item:hover {
   border-radius: calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px) 0 0;
   background: linear-gradient(160deg, var(--hero-1), var(--hero-2) 85%);
   color: var(--on-hero);
-  --motif-size: 420px;
 }
 
 .hero .card-head h2 {
@@ -2983,9 +2956,6 @@ button.menu-item:hover {
 
 /* ---------- منطقة الإفلات (المحوّل) ---------- */
 .dropzone {
-  --motif-color: var(--accent);
-  --motif-opacity: 0.07;
-  --motif-size: 360px;
   border-style: dashed;
 }
 
@@ -2995,9 +2965,6 @@ button.menu-item:hover {
 
 /* ---------- نافذة التحديث ---------- */
 .update-card {
-  --motif-color: var(--accent);
-  --motif-opacity: 0.06;
-  --motif-size: 300px;
   border-radius: var(--r-lg);
   padding: var(--s-6);
 }
@@ -3088,9 +3055,6 @@ button.menu-item:hover {
   .hero {
     margin: calc(var(--s-4) * -1) calc(var(--s-4) * -1) var(--s-5);
     padding: var(--s-5) var(--s-4);
-  }
-  .hero {
-    --motif-size: 300px;
   }
   .card-head h2 {
     font-size: var(--fs-sec);
@@ -3497,7 +3461,7 @@ button.menu-item:hover {
   color: var(--accent);
   font-weight: var(--fw-semi);
 }
-.tab-dot {
+.suggest-dot {
   display: inline-block;
   width: 6px;
   height: 6px;
@@ -3687,4 +3651,54 @@ button.menu-item:hover {
   display: flex;
   justify-content: flex-end;
   padding: var(--s-2) 0 var(--s-6);
+}
+
+/* =====================================================================
+   الشريط العلوي والهوية (القسم 6 من مقترح التصميم)
+   ===================================================================== */
+.topbar {
+  position: relative;
+}
+/* الشعار 32px واسم «خامة» بوزن أثقل (D-46) */
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  margin: 0;
+}
+.brand-name {
+  font-size: var(--fs-sec);
+  font-weight: var(--fw-bold);
+}
+/* نقطة «جارٍ» أوضح: أكبر وبحلقة (D-44) */
+.tab-dot {
+  width: 8px;
+  height: 8px;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+/* زر «مصغّر» بنص (D-17) */
+.topbar-btn {
+  gap: var(--s-2);
+}
+@media (max-width: 560px) {
+  .topbar-btn-label {
+    display: none;
+  }
+}
+/* خط زمني رفيع تحت الشريط العلوي يمثّل التقدّم الكلي، بدل التوهّج (D-39، D-59) */
+.topbar-progress {
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--line);
+  pointer-events: none;
+}
+.topbar-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.6s linear;
+}
+.download-card {
+  box-shadow: var(--shadow);
 }
