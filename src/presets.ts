@@ -1,5 +1,5 @@
 // قائمة الـ Presets كما تظهر في المحوّل: مجمّعة حسب الهدف لا حسب الكودك.
-// المعرّفات (id) نفسها الموجودة في src-tauri/src/convert.rs
+// المعرّفات والأنواع والامتدادات تطابق src-tauri/src/convert.rs، ويتحقق presets.test.ts من ذلك
 
 import type { ConvertOptions, Issue, MediaInfo } from "./api";
 import type { Lang } from "./i18n";
