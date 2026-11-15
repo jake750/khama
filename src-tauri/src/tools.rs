@@ -297,12 +297,34 @@ pub async fn update_ytdlp(app: AppHandle) -> Result<UpdateResult, AppError> {
         return Err(missing("yt-dlp", &path));
     }
     let before = first_line(&path, "--version").await;
-    let (ok, out, err) = run_capture(&path, &["-U"]).await?;
+    // نسخة احتياطية قبل التحديث (T-99): إن فشل التحديث أو لم تعمل النسخة الجديدة نعيد القديمة
+    let backup = path.with_extension("bak");
+    tokio::fs::copy(&path, &backup).await?;
+    let restore = || async {
+        let _ = tokio::fs::copy(&backup, &path).await;
+        let _ = tokio::fs::remove_file(&backup).await;
+    };
+    let (ok, out, err) = match run_capture(&path, &["-U"]).await {
+        Ok(r) => r,
+        Err(e) => {
+            restore().await;
+            return Err(e);
+        }
+    };
     if !ok {
+        restore().await;
         let raw = format!("{out}\n{err}");
         return Err(AppError::with_detail("updateFailed", crate::errors::tail(&raw, 12)));
     }
     let after = first_line(&path, "--version").await;
+    if after.as_deref().is_none_or(str::is_empty) {
+        restore().await;
+        return Err(AppError::with_detail(
+            "updateFailed",
+            "yt-dlp did not run after the update; the previous version was restored",
+        ));
+    }
+    let _ = tokio::fs::remove_file(&backup).await;
     Ok(UpdateResult {
         updated: before != after,
         version: after,
