@@ -22,6 +22,10 @@ import { isMobile, MOBILE_SAVE_DIR } from "../platform";
 import { TrimRange, type PreviewLink, type Range } from "./TrimRange";
 import { PlaylistPanel } from "./PlaylistPanel";
 import { FolderPicker } from "./FolderPicker";
+import { ExtrasPanel } from "./download/ExtrasPanel";
+import { ProjectPicker } from "./download/ProjectPicker";
+import { ScheduleRow, type When } from "./download/ScheduleRow";
+import { StemsRow } from "./download/StemsRow";
 
 const QUALITIES = ["best", "2160", "1440", "1080", "720", "480"] as const;
 
@@ -89,7 +93,7 @@ export function DownloadView(props: {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [stemsScope, setStemsScope] = useState<"all" | "pick">("all");
   const [picked, setPicked] = useState<Set<number>>(new Set());
-  const [when, setWhen] = useState<"now" | "later">("now");
+  const [when, setWhen] = useState<When>("now");
   const [atTime, setAtTime] = useState(() => {
     const d = new Date(Date.now() + 60 * 60 * 1000);
     return `${String(d.getHours()).padStart(2, "0")}:00`;
@@ -202,12 +206,6 @@ export function DownloadView(props: {
   const willJoin = multi && joinClips;
   const original = !!info?.original;
   const ready = !!info || multiLinks;
-
-  // لغات الترجمة لهذا الفيديو: المختارة سابقًا إن توفرت، وإلا الأولى
-  const available = info?.subtitles ?? [];
-  const chosenSubs = info ? available.filter((l) => s.subLangs.includes(l.code)).map((l) => l.code) : s.subLangs;
-  const toggleLang = (code: string) =>
-    update({ subLangs: s.subLangs.includes(code) ? s.subLangs.filter((c) => c !== code) : [...s.subLangs, code] });
 
   const preview: PreviewLink | null =
     info?.previewUrl && trimOn
@@ -641,173 +639,34 @@ export function DownloadView(props: {
         )}
 
         {/* ---------- إضافات: ترجمة، صورة، معلومات المصدر، لقطات ---------- */}
-        <details className="extras" open={s.wantSubs || s.wantThumb || s.wantInfo || stills !== "off" || undefined}>
-          <summary>
-            <Icon name="layers" size={16} /> {t.extrasLabel}
-            <span className="extras-count">
-              {[s.wantSubs && "SRT", s.wantThumb && "JPG", s.wantInfo && "TXT", stills !== "off" && t.stillsLabel]
-                .filter(Boolean)
-                .join(" · ")}
-            </span>
-            <Icon name="chevron" size={16} />
-          </summary>
-          <div className="extras-grid">
-            <div>
-              <Toggle checked={s.wantSubs} onChange={(wantSubs) => update({ wantSubs })} title={t.subsToggle} hint={t.subsHint} />
-              {s.wantSubs && info && !entries && (
-                <div className="chips">
-                  {available.length === 0 && <span className="faint">{t.subsNone}</span>}
-                  {available.map((l) => {
-                    const on = chosenSubs.length ? chosenSubs.includes(l.code) : l === available[0];
-                    return (
-                      <button key={l.code} className="chip-btn" aria-pressed={on} onClick={() => toggleLang(l.code)}>
-                        {l.name}
-                        {l.auto && <small>{t.subsAuto}</small>}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            <Toggle checked={s.wantThumb} onChange={(wantThumb) => update({ wantThumb })} title={t.thumbToggle} hint={t.thumbHint} />
-            <Toggle checked={s.wantInfo} onChange={(wantInfo) => update({ wantInfo })} title={t.infoToggle} hint={t.infoHint} />
-            {s.kind === "video" && !original && (
-              <div>
-                <span className="field-label">{t.stillsLabel}</span>
-                <Segmented<Stills>
-                  label={t.stillsLabel}
-                  value={stills}
-                  onChange={setStills}
-                  options={[
-                    { value: "off", label: t.stillsOff },
-                    { value: "5", label: t.stillsEvery(5) },
-                    { value: "10", label: t.stillsEvery(10) },
-                    { value: "scene", label: t.stillsScenes },
-                  ]}
-                />
-                {stills !== "off" && (
-                  <div className="faint" style={{ marginTop: 6 }}>
-                    {t.stillsHint}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </details>
+        <ExtrasPanel
+          settings={s}
+          update={update}
+          video={info && !entries ? info : null}
+          original={original}
+          stills={stills}
+          onStills={setStills}
+        />
 
         {!original && (
-          <div className="stems-row">
-            <span className="field-label">{t.stemsLabel}</span>
-            <Segmented<"off" | "voice" | "music">
-              label={t.stemsLabel}
-              value={stems}
-              onChange={setStems}
-              options={[
-                { value: "off", label: t.stemsOff },
-                { value: "voice", label: t.stemsVoice },
-                { value: "music", label: t.stemsMusic },
-              ]}
-            />
-            <div className="collapse" data-open={stems !== "off"}>
-              <div>
-                {entries && (
-                  <div className="stems-scope">
-                    <span className="field-label">{t.stemsApplyTo}</span>
-                    <Segmented<"all" | "pick">
-                      label={t.stemsApplyTo}
-                      value={stemsScope}
-                      onChange={setStemsScope}
-                      options={[
-                        { value: "all", label: t.stemsApplyAll },
-                        { value: "pick", label: t.stemsApplyPick },
-                      ]}
-                    />
-                    <div className="faint" style={{ marginTop: 6 }}>
-                      {stemsScope === "pick" ? t.stemsPickHint(stemsCount, selected.size, stemsLabel) : t.stemsAllHint(stemsCount)}
-                    </div>
-                  </div>
-                )}
-                <div className="faint" style={{ marginTop: 6 }}>
-                  {isMobile ? t.stemsHintMobile : t.stemsHint}
-                </div>
-              </div>
-            </div>
-          </div>
+          <StemsRow
+            stems={stems}
+            onStems={setStems}
+            playlist={!!entries}
+            scope={stemsScope}
+            onScope={setStemsScope}
+            count={stemsCount}
+            selected={selected.size}
+          />
         )}
 
-        <div className="schedule-row">
-          <span className="field-label">{t.startLabel}</span>
-          <div className="schedule-controls">
-            <Segmented<"now" | "later">
-              label={t.startLabel}
-              value={when}
-              onChange={setWhen}
-              options={[
-                { value: "now", label: t.startNow },
-                {
-                  value: "later",
-                  label: (
-                    <>
-                      <Icon name="clock" size={16} /> {t.startLater}
-                    </>
-                  ),
-                },
-              ]}
-            />
-            {when === "later" && (
-              <input
-                className="input time-input ltr"
-                type="time"
-                value={atTime}
-                onChange={(e) => setAtTime(e.target.value)}
-                aria-label={t.startLater}
-              />
-            )}
-          </div>
-          {when === "later" && (
-            <div className="faint" style={{ marginTop: 6 }}>
-              {t.scheduleHint(atTime)}
-            </div>
-          )}
-        </div>
+        <ScheduleRow when={when} onWhen={setWhen} atTime={atTime} onAtTime={setAtTime} />
       </div>
 
       {startError && <ErrorBox error={startError} inline onFix={fix} />}
 
       <div className="action-row">
-        {s.projects.length > 0 && (
-          <label className="project-pick" title={t.project}>
-            <Icon name="layers" size={16} />
-            <select
-              className="select select-sm"
-              value={s.activeProject ?? ""}
-              aria-label={t.project}
-              onChange={(e) => {
-                const p = s.projects.find((x) => x.id === e.target.value);
-                if (!p) return update({ activeProject: null });
-                update({
-                  activeProject: p.id,
-                  outputDir: p.outputDir,
-                  kind: p.kind,
-                  videoFormat: p.videoFormat,
-                  audioFormat: p.audioFormat,
-                  quality: p.quality,
-                  editorReady: p.editorReady,
-                  filenameTemplate: p.filenameTemplate,
-                  siteFolders: p.siteFolders,
-                });
-                props.toast(t.toastProject(p.name));
-              }}
-            >
-              <option value="">{t.noProject}</option>
-              {s.projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        <ProjectPicker settings={s} update={update} toast={props.toast} />
         {isMobile ? (
           <div className="save-to">
             <Icon name="folder" size={16} />

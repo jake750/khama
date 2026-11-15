@@ -7,12 +7,12 @@ import {
   type AppError,
   type CookiesMode,
   type Language,
-  type Project,
   type Settings,
   type Theme,
   type ToolsInfo,
   type WatchFolder,
 } from "../api";
+import { snapshotProject } from "../projects";
 import { useI18n } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
 import { Icon, type IconName } from "./Icon";
@@ -310,18 +310,7 @@ function ProjectsSection(props: {
   const { t } = useI18n();
   const { settings: s, update } = props;
   const [name, setName] = useState("");
-  const snapshot = (id: string, n: string): Project => ({
-    id,
-    name: n,
-    outputDir: s.outputDir,
-    kind: s.kind,
-    videoFormat: s.videoFormat,
-    audioFormat: s.audioFormat,
-    quality: s.quality,
-    editorReady: s.editorReady,
-    filenameTemplate: s.filenameTemplate,
-    siteFolders: s.siteFolders,
-  });
+  const snapshot = (id: string, n: string) => snapshotProject(s, id, n);
   const save = () => {
     const n = name.trim();
     if (!n) return;
