@@ -45,14 +45,12 @@ export function StemsRow(props: {
                   { value: "pick", label: t.stemsApplyPick },
                 ]}
               />
-              <div className="faint" style={{ marginTop: 6 }}>
+              <div className="faint mt-2">
                 {scope === "pick" ? t.stemsPickHint(props.count, props.selected, label) : t.stemsAllHint(props.count)}
               </div>
             </div>
           )}
-          <div className="faint" style={{ marginTop: 6 }}>
-            {isMobile ? t.stemsHintMobile : t.stemsHint}
-          </div>
+          <div className="faint mt-2">{isMobile ? t.stemsHintMobile : t.stemsHint}</div>
         </div>
       </div>
     </div>

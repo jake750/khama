@@ -100,11 +100,7 @@ export function HistoryView(props: {
           <p>{t.historyEmpty}</p>
         </div>
       )}
-      {list && list.length > 0 && shown.length === 0 && (
-        <p className="faint" style={{ textAlign: "center" }}>
-          {t.historyNoMatch}
-        </p>
-      )}
+      {list && list.length > 0 && shown.length === 0 && <p className="faint text-center">{t.historyNoMatch}</p>}
 
       {shown.map((g) => (
         <section key={g.label} className="history-group">

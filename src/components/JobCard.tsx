@@ -219,7 +219,7 @@ export function JobCard(props: {
           </button>
         )}
         {!active && j.state !== "scheduled" && (
-          <button className="icon-btn" style={{ width: 32, height: 32 }} title={t.remove} aria-label={t.remove} onClick={props.onRemove}>
+          <button className="icon-btn sm" title={t.remove} aria-label={t.remove} onClick={props.onRemove}>
             <Icon name="x" size={16} />
           </button>
         )}

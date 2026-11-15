@@ -28,7 +28,7 @@ export function ErrorBox(props: { error: AppError; compact?: boolean; inline?: b
     <div className={props.inline ? "error-inline" : undefined}>
       <div className={`alert ${props.inline ? "inline" : ""}`} style={props.compact ? { marginTop: 8 } : undefined} role="alert">
         <Icon name="alert" size={16} />
-        <span style={{ flex: 1 }}>{errorText(t, error)}</span>
+        <span className="grow">{errorText(t, error)}</span>
         {fix && (
           <button className="btn btn-sm" onClick={() => props.onFix!(fix)}>
             <Icon name={fix === "cookies" ? "settings" : "retry"} size={16} /> {fixLabel}

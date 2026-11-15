@@ -542,7 +542,7 @@ export default function App() {
             {!settings.acceptedNotice && (
               <div className="alert info notice-bar">
                 <Icon name="alert" size={16} />
-                <span style={{ flex: 1 }}>{t.notice}</span>
+                <span className="grow">{t.notice}</span>
                 <button className="btn btn-sm" onClick={() => update({ acceptedNotice: true })}>
                   {t.gotIt}
                 </button>

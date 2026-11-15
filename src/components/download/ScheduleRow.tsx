@@ -38,11 +38,7 @@ export function ScheduleRow(props: { when: When; onWhen: (w: When) => void; atTi
           />
         )}
       </div>
-      {when === "later" && (
-        <div className="faint" style={{ marginTop: 6 }}>
-          {t.scheduleHint(atTime)}
-        </div>
-      )}
+      {when === "later" && <div className="faint mt-2">{t.scheduleHint(atTime)}</div>}
     </div>
   );
 }

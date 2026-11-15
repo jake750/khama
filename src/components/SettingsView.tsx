@@ -114,14 +114,12 @@ export function SettingsView(props: {
             />
           </div>
           <div className="setting-row">
-            <div style={{ minWidth: 0 }}>
+            <div className="min-w-0">
               <div>{t.saveFolder}</div>
-              <div className="faint ltr" style={{ wordBreak: "break-all" }}>
-                {isMobile ? MOBILE_SAVE_DIR : props.outputDir}
-              </div>
+              <div className="faint ltr break-all">{isMobile ? MOBILE_SAVE_DIR : props.outputDir}</div>
             </div>
             {!isMobile && (
-              <div style={{ display: "flex", gap: 8 }}>
+              <div className="row-2">
                 <button className="btn" onClick={props.onOpenDir}>
                   <Icon name="folder" size={16} /> {t.open}
                 </button>
@@ -141,12 +139,8 @@ export function SettingsView(props: {
         <ToolsSection toast={props.toast} />
 
         <Section id="about" title={t.aboutTitle}>
-          <p className="muted" style={{ margin: "4px 0 8px" }}>
-            {t.aboutBody}
-          </p>
-          <p className="faint" style={{ margin: 0 }}>
-            {t.notice}
-          </p>
+          <p className="muted mt-1 mb-2">{t.aboutBody}</p>
+          <p className="faint m-0">{t.notice}</p>
         </Section>
       </div>
     </div>
@@ -158,11 +152,7 @@ function Section(props: { id: string; title: string; intro?: string; children: R
     <section className="card settings-section" id={`set-${props.id}`} data-section={props.id}>
       <div>
         <h2>{props.title}</h2>
-        {props.intro && (
-          <p className="faint" style={{ margin: 0 }}>
-            {props.intro}
-          </p>
-        )}
+        {props.intro && <p className="faint m-0">{props.intro}</p>}
       </div>
       <div>{props.children}</div>
     </section>
@@ -419,9 +409,7 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
               <input type="radio" name="cookies" checked={s.cookiesMode === m.value} onChange={() => update({ cookiesMode: m.value })} />
               <span>
                 <span>{m.title}</span>
-                <span className="faint" style={{ display: "block" }}>
-                  {m.hint}
-                </span>
+                <span className="faint block">{m.hint}</span>
               </span>
             </label>
           ))}
@@ -438,17 +426,13 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
                 </option>
               ))}
             </select>
-            {s.cookiesBrowser !== "firefox" && s.cookiesBrowser !== "safari" && (
-              <div className="faint" style={{ marginTop: 6 }}>
-                {t.chromeNote}
-              </div>
-            )}
+            {s.cookiesBrowser !== "firefox" && s.cookiesBrowser !== "safari" && <div className="faint mt-2">{t.chromeNote}</div>}
           </div>
         )}
 
         {s.cookiesMode === "file" && (
-          <div style={{ display: "grid", gap: 10 }}>
-            <div className="faint" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div className="stack-3">
+            <div className="faint row-2 items-center">
               <Icon name={hasSaved ? "check" : "x"} size={16} />
               {hasSaved ? t.cookiesSaved : t.cookiesNotSaved}
             </div>
@@ -470,7 +454,7 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
                 e.target.value = "";
               }}
             />
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div className="row-2 wrap">
               <button className="btn btn-primary" disabled={!text.trim()} onClick={save}>
                 {t.saveCookies}
               </button>
@@ -486,9 +470,9 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
           </div>
         )}
 
-        <details className="tech" style={{ fontSize: 13 }}>
+        <details className="tech fs-meta">
           <summary>{t.cookiesHowTitle}</summary>
-          <p style={{ margin: "8px 0 0" }}>{t.cookiesHowBody}</p>
+          <p className="mt-2 mb-0">{t.cookiesHowBody}</p>
         </details>
       </div>
     </Section>
@@ -542,12 +526,7 @@ function ToolsSection(props: { toast: (m: string) => void }) {
             {tools.map(([name, v]) => (
               <div key={name} className="tool">
                 <b>{name}</b>
-                <span
-                  className="faint ltr"
-                  style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                >
-                  {info ? (v ?? "—") : "…"}
-                </span>
+                <span className="faint ltr block ellipsis">{info ? (v ?? "—") : "…"}</span>
               </div>
             ))}
           </div>
@@ -606,7 +585,7 @@ function WatchSection(props: { settings: Settings; update: (p: Partial<Settings>
           </button>
         </div>
       ))}
-      <button className="btn btn-sm" onClick={add} style={{ marginTop: 8 }}>
+      <button className="btn btn-sm mt-2" onClick={add}>
         <Icon name="plus" size={16} /> {t.addWatch}
       </button>
     </Section>
