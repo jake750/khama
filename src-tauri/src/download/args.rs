@@ -98,6 +98,8 @@ pub(super) fn download_args(
         "-o".into(),
         template,
         "--windows-filenames".into(), // أسماء ملفات تصلح على كل الأنظمة
+        "--trim-filenames".into(),
+        opts.max_name.to_string(),
         "--no-mtime".into(),          // تاريخ الملف = وقت التنزيل (أسهل للفرز في المجلد)
         "--newline".into(),
         "--progress".into(),

@@ -89,7 +89,7 @@ pub(super) fn stem_of(p: &Path) -> String {
 }
 
 /// نص ملف معلومات المصدر (لذكر المصدر وحقوق المحتوى)
-pub(super) fn info_text(info: &Value, sections: &[(f64, f64)]) -> String {
+pub(super) fn info_text(info: &Value, sections: &[(f64, f64)], downloaded: &str) -> String {
     let s = |k: &str| info[k].as_str().filter(|v| !v.is_empty() && *v != "NA");
     let mut out = String::new();
     let mut line = |label: &str, v: Option<String>| {
@@ -108,7 +108,7 @@ pub(super) fn info_text(info: &Value, sections: &[(f64, f64)]) -> String {
     );
     line("Site", s("extractor_key").map(String::from));
     line("License", s("license").map(String::from));
-    line("Downloaded", Some(today()));
+    line("Downloaded", Some(downloaded.to_string()));
     if !sections.is_empty() {
         let parts: Vec<String> = sections.iter().map(|(a, b)| format!("{} - {}", ts(*a), ts(*b))).collect();
         line("Section", Some(parts.join(", ")));
@@ -160,7 +160,7 @@ pub(super) async fn deliver_with_extras(
     }
     if let Some(info) = &side.info {
         let target = extra_dir.join(format!("{stem} - source.txt"));
-        tokio::fs::write(&target, info_text(info, sections)).await?;
+        tokio::fs::write(&target, info_text(info, sections, &today(req.tz_offset_min))).await?;
         if let Err(e) = deliver(app, &target, final_dir).await {
             log::warn!("deliver info: {e:?}");
         }

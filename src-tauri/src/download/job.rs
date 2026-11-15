@@ -42,8 +42,9 @@ pub(super) async fn run_job(
     let user_tpl = &settings.filename_template;
     let n = if user_tpl.contains("{n}") { settings::next_counter(app) } else { 0 };
     let opts = JobOptions {
-        template: output_template(user_tpl, settings.site_folders, n, &today()),
+        template: output_template(user_tpl, settings.site_folders, n, &today(req.tz_offset_min)),
         rate_limit_kb: settings.rate_limit_kb,
+        max_name: max_name_len(&[&final_dir, &job_dir.join("work")]),
     };
     let parts = clips(&req);
     // الدمج يحتاج ffmpeg، وهو على الكمبيوتر فقط

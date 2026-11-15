@@ -279,7 +279,9 @@ export const api = {
   probe: (url: string, opts?: { replace?: boolean }) => invoke<ProbeInfo>("probe", { url, replace: opts?.replace ?? false }),
   /** على الهاتف: ينسخ ملفات اختارها المستخدم (content://) داخل التطبيق ويعيد مساراتها */
   importFiles: (paths: string[]) => invoke<string[]>("import_files", { paths }),
-  startDownload: (request: DownloadRequest) => invoke<number>("start_download", { request }),
+  /** نرسل فرق التوقيت ليكون {today} في اسم الملف تاريخ اليوم المحلي */
+  startDownload: (request: DownloadRequest) =>
+    invoke<number>("start_download", { request: { ...request, tzOffsetMin: -new Date().getTimezoneOffset() } }),
   cancelDownload: (id: number) => invoke<void>("cancel_download", { id }),
   revealFile: (path: string) => invoke<void>("reveal_file", { path }),
   openOutputDir: () => invoke<void>("open_output_dir"),

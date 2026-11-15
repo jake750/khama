@@ -71,7 +71,7 @@ fn info_file_text() {
         r#"{"title":"T","webpage_url":"https://x","uploader":"U","upload_date":"20141110","extractor_key":"Youtube","license":"NA"}"#,
     )
     .unwrap();
-    let t = info_text(&j, &[(1.0, 2.5)]);
+    let t = info_text(&j, &[(1.0, 2.5)], "2026-11-15");
     assert!(t.contains("Source: https://x\n"));
     assert!(t.contains("Published: 2014-11-10\n"));
     assert!(!t.contains("License"));
@@ -247,4 +247,22 @@ fn meta_line_gives_title_and_thumbnail() {
     );
     assert_eq!(parse_meta_line("NA"), None);
     assert_eq!(parse_meta_line(r#"{"title": null}"#), None);
+}
+
+#[test]
+fn today_uses_the_local_offset() {
+    // 2026-11-14 23:30 UTC
+    let t = 1_794_699_000;
+    assert_eq!(local_date(t, 0), "2026-11-14");
+    assert_eq!(local_date(t, 60), "2026-11-15", "UTC+1 بعد منتصف الليل المحلي");
+    assert_eq!(local_date(t, -300), "2026-11-14");
+    assert_eq!(local_date(t, 99_999), "2026-11-14", "قيمة غير معقولة تُهمل");
+}
+
+#[test]
+fn file_names_fit_under_the_windows_path_limit() {
+    let short = Path::new("C:/Users/me/Downloads");
+    assert_eq!(max_name_len(&[short]), 260 - 21 - 40);
+    let deep = "C:/x/".repeat(40);
+    assert_eq!(max_name_len(&[short, Path::new(&deep)]), 60, "لا يقل عن 60");
 }

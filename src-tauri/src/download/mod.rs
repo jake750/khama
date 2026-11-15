@@ -83,6 +83,9 @@ static SEPARATING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 #[serde(rename_all = "camelCase")]
 pub struct DownloadRequest {
     pub url: String,
+    /// فرق توقيت الجهاز عن UTC بالدقائق (من الواجهة)، ليكون {today} تاريخ اليوم المحلي (T-65)
+    #[serde(default)]
+    pub tz_offset_min: i32,
     /// "video" | "audio"
     pub kind: String,
     /// "mp4" | "mov"
@@ -136,15 +139,35 @@ struct JobOptions {
     /// قالب yt-dlp لاسم الملف، بلا لاحقة المقطع ولا الامتداد
     template: String,
     rate_limit_kb: u32,
+    /// أقصى طول لاسم الملف (بالحروف)، حتى لا يتجاوز المسار الكامل 260 حرفًا على Windows (T-97)
+    max_name: usize,
 }
 
-/// اليوم بصيغة 2026-11-10 (بلا مكتبة تواريخ: خوارزمية التقويم المدني)
-fn today() -> String {
+/// طول اسم الملف المسموح حتى يبقى أطول المسارين (مجلد العمل المؤقت ومجلد الحفظ) تحت حد Windows.
+/// 260 ناقص المجلد، ناقص 40 لمجلد الموقع ولاحقة المقطع (" [00m10s - 00m20s]") والامتداد. لا يقل عن 60.
+pub(super) fn max_name_len(dirs: &[&Path]) -> usize {
+    let longest = dirs.iter().map(|d| d.to_string_lossy().encode_utf16().count()).max().unwrap_or(0);
+    260usize.saturating_sub(longest + 40).max(60)
+}
+
+/// اليوم المحلي بصيغة 2026-11-10 (بلا مكتبة تواريخ: خوارزمية التقويم المدني).
+/// offset_min = فرق توقيت المستخدم عن UTC؛ بدونه يكون التاريخ خاطئًا بعد منتصف الليل المحلي (T-65)
+fn today(offset_min: i32) -> String {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0) as i64;
-    civil_date(secs.div_euclid(86_400))
+    local_date(secs, offset_min)
+}
+
+fn local_date(utc_secs: i64, offset_min: i32) -> String {
+    // فرق التوقيت في العالم بين -12 و+14 ساعة؛ ما خارجه قيمة خاطئة فنهملها
+    let offset = if (-720..=840).contains(&offset_min) {
+        i64::from(offset_min) * 60
+    } else {
+        0
+    };
+    civil_date((utc_secs + offset).div_euclid(86_400))
 }
 
 fn civil_date(days: i64) -> String {
