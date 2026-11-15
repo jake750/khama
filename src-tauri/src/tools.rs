@@ -21,6 +21,7 @@ use crate::errors::AppError;
 
 pub const EXE: &str = if cfg!(windows) { ".exe" } else { "" };
 
+#[derive(Clone)]
 pub struct Tools {
     /// البرنامج الذي نشغّله لـ yt-dlp (على الهاتف: Python، و yt-dlp أول وسيط له)
     pub ytdlp: PathBuf,
@@ -77,8 +78,30 @@ pub fn resolve(app: &AppHandle) -> Result<Tools, AppError> {
     })
 }
 
+/// آخر نتيجة لـ resolve (T-90): لا نعيد فحص الملفات وإنشاء المجلد في كل أمر.
+/// تُمسح حين تتغيّر نسخة yt-dlp المدارة، وتُهمل إن اختفى ملف yt-dlp.
+#[cfg(desktop)]
+static RESOLVED: std::sync::Mutex<Option<Tools>> = std::sync::Mutex::new(None);
+
+#[cfg(desktop)]
+fn forget_resolved() {
+    use crate::errors::LockExt;
+    *RESOLVED.lock_ok() = None;
+}
+
 #[cfg(desktop)]
 pub fn resolve(app: &AppHandle) -> Result<Tools, AppError> {
+    use crate::errors::LockExt;
+    if let Some(t) = RESOLVED.lock_ok().as_ref().filter(|t| t.ytdlp.exists()) {
+        return Ok(t.clone());
+    }
+    let tools = resolve_uncached(app)?;
+    *RESOLVED.lock_ok() = Some(tools.clone());
+    Ok(tools)
+}
+
+#[cfg(desktop)]
+fn resolve_uncached(app: &AppHandle) -> Result<Tools, AppError> {
     let managed = managed_ytdlp(app)?;
     let ytdlp = if managed.exists() { managed } else { bundled_ytdlp()? };
     let deno = exe_dir()?.join(format!("khama-deno{EXE}"));
@@ -220,6 +243,7 @@ pub async fn ensure_managed_ytdlp(app: &AppHandle) -> Result<(), AppError> {
     };
     if copy {
         tokio::fs::copy(&bundled, &managed).await?;
+        forget_resolved();
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
