@@ -14,8 +14,9 @@ import { SettingsView } from "./components/SettingsView";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { formatTimecode } from "./format";
 import { dictionaries, I18n, type Dict } from "./i18n";
-import { AnimatedList, reducedMotion, SlideSwitch, usePresence, useSlidingIndicator } from "./motion";
+import { AnimatedList, SlideSwitch, usePresence, useSlidingIndicator } from "./motion";
 import { isMobile } from "./platform";
+import type { Toast, ToastAction } from "./toast";
 import { presetById } from "./presets";
 import { logError } from "./log";
 
@@ -31,18 +32,9 @@ function useTheme(theme: Settings["theme"] | undefined): "dark" | "light" {
     return () => media.removeEventListener("change", onChange);
   }, [media]);
   const resolved = theme === "system" || !theme ? (systemLight ? "light" : "dark") : theme;
-  const first = useRef(true);
+  // تبديل الثيم فوري: التلاشي البطيء كان يُظهر ألوانًا نصفها قديم (D-79)
   useEffect(() => {
-    const root = document.documentElement;
-    // عند التبديل (لا عند الفتح): الألوان تتلاشى إلى الثيم الجديد بدل الوميض
-    if (!first.current && !reducedMotion()) {
-      root.classList.add("theme-anim");
-      const t = window.setTimeout(() => root.classList.remove("theme-anim"), 500);
-      root.setAttribute("data-theme", resolved);
-      return () => window.clearTimeout(t);
-    }
-    first.current = false;
-    root.setAttribute("data-theme", resolved);
+    document.documentElement.setAttribute("data-theme", resolved);
   }, [resolved]);
   return resolved;
 }
@@ -101,7 +93,7 @@ export default function App() {
   const [files, setFiles] = useState<SourceFile[]>([]);
   const [hw, setHw] = useState<string[] | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<{ msg: string; action?: ToastAction } | null>(null);
   const [clipUrl, setClipUrl] = useState<string | null>(null);
   const [inject, setInject] = useState<{ url: string; n: number } | null>(null);
   const [settingsSection, setSettingsSection] = useState<{ id: string; n: number } | null>(null);
@@ -231,10 +223,10 @@ export default function App() {
 
   // مؤقّت واحد للتنبيه: رسالة جديدة (أو نفس الرسالة مرة ثانية) تبدأ مدتها من جديد
   const toastTimer = useRef<number | undefined>(undefined);
-  const toast = useCallback((msg: string) => {
-    setToastMsg(msg);
+  const toast: Toast = useCallback((msg, action) => {
+    setToastMsg({ msg, action });
     window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToastMsg(null), 2600);
+    toastTimer.current = window.setTimeout(() => setToastMsg(null), 4000);
   }, []);
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
   saveFailed.current = () => toast(t.settingsSaveFailed);
@@ -554,7 +546,7 @@ export default function App() {
               </div>
             )}
 
-            <SlideSwitch id={tab} index={tabs.findIndex((x) => x.id === tab)}>
+            <SlideSwitch id={tab} index={tabs.findIndex((x) => x.id === tab)} fade={!isMobile}>
               <div className="view">
                 {tab === "download" && (
                   <DownloadView
@@ -666,7 +658,18 @@ export default function App() {
 
         {toastShown && (
           <div className={`toast ${toastLeaving ? "leaving" : ""}`} role="status">
-            {toastShown}
+            <span>{toastShown.msg}</span>
+            {toastShown.action && (
+              <button
+                className="toast-action"
+                onClick={() => {
+                  toastShown.action!.run();
+                  setToastMsg(null);
+                }}
+              >
+                {toastShown.action.label}
+              </button>
+            )}
           </div>
         )}
 

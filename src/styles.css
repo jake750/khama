@@ -1671,19 +1671,6 @@ img.file-thumb {
   scroll-behavior: smooth;
 }
 
-/* تبديل الثيم: كل الألوان تتلاشى معًا */
-.theme-anim,
-.theme-anim *,
-.theme-anim *::before,
-.theme-anim *::after {
-  transition:
-    background-color 0.45s var(--ease-io),
-    border-color 0.45s var(--ease-io),
-    color 0.45s var(--ease-io),
-    fill 0.45s var(--ease-io),
-    box-shadow 0.45s var(--ease-io) !important;
-}
-
 /* صف الجودة: ينطوي وينزلق مع «فيديو» (يمين/يسار حسب مكان الزر) بدل أن يختفي فجأة */
 .collapse.slide-x > div > * {
   transition:
@@ -3701,4 +3688,25 @@ button.menu-item:hover {
 }
 .download-card {
   box-shadow: var(--shadow);
+}
+
+/* =====================================================================
+   الحركة (القسم 7 من مقترح التصميم)
+   ===================================================================== */
+/* الإشعار مع زر فعل (D-82) */
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+.toast-action {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: var(--fw-bold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }

@@ -1,4 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
+import type { Toast } from "../toast";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PRESETS } from "../presets";
 import {
@@ -31,7 +32,7 @@ export function SettingsView(props: {
   outputDir: string;
   onChooseDir: () => void;
   onOpenDir: () => void;
-  toast: (msg: string) => void;
+  toast: Toast;
   /** القسم المطلوب عند الفتح (مثلًا "cookies" من رسالة خطأ) */
   section?: { id: string; n: number } | null;
 }) {
@@ -296,12 +297,7 @@ function BackgroundSection(props: { settings: Settings; update: (p: Partial<Sett
 }
 
 /** المشاريع: لقطة من مجلد الحفظ وخيارات التنزيل، يُبدَّل بينها من شاشة التنزيل */
-function ProjectsSection(props: {
-  settings: Settings;
-  update: (p: Partial<Settings>) => void;
-  outputDir: string;
-  toast: (m: string) => void;
-}) {
+function ProjectsSection(props: { settings: Settings; update: (p: Partial<Settings>) => void; outputDir: string; toast: Toast }) {
   const { t } = useI18n();
   const { settings: s, update } = props;
   const [name, setName] = useState("");
@@ -366,7 +362,7 @@ function ProjectsSection(props: {
   );
 }
 
-function CookiesSection(props: { settings: Settings; update: (p: Partial<Settings>) => void; toast: (m: string) => void }) {
+function CookiesSection(props: { settings: Settings; update: (p: Partial<Settings>) => void; toast: Toast }) {
   const { t } = useI18n();
   const { settings: s, update } = props;
   const [text, setText] = useState("");
@@ -482,7 +478,7 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
   );
 }
 
-function ToolsSection(props: { toast: (m: string) => void }) {
+function ToolsSection(props: { toast: Toast }) {
   const { t } = useI18n();
   const [info, setInfo] = useState<ToolsInfo | null>(null);
   const [infoError, setInfoError] = useState<AppError | null>(null);

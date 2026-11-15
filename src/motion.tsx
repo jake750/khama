@@ -10,7 +10,8 @@ import {
   type RefObject,
 } from "react";
 
-/* أدوات الحركة: كلها تحرّك transform/opacity أو ارتفاع عنصر واحد، وتحترم «تقليل الحركة». */
+/* أدوات الحركة: انتقالان فقط، بين التبويبات (SlideSwitch ومؤشّرها) وفي القوائم (AnimatedList) (D-35).
+   كلها تحرّك transform/opacity أو ارتفاع عنصر واحد، وتحترم «تقليل الحركة». */
 
 export const EASE_OUT = "cubic-bezier(0.16, 1, 0.3, 1)";
 export const EASE_IN = "cubic-bezier(0.7, 0, 0.84, 0)";
@@ -69,28 +70,13 @@ export function useSlidingIndicator(container: RefObject<HTMLElement | null>, se
     s.placed = true;
     if (!glide || (from.x === to.x && from.y === to.y && from.w === to.w)) return;
 
-    // حركة «سائلة»: الحافة الأمامية تسبق والخلفية تلحق، فتتمطّط الحبّة في منتصف الطريق
-    // ثم تنكمش وتستقر على الخيار الجديد. تمطيط خفيف للعرض وانضغاط بسيط للارتفاع.
-    // كل حافة لها منحنى خاص: الأمامية تنطلق وتهدأ، والخلفية تبدأ ببطء ثم تلحق.
-    // نحسب الإطارات مسبقًا فتبقى السرعة متصلة بلا أي قفزة.
-    const right = to.x >= from.x;
-    const lead = (t: number) => 1 - Math.pow(1 - t, 3);
-    const trail = (t: number) => t * t * t * (t * (6 * t - 15) + 10);
-    const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
-    const frames: Keyframe[] = [];
-    const N = 36;
-    for (let i = 0; i <= N; i++) {
-      const t = i / N;
-      const kl = right ? trail(t) : lead(t);
-      const kr = right ? lead(t) : trail(t);
-      const l = lerp(from.x, to.x, kl);
-      const r = lerp(from.x + from.w, to.x + to.w, kr);
-      const baseH = lerp(from.h, to.h, t);
-      const h = baseH * (1 - 0.08 * Math.sin(Math.PI * t)); // انضغاط خفيف في منتصف الطريق
-      const y = lerp(from.y, to.y, lead(t)) + (baseH - h) / 2;
-      frames.push({ transform: `translate(${l}px, ${y}px)`, width: `${r - l}px`, height: `${h}px` });
-    }
-    el.animate(frames, { duration: 540, easing: "linear" });
+    el.animate(
+      [
+        { transform: `translate(${from.x}px, ${from.y}px)`, width: `${from.w}px`, height: `${from.h}px` },
+        { transform: `translate(${to.x}px, ${to.y}px)`, width: `${to.w}px`, height: `${to.h}px` },
+      ],
+      { duration: 220, easing: EASE_OUT },
+    );
   };
 
   // يعمل بعد كل رسم، لكنه لا يقيس إلا إذا تغيّر المختار أو ظهر الحاوي لأول مرة
@@ -283,21 +269,20 @@ export function usePresence<T>(value: T | null, exitMs: number): [T | null, bool
   return [shown, leaving];
 }
 
-/** تبديل المظهر (فاتح/داكن) بتلاشٍ لوني ناعم بدل الوميض */
-export function smoothThemeSwitch(apply: () => void) {
-  const root = document.documentElement;
-  if (reducedMotion()) return apply();
-  root.classList.add("theme-anim");
-  apply();
-  window.setTimeout(() => root.classList.remove("theme-anim"), 450);
-}
-
 /**
  * تبديل محتوى باتجاه: عند الانتقال إلى خيار على اليمين ينزلق المحتوى الحالي إلى اليسار ويختفي،
  * ويدخل الجديد من اليمين (والعكس). الاتجاه بصري، فيُعكس في الواجهة العربية.
  * المغادر يبقى نفس النسخة (لا يُعاد بناؤه) ويُرفع فوق الجديد حتى تنتهي حركته، والحاوي يغيّر ارتفاعه بانسياب.
  */
-export function SlideSwitch(props: { id: string; index: number; children: ReactNode; className?: string; distance?: number }) {
+export function SlideSwitch(props: {
+  id: string;
+  index: number;
+  children: ReactNode;
+  className?: string;
+  distance?: number;
+  /** تلاشٍ سريع بلا انزلاق، فلا تتداخل الشاشتان (الكمبيوتر، D-9، D-80) */
+  fade?: boolean;
+}) {
   const [cur, setCur] = useState({ id: props.id, index: props.index, dir: 0 });
   const [leaving, setLeaving] = useState<{ id: string; el: ReactNode; dir: number }[]>([]);
   const last = useRef<ReactNode>(props.children);
@@ -342,18 +327,34 @@ export function SlideSwitch(props: { id: string; index: number; children: ReactN
   return (
     <div className={`slide-switch ${props.className ?? ""}`} ref={box}>
       {leaving.map((l) => (
-        <SlidePane key={l.id} out dir={l.dir} distance={D} animate onGone={() => setLeaving((x) => x.filter((y) => y.id !== l.id))}>
+        <SlidePane
+          key={l.id}
+          out
+          dir={l.dir}
+          distance={D}
+          fade={props.fade}
+          animate
+          onGone={() => setLeaving((x) => x.filter((y) => y.id !== l.id))}
+        >
           {l.el}
         </SlidePane>
       ))}
-      <SlidePane key={cur.id} out={false} dir={cur.dir} distance={D} animate={ready.current} onGone={() => {}}>
+      <SlidePane key={cur.id} out={false} dir={cur.dir} distance={D} fade={props.fade} animate={ready.current} onGone={() => {}}>
         {props.children}
       </SlidePane>
     </div>
   );
 }
 
-function SlidePane(props: { out: boolean; dir: number; distance: number; animate: boolean; children: ReactNode; onGone: () => void }) {
+function SlidePane(props: {
+  out: boolean;
+  dir: number;
+  distance: number;
+  fade?: boolean;
+  animate: boolean;
+  children: ReactNode;
+  onGone: () => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const onGone = useRef(props.onGone);
   onGone.current = props.onGone;
@@ -370,6 +371,14 @@ function SlidePane(props: { out: boolean; dir: number; distance: number; animate
     const fromX = new DOMMatrix(cs.transform).e;
     const fromO = parseFloat(cs.opacity);
     el.getAnimations().forEach((a) => a.cancel());
+    if (props.fade) {
+      // يختفي القديم في 120ms ثم يظهر الجديد في 150ms، فلا تُرى الشاشتان معًا
+      const a = props.out
+        ? el.animate([{ opacity: fromO }, { opacity: 0 }], { duration: 120, easing: "linear", fill: "forwards" })
+        : el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, delay: 120, easing: EASE_OUT, fill: "backwards" });
+      if (props.out) a.onfinish = () => onGone.current();
+      return;
+    }
     const d = props.distance * props.dir;
     if (props.out) {
       // يغادر بسرعة نحو الجهة المعاكسة ويبهت قبل أن يصل، فلا يتزاحم مع القادم

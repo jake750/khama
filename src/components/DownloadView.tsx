@@ -1,4 +1,5 @@
 import { readText } from "@tauri-apps/plugin-clipboard-manager";
+import type { Toast } from "../toast";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
@@ -19,6 +20,7 @@ import { Icon } from "./Icon";
 import { Segmented, Toggle } from "./Segmented";
 import { SlideSwitch } from "../motion";
 import { isMobile, MOBILE_SAVE_DIR } from "../platform";
+import { logError } from "../log";
 import { TrimRange, type PreviewLink, type Range } from "./TrimRange";
 import { PlaylistPanel } from "./PlaylistPanel";
 import { FolderPicker } from "./FolderPicker";
@@ -67,7 +69,7 @@ export function DownloadView(props: {
   /** رابط من خارج الشاشة (السجلّ: «نزّله مرة أخرى») */
   inject: { url: string; n: number } | null;
   onOpenSettings: (section: string) => void;
-  toast: (msg: string) => void;
+  toast: Toast;
   session: DownloadSession;
 }) {
   const { t } = useI18n();
@@ -257,8 +259,11 @@ export function DownloadView(props: {
     if (!info || savingThumb) return;
     setSavingThumb(true);
     try {
-      await api.saveThumbnail(url.trim());
-      props.toast(t.toastThumbSaved);
+      const path = await api.saveThumbnail(url.trim());
+      props.toast(
+        t.toastThumbSaved,
+        isMobile ? undefined : { label: t.show, run: () => api.revealFile(path).catch(logError("revealFile")) },
+      );
     } catch (e) {
       setStartError(asAppError(e));
     } finally {

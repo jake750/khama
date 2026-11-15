@@ -1,4 +1,5 @@
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import type { Toast } from "../toast";
 import { useEffect, useMemo, useState } from "react";
 import { api, type HistoryEntry } from "../api";
 import { useI18n } from "../i18n";
@@ -30,7 +31,7 @@ export function HistoryView(props: {
   version: number;
   onDownloadAgain: (url: string) => void;
   onDragOut?: (file: string, thumbnail?: string | null) => void;
-  toast: (msg: string) => void;
+  toast: Toast;
 }) {
   const { t, lang } = useI18n();
   const [list, setList] = useState<HistoryEntry[] | null>(null);
