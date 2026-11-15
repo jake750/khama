@@ -1,6 +1,10 @@
 // تنسيق الأرقام للعرض، حسب لغة الواجهة
 import type { Dict } from "./i18n";
 
+/**
+ * الحجم بوحدات 1024 (KB = 1024 بايت) عن قصد (T-60): نفس ما يعرضه مستكشف Windows،
+ * فيطابق الرقم في خامة الرقم الذي يراه المستخدم في مجلده. (macOS ومواقع التخزين تستعمل 1000.)
+ */
 export function formatBytes(t: Dict, n?: number | null): string {
   if (n == null || !isFinite(n)) return "";
   let i = 0;

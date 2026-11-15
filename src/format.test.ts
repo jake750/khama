@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { extractUrls, formatDuration, formatTimecode, isHttpUrl, parseTime } from "./format";
+import { dictionaries } from "./i18n";
+import { extractUrls, formatBytes, formatDuration, formatTimecode, isHttpUrl, parseTime } from "./format";
 
 describe("formatTimecode", () => {
   it("يعرض أجزاء الثانية", () => {
@@ -69,5 +70,14 @@ describe("isHttpUrl (T-62)", () => {
     for (const bad of ["https://", "ftp://x.com", "youtu.be/abc", "javascript:alert(1)", "https://a.com b", ""]) {
       expect(isHttpUrl(bad)).toBe(false);
     }
+  });
+});
+
+describe("formatBytes (T-60)", () => {
+  const t = dictionaries.en;
+  it("وحدات 1024 مثل مستكشف Windows", () => {
+    expect(formatBytes(t, 1024)).toBe(`1 ${t.bytes[1]}`);
+    expect(formatBytes(t, 1536 * 1024)).toBe(`1.5 ${t.bytes[2]}`);
+    expect(formatBytes(t, null)).toBe("");
   });
 });
