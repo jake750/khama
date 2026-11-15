@@ -16,7 +16,7 @@ pub(crate) fn unique_dir(dir: &Path, name: &str) -> PathBuf {
 
 /// يحجز أول اسم غير مستخدم: "name"، ثم "name (1)"، "name (2)"...
 /// الحجز ذرّي (create_new / create_dir يفشلان إن سبقنا أحد)، فعمليتان تنتهيان معًا
-/// لا تأخذان نفس الاسم ولا يكتب إحداهما فوق الأخرى (T-55). المستدعي يستبدل الحجز بالملف الحقيقي.
+/// لا تأخذان نفس الاسم ولا يكتب إحداهما فوق الأخرى (T-47). المستدعي يستبدل الحجز بالملف الحقيقي.
 fn reserve(dir: &Path, name: &str, create: impl Fn(&Path) -> std::io::Result<()>) -> PathBuf {
     let path = Path::new(name);
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");

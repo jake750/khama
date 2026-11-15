@@ -20,7 +20,7 @@ pub(super) struct WatchHit {
 }
 
 /// ملفات الوسائط في المجلد (المسار، الحجم). يُستدعى خارج خيوط tokio لأن المجلد قد يكون
-/// على قرص شبكي بطيء (T-22). None = تعذّرت قراءة المجلد.
+/// على قرص شبكي بطيء (T-23). None = تعذّرت قراءة المجلد.
 #[cfg(desktop)]
 fn list_media(dir: &Path) -> Option<Vec<(PathBuf, u64)>> {
     let entries = std::fs::read_dir(dir).ok()?;
@@ -87,7 +87,7 @@ pub fn spawn_watcher(app: AppHandle) {
                     if entry.1 >= 2 {
                         pending.remove(&path);
                         seen.insert(path.clone());
-                        // التحويل يبدأ هنا في Rust، فلا يضيع الملف إن لم تكن الواجهة جاهزة (T-26)
+                        // التحويل يبدأ هنا في Rust، فلا يضيع الملف إن لم تكن الواجهة جاهزة (T-27)
                         let hw = app.state::<SettingsState>().0.lock_ok().convert_hw;
                         let request = ConvertRequest {
                             inputs: vec![path.to_string_lossy().into_owned()],

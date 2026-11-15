@@ -14,7 +14,7 @@ const s = {
   language: "ar",
 } as Settings;
 
-describe("المشاريع (T-56)", () => {
+describe("المشاريع (T-48)", () => {
   it("الحفظ ثم التطبيق يعيد نفس الخيارات", () => {
     const p = snapshotProject(s, "id-1", "قناتي");
     expect(p).toMatchObject({ id: "id-1", name: "قناتي", outputDir: "D:/قناتي", quality: "720", siteFolders: true });

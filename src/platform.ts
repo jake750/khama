@@ -1,6 +1,6 @@
 import { platform } from "@tauri-apps/plugin-os";
 
-/** المنصة من Tauri مباشرة (T-74). في معاينة المتصفح (npm run dev) لا يوجد Tauri فنرجع لـ userAgent. */
+/** المنصة من Tauri مباشرة (T-78). في معاينة المتصفح (npm run dev) لا يوجد Tauri فنرجع لـ userAgent. */
 function detectMobile(): boolean {
   try {
     const p = platform();

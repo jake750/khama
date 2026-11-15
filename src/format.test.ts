@@ -33,7 +33,7 @@ describe("parseTime", () => {
     expect(parseTime("١:١٥")).toBe(75);
     expect(parseTime("۱:۱۵")).toBe(75);
   });
-  it("يرفض الدقائق والثواني فوق 59 (T-50)", () => {
+  it("يرفض الدقائق والثواني فوق 59 (T-71)", () => {
     expect(parseTime("1:99")).toBeNull();
     expect(parseTime("1:60:00")).toBeNull();
   });
@@ -48,7 +48,7 @@ describe("parseTime", () => {
 });
 
 describe("extractUrls", () => {
-  it("يحذف علامات الترقيم في آخر الرابط (T-71)", () => {
+  it("يحذف علامات الترقيم في آخر الرابط (T-50)", () => {
     expect(extractUrls("شوف https://youtu.be/abc.")).toEqual(["https://youtu.be/abc"]);
     expect(extractUrls("(https://youtu.be/abc)")).toEqual(["https://youtu.be/abc"]);
     expect(extractUrls("https://a.com/x، https://b.com/y؟")).toEqual(["https://a.com/x", "https://b.com/y"]);
@@ -61,7 +61,7 @@ describe("extractUrls", () => {
   });
 });
 
-describe("isHttpUrl (T-62)", () => {
+describe("isHttpUrl (T-70)", () => {
   it("يقبل روابط http/https كاملة", () => {
     expect(isHttpUrl(" https://youtu.be/abc ")).toBe(true);
     expect(isHttpUrl("http://example.com/a?b=c")).toBe(true);
@@ -73,7 +73,7 @@ describe("isHttpUrl (T-62)", () => {
   });
 });
 
-describe("formatBytes (T-60)", () => {
+describe("formatBytes (T-69)", () => {
   const t = dictionaries.en;
   it("وحدات 1024 مثل مستكشف Windows", () => {
     expect(formatBytes(t, 1024)).toBe(`1 ${t.bytes[1]}`);

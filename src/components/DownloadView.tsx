@@ -33,7 +33,7 @@ type ProbeState = { status: "idle" } | { status: "loading" } | { status: "ok"; i
 
 /**
  * ما يجب أن يبقى عند الانتقال لتبويب آخر والعودة (الشاشة تُبنى من جديد).
- * يملكه App (useRef) ويمرّره صراحة، بدل متغيرات عامة في الوحدة (T-9).
+ * يملكه App (useRef) ويمرّره صراحة، بدل متغيرات عامة في الوحدة (T-12).
  */
 export interface DownloadSession {
   /** النص في حقل الرابط */

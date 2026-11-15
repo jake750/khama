@@ -23,7 +23,7 @@ tauri-plugin-notification = "2"
 tauri-plugin-clipboard-manager = "2"
 # المنصة (هاتف أو كمبيوتر) للواجهة بدل تخمينها من userAgent
 tauri-plugin-os = "2"
-# سجلّ أخطاء في ملف دوّار يمكن للمستخدم إرساله عند البلاغ (T-28)
+# سجلّ أخطاء في ملف دوّار يمكن للمستخدم إرساله عند البلاغ (T-29)
 tauri-plugin-log = "2"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
@@ -51,7 +51,7 @@ tauri-plugin-single-instance = "2"
 codegen-units = 1
 lto = true
 opt-level = 3
-# بلا panic = "abort": انهيار مهمة في الخلفية يبقى داخلها ولا يُغلق التطبيق كله (T-27)
+# بلا panic = "abort": انهيار مهمة في الخلفية يبقى داخلها ولا يُغلق التطبيق كله (T-28)
 strip = true
 
 # في وضع التطوير: نحسّن مكتبات الحساب الثقيل فقط (إزالة الموسيقى بطيئة جدًا بدونها)

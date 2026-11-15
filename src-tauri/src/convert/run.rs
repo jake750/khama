@@ -39,7 +39,7 @@ pub(super) fn output_dir_for(app: &AppHandle, o: &ConvertOptions, input: &Path) 
 }
 
 /// يشغّل ffmpeg ويرسل النسبة والوقت المتبقي
-#[allow(clippy::too_many_arguments)] // تُجمع في struct ضمن إعادة الهيكلة (T-8)
+#[allow(clippy::too_many_arguments)] // تُجمع في struct ضمن إعادة الهيكلة (T-11)
 pub(super) async fn run_ffmpeg(
     app: &AppHandle,
     id: u64,

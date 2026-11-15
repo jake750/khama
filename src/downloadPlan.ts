@@ -1,4 +1,4 @@
-// منطق شاشة التنزيل بلا React (M-33): أيّ طلبات تُرسل لـ Rust، ومتى، وبأي خيارات.
+// منطق شاشة التنزيل بلا React (M-25): أيّ طلبات تُرسل لـ Rust، ومتى، وبأي خيارات.
 // الشاشة تجمع اختيارات المستخدم وتعرضها؛ القرار هنا، وله اختبارات في downloadPlan.test.ts.
 import type { DownloadRequest, PlaylistEntry, ProbeInfo, Settings, SubLang } from "./api";
 

@@ -336,7 +336,7 @@ pub async fn save_thumbnail(app: AppHandle, settings: State<'_, SettingsState>, 
 }
 
 /// يشغّل yt-dlp للمعاينة (حد 90 ثانية). replace = معاينة شاشة التنزيل: كل معاينة جديدة
-/// توقف السابقة وكل ما شغّلته (T-48)، فكتابة رابط ببطء أو تغييره لا تُراكم عمليات Python.
+/// توقف السابقة وكل ما شغّلته (T-42)، فكتابة رابط ببطء أو تغييره لا تُراكم عمليات Python.
 pub(super) async fn run_probe(tools: &Tools, args: &[&str], replace: bool) -> Result<(bool, String, String), AppError> {
     use std::sync::OnceLock;
     use tokio::io::AsyncReadExt;

@@ -3,7 +3,7 @@ import { arCount, dictionaries } from "./i18n";
 
 const files = { one: "ملف واحد", two: "ملفان", few: "# ملفات", many: "# ملفًا", other: "# ملف" };
 
-describe("arCount (T-58)", () => {
+describe("arCount (T-49)", () => {
   it("يختار الصيغة العربية الصحيحة", () => {
     expect(arCount(1, files)).toBe("ملف واحد");
     expect(arCount(2, files)).toBe("ملفان");

@@ -1,5 +1,5 @@
 /// <reference types="node" />
-// عقد بين الواجهة وRust (T-72): الـ Presets معرّفة في presets.ts (الأسماء والأوصاف والتقدير)
+// عقد بين الواجهة وRust (T-54): الـ Presets معرّفة في presets.ts (الأسماء والأوصاف والتقدير)
 // وفي convert/presets.rs (أوامر FFmpeg). هذا الاختبار يفشل إن اختلف معرّف أو نوع أو امتداد بينهما.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";

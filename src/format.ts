@@ -2,7 +2,7 @@
 import type { Dict } from "./i18n";
 
 /**
- * الحجم بوحدات 1024 (KB = 1024 بايت) عن قصد (T-60): نفس ما يعرضه مستكشف Windows،
+ * الحجم بوحدات 1024 (KB = 1024 بايت) عن قصد (T-69): نفس ما يعرضه مستكشف Windows،
  * فيطابق الرقم في خامة الرقم الذي يراه المستخدم في مجلده. (macOS ومواقع التخزين تستعمل 1000.)
  */
 export function formatBytes(t: Dict, n?: number | null): string {
@@ -37,7 +37,7 @@ export function formatEta(t: Dict, sec?: number | null): string {
   return t.left(formatDuration(sec));
 }
 
-/** رابط http/https صالح فيه اسم موقع (تحليل كامل بـ URL، لا مجرد البادئة — T-62) */
+/** رابط http/https صالح فيه اسم موقع (تحليل كامل بـ URL، لا مجرد البادئة — T-70) */
 export function isHttpUrl(s: string): boolean {
   const text = s.trim();
   if (/\s/.test(text)) return false;

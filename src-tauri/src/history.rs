@@ -61,7 +61,7 @@ fn with_list<T>(app: &AppHandle, state: &HistoryState, f: impl FnOnce(&mut Vec<H
     Ok(out)
 }
 
-/// async + خيط منفصل (T-21): فحص وجود حتى 1000 ملف لا يجمّد النافذة
+/// async + خيط منفصل (T-22): فحص وجود حتى 1000 ملف لا يجمّد النافذة
 /// (الأوامر المتزامنة في Tauri تعمل على الخيط الرئيسي).
 #[tauri::command]
 pub async fn get_history(app: AppHandle, state: State<'_, HistoryState>) -> Result<Vec<HistoryEntry>, AppError> {
@@ -82,7 +82,7 @@ pub fn contains_file(app: &AppHandle, file: &str) -> bool {
     with_list(app, &state, |list| (list.iter().any(|e| e.file == file), false)).unwrap_or(false)
 }
 
-/// معرّف جديد أكبر من كل ما في السجلّ (T-19): لا تصادم حتى لو انتهى تنزيلان في نفس الجزء من الثانية
+/// معرّف جديد أكبر من كل ما في السجلّ (T-20): لا تصادم حتى لو انتهى تنزيلان في نفس الجزء من الثانية
 fn next_id(list: &[HistoryEntry], now_ms: u64) -> u64 {
     let newest = list.iter().map(|e| e.id).max().unwrap_or(0);
     newest.max(now_ms.saturating_mul(1000)) + 1
@@ -105,7 +105,7 @@ pub async fn add_history(app: AppHandle, state: State<'_, HistoryState>, mut ent
     })
 }
 
-/// نسخة صغيرة دائمة من الصورة المصغّرة (T-20): روابط صور إنستغرام وتيك توك موقّعة
+/// نسخة صغيرة دائمة من الصورة المصغّرة (T-21): روابط صور إنستغرام وتيك توك موقّعة
 /// وتنتهي خلال ساعات، فنحفظ الصورة نفسها (حوالي 4 كيلوبايت) بدل رابطها.
 /// المصدر: رابط الصورة وهو ما زال صالحًا، وإلا إطار من الفيديو المنزَّل.
 async fn local_thumbnail(app: &AppHandle, entry: &HistoryEntry) -> Option<String> {
