@@ -3,6 +3,7 @@ import { api, type HistoryEntry } from "../api";
 import { useI18n } from "../i18n";
 import { isMobile } from "../platform";
 import { Icon } from "./Icon";
+import { logError } from "../log";
 
 /** «اليوم»، «أمس»، أو التاريخ: عنوان كل مجموعة في السجلّ */
 function dayLabel(lang: string, ms: number): string {
@@ -59,13 +60,13 @@ export function HistoryView(props: {
   }, [list, q, lang]);
 
   const remove = async (id: number) => {
-    await api.removeHistory(id).catch(() => {});
+    await api.removeHistory(id).catch(logError("removeHistory"));
     setList((l) => l?.filter((e) => e.id !== id) ?? null);
   };
 
   const clear = async () => {
     if (!window.confirm(t.historyConfirmClear)) return;
-    await api.clearHistory().catch(() => {});
+    await api.clearHistory().catch(logError("clearHistory"));
     setList([]);
   };
 
@@ -149,7 +150,7 @@ export function HistoryView(props: {
                 </div>
                 <div className="job-actions">
                   {e.exists && !isMobile && (
-                    <button className="btn btn-sm" onClick={() => api.revealFile(e.file).catch(() => {})}>
+                    <button className="btn btn-sm" onClick={() => api.revealFile(e.file).catch(logError("revealFile"))}>
                       <Icon name="folder" size={16} /> {t.showInFolder}
                     </button>
                   )}
@@ -164,7 +165,7 @@ export function HistoryView(props: {
                       navigator.clipboard
                         .writeText(e.url)
                         .then(() => props.toast(t.toastCopied))
-                        .catch(() => {})
+                        .catch(logError("copyLink"))
                     }
                   >
                     <Icon name="copy" size={16} />

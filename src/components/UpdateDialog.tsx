@@ -7,6 +7,7 @@ import { useI18n } from "../i18n";
 import { EASE_IN, EASE_OUT, reducedMotion, usePresence } from "../motion";
 import { isMobile } from "../platform";
 import { Icon } from "./Icon";
+import { logError } from "../log";
 
 /** صفحة آخر إصدار: بديل يدوي إن فشل التثبيت التلقائي */
 const RELEASES_URL = "https://github.com/jake750/khama/releases/latest";
@@ -65,7 +66,7 @@ async function checkMobile(): Promise<Available | null> {
   }
 }
 
-const openUrl = (url: string) => invoke("plugin:opener|open_url", { url }).catch(() => {});
+const openUrl = (url: string) => invoke("plugin:opener|open_url", { url }).catch(logError("openUrl"));
 
 /**
  * يبحث عن نسخة أحدث من خامة مرة واحدة بعد الفتح، ويعرض نافذة «تحديث / لاحقًا».

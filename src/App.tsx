@@ -16,6 +16,7 @@ import { dictionaries, I18n, type Dict } from "./i18n";
 import { AnimatedList, reducedMotion, SlideSwitch, usePresence, useSlidingIndicator } from "./motion";
 import { isMobile } from "./platform";
 import { presetById } from "./presets";
+import { logError } from "./log";
 
 type Tab = "download" | "convert" | "history" | "settings";
 
@@ -183,7 +184,7 @@ export default function App() {
           }),
         )
         .then(() => setHistoryVersion((v) => v + 1))
-        .catch(() => {});
+        .catch(logError("addHistory"));
     }
   }, []);
 
@@ -297,7 +298,7 @@ export default function App() {
         const restored = (items ?? []).map((it) => ({ ...it, id: nextLocalId.current--, type: "download", state: "scheduled" }) as Job);
         setJobs((prev) => [...prev, ...restored]);
       })
-      .catch(() => {})
+      .catch(logError("getScheduled"))
       .finally(() => alive && setScheduledLoaded(true));
     return () => {
       alive = false;
@@ -314,7 +315,7 @@ export default function App() {
   useEffect(() => {
     if (!scheduledLoaded || savedScheduled.current === scheduledJson) return;
     savedScheduled.current = scheduledJson;
-    api.saveScheduled(JSON.parse(scheduledJson)).catch(() => {});
+    api.saveScheduled(JSON.parse(scheduledJson)).catch(logError("saveScheduled"));
   }, [scheduledLoaded, scheduledJson]);
 
   // فاحص المواعيد: كل 15 ثانية وعند عودة النافذة. لا يعتمد على مؤقّت واحد طويل
@@ -422,7 +423,7 @@ export default function App() {
         setCompact(next);
         if (next) setTab("download");
       })
-      .catch(() => {});
+      .catch(logError("setCompact"));
   }, [compact]);
 
   if (bootError)
@@ -440,8 +441,9 @@ export default function App() {
 
   const retry = (j: Job) => {
     setJobs((p) => p.filter((x) => x.id !== j.id));
-    if (j.type === "download" && j.request) startDownload(j.request, { title: j.title, thumbnail: j.thumbnail }).catch(() => {});
-    if (j.type === "convert" && j.convert) startConvert(j.convert, j.title, j.meta).catch(() => {});
+    if (j.type === "download" && j.request)
+      startDownload(j.request, { title: j.title, thumbnail: j.thumbnail }).catch(logError("retryDownload"));
+    if (j.type === "convert" && j.convert) startConvert(j.convert, j.title, j.meta).catch(logError("retryConvert"));
   };
 
   /** من نتائج الكشف: نقاط القطع = بداية المشهد، أو منتصف الفراغ الأسود/الصامت */
@@ -466,7 +468,7 @@ export default function App() {
       },
       baseName(input),
       t.splitHere,
-    ).catch(() => {});
+    ).catch(logError("splitHere"));
   };
 
   const copyMarkers = (j: Job) => {
@@ -474,7 +476,7 @@ export default function App() {
     navigator.clipboard
       .writeText(text)
       .then(() => toast(t.toastCopied))
-      .catch(() => {});
+      .catch(logError("copyMarkers"));
   };
 
   const tabs: { id: Tab; icon: IconName; label: string }[] = [
@@ -595,7 +597,7 @@ export default function App() {
                     update={update}
                     outputDir={outputDir}
                     onChooseDir={chooseDir}
-                    onOpenDir={() => api.openOutputDir().catch(() => {})}
+                    onOpenDir={() => api.openOutputDir().catch(logError("openOutputDir"))}
                     toast={toast}
                     section={settingsSection}
                   />

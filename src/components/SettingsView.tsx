@@ -18,6 +18,7 @@ import { ErrorBox } from "./ErrorBox";
 import { Icon, type IconName } from "./Icon";
 import { Segmented, Toggle } from "./Segmented";
 import { isMobile, MOBILE_SAVE_DIR } from "../platform";
+import { logError } from "../log";
 
 // المتصفحات التي يستطيع yt-dlp قراءة الكوكيز منها، حسب النظام
 const isMac = navigator.userAgent.includes("Mac");
@@ -380,10 +381,7 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    api
-      .hasSavedCookies()
-      .then(setHasSaved)
-      .catch(() => {});
+    api.hasSavedCookies().then(setHasSaved).catch(logError("hasSavedCookies"));
   }, []);
 
   async function save() {
@@ -399,7 +397,7 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
   }
 
   async function remove() {
-    await api.deleteCookies().catch(() => {});
+    await api.deleteCookies().catch(logError("deleteCookies"));
     setHasSaved(false);
     props.toast(t.toastCookiesDeleted);
   }
