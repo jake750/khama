@@ -55,7 +55,7 @@ impl<T: Default> Loaded<T> {
             Loaded::Ok(v) => v,
             Loaded::Missing => T::default(),
             Loaded::Corrupt(backup) => {
-                eprintln!("khama: {what} تالف، حُفظت نسخة في {}", backup.display());
+                log::error!("khama: {what} تالف، حُفظت نسخة في {}", backup.display());
                 T::default()
             }
         }

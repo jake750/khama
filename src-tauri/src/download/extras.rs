@@ -64,7 +64,7 @@ pub(super) async fn fetch_sidecars(
     match outcome {
         RunOutcome::Canceled => return Ok(None),
         // الإضافات ليست أساسية: إن فشلت نكمل تنزيل الفيديو نفسه
-        RunOutcome::Exited { success: false, stderr } => eprintln!("sidecars: {}", tail(&stderr, 6)),
+        RunOutcome::Exited { success: false, stderr } => log::warn!("sidecars: {}", tail(&stderr, 6)),
         RunOutcome::Exited { success: true, .. } => {}
     }
     let mut files = Vec::new();
@@ -155,14 +155,14 @@ pub(super) async fn deliver_with_extras(
             std::fs::copy(src, &target)?;
         }
         if let Err(e) = deliver(app, &target, final_dir).await {
-            eprintln!("deliver extra: {e:?}");
+            log::warn!("deliver extra: {e:?}");
         }
     }
     if let Some(info) = &side.info {
         let target = extra_dir.join(format!("{stem} - source.txt"));
         std::fs::write(&target, info_text(info, sections))?;
         if let Err(e) = deliver(app, &target, final_dir).await {
-            eprintln!("deliver info: {e:?}");
+            log::warn!("deliver info: {e:?}");
         }
     }
     if let Some(dir) = stills_dir {
@@ -176,7 +176,7 @@ pub(super) async fn deliver_with_extras(
         // الهاتف: المجلد كله إلى Download/Khama/<الاسم> stills
         #[cfg(mobile)]
         if let Err(e) = crate::mobile::publish_any(app, dest).await {
-            eprintln!("deliver stills: {e:?}");
+            log::warn!("deliver stills: {e:?}");
         }
     }
     Ok(Some(done))

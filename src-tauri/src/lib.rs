@@ -27,6 +27,19 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_os::init())
+        // ملف سجلّ في مجلد سجلات التطبيق (Windows: %LOCALAPPDATA%\com.jake750.khama\logs)،
+        // يُستبدل عند 2 ميغابايت ويبقى ملف سابق واحد
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .max_file_size(2_000_000)
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepOne)
+                .target(tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+                    file_name: None,
+                }))
+                .target(tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stderr))
+                .build(),
+        )
         .manage(download::Jobs::default())
         .manage(download::DownloadQueue::default())
         .manage(history::HistoryState::default())
@@ -56,7 +69,7 @@ pub fn run() {
             // في الخلفية: جهّز yt-dlp (نسخة قابلة للتحديث على الكمبيوتر، أو فكّ الأدوات على الهاتف)
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = tools::ensure_managed_ytdlp(&handle).await {
-                    eprintln!("ensure_managed_ytdlp: {e:?}");
+                    log::error!("ensure_managed_ytdlp: {e:?}");
                 }
             });
             Ok(())

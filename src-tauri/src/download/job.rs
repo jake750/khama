@@ -116,7 +116,7 @@ pub(super) async fn run_job(
         && req.kind == "video"
         && let Err(e) = write_timeline(&tools, &delivered).await
     {
-        eprintln!("timeline: {e:?}");
+        log::warn!("timeline: {e:?}");
     }
     Ok(first)
 }

@@ -287,7 +287,7 @@ pub(super) async fn run_convert(
     // مشفّر كرت الشاشة/الهاتف أنهى بلا فيديو (يحدث مع MediaCodec على بعض الأجهزة): نعيد بالمعالج
     let used_hw = plan.args.iter().any(|a| hw.contains(a));
     if used_hw && !folder_out && p.kind == PKind::Video && matches!(result, Ok(Some(_))) && video_packets(&tools, &temp).await == 0 {
-        eprintln!("hw encoder produced no video, retrying on CPU");
+        log::warn!("hw encoder produced no video, retrying on CPU");
         let _ = std::fs::remove_file(&temp);
         let plan = build_plan(&p, o, &infos, &[], &target, loudnorm.as_deref())?;
         emit(
