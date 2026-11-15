@@ -166,7 +166,7 @@ pub(super) async fn deliver_with_extras(
         }
     }
     if let Some(dir) = stills_dir {
-        let dest = unique_path(final_dir, &format!("{stem} stills"));
+        let dest = unique_dir(final_dir, &format!("{stem} stills"));
         if std::fs::rename(&dir, &dest).is_err() {
             std::fs::create_dir_all(&dest)?;
             for e in std::fs::read_dir(&dir)?.flatten() {

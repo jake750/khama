@@ -160,5 +160,25 @@ fn unique_names() {
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("a.mp4"), b"x").unwrap();
     assert_eq!(unique_path(&dir, "a.mp4"), dir.join("a (1).mp4"));
+    // الاسم محجوز: الطلب التالي يأخذ اسمًا آخر حتى قبل نقل الملف الحقيقي (T-55)
+    assert_eq!(unique_path(&dir, "a.mp4"), dir.join("a (2).mp4"));
+    assert_eq!(unique_dir(&dir, "a stills"), dir.join("a stills"));
+    assert_eq!(unique_dir(&dir, "a stills"), dir.join("a stills (1)"));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn unique_names_under_concurrency() {
+    let dir = std::env::temp_dir().join(format!("khama-race-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let handles: Vec<_> = (0..16)
+        .map(|_| {
+            let d = dir.clone();
+            std::thread::spawn(move || unique_path(&d, "same.mp4"))
+        })
+        .collect();
+    let names: std::collections::HashSet<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+    assert_eq!(names.len(), 16, "كل عملية أخذت اسمًا مختلفًا");
     std::fs::remove_dir_all(dir).unwrap();
 }

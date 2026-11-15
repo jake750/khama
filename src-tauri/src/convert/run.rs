@@ -195,7 +195,10 @@ pub(super) async fn run_convert(
             }
         }
         let dest = unique_path(&dir, &format!("{stem} [{}].{ext}", p.suffix));
-        std::fs::rename(&temp, &dest).map_err(|e| AppError::with_detail("moveFailed", e.to_string()))?;
+        std::fs::rename(&temp, &dest).map_err(|e| {
+            let _ = std::fs::remove_file(&dest);
+            AppError::with_detail("moveFailed", e.to_string())
+        })?;
         return Ok(Some((deliver(app, dest).await?, None)));
     }
 
@@ -317,7 +320,10 @@ pub(super) async fn run_convert(
         }
     }
     let dest = unique_path(&dir, &final_name);
-    std::fs::rename(&temp, &dest).map_err(|e| AppError::with_detail("moveFailed", e.to_string()))?;
+    std::fs::rename(&temp, &dest).map_err(|e| {
+        let _ = std::fs::remove_file(&dest);
+        AppError::with_detail("moveFailed", e.to_string())
+    })?;
     Ok(Some((deliver(app, dest).await?, None)))
 }
 
