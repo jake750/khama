@@ -215,18 +215,41 @@ export default function App() {
     };
   }, []);
 
-  // حفظ الإعدادات: خارج دالة setState (React قد يستدعيها مرتين)، وبالتسلسل حتى لا يكتب
-  // حفظٌ قديم فوق أحدث منه. settingsRef يُحدَّث فورًا فلا يضيع تعديلان في نفس اللحظة.
-  const saveChain = useRef(Promise.resolve());
+  // حفظ الإعدادات: خارج دالة setState (React قد يستدعيها مرتين)، وحفظ واحد في كل لحظة حتى لا يكتب
+  // حفظٌ قديم فوق أحدث منه. التعديلات التي تصل أثناء الحفظ تُجمع في حفظ واحد بآخر قيمة (T-88)،
+  // فعدة نقرات سريعة لا تكتب الملف عدة مرات، ولا تأخير على أول تعديل (Rust يقرأ الإعدادات عند بدء أي تنزيل).
+  const saving = useRef(false);
+  const queuedSave = useRef<Settings | null>(null);
   const saveFailed = useRef<(e: unknown) => void>(() => {});
-  const update = useCallback((patch: Partial<Settings>) => {
-    const prev = settingsRef.current;
-    if (!prev) return;
-    const next = { ...prev, ...patch };
-    settingsRef.current = next;
-    setSettings(next);
-    saveChain.current = saveChain.current.then(() => api.saveSettings(next)).catch((e) => saveFailed.current(e));
+  const flushSave = useCallback(async () => {
+    if (saving.current) return;
+    saving.current = true;
+    try {
+      while (queuedSave.current) {
+        const next = queuedSave.current;
+        queuedSave.current = null;
+        try {
+          await api.saveSettings(next);
+        } catch (e) {
+          saveFailed.current(e);
+        }
+      }
+    } finally {
+      saving.current = false;
+    }
   }, []);
+  const update = useCallback(
+    (patch: Partial<Settings>) => {
+      const prev = settingsRef.current;
+      if (!prev) return;
+      const next = { ...prev, ...patch };
+      settingsRef.current = next;
+      setSettings(next);
+      queuedSave.current = next;
+      void flushSave();
+    },
+    [flushSave],
+  );
 
   // مؤقّت واحد للتنبيه: رسالة جديدة (أو نفس الرسالة مرة ثانية) تبدأ مدتها من جديد
   const toastTimer = useRef<number | undefined>(undefined);

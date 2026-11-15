@@ -240,6 +240,14 @@ pub(super) fn hw_candidates() -> &'static [&'static str] {
 pub(super) async fn detect_hw(tools: &Tools) -> Vec<String> {
     let mut found = Vec::new();
     let dir = std::env::temp_dir().join(format!("khama-hw-{}", std::process::id()));
+    // مجلدات فحص سابقة بقيت بعد انهيار أو إغلاق قسري (T-92)
+    if let Ok(entries) = std::fs::read_dir(std::env::temp_dir()) {
+        for e in entries.flatten() {
+            if e.file_name().to_string_lossy().starts_with("khama-hw-") && e.path() != dir {
+                let _ = std::fs::remove_dir_all(e.path());
+            }
+        }
+    }
     let _ = std::fs::create_dir_all(&dir);
     for enc in hw_candidates() {
         let fmt = if enc.ends_with("_qsv") { "nv12" } else { "yuv420p" };
