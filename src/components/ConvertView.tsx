@@ -117,8 +117,8 @@ function FilePick(props: { label: string; value?: string | null; extensions: str
         </button>
         {props.value && (
           <button
-            className="icon-btn"
-            style={{ width: 30, height: 30 }}
+            className="icon-btn sm"
+
             title={t.unpick}
             aria-label={t.unpick}
             onClick={() => props.onChange(null)}
@@ -131,7 +131,7 @@ function FilePick(props: { label: string; value?: string | null; extensions: str
   );
 }
 
-/** قائمة منسدلة بسيطة */
+/** اختيار واحد: حتى 5 خيارات أزرار مجزّأة، وأكثر قائمة منسدلة (D-23) */
 function Pick<T extends string | number | null>(props: {
   label: string;
   value: T;
@@ -139,6 +139,19 @@ function Pick<T extends string | number | null>(props: {
   onChange: (v: T) => void;
 }) {
   const idx = props.options.findIndex((o) => o.value === props.value);
+  if (props.options.length <= 5) {
+    return (
+      <div className="pick">
+        <span className="field-label">{props.label}</span>
+        <Segmented<string>
+          label={props.label}
+          value={String(idx)}
+          onChange={(v) => props.onChange(props.options[Number(v)].value)}
+          options={props.options.map((o, i) => ({ value: String(i), label: o.label }))}
+        />
+      </div>
+    );
+  }
   return (
     <label className="pick">
       <span className="field-label">{props.label}</span>
@@ -330,7 +343,7 @@ export function ConvertView(props: {
                   <div className="issues">
                     {f.info.issues.map((i) => (
                       <span key={i} className={`issue ${i === "noAudio" ? "" : "warn"}`} title={t.issues[i]}>
-                        <Icon name="alert" size={16} /> {t.issues[i]}
+                        <Icon name={i === "noAudio" ? "info" : "alert"} size={16} /> {t.issues[i]}
                       </span>
                     ))}
                   </div>
@@ -338,8 +351,8 @@ export function ConvertView(props: {
                 {f.error && <ErrorBox error={f.error} compact />}
               </div>
               <button
-                className="icon-btn"
-                style={{ width: 32, height: 32 }}
+                className="icon-btn sm"
+
                 title={t.removeFile}
                 aria-label={t.removeFile}
                 onClick={() => props.setFiles((prev) => prev.filter((x) => x.path !== f.path))}
@@ -352,7 +365,7 @@ export function ConvertView(props: {
         {suggestion && suggestion !== preset.id && (
           <div className="alert info suggestion">
             <Icon name="check" size={16} />
-            <span style={{ flex: 1 }}>
+            <span className="grow">
               {t.suggested}: <b>{presetById(suggestion)!.name[lang]}</b> — {presetById(suggestion)!.desc[lang]}
             </span>
             <button
@@ -398,7 +411,7 @@ export function ConvertView(props: {
         </SlideSwitch>
 
         {(preset.quality || preset.hw) && (
-          <div className="options" style={{ marginTop: 16 }}>
+          <div className="options mt-4">
             {preset.quality && (
               <div>
                 <span className="field-label">{t.quality}</span>
@@ -594,9 +607,7 @@ export function ConvertView(props: {
             </div>
           ) : (
             <div className="dest">
-              <span className="field-label" style={{ margin: 0 }}>
-                {t.saveTo2}
-              </span>
+              <span className="field-label m-0">{t.saveTo2}</span>
               <Segmented<Settings["convertDest"]>
                 label={t.saveTo2}
                 value={s.convertDest}

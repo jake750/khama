@@ -35,15 +35,11 @@ export function Segmented<T extends string>(props: { value: T; options: SegOptio
 export function Toggle(props: { checked: boolean; onChange: (v: boolean) => void; title: string; hint?: string }) {
   return (
     <label className="toggle">
-      <input type="checkbox" checked={props.checked} onChange={(e) => props.onChange(e.target.checked)} />
+      <input type="checkbox" role="switch" checked={props.checked} onChange={(e) => props.onChange(e.target.checked)} />
       <span className="switch" />
       <span>
         <span>{props.title}</span>
-        {props.hint && (
-          <span className="faint" style={{ display: "block" }}>
-            {props.hint}
-          </span>
-        )}
+        {props.hint && <span className="faint block">{props.hint}</span>}
       </span>
     </label>
   );
