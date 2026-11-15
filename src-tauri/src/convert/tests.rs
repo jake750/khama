@@ -296,3 +296,15 @@ mod real {
         assert!(failures.is_empty(), "failed: {failures:?}");
     }
 }
+
+#[test]
+fn hw_cache_is_reused_only_for_the_same_key_and_age() {
+    let cache = HwCache {
+        key: "0.3.1|10|20".into(),
+        at_ms: 1_000,
+        encoders: vec!["h264_nvenc".into()],
+    };
+    assert_eq!(hw_cache_valid(&cache, "0.3.1|10|20", 2_000), Some(vec!["h264_nvenc".to_string()]));
+    assert_eq!(hw_cache_valid(&cache, "0.3.2|10|20", 2_000), None, "إصدار جديد = فحص جديد");
+    assert_eq!(hw_cache_valid(&cache, "0.3.1|10|20", 1_000 + HW_CACHE_TTL_MS), None, "انتهت المدة");
+}

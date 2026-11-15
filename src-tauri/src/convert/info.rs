@@ -297,12 +297,74 @@ pub(super) async fn video_packets(tools: &Tools, file: &Path) -> u64 {
     }
 }
 
-pub(super) async fn hw_list(tools: &Tools) -> Vec<String> {
-    HW.get_or_init(|| detect_hw(tools)).await.clone()
+/// نتيجة الفحص محفوظة على القرص (T-65): الفحص الحقيقي يأخذ ثواني، فلا نكرّره في كل جلسة.
+/// تُعاد عند تغيّر إصدار التطبيق أو ملف FFmpeg، أو بعد 14 يومًا (تحديث تعريف كرت الشاشة مثلًا).
+/// إن تعطّل مشفّر بعد الحفظ فالتحويل يعيد المحاولة على المعالج (run.rs) فلا يفشل.
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub(super) struct HwCache {
+    pub(super) key: String,
+    pub(super) at_ms: u64,
+    pub(super) encoders: Vec<String>,
+}
+
+pub(super) const HW_CACHE_TTL_MS: u64 = 14 * 24 * 3600 * 1000;
+
+/// بصمة ما يحدّد نتيجة الفحص: إصدار التطبيق وحجم ملف FFmpeg وتاريخه
+pub(super) fn hw_cache_key(ffmpeg: &Path) -> String {
+    let meta = std::fs::metadata(ffmpeg).ok();
+    let len = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+    let modified = meta
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    format!("{}|{len}|{modified}", env!("CARGO_PKG_VERSION"))
+}
+
+/// القائمة المحفوظة إن كانت صالحة لهذه البصمة وهذا الوقت
+pub(super) fn hw_cache_valid(cache: &HwCache, key: &str, now_ms: u64) -> Option<Vec<String>> {
+    (cache.key == key && now_ms.saturating_sub(cache.at_ms) < HW_CACHE_TTL_MS).then(|| cache.encoders.clone())
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+pub(super) async fn hw_list(app: &AppHandle, tools: &Tools) -> Vec<String> {
+    HW.get_or_init(|| async {
+        let file = app.path().app_cache_dir().ok().map(|d| d.join("hw-encoders.json"));
+        let key = hw_cache_key(&tools.ffmpeg);
+        if let Some(f) = &file
+            && let crate::persist::Loaded::Ok(cache) = crate::persist::read_json::<HwCache>(f)
+            && let Some(list) = hw_cache_valid(&cache, &key, now_ms())
+        {
+            return list;
+        }
+        let encoders = detect_hw(tools).await;
+        if let Some(f) = &file {
+            let cache = HwCache {
+                key,
+                at_ms: now_ms(),
+                encoders: encoders.clone(),
+            };
+            if let Some(dir) = f.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            if let Ok(json) = serde_json::to_vec(&cache) {
+                let _ = crate::persist::write_atomic(f, &json);
+            }
+        }
+        encoders
+    })
+    .await
+    .clone()
 }
 
 #[tauri::command]
 pub async fn hw_encoders(app: AppHandle) -> Result<Vec<String>, AppError> {
     let tools = tools::resolve(&app)?;
-    Ok(hw_list(&tools).await)
+    Ok(hw_list(&app, &tools).await)
 }

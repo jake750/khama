@@ -202,7 +202,7 @@ pub(super) async fn run_convert(
         return Ok(Some((deliver(app, dest).await?, None)));
     }
 
-    let hw = if o.hw { hw_list(&tools).await } else { vec![] };
+    let hw = if o.hw { hw_list(app, &tools).await } else { vec![] };
 
     // ---- توحيد الصوت: مرور أول للقياس ----
     let mut loudnorm = None;
