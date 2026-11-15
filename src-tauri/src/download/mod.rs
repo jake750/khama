@@ -86,6 +86,9 @@ pub struct DownloadRequest {
     /// فرق توقيت الجهاز عن UTC بالدقائق (من الواجهة)، ليكون {today} تاريخ اليوم المحلي (T-65)
     #[serde(default)]
     pub tz_offset_min: i32,
+    /// ما تعرفه الواجهة عند البدء (عنوان المعاينة وسطر الوصف) ليكتب Rust عنصر السجلّ عند الانتهاء (T-19)
+    #[serde(default)]
+    pub history: Option<HistoryStart>,
     /// "video" | "audio"
     pub kind: String,
     /// "mp4" | "mov"
@@ -285,6 +288,69 @@ pub struct JobUpdate {
     pub thumbnail: Option<String>,
 }
 
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryStart {
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub meta: String,
+    #[serde(default)]
+    pub thumbnail: Option<String>,
+}
+
+/// العنوان والصورة كما طبعهما yt-dlp لكل عملية جارية (لعنصر السجلّ)
+/// (العنوان، الصورة)
+type Printed = (Option<String>, Option<String>);
+static JOB_META: Mutex<Option<HashMap<u64, Printed>>> = Mutex::new(None);
+
+fn remember_meta(u: &JobUpdate) {
+    if u.title.is_none() && u.thumbnail.is_none() {
+        return;
+    }
+    let mut guard = JOB_META.lock_ok();
+    let slot = guard.get_or_insert_with(HashMap::new).entry(u.id).or_default();
+    if u.title.is_some() {
+        slot.0.clone_from(&u.title);
+    }
+    if u.thumbnail.is_some() {
+        slot.1.clone_from(&u.thumbnail);
+    }
+}
+
+pub(super) fn take_meta(id: u64) -> Printed {
+    JOB_META.lock_ok().as_mut().and_then(|m| m.remove(&id)).unwrap_or_default()
+}
+
+/// عنصر السجلّ لتنزيل انتهى: عنوان المعاينة إن وُجد (وليس رابطًا)، وإلا ما طبعه yt-dlp، وإلا اسم الملف
+pub(super) fn history_entry(
+    req_url: &str,
+    kind: &str,
+    start: Option<HistoryStart>,
+    printed: Printed,
+    file: &Path,
+    now_ms: u64,
+) -> crate::history::HistoryEntry {
+    let start = start.unwrap_or_default();
+    let is_url = |t: &str| t.starts_with("http://") || t.starts_with("https://");
+    let stem = file.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    let title = Some(start.title)
+        .filter(|t| !t.trim().is_empty() && !is_url(t))
+        .or(printed.0)
+        .unwrap_or(stem);
+    crate::history::HistoryEntry {
+        id: 0,
+        title,
+        url: req_url.to_string(),
+        file: file.to_string_lossy().into_owned(),
+        kind: kind.to_string(),
+        meta: start.meta,
+        thumbnail: start.thumbnail.or(printed.1),
+        date: now_ms,
+        exists: true,
+    }
+}
+
 /// يقرأ سطر KHAMA_META: {"title": ..., "thumbnail": ...}
 pub(super) fn parse_meta_line(rest: &str) -> Option<(Option<String>, Option<String>)> {
     let v: serde_json::Value = serde_json::from_str(rest.trim()).ok()?;
@@ -297,6 +363,7 @@ pub(crate) fn emit(app: &AppHandle, u: JobUpdate) {
     if let Some(f) = &u.file {
         remember_output(f);
     }
+    remember_meta(&u);
     if should_emit(&u, Instant::now()) {
         let _ = app.emit("job-update", u);
     }

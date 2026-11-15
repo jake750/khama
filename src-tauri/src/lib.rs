@@ -98,7 +98,6 @@ macro_rules! handlers_with {
             download::open_output_dir,
             download::save_thumbnail,
             history::get_history,
-            history::add_history,
             history::remove_history,
             history::clear_history,
             history::get_scheduled,

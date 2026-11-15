@@ -266,3 +266,38 @@ fn file_names_fit_under_the_windows_path_limit() {
     let deep = "C:/x/".repeat(40);
     assert_eq!(max_name_len(&[short, Path::new(&deep)]), 60, "لا يقل عن 60");
 }
+
+#[test]
+fn history_entry_prefers_the_preview_title_then_ytdlp_then_the_file_name() {
+    let file = Path::new("C:/out/My Video [1080p].mp4");
+    let start = |title: &str| {
+        Some(HistoryStart {
+            title: title.into(),
+            meta: "MP4 · 1080p".into(),
+            thumbnail: None,
+        })
+    };
+    let printed = (Some("من yt-dlp".to_string()), Some("https://i/t.jpg".to_string()));
+    let e = history_entry("https://youtu.be/x", "video", start("من المعاينة"), printed.clone(), file, 5);
+    assert_eq!((e.title.as_str(), e.meta.as_str(), e.date), ("من المعاينة", "MP4 · 1080p", 5));
+    assert_eq!(e.thumbnail.as_deref(), Some("https://i/t.jpg"));
+    let e = history_entry("https://youtu.be/x", "video", start("https://youtu.be/x"), printed, file, 5);
+    assert_eq!(e.title, "من yt-dlp", "العنوان رابط: نأخذ ما طبعه yt-dlp");
+    let e = history_entry("https://youtu.be/x", "audio", None, (None, None), file, 5);
+    assert_eq!(e.title, "My Video [1080p]");
+}
+
+#[test]
+fn printed_meta_is_kept_per_job_until_taken() {
+    let up = |title: Option<&str>, thumb: Option<&str>| JobUpdate {
+        id: 777,
+        state: "downloading",
+        title: title.map(String::from),
+        thumbnail: thumb.map(String::from),
+        ..Default::default()
+    };
+    remember_meta(&up(Some("أ"), None));
+    remember_meta(&up(None, Some("t.jpg")));
+    assert_eq!(take_meta(777), (Some("أ".into()), Some("t.jpg".into())));
+    assert_eq!(take_meta(777), (None, None));
+}

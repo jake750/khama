@@ -56,7 +56,6 @@ function downloadMeta(t: Dict, r: DownloadRequest): string {
 const MEDIA_EXT = new Set(MEDIA_FILTER.extensions);
 const isMedia = (p: string) => MEDIA_EXT.has(p.split(".").pop()?.toLowerCase() ?? "");
 const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p;
-const stripExt = (n: string) => n.replace(/\.[^.]+$/, "");
 
 /** صورة صغيرة تتبع المؤشر أثناء سحب ملف إلى برنامج آخر (الشعار، PNG بصيغة data URL) */
 let dragIcon: Promise<string> | null = null;
@@ -85,6 +84,11 @@ async function notify(title: string, body: string) {
   } catch {
     // الإشعارات ليست أساسية
   }
+}
+
+/** ما يكتبه Rust في السجلّ عند انتهاء التنزيل (T-19) */
+function withHistory(request: DownloadRequest, base: { title: string; meta: string; thumbnail?: string | null }): DownloadRequest {
+  return { ...request, history: { title: base.title, meta: base.meta, thumbnail: base.thumbnail ?? null } };
 }
 
 export default function App() {
@@ -159,34 +163,8 @@ export default function App() {
       const title = u.state === "error" ? tt.notifyFailed : job.type === "convert" ? tt.notifyConvertDone : tt.notifyDone;
       notify(title, name);
     }
-    if (u.state === "done" && job.type === "download" && job.request && u.file) {
-      const request = job.request;
-      const file = u.file;
-      const titleIsUrl = /^https?:\/\//.test(job.title);
-      // بدأ التنزيل قبل اكتمال المعاينة (أو عدة روابط): نجلب العنوان والصورة الآن
-      const info =
-        titleIsUrl || !job.thumbnail
-          ? api
-              .probe(request.url)
-              .then((p) => ({ title: p.title, thumbnail: p.thumbnail ?? null }))
-              .catch(() => null)
-          : Promise.resolve(null);
-      info
-        .then((p) =>
-          api.addHistory({
-            id: 0, // يحدده Rust (معرّف فريد)
-            title: titleIsUrl ? (p?.title ?? stripExt(name)) : job.title,
-            url: request.url,
-            file,
-            kind: request.kind,
-            meta: job.meta,
-            thumbnail: job.thumbnail ?? p?.thumbnail ?? null,
-            date: Date.now(),
-          }),
-        )
-        .then(() => setHistoryVersion((v) => v + 1))
-        .catch(logError("addHistory"));
-    }
+    // عنصر السجلّ كتبه Rust قبل إرسال "done" (T-19)؛ نعيد قراءة السجلّ فقط
+    if (u.state === "done" && job.type === "download") setHistoryVersion((v) => v + 1);
   }, []);
 
   // نستمع لأحداث التقدّم القادمة من Rust
@@ -299,7 +277,7 @@ export default function App() {
         setJobs((prev) => [{ id: localId, state: "scheduled", at, ...base } as Job, ...prev]);
         return;
       }
-      const id = await api.startDownload(request);
+      const id = await api.startDownload(withHistory(request, base));
       addJob(id, base);
     },
     [addJob],
@@ -356,7 +334,7 @@ export default function App() {
         const { request, title, meta, thumbnail } = j;
         const base = { type: "download" as const, request, title, meta, thumbnail };
         api
-          .startDownload(request!)
+          .startDownload(withHistory(request!, base))
           .then((id) => addJob(id, base))
           .catch((e) => setJobs((prev) => [{ id: j.id, state: "error", error: asAppError(e), ...base } as Job, ...prev]));
       }

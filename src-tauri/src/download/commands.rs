@@ -13,6 +13,7 @@ pub async fn start_download(
 ) -> Result<u64, AppError> {
     let mut req = request;
     req.url = validate_url(&req.url)?;
+    let (history_url, history_kind, history_start) = (req.url.clone(), req.kind.clone(), req.history.take());
     let settings = settings.0.lock_ok().clone();
     let id = jobs.next_id.fetch_add(1, Ordering::Relaxed) + 1;
     let (tx, mut rx) = watch::channel(false);
@@ -86,6 +87,18 @@ pub async fn start_download(
             let _ = tokio::fs::remove_dir_all(dir).await;
         }
         app2.state::<Jobs>().cancels.lock_ok().remove(&id);
+        let printed = take_meta(id);
+        // السجلّ يُكتب هنا في Rust قبل إعلان الانتهاء (T-19): حين تستقبل الواجهة "done" يكون موجودًا
+        if let Some(file) = update.file.as_deref().filter(|_| update.state == "done") {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+            let entry = history_entry(&history_url, &history_kind, history_start, printed, Path::new(file), now);
+            if let Err(e) = crate::history::add_entry(&app2, entry).await {
+                log::error!("history: {e}");
+            }
+        }
         emit(&app2, update);
     });
     Ok(id)

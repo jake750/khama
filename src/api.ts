@@ -212,6 +212,8 @@ export interface DownloadRequest {
   timeline?: boolean;
   /** الملف الأصلي بلا تحويل (Google Drive) */
   original?: boolean;
+  /** ما يُكتب في السجلّ عند الانتهاء (يكتبه Rust) */
+  history?: { title: string; meta: string; thumbnail?: string | null };
 }
 
 export type JobState =
@@ -291,7 +293,6 @@ export const api = {
   startConvert: (request: ConvertRequest) => invoke<number>("start_convert", { request }),
   saveThumbnail: (url: string) => invoke<string>("save_thumbnail", { url }),
   getHistory: () => invoke<HistoryEntry[]>("get_history"),
-  addHistory: (entry: HistoryEntry) => invoke<void>("add_history", { entry }),
   removeHistory: (id: number) => invoke<void>("remove_history", { id }),
   clearHistory: () => invoke<void>("clear_history"),
   setCompact: (compact: boolean) => invoke<void>("set_compact", { compact }),

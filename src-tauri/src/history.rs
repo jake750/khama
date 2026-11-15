@@ -88,16 +88,17 @@ fn next_id(list: &[HistoryEntry], now_ms: u64) -> u64 {
     newest.max(now_ms.saturating_mul(1000)) + 1
 }
 
-#[tauri::command]
-pub async fn add_history(app: AppHandle, state: State<'_, HistoryState>, mut entry: HistoryEntry) -> Result<(), AppError> {
-    if let Some(local) = local_thumbnail(&app, &entry).await {
+/// يضيف عنصرًا للسجلّ. يستدعيه Rust نفسه عند انتهاء التنزيل (T-19)، فلا يضيع العنصر إن فات الواجهةَ الحدث.
+pub async fn add_entry(app: &AppHandle, mut entry: HistoryEntry) -> Result<(), AppError> {
+    let state = app.state::<HistoryState>();
+    if let Some(local) = local_thumbnail(app, &entry).await {
         entry.thumbnail = Some(local);
     }
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0);
-    with_list(&app, &state, |list| {
+    with_list(app, &state, |list| {
         entry.id = next_id(list, now);
         list.insert(0, entry);
         list.truncate(MAX_ENTRIES);
