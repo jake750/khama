@@ -67,6 +67,12 @@ pub struct Settings {
     /// مشاريع: كل مشروع مجلد حفظ وإعدادات خاصة به
     pub projects: Vec<Project>,
     pub active_project: Option<String>,
+    /// عدد التنزيلات التي تعمل معًا، من 1 إلى 5 (T-63)
+    pub parallel_downloads: u8,
+    /// فحص أسبوعي لتحديث yt-dlp، بموافقة المستخدم (معطّل افتراضيًا، T-100)
+    pub ytdlp_weekly: bool,
+    /// آخر فحص لتحديث yt-dlp (ms منذ 1970)
+    pub ytdlp_checked_at: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -128,6 +134,9 @@ impl Default for Settings {
             want_info: false,
             projects: Vec::new(),
             active_project: None,
+            parallel_downloads: 3,
+            ytdlp_weekly: false,
+            ytdlp_checked_at: 0,
         }
     }
 }
@@ -184,6 +193,7 @@ fn migrate(mut s: Settings) -> Settings {
         s.rate_limit_kb = s.rate_limit.saturating_mul(1024);
     }
     s.rate_limit = 0;
+    s.parallel_downloads = s.parallel_downloads.clamp(1, 5);
     s
 }
 
@@ -203,7 +213,14 @@ pub fn get_settings(state: tauri::State<SettingsState>) -> Settings {
 }
 
 #[tauri::command]
-pub fn save_settings(app: AppHandle, state: tauri::State<SettingsState>, settings: Settings) -> Result<(), AppError> {
+pub fn save_settings(
+    app: AppHandle,
+    state: tauri::State<SettingsState>,
+    queue: tauri::State<crate::download::DownloadQueue>,
+    mut settings: Settings,
+) -> Result<(), AppError> {
+    settings.parallel_downloads = settings.parallel_downloads.clamp(1, 5);
+    queue.set_limit(settings.parallel_downloads.into());
     let json = serde_json::to_string_pretty(&settings).expect("settings serialize");
     crate::persist::write_atomic(&settings_path(&app)?, json.as_bytes())?;
     *state.0.lock_ok() = settings;
@@ -306,6 +323,16 @@ mod tests {
         assert_eq!(clean_cookies("hello\tworld", 0), Err("cookiesInvalid"));
         assert_eq!(clean_cookies("a\tb\tc\td\te\tf\tg", 0), Err("cookiesInvalid"), "7 حقول لا تكفي");
         assert_eq!(clean_cookies(old, 1_800_000_000), Err("cookiesExpired"));
+    }
+
+    #[test]
+    fn parallel_downloads_defaults_to_three_and_is_clamped() {
+        let s = migrate(serde_json::from_str("{}").unwrap());
+        assert_eq!(s.parallel_downloads, 3);
+        let s = migrate(serde_json::from_str(r#"{"parallelDownloads":9}"#).unwrap());
+        assert_eq!(s.parallel_downloads, 5);
+        let s = migrate(serde_json::from_str(r#"{"parallelDownloads":0}"#).unwrap());
+        assert_eq!(s.parallel_downloads, 1);
     }
 
     #[test]

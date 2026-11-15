@@ -1,3 +1,5 @@
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { useState } from "react";
 import type { AppError } from "../api";
 import { errorText, useI18n } from "../i18n";
 import { Icon } from "./Icon";
@@ -24,6 +26,11 @@ export function ErrorBox(props: { error: AppError; compact?: boolean; inline?: b
   const { error } = props;
   const fix = props.onFix ? suggestedFix(error) : null;
   const fixLabel = fix === "cookies" ? t.fixCookies : fix === "ytdlp" ? t.updateYtdlpAction : t.tryAgain;
+  const [copied, setCopied] = useState(false);
+  const copy = () =>
+    writeText(`Khama error: ${error.code}\n${error.detail ?? ""}`)
+      .then(() => setCopied(true))
+      .catch(() => setCopied(false));
   return (
     <div className={props.inline ? "error-inline" : undefined}>
       <div className={`alert ${props.inline ? "inline" : ""}`} style={props.compact ? { marginTop: 8 } : undefined} role="alert">
@@ -38,7 +45,10 @@ export function ErrorBox(props: { error: AppError; compact?: boolean; inline?: b
       {error.detail && (
         <details className="tech">
           <summary>{t.techDetails}</summary>
-          <pre>{error.detail}</pre>
+          <pre className="ltr">{error.detail}</pre>
+          <button className="btn btn-sm btn-ghost" onClick={copy}>
+            <Icon name={copied ? "check" : "copy"} size={16} /> {copied ? t.copiedForReport : t.copyForReport}
+          </button>
         </details>
       )}
     </div>

@@ -44,6 +44,11 @@ export interface Settings {
   projects: Project[];
   /** معرّف المشروع النشط */
   activeProject: string | null;
+  /** عدد التنزيلات معًا، 1 إلى 5 (T-63) */
+  parallelDownloads: number;
+  /** فحص أسبوعي لتحديث yt-dlp بموافقة المستخدم (T-100) */
+  ytdlpWeekly: boolean;
+  ytdlpCheckedAt: number;
 }
 
 /** مشروع: مجلد حفظ وإعدادات تنزيل خاصة به */
@@ -173,6 +178,9 @@ export interface ProbeInfo {
   previewUrl?: string | null;
   /** ملفات Google Drive: تُنزَّل كما هي */
   original: boolean;
+  /** الحجم التقريبي لكل دقة [الارتفاع، البايتات]، من الأعلى (U-36) */
+  videoSizes?: [number, number][];
+  audioSize?: number | null;
 }
 
 export interface PlaylistEntry {
@@ -297,6 +305,15 @@ export const api = {
   clearHistory: () => invoke<void>("clear_history"),
   setCompact: (compact: boolean) => invoke<void>("set_compact", { compact }),
   quitApp: () => invoke<void>("quit_app"),
+  /** «أكمل في الخلفية»: إخفاء النافذة */
+  hideMain: () => invoke<void>("hide_main"),
+  /** المساحة الحرة على قرص المجلد (بايت)، أو null إن تعذّرت معرفتها (T-96) */
+  freeSpace: (path: string) => invoke<number | null>("free_space", { path }),
+  /** رابط khama:// فتح التطبيق قبل أن تجهز الواجهة (T-101) */
+  takeDeepLink: () => invoke<string | null>("take_deep_link"),
+  onDeepLink: (cb: (url: string) => void): Promise<UnlistenFn> => listen<string>("deep-link", (e) => cb(e.payload)),
+  /** إغلاق النافذة وفيها عمليات جارية (U-27) */
+  onCloseRequested: (cb: () => void): Promise<UnlistenFn> => listen("close-requested", () => cb()),
   onClipboardUrl: (cb: (url: string) => void): Promise<UnlistenFn> => listen<string>("clipboard-url", (e) => cb(e.payload)),
   /** ملف جديد في مجلد مراقَب: Rust بدأ تحويله برقم id */
   onWatchFile: (cb: (hit: { id: number; path: string; preset: string }) => void): Promise<UnlistenFn> =>

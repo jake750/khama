@@ -12,7 +12,7 @@ import {
   type Settings,
   type VideoFormat,
 } from "../api";
-import { extractUrls, formatDuration, isHttpUrl } from "../format";
+import { extractUrls, formatBytes, formatDuration, isHttpUrl } from "../format";
 import { nextClip, planDownloads, scheduledAt, type Stills } from "../downloadPlan";
 import { useI18n } from "../i18n";
 import { ErrorBox, type ErrorFix } from "./ErrorBox";
@@ -21,6 +21,7 @@ import { Segmented, Toggle } from "./Segmented";
 import { SlideSwitch } from "../motion";
 import { isMobile, MOBILE_SAVE_DIR } from "../platform";
 import { logError } from "../log";
+import { estimateDownload } from "../estimate";
 import { TrimRange, type PreviewLink, type Range } from "./TrimRange";
 import { PlaylistPanel } from "./PlaylistPanel";
 import { FolderPicker } from "./FolderPicker";
@@ -78,7 +79,11 @@ export function DownloadView(props: {
   useEffect(() => {
     session.draftUrl = url;
   }, [session, url]);
-  const [autoPasted, setAutoPasted] = useState(false);
+  // رابط في الحافظة وجدناه عند الرجوع للنافذة: اقتراح بزر، لا لصق مباشر (U-5، U-8)
+  const [clipFound, setClipFound] = useState<string | null>(null);
+  // آخر رابط بدأ تنزيله: يبقى في الحقل مع سطر «أُضيف للقائمة» (U-10)
+  const [startedUrl, setStartedUrl] = useState<string | null>(null);
+  const [free, setFree] = useState<number | null>(null);
   const [probe, setProbe] = useState<ProbeState>({ status: "idle" });
   const [reprobe, setReprobe] = useState(0);
   const [starting, setStarting] = useState(false);
@@ -162,7 +167,7 @@ export function DownloadView(props: {
     }
   }
 
-  // لصق تلقائي: عند فتح خامة أو الرجوع إليها، إن كان الحقل فارغًا وفي الحافظة رابط جديد
+  // اقتراح من الحافظة: عند فتح خامة أو الرجوع إليها، إن كان الحقل فارغًا وفي الحافظة رابط جديد
   const urlRef = useRef(url);
   urlRef.current = url;
   useEffect(() => {
@@ -171,8 +176,7 @@ export function DownloadView(props: {
       const found = await clipboardUrl();
       if (found && found !== session.lastAutoPasted && !urlRef.current.trim()) {
         session.lastAutoPasted = found;
-        setUrl(found);
-        setAutoPasted(true);
+        setClipFound(found);
       }
     };
     check();
@@ -230,7 +234,6 @@ export function DownloadView(props: {
     const found = await clipboardUrl();
     if (found) {
       setUrl(found);
-      setAutoPasted(false);
       return;
     }
     try {
@@ -279,7 +282,7 @@ export function DownloadView(props: {
     setStartError(null);
     const at = scheduledAt(when, atTime);
     const plan = planDownloads({
-      settings: s,
+      settings: { ...s, quality: effQuality },
       urls: multiLinks ? urls : [clean],
       info,
       stills,
@@ -303,21 +306,49 @@ export function DownloadView(props: {
     }
     setStarting(false);
     if (firstError) return setStartError(firstError);
-    setUrl("");
-    setAutoPasted(false);
+    // الرابط يبقى في الحقل (لتنزيله بصيغة أخرى مثلًا)، مع سطر يؤكّد الإضافة وزر «امسح» (U-10)
+    setStartedUrl(clean);
     setTrimOn(false);
   }
 
+  const clearUrl = () => {
+    setUrl("");
+    setStartedUrl(null);
+    input.current?.focus();
+  };
+
   const qualityLabel = (q: string) => (q === "best" ? t.best : q === "2160" ? "4K" : `${q}p`);
+  // الدقة المختارة أعلى مما يوفّره الفيديو: نستعمل أقرب دقة أقل منها لهذا الرابط فقط،
+  // ولا نغيّر الإعداد المحفوظ (U-13)
+  const fellBack = s.kind === "video" && !!maxHeight && s.quality !== "best" && Number(s.quality) > maxHeight;
+  const effQuality = fellBack ? (QUALITIES.find((q) => q !== "best" && Number(q) <= maxHeight!) ?? "best") : s.quality;
   const qualityHint =
     s.kind !== "video"
       ? null
-      : maxHeight && s.quality !== "best" && Number(s.quality) > maxHeight
-        ? t.qualityAboveMax(maxHeight)
+      : fellBack
+        ? t.qualityFellBack(qualityLabel(s.quality), qualityLabel(effQuality))
         : s.editorReady && (s.quality === "best" || Number(s.quality) > 1080) && (maxHeight ?? 2160) > 1080
           ? t.qualityNeedsConvert
           : null;
   const canStart = (multiLinks || isHttpUrl(url)) && !starting && !(entries && selected.size === 0);
+  // اقتراح واحد فقط: من مراقبة الحافظة أو مما وجدناه عند الرجوع للنافذة (U-82)
+  const clipSuggest = [props.clipUrl, clipFound].find((c) => c && c !== url.trim()) ?? null;
+
+  // الحجم المتوقّع والمساحة الحرة (U-36، U-37، T-96)
+  const clipFraction = activeClips && duration ? activeClips.reduce((n, c) => n + (c.end - c.start), 0) / duration : 1;
+  const expected = info && !entries && !original ? estimateDownload(info, s.kind, effQuality, clipFraction) : null;
+  useEffect(() => {
+    if (isMobile || expected == null) return;
+    let alive = true;
+    api
+      .freeSpace(props.outputDir)
+      .then((f) => alive && setFree(f))
+      .catch(() => alive && setFree(null));
+    return () => {
+      alive = false;
+    };
+  }, [props.outputDir, expected]);
+  const noRoom = expected != null && free != null && expected > free;
   const startCount = multiLinks ? urls.length : entries ? selected.size : 0;
 
   return (
@@ -328,23 +359,31 @@ export function DownloadView(props: {
           <p className="faint">{t.pasteSub}</p>
         </div>
 
-        {props.clipUrl && props.clipUrl !== url.trim() && (
+        {clipSuggest && (
           <div className="clip-banner" role="status">
             <Icon name="link" size={16} />
             <span className="clip-banner-text">
               <b>{t.clipboardBanner}</b>
-              <span className="ltr">{props.clipUrl}</span>
+              <span className="ltr">{clipSuggest}</span>
             </span>
             <button
               className="btn btn-sm btn-primary"
               onClick={() => {
-                setUrl(props.clipUrl!);
+                setUrl(clipSuggest);
+                setStartedUrl(null);
+                setClipFound(null);
                 props.onClipDone();
               }}
             >
               {t.useLink}
             </button>
-            <button className="btn btn-sm btn-ghost" onClick={props.onClipDone}>
+            <button
+              className="btn btn-sm btn-ghost"
+              onClick={() => {
+                setClipFound(null);
+                props.onClipDone();
+              }}
+            >
               {t.dismiss}
             </button>
           </div>
@@ -361,23 +400,14 @@ export function DownloadView(props: {
             autoFocus
             onChange={(e) => {
               setUrl(e.target.value);
-              setAutoPasted(false);
+              setStartedUrl(null);
             }}
             // Enter يبدأ فقط بعد اكتمال المعاينة: لا تنزيل بخيارات لم يرها المستخدم بعد (U-1)
             onKeyDown={(e) => e.key === "Enter" && (multiLinks || probe.status === "ok") && start()}
             aria-label={t.urlAria}
           />
           {url ? (
-            <button
-              className="url-action"
-              onClick={() => {
-                setUrl("");
-                setAutoPasted(false);
-                input.current?.focus();
-              }}
-              title={t.remove}
-              aria-label={t.remove}
-            >
+            <button className="url-action" onClick={clearUrl} title={t.clearLink} aria-label={t.clearLink}>
               <Icon name="x" size={20} />
             </button>
           ) : (
@@ -386,15 +416,24 @@ export function DownloadView(props: {
             </button>
           )}
         </div>
-        {autoPasted && url && (
-          <div className="faint url-note">
-            <Icon name="check" size={16} /> {t.autoPasted}
+        {startedUrl && startedUrl === url.trim() && (
+          <div className="url-note">
+            <Icon name="check" size={16} /> <span className="grow">{t.addedToQueue}</span>
+            <button className="btn btn-sm btn-ghost" onClick={clearUrl}>
+              {t.clearLink}
+            </button>
           </div>
         )}
       </div>
 
       {probe.status === "error" && !multiLinks && <ErrorBox error={probe.error} inline onFix={fix} />}
       {startError && <ErrorBox error={startError} inline onFix={fix} />}
+      {noRoom && (
+        <div className="alert warn">
+          <Icon name="alert" size={16} />
+          <span>{t.noRoom(formatBytes(t, expected!), formatBytes(t, free!))}</span>
+        </div>
+      )}
 
       {multiLinks && (
         <div className="link-list">
@@ -543,16 +582,16 @@ export function DownloadView(props: {
                     <span className="field-label">{t.quality}</span>
                     <Segmented<string>
                       label={t.quality}
-                      value={s.quality}
+                      value={effQuality}
                       onChange={(quality) => update({ quality })}
                       options={QUALITIES.map((q) => ({
                         value: q,
                         label: qualityLabel(q),
                         // بعد جلب معلومات الرابط: نعطّل الدقات الأعلى من المتاح
-                        disabled: q !== "best" && maxHeight != null && Number(q) > maxHeight && s.quality !== q,
+                        disabled: q !== "best" && maxHeight != null && Number(q) > maxHeight,
                       }))}
                     />
-                    {qualityHint && <div className="faint mt-2">{qualityHint}</div>}
+                    {qualityHint && <div className={`mt-2 ${fellBack ? "warn-text" : "faint"}`}>{qualityHint}</div>}
                   </div>
                   {
                     <div>
@@ -683,6 +722,11 @@ export function DownloadView(props: {
           <FolderPicker current={props.outputDir} recent={s.recentDirs} onPick={props.onPickDir} onChoose={props.onChooseDir} />
         )}
         <span className="spacer" />
+        {expected != null && (
+          <span className="estimate ltr-num" title={t.estimateHint}>
+            {t.estimate(formatBytes(t, expected))}
+          </span>
+        )}
         <button className="btn btn-primary btn-lg download-btn" disabled={!canStart} onClick={start}>
           <Icon name={when === "later" ? "clock" : "download"} />
           {startCount ? t.downloadN(startCount) : t.download}

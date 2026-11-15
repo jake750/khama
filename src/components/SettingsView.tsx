@@ -1,4 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
+import { isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import type { Toast } from "../toast";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PRESETS } from "../presets";
@@ -35,6 +36,9 @@ export function SettingsView(props: {
   toast: Toast;
   /** القسم المطلوب عند الفتح (مثلًا "cookies" من رسالة خطأ) */
   section?: { id: string; n: number } | null;
+  /** إصدار أحدث من خامة متاح (U-32) */
+  updateVersion?: string | null;
+  onInstallUpdate?: () => void;
 }) {
   const { t } = useI18n();
   const { settings: s, update } = props;
@@ -137,9 +141,18 @@ export function SettingsView(props: {
         {<ProjectsSection settings={s} update={update} outputDir={props.outputDir} toast={props.toast} />}
         <CookiesSection settings={s} update={update} toast={props.toast} />
         {!isMobile && <WatchSection settings={s} update={update} />}
-        <ToolsSection toast={props.toast} />
+        <ToolsSection toast={props.toast} settings={s} update={update} />
 
         <Section id="about" title={t.aboutTitle}>
+          {props.updateVersion && props.onInstallUpdate && (
+            <div className="alert info mb-2">
+              <Icon name="download" size={16} />
+              <span className="grow">{t.updateAvailable(props.updateVersion)}</span>
+              <button className="btn btn-sm btn-primary" onClick={props.onInstallUpdate}>
+                {t.appUpdateNow}
+              </button>
+            </div>
+          )}
           <p className="muted mt-1 mb-2">{t.aboutBody}</p>
           <p className="faint m-0">{t.notice}</p>
         </Section>
@@ -224,7 +237,8 @@ function DownloadsSection(props: { settings: Settings; update: (p: Partial<Setti
           {TOKENS.map((k) => (
             <button
               key={k}
-              className="chip-btn ltr"
+              className="chip-btn"
+              title={k}
               onClick={() => {
                 const sep = tpl && !/[\s_-]$/.test(tpl) ? "_" : "";
                 const v = `${tpl}${sep}${k}`;
@@ -232,7 +246,7 @@ function DownloadsSection(props: { settings: Settings; update: (p: Partial<Setti
                 commit(v);
               }}
             >
-              {k}
+              <Icon name="plus" size={14} /> {t.tokenNames[k.slice(1, -1)] ?? k}
             </button>
           ))}
         </div>
@@ -260,6 +274,18 @@ function DownloadsSection(props: { settings: Settings; update: (p: Partial<Setti
           options={RATES.map((r) => ({ value: String(r), label: r ? t.speedLimit(r) : t.rateOff }))}
         />
       </div>
+      <div className="setting-row">
+        <div>
+          <div>{t.parallelTitle}</div>
+          <div className="faint">{t.parallelHint}</div>
+        </div>
+        <Segmented<string>
+          label={t.parallelTitle}
+          value={String(s.parallelDownloads ?? 3)}
+          onChange={(v) => update({ parallelDownloads: Number(v) })}
+          options={["1", "2", "3", "4", "5"].map((n) => ({ value: n, label: n }))}
+        />
+      </div>
     </Section>
   );
 }
@@ -270,7 +296,16 @@ function BackgroundSection(props: { settings: Settings; update: (p: Partial<Sett
   return (
     <Section id="background" title={t.secBackground}>
       <div className="setting-row">
-        <Toggle checked={s.notify} onChange={(notify) => update({ notify })} title={t.notifyTitle} hint={t.notifyHint} />
+        <Toggle
+          checked={s.notify}
+          onChange={async (notify) => {
+            update({ notify });
+            // نطلب الإذن الآن، حين يفهم المستخدم لماذا، لا بعد أول تنزيل (T-75)
+            if (notify && !(await isPermissionGranted().catch(() => true))) await requestPermission().catch(logError("notifyPermission"));
+          }}
+          title={t.notifyTitle}
+          hint={t.notifyHint}
+        />
       </div>
       {!isMobile && (
         <>
@@ -478,7 +513,7 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
   );
 }
 
-function ToolsSection(props: { toast: Toast }) {
+function ToolsSection(props: { toast: Toast; settings: Settings; update: (p: Partial<Settings>) => void }) {
   const { t } = useI18n();
   const [info, setInfo] = useState<ToolsInfo | null>(null);
   const [infoError, setInfoError] = useState<AppError | null>(null);
@@ -536,6 +571,14 @@ function ToolsSection(props: { toast: Toast }) {
           </button>
         </div>
         {updateError && <ErrorBox error={updateError} />}
+        {!isMobile && (
+          <Toggle
+            checked={props.settings.ytdlpWeekly}
+            onChange={(ytdlpWeekly) => props.update({ ytdlpWeekly })}
+            title={t.ytdlpWeekly}
+            hint={t.ytdlpWeeklyHint}
+          />
+        )}
       </div>
     </Section>
   );

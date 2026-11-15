@@ -65,14 +65,40 @@ pub struct Jobs {
     pub(crate) cancels: Mutex<HashMap<u64, watch::Sender<bool>>>,
 }
 
-/// عدد التنزيلات التي تعمل معًا. الباقي ينتظر دوره (مهم مع قوائم التشغيل الطويلة)
+/// عدد التنزيلات التي تعمل معًا افتراضيًا. الباقي ينتظر دوره (مهم مع قوائم التشغيل الطويلة)
 const PARALLEL_DOWNLOADS: usize = 3;
 
-pub struct DownloadQueue(pub Arc<Semaphore>);
+/// الخانات، والحدّ الحالي (يغيّره المستخدم من الإعدادات، T-63)
+pub struct DownloadQueue(pub Arc<Semaphore>, Mutex<usize>);
 
 impl Default for DownloadQueue {
     fn default() -> Self {
-        Self(Arc::new(Semaphore::new(PARALLEL_DOWNLOADS)))
+        Self(Arc::new(Semaphore::new(PARALLEL_DOWNLOADS)), Mutex::new(PARALLEL_DOWNLOADS))
+    }
+}
+
+impl DownloadQueue {
+    /// يغيّر عدد الخانات. الزيادة فورية؛ والنقص يأخذ الخانات الفارغة الآن،
+    /// والباقي يُسحب حين تنتهي تنزيلات جارية (لا نوقف تنزيلًا بدأ)
+    pub fn set_limit(&self, n: usize) {
+        let n = n.clamp(1, 5);
+        let mut cur = self.1.lock_ok();
+        if n > *cur {
+            self.0.add_permits(n - *cur);
+        } else if n < *cur {
+            let need = *cur - n;
+            let got = self.0.forget_permits(need);
+            if got < need {
+                let sem = self.0.clone();
+                let rest = (need - got) as u32;
+                tauri::async_runtime::spawn(async move {
+                    if let Ok(p) = sem.acquire_many_owned(rest).await {
+                        p.forget();
+                    }
+                });
+            }
+        }
+        *cur = n;
     }
 }
 

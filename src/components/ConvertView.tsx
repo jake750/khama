@@ -284,6 +284,8 @@ export function ConvertView(props: {
   setFiles: (f: (prev: SourceFile[]) => SourceFile[]) => void;
   hw: string[] | null;
   dragging: boolean;
+  /** «امسح القائمة» مع «تراجع» (U-98) */
+  onClearFiles: () => void;
   onStart: (req: ConvertRequest, title: string, meta: string) => Promise<void>;
 }) {
   const { t, lang } = useI18n();
@@ -443,7 +445,7 @@ export function ConvertView(props: {
           <button className="btn btn-sm" onClick={chooseFiles}>
             <Icon name="plus" size={16} /> {t.chooseFiles}
           </button>
-          <button className="btn btn-sm btn-ghost" onClick={() => props.setFiles(() => [])}>
+          <button className="btn btn-sm btn-ghost" onClick={props.onClearFiles}>
             {t.clearFiles}
           </button>
         </div>

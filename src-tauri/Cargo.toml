@@ -44,8 +44,17 @@ tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 # سحب الملف من بطاقة التنزيل إلى برنامج المونتاج مباشرة
 tauri-plugin-drag = "2"
-# نسخة واحدة من التطبيق (فتحه مرة ثانية يُظهر النافذة المخفية في شريط المهام)
-tauri-plugin-single-instance = "2"
+# نسخة واحدة من التطبيق (فتحه مرة ثانية يُظهر النافذة المخفية في شريط المهام)،
+# وتمرّر روابط khama:// للنسخة المفتوحة
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+# روابط khama://download?url=... من المتصفح (T-101)
+tauri-plugin-deep-link = "2"
+
+# المساحة الحرة على القرص قبل التنزيل (T-96)
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [profile.release]
 codegen-units = 1

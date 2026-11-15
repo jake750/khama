@@ -2,13 +2,14 @@ import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
+import { isPermissionGranted, sendNotification } from "@tauri-apps/plugin-notification";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, asAppError, type AppError, type ConvertRequest, type DownloadRequest, type JobUpdate, type Settings } from "./api";
 import { ConvertView, defaultOptions, MEDIA_FILTER, type SourceFile } from "./components/ConvertView";
 import { DownloadView, newDownloadSession, type StartMeta } from "./components/DownloadView";
 import { HistoryView } from "./components/HistoryView";
 import { Icon, type IconName } from "./components/Icon";
+import { Dialog } from "./components/Dialog";
 import { isActive, JobCard, mergeUpdate, type Job } from "./components/JobCard";
 import { SettingsView } from "./components/SettingsView";
 import { UpdateDialog } from "./components/UpdateDialog";
@@ -70,9 +71,8 @@ function getDragIcon(): Promise<string> {
 /** إشعار من النظام (يطلب الإذن مرة واحدة) */
 async function notify(title: string, body: string) {
   try {
-    let ok = await isPermissionGranted();
-    if (!ok) ok = (await requestPermission()) === "granted";
-    if (ok) sendNotification({ title, body });
+    // الإذن يُطلب عند تفعيل «الإشعارات» في الإعدادات، لا فجأة بعد أول تنزيل (T-75)
+    if (await isPermissionGranted()) sendNotification({ title, body });
   } catch {
     // الإشعارات ليست أساسية
   }
@@ -99,6 +99,12 @@ export default function App() {
   const [settingsSection, setSettingsSection] = useState<{ id: string; n: number } | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [compact, setCompact] = useState(false);
+  // إغلاق النافذة وفيها عمليات جارية (U-27، U-44)
+  const [closeAsk, setCloseAsk] = useState(false);
+  const [shortcuts, setShortcuts] = useState(false);
+  // تحديث خامة متاح: شارة على «الإعدادات» بدل نافذة عند الإقلاع (U-31، U-32)
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  const [updateRequest, setUpdateRequest] = useState(0);
   // تحديثات وصلت قبل أن نضيف العملية للقائمة (Rust أسرع أحيانًا من الرد)
   const pending = useRef(new Map<number, JobUpdate>());
   const jobsRef = useRef<Job[]>([]);
@@ -177,6 +183,25 @@ export default function App() {
     };
   }, [onFinished]);
 
+  useEffect(() => {
+    if (isMobile) return;
+    const un = api.onCloseRequested(() => setCloseAsk(true));
+    // رابط khama:// فتح التطبيق، أو وصل والتطبيق مفتوح: يوضع في حقل الرابط فقط (T-101)
+    const toDownload = (url: string) => {
+      setInject({ url, n: Date.now() });
+      setTab("download");
+    };
+    api
+      .takeDeepLink()
+      .then((u) => u && toDownload(u))
+      .catch(logError("takeDeepLink"));
+    const un2 = api.onDeepLink(toDownload);
+    return () => {
+      un.then((f) => f());
+      un2.then((f) => f());
+    };
+  }, []);
+
   // مراقبة الحافظة (Rust): رابط منسوخ جديد يظهر كاقتراح في شاشة التنزيل
   useEffect(() => {
     const un = api.onClipboardUrl((url) => setClipUrl(url));
@@ -226,7 +251,7 @@ export default function App() {
   const toast: Toast = useCallback((msg, action) => {
     setToastMsg({ msg, action });
     window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToastMsg(null), 4000);
+    toastTimer.current = window.setTimeout(() => setToastMsg(null), action?.ms ?? 4000);
   }, []);
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
   saveFailed.current = () => toast(t.settingsSaveFailed);
@@ -274,6 +299,23 @@ export default function App() {
     },
     [addJob],
   );
+
+  // فحص أسبوعي لتحديث yt-dlp، لمن فعّله فقط، وليس أثناء تنزيل (T-100)
+  const ytdlpChecked = useRef(false);
+  useEffect(() => {
+    const s = settings;
+    if (!s || ytdlpChecked.current || !s.ytdlpWeekly || isMobile) return;
+    if (Date.now() - (s.ytdlpCheckedAt ?? 0) < 7 * 86_400_000) return;
+    if (jobs.some(isActive)) return;
+    ytdlpChecked.current = true;
+    api
+      .updateYtdlp()
+      .then((r) => {
+        update({ ytdlpCheckedAt: Date.now() });
+        if (r.updated) toast(tRef.current.updatedTo(r.version ?? ""));
+      })
+      .catch(logError("weeklyYtdlp"));
+  }, [settings, jobs, update, toast]);
 
   const cancel = useCallback((j: Job) => {
     if (j.state === "scheduled") {
@@ -410,6 +452,24 @@ export default function App() {
     };
   }, [addJob, toast, lang]);
 
+  useEffect(() => {
+    const order: Tab[] = ["download", "convert", "history", "settings"];
+    const onKey = (e: KeyboardEvent) => {
+      const typing = (e.target as HTMLElement | null)?.closest("input, textarea, select, [contenteditable]");
+      if ((e.ctrlKey || e.metaKey) && /^[1-4]$/.test(e.key)) {
+        e.preventDefault();
+        setTab(order[Number(e.key) - 1]);
+      } else if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+        e.preventDefault();
+        setTab("settings");
+      } else if (!typing && e.key === "?") {
+        setShortcuts((v) => !v);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
   const toggleCompact = useCallback(() => {
     const next = !compact;
     api
@@ -433,6 +493,27 @@ export default function App() {
   const outputDir = settings.outputDir || defaultDir;
   const shown = jobs.filter((j) => (tab === "convert" ? j.type === "convert" : j.type === "download"));
   const finished = shown.filter((j) => !isActive(j) && j.state !== "scheduled");
+
+  /** إزالة عمليات من القائمة مع «تراجع» لمدة 5 ثوانٍ (U-20، U-91) */
+  const removeJobs = (gone: Job[]) => {
+    if (!gone.length) return;
+    const ids = new Set(gone.map((j) => j.id));
+    const before = jobs.map((j) => j.id);
+    setJobs((p) => p.filter((j) => !ids.has(j.id)));
+    toast(t.removedN(gone.length), {
+      label: t.undo,
+      ms: 5000,
+      run: () =>
+        setJobs((cur) => {
+          const have = new Set(cur.map((j) => j.id));
+          const merged = [...cur, ...gone.filter((g) => !have.has(g.id))];
+          const pos = (j: Job) => (before.includes(j.id) ? before.indexOf(j.id) : -1);
+          return merged.sort((a, b) => pos(a) - pos(b));
+        }),
+    });
+  };
+  const failed = shown.filter((j) => j.state === "error");
+  const activeShown = shown.filter((j) => isActive(j) || j.state === "scheduled");
 
   const retry = (j: Job) => {
     setJobs((p) => p.filter((x) => x.id !== j.id));
@@ -503,6 +584,7 @@ export default function App() {
                 title={x.label}
               >
                 <Icon name={x.icon} size={20} /> <span>{x.label}</span>
+                {x.id === "settings" && updateVersion && <span className="tab-dot update" title={t.appUpdateTitle} />}
                 {(x.id === "download" || x.id === "convert") &&
                   jobs.some((j) => isActive(j) && (x.id === "convert") === (j.type === "convert")) && (
                     <span className="tab-dot" aria-hidden="true" />
@@ -536,16 +618,6 @@ export default function App() {
 
         <main className="main">
           <div className={`container ${tab === "settings" ? "wide" : ""}`}>
-            {!settings.acceptedNotice && (
-              <div className="alert info notice-bar">
-                <Icon name="alert" size={16} />
-                <span className="grow">{t.notice}</span>
-                <button className="btn btn-sm" onClick={() => update({ acceptedNotice: true })}>
-                  {t.gotIt}
-                </button>
-              </div>
-            )}
-
             <SlideSwitch id={tab} index={tabs.findIndex((x) => x.id === tab)} fade={!isMobile}>
               <div className="view">
                 {tab === "download" && (
@@ -576,6 +648,11 @@ export default function App() {
                     setFiles={setFiles}
                     hw={hw}
                     dragging={dragging}
+                    onClearFiles={() => {
+                      const prev = files;
+                      setFiles(() => []);
+                      toast(t.filesCleared(prev.length), { label: t.undo, ms: 5000, run: () => setFiles(() => prev) });
+                    }}
                     onStart={startConvert}
                   />
                 )}
@@ -599,6 +676,8 @@ export default function App() {
                     onOpenDir={() => api.openOutputDir().catch(logError("openOutputDir"))}
                     toast={toast}
                     section={settingsSection}
+                    updateVersion={updateVersion}
+                    onInstallUpdate={() => setUpdateRequest((n) => n + 1)}
                   />
                 )}
 
@@ -606,11 +685,22 @@ export default function App() {
                   <>
                     <div className="jobs-header">
                       <h3>{tab === "convert" ? t.convertJobsTitle : t.jobsTitle}</h3>
-                      {finished.length > 0 && (
+                      {/* أفعال على القائمة كلها (U-45) */}
+                      {failed.length > 1 && (
+                        <button className="btn btn-sm btn-ghost" onClick={() => failed.forEach(retry)}>
+                          <Icon name="retry" size={16} /> {t.retryFailed(failed.length)}
+                        </button>
+                      )}
+                      {activeShown.length > 1 && (
                         <button
-                          className="btn btn-sm btn-ghost"
-                          onClick={() => setJobs((p) => p.filter((j) => isActive(j) || j.state === "scheduled" || !shown.includes(j)))}
+                          className="btn btn-sm btn-ghost danger-text"
+                          onClick={() => window.confirm(t.cancelAllConfirm(activeShown.length)) && activeShown.forEach(cancel)}
                         >
+                          <Icon name="x" size={16} /> {t.cancelAll}
+                        </button>
+                      )}
+                      {finished.length > 0 && (
+                        <button className="btn btn-sm btn-ghost" onClick={() => removeJobs(finished)}>
                           {t.clearFinished}
                         </button>
                       )}
@@ -674,7 +764,71 @@ export default function App() {
         )}
 
         {/* تحديثات خامة: الكمبيوتر يثبّتها بنفسه، والهاتف يفتح رابط ملف APK الجديد */}
-        <UpdateDialog />
+        <UpdateDialog busy={running.length > 0} request={updateRequest} onAvailable={setUpdateVersion} />
+
+        {!settings.acceptedNotice && (
+          <Dialog
+            title={t.noticeTitle}
+            actions={
+              <button className="btn btn-primary" onClick={() => update({ acceptedNotice: true })}>
+                {t.gotIt}
+              </button>
+            }
+          >
+            <p className="muted">{t.notice}</p>
+          </Dialog>
+        )}
+
+        {closeAsk && (
+          <Dialog
+            title={t.closeAskTitle}
+            onClose={() => setCloseAsk(false)}
+            actions={
+              <>
+                <button className="btn btn-ghost" onClick={() => setCloseAsk(false)}>
+                  {t.stay}
+                </button>
+                <button className="btn btn-danger" onClick={() => api.quitApp()}>
+                  {t.stopAndQuit}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setCloseAsk(false);
+                    api.hideMain().catch(logError("hideMain"));
+                  }}
+                >
+                  {t.keepInBackground}
+                </button>
+              </>
+            }
+          >
+            <p className="muted">{t.closeAskBody(running.length)}</p>
+          </Dialog>
+        )}
+
+        {shortcuts && (
+          <Dialog
+            title={t.shortcutsTitle}
+            onClose={() => setShortcuts(false)}
+            actions={
+              <button className="btn btn-primary" onClick={() => setShortcuts(false)}>
+                {t.gotIt}
+              </button>
+            }
+          >
+            <dl className="shortcuts">
+              {t.shortcutList.map(([k, v]) => (
+                <div key={k}>
+                  <dt>
+                    <kbd className="ltr">{k}</kbd>
+                  </dt>
+                  <dd>{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </Dialog>
+        )}
       </div>
     </I18n.Provider>
   );

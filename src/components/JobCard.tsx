@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { AppError, ConvertRequest, DownloadRequest, JobState, JobUpdate } from "../api";
 import { formatDuration, formatEta, formatSpeed, formatTimecode } from "../format";
 import { numLocale, useI18n, type Dict } from "../i18n";
@@ -87,6 +87,13 @@ export function JobCard(props: {
 }) {
   const { t, lang } = useI18n();
   const j = props.job;
+  // الضغطة الأولى على «إلغاء» تطلب تأكيدًا، والثانية خلال 3 ثوانٍ تلغي (U-28)
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const tm = window.setTimeout(() => setArmed(false), 3000);
+    return () => window.clearTimeout(tm);
+  }, [armed]);
   const active = isActive(j);
   // نسبة مجهولة (انتظار/تحضير/معالجة) ← شريط متحرك بدل رقم
   const indeterminate =
@@ -195,8 +202,15 @@ export function JobCard(props: {
           </span>
         )}
         {(active || j.state === "scheduled") && (
-          <button className="btn btn-sm btn-danger" onClick={props.onCancel}>
-            <Icon name="x" size={16} /> {t.cancel}
+          <button
+            className={`btn btn-sm btn-danger ${armed ? "armed" : ""}`}
+            onClick={() => {
+              // المجدول لم يبدأ بعد: إلغاؤه لا يضيّع شيئًا
+              if (armed || j.state === "scheduled") props.onCancel();
+              else setArmed(true);
+            }}
+          >
+            <Icon name="x" size={16} /> {armed ? t.cancelConfirm : t.cancel}
           </button>
         )}
         {j.state === "done" && j.file && props.onReveal && (

@@ -5,6 +5,7 @@ import { api, type HistoryEntry } from "../api";
 import { numLocale, useI18n } from "../i18n";
 import { isMobile } from "../platform";
 import { Icon } from "./Icon";
+import { Segmented } from "./Segmented";
 import { logError } from "../log";
 
 /** «اليوم»، «أمس»، أو التاريخ: عنوان كل مجموعة في السجلّ */
@@ -36,6 +37,10 @@ export function HistoryView(props: {
   const { t, lang } = useI18n();
   const [list, setList] = useState<HistoryEntry[] | null>(null);
   const [q, setQ] = useState("");
+  // تصفية بالنوع والتاريخ، ورسم أول 100 فقط حتى يطلب المستخدم المزيد (U-63، T-87)
+  const [kind, setKind] = useState<"all" | "video" | "audio">("all");
+  const [since, setSince] = useState<"all" | "7" | "30">("all");
+  const [limit, setLimit] = useState(100);
   const [brokenThumbs, setBrokenThumbs] = useState<Set<number>>(() => new Set());
 
   const load = () =>
@@ -49,7 +54,12 @@ export function HistoryView(props: {
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    const items = (list ?? []).filter((e) => !needle || [e.title, e.url, e.meta, e.file].some((x) => x.toLowerCase().includes(needle)));
+    const from = since === "all" ? 0 : Date.now() - Number(since) * 86_400_000;
+    const items = (list ?? [])
+      .filter((e) => !needle || [e.title, e.url, e.meta, e.file].some((x) => x.toLowerCase().includes(needle)))
+      .filter((e) => kind === "all" || (kind === "audio") === (e.kind === "audio"))
+      .filter((e) => e.date >= from)
+      .slice(0, limit);
     // مجموعات حسب اليوم
     const groups: { label: string; items: HistoryEntry[] }[] = [];
     for (const e of items) {
@@ -59,7 +69,8 @@ export function HistoryView(props: {
       else groups.push({ label, items: [e] });
     }
     return groups;
-  }, [list, q, lang]);
+  }, [list, q, lang, kind, since, limit]);
+  const total = list?.length ?? 0;
 
   const remove = async (id: number) => {
     await api.removeHistory(id).catch(logError("removeHistory"));
@@ -91,6 +102,30 @@ export function HistoryView(props: {
           <Icon name="search" size={16} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.historySearch} spellCheck={false} />
         </label>
+      )}
+      {list && list.length > 0 && (
+        <div className="row-2 wrap mt-2">
+          <Segmented<"all" | "video" | "audio">
+            label={t.kind}
+            value={kind}
+            onChange={setKind}
+            options={[
+              { value: "all", label: t.filterAll },
+              { value: "video", label: t.video },
+              { value: "audio", label: t.audio },
+            ]}
+          />
+          <Segmented<"all" | "7" | "30">
+            label={t.filterSince}
+            value={since}
+            onChange={setSince}
+            options={[
+              { value: "all", label: t.filterAnyTime },
+              { value: "7", label: t.filterDays(7) },
+              { value: "30", label: t.filterDays(30) },
+            ]}
+          />
+        </div>
       )}
 
       {list && list.length === 0 && (
@@ -182,6 +217,11 @@ export function HistoryView(props: {
           })}
         </section>
       ))}
+      {shown.reduce((n, g) => n + g.items.length, 0) >= limit && total > limit && (
+        <button className="btn btn-sm mt-3" onClick={() => setLimit((l) => l + 100)}>
+          {t.showMore}
+        </button>
+      )}
     </div>
   );
 }

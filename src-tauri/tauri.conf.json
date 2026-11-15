@@ -50,6 +50,9 @@
     }
   },
   "plugins": {
+    "deep-link": {
+      "desktop": { "schemes": ["khama"] }
+    },
     "updater": {
       "pubkey": "",
       "endpoints": ["https://github.com/jake750/khama/releases/latest/download/latest.json"],

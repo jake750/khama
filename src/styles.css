@@ -3737,3 +3737,66 @@ bdi {
 :root[dir="ltr"] [dir="auto"] {
   text-align: left;
 }
+
+/* =====================================================================
+   تجربة الاستعمال (القسم 9 من مقترح التصميم)
+   ===================================================================== */
+.warn-text {
+  color: var(--warn);
+}
+.url-note .btn {
+  margin-inline-start: auto;
+}
+
+.alert.warn {
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  color: var(--warn);
+}
+
+.danger-text {
+  color: var(--danger);
+}
+/* الإلغاء ينتظر ضغطة تأكيد (U-28) */
+.btn-danger.armed {
+  background: var(--danger);
+  color: var(--bg);
+}
+/* شارة «تحديث متاح» على تبويب الإعدادات (U-32) */
+.tab-dot.update {
+  background: var(--warn);
+  animation: none;
+}
+.dialog-body {
+  margin: var(--s-3) 0 var(--s-5);
+}
+.shortcuts {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+}
+.shortcuts > div {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: var(--s-3);
+  align-items: baseline;
+}
+.shortcuts dd {
+  margin: 0;
+  color: var(--text-dim);
+}
+kbd {
+  padding: 2px var(--s-2);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: var(--r-xs);
+  background: var(--surface-2);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: var(--fs-meta);
+}
+/* تفاصيل الخطأ بخط ثابت العرض (U-74، D-96) */
+.tech pre {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

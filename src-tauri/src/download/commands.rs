@@ -132,6 +132,71 @@ pub struct ProbeInfo {
     pub(super) preview_url: Option<String>,
     /// ملفات Google Drive: تُنزَّل كما هي (بلا تحويل صيغة)
     pub(super) original: bool,
+    /// الحجم التقريبي لأفضل فيديو بكل دقة [الارتفاع، البايتات]، من الأعلى (U-36)
+    pub(super) video_sizes: Vec<[u64; 2]>,
+    /// الحجم التقريبي لأفضل صوت منفصل
+    pub(super) audio_size: Option<u64>,
+}
+
+/// أحجام النسخ من قائمة formats: أكبر فيديو لكل ارتفاع، وأكبر صوت منفصل.
+/// yt-dlp يعطي filesize أو filesize_approx (من معدل البت والمدة)، وقد لا يعطي أيًا منهما
+pub(super) fn format_sizes(j: &Value) -> (Vec<[u64; 2]>, Option<u64>) {
+    let size = |f: &Value| f["filesize"].as_u64().or_else(|| f["filesize_approx"].as_u64());
+    let mut video: Vec<[u64; 2]> = Vec::new();
+    let mut audio: Option<u64> = None;
+    for f in j["formats"].as_array().map(Vec::as_slice).unwrap_or_default() {
+        let Some(bytes) = size(f) else { continue };
+        let has_v = f["vcodec"].as_str().is_some_and(|v| v != "none");
+        let has_a = f["acodec"].as_str().is_some_and(|a| a != "none");
+        if has_v {
+            let Some(h) = f["height"].as_u64() else { continue };
+            match video.iter_mut().find(|e| e[0] == h) {
+                Some(e) => e[1] = e[1].max(bytes),
+                None => video.push([h, bytes]),
+            }
+        } else if has_a {
+            audio = Some(audio.map_or(bytes, |a| a.max(bytes)));
+        }
+    }
+    video.sort_unstable_by(|a, b| b[0].cmp(&a[0]));
+    (video, audio)
+}
+
+/// المساحة الحرة (بايت) على القرص الذي فيه المجلد، أو أقرب مجلد أب موجود (T-96)
+#[tauri::command]
+pub fn free_space(path: String) -> Option<u64> {
+    let mut p = std::path::PathBuf::from(path);
+    while !p.exists() {
+        if !p.pop() {
+            return None;
+        }
+    }
+    disk_free(&p)
+}
+
+#[cfg(windows)]
+fn disk_free(p: &std::path::Path) -> Option<u64> {
+    use std::os::windows::ffi::OsStrExt;
+    let wide: Vec<u16> = p.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let mut free = 0u64;
+    // SAFETY: wide ينتهي بصفر، والمؤشرات الأخرى اختيارية (null) أو تشير إلى u64 صالح
+    let ok = unsafe {
+        windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW(wide.as_ptr(), &mut free, std::ptr::null_mut(), std::ptr::null_mut())
+    };
+    (ok != 0).then_some(free)
+}
+
+#[cfg(unix)]
+fn disk_free(p: &std::path::Path) -> Option<u64> {
+    use std::os::unix::ffi::OsStrExt;
+    let c = std::ffi::CString::new(p.as_os_str().as_bytes()).ok()?;
+    let mut st: libc::statvfs = unsafe { std::mem::zeroed() };
+    // SAFETY: c مسار منتهٍ بصفر، وst بنية مهيّأة يملؤها النظام
+    if unsafe { libc::statvfs(c.as_ptr(), &mut st) } != 0 {
+        return None;
+    }
+    #[allow(clippy::unnecessary_cast)]
+    Some(st.f_bavail as u64 * st.f_frsize as u64)
 }
 
 #[derive(Serialize, Debug, PartialEq)]
@@ -224,6 +289,8 @@ pub(super) async fn probe_spotify(tools: &Tools, embed: String) -> Result<ProbeI
         subtitles: vec![],
         preview_url: None,
         original: false,
+        video_sizes: vec![],
+        audio_size: None,
     })
 }
 
@@ -273,6 +340,8 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
             subtitles: vec![],
             preview_url: None,
             original: j["extractor_key"].as_str().is_some_and(|k| k.starts_with("GoogleDrive")),
+            video_sizes: vec![],
+            audio_size: None,
         });
     }
     let mut heights: Vec<u32> = j["formats"]
@@ -298,6 +367,8 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
         subtitles: sub_langs(&j),
         preview_url: preview_url(&j),
         original: j["extractor_key"].as_str().is_some_and(|k| k.starts_with("GoogleDrive")),
+        video_sizes: format_sizes(&j).0,
+        audio_size: format_sizes(&j).1,
     })
 }
 

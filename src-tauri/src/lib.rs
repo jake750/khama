@@ -50,7 +50,14 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_drag::init())
         // نسخة واحدة فقط: فتح خامة مرة ثانية يُظهر النافذة الموجودة (المخفية في شريط المهام مثلًا)
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| background::show_main(app)))
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            background::show_main(app);
+            // فتح رابط khama:// والتطبيق مفتوح: يصل كوسيط للنسخة الثانية
+            for a in args.iter().filter(|a| a.starts_with("khama://")) {
+                background::open_link(app, a);
+            }
+        }))
+        .plugin(tauri_plugin_deep_link::init())
         .on_window_event(background::on_window_event);
     #[cfg(mobile)]
     let builder = builder.plugin(mobile::init());
@@ -58,13 +65,32 @@ pub fn run() {
     builder
         .setup(|app| {
             let handle = app.handle().clone();
-            app.manage(settings::SettingsState(Mutex::new(settings::load(&handle))));
+            let loaded = settings::load(&handle);
+            app.state::<download::DownloadQueue>().set_limit(loaded.parallel_downloads.into());
+            app.manage(settings::SettingsState(Mutex::new(loaded)));
             download::clean_stale_jobs(&handle);
             #[cfg(desktop)]
             {
                 convert::spawn_watcher(handle.clone());
                 background::setup_tray(&handle)?;
                 background::spawn_clipboard_watcher(handle.clone());
+                // روابط khama:// (T-101): التسجيل في النظام يكتبه المثبّت، ونكرّره هنا لنسخ التطوير وAppImage
+                use tauri_plugin_deep_link::DeepLinkExt;
+                #[cfg(any(windows, target_os = "linux"))]
+                if let Err(e) = app.deep_link().register_all() {
+                    log::warn!("deep link register: {e}");
+                }
+                if let Ok(Some(urls)) = app.deep_link().get_current() {
+                    for u in urls {
+                        background::open_link(&handle, u.as_str());
+                    }
+                }
+                let h = handle.clone();
+                app.deep_link().on_open_url(move |e| {
+                    for u in e.urls() {
+                        background::open_link(&h, u.as_str());
+                    }
+                });
             }
             // في الخلفية: جهّز yt-dlp (نسخة قابلة للتحديث على الكمبيوتر، أو فكّ الأدوات على الهاتف)
             tauri::async_runtime::spawn(async move {
@@ -97,6 +123,7 @@ macro_rules! handlers_with {
             download::reveal_file,
             download::open_output_dir,
             download::save_thumbnail,
+            download::free_space,
             history::get_history,
             history::remove_history,
             history::clear_history,
@@ -113,7 +140,12 @@ macro_rules! handlers_with {
 
 #[cfg(desktop)]
 fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
-    handlers_with![background::quit_app, background::set_compact]
+    handlers_with![
+        background::quit_app,
+        background::set_compact,
+        background::hide_main,
+        background::take_deep_link
+    ]
 }
 
 #[cfg(mobile)]

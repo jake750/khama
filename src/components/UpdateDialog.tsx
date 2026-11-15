@@ -72,9 +72,19 @@ const openUrl = (url: string) => invoke("plugin:opener|open_url", { url }).catch
  * يبحث عن نسخة أحدث من خامة مرة واحدة بعد الفتح، ويعرض نافذة «تحديث / لاحقًا».
  * بلا إنترنت أو بلا إصدار منشور: يفشل بصمت. «لاحقًا» تغلقها حتى الفتح القادم.
  */
-export function UpdateDialog() {
+export function UpdateDialog(props: {
+  /** عمليات جارية: لا نقاطعها بنافذة */
+  busy: boolean;
+  /** يزيد حين يضغط المستخدم «ثبّت التحديث» في الإعدادات */
+  request: number;
+  /** وُجد تحديث: شارة على «الإعدادات» بدل نافذة عند الإقلاع */
+  onAvailable: (version: string | null) => void;
+}) {
   const { t } = useI18n();
   const [update, setUpdate] = useState<Available | null>(null);
+  const found = useRef<Available | null>(null);
+  const onAvailable = useRef(props.onAvailable);
+  onAvailable.current = props.onAvailable;
   const [phase, setPhase] = useState<Phase>({ step: "ask" });
   const [shown, leaving] = usePresence(update, EXIT_MS);
   const started = useRef(false);
@@ -85,10 +95,21 @@ export function UpdateDialog() {
     if (started.current) return;
     const timer = window.setTimeout(() => {
       started.current = true;
-      (isMobile ? checkMobile() : checkDesktop()).then((u) => u && setUpdate(u)).catch(() => {}); // بلا اتصال، أو لا يوجد إصدار منشور بعد
+      (isMobile ? checkMobile() : checkDesktop())
+        .then((u) => {
+          found.current = u;
+          onAvailable.current(u?.version ?? null);
+        })
+        .catch(() => {}); // بلا اتصال، أو لا يوجد إصدار منشور بعد
     }, CHECK_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, []);
+
+  // تُفتح النافذة فقط حين يطلبها المستخدم، ولا أثناء تنزيل
+  useEffect(() => {
+    if (props.request > 0 && found.current && !props.busy) setUpdate(found.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.request]);
 
   const busy = phase.step === "downloading" || phase.step === "installing";
   const close = () => {
