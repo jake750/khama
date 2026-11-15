@@ -196,7 +196,8 @@ function templateExample(tpl: string, siteFolders: boolean): string {
 }
 
 const TOKENS = ["{title}", "{uploader}", "{date}", "{today}", "{site}", "{id}", "{res}", "{n}"];
-const RATES = [0, 1, 5, 10, 25];
+/** كيلوبايت/ثانية */
+const RATES = [0, 512, 1024, 5120, 10240, 25600];
 
 function DownloadsSection(props: { settings: Settings; update: (p: Partial<Settings>) => void }) {
   const { t } = useI18n();
@@ -255,9 +256,9 @@ function DownloadsSection(props: { settings: Settings; update: (p: Partial<Setti
         </div>
         <Segmented<string>
           label={t.rateLimit}
-          value={String(s.rateLimit)}
-          onChange={(v) => update({ rateLimit: Number(v) })}
-          options={RATES.map((r) => ({ value: String(r), label: r ? t.mbps(r) : t.rateOff }))}
+          value={String(s.rateLimitKb)}
+          onChange={(v) => update({ rateLimitKb: Number(v) })}
+          options={RATES.map((r) => ({ value: String(r), label: r ? t.speedLimit(r) : t.rateOff }))}
         />
       </div>
     </Section>

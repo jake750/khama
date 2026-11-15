@@ -3,7 +3,7 @@ use super::*;
 // ======================= بناء أوامر yt-dlp =======================
 
 pub(super) fn validate_url(url: &str) -> Result<String, AppError> {
-    // تحليل كامل للرابط (T-62) لا مجرد البادئة: http/https ومعه اسم موقع
+    // تحليل كامل للرابط (T-70) لا مجرد البادئة: http/https ومعه اسم موقع
     let url = url.trim();
     match tauri::Url::parse(url) {
         Ok(u) if matches!(u.scheme(), "http" | "https") && u.host_str().is_some_and(|h| !h.is_empty()) => Ok(url.to_string()),
@@ -73,8 +73,8 @@ pub(super) fn download_args(
     let mut a = tools::ytdlp_base_args(tools);
     a.extend(cookies);
     a.extend(format_args(req));
-    if opts.rate_limit > 0 {
-        a.extend(["-r".into(), format!("{}M", opts.rate_limit)]);
+    if opts.rate_limit_kb > 0 {
+        a.extend(["-r".into(), format!("{}K", opts.rate_limit_kb)]);
     }
     // أغنية من سبوتيفاي: رابط بحث، نأخذ أول نتيجة فقط
     if req.url.starts_with(playlist::MUSIC_SEARCH) {
@@ -109,6 +109,9 @@ pub(super) fn download_args(
         "postprocess:KHAMA_PP %(progress.status)s|%(progress.postprocessor)s".into(),
         "--print".into(),
         "after_move:KHAMA_FILE %(filepath)s".into(),
+        // العنوان والصورة أثناء التنزيل، فلا نحتاج معاينة ثانية للسجلّ إن بدأ التنزيل قبلها (T-43)
+        "--print".into(),
+        "before_dl:KHAMA_META %(.{title,thumbnail})j".into(),
         "--".into(), // ما بعده رابط وليس خيارًا (حماية من روابط تبدأ بـ -)
         req.url.clone(),
     ]);

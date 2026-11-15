@@ -160,7 +160,7 @@ fn unique_names() {
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("a.mp4"), b"x").unwrap();
     assert_eq!(unique_path(&dir, "a.mp4"), dir.join("a (1).mp4"));
-    // الاسم محجوز: الطلب التالي يأخذ اسمًا آخر حتى قبل نقل الملف الحقيقي (T-55)
+    // الاسم محجوز: الطلب التالي يأخذ اسمًا آخر حتى قبل نقل الملف الحقيقي (T-47)
     assert_eq!(unique_path(&dir, "a.mp4"), dir.join("a (2).mp4"));
     assert_eq!(unique_dir(&dir, "a stills"), dir.join("a stills"));
     assert_eq!(unique_dir(&dir, "a stills"), dir.join("a stills (1)"));
@@ -207,7 +207,7 @@ fn produced_files_are_remembered() {
     assert!(was_produced(f));
 }
 
-/// معاينة جديدة من الشاشة توقف السابقة فورًا (T-48). أمر بطيء بدل yt-dlp: ping/sleep خمس ثوانٍ
+/// معاينة جديدة من الشاشة توقف السابقة فورًا (T-42). أمر بطيء بدل yt-dlp: ping/sleep خمس ثوانٍ
 #[test]
 fn a_new_screen_probe_cancels_the_previous_one() {
     let slow = |prog: &str| Tools {
@@ -234,4 +234,17 @@ fn a_new_screen_probe_cancels_the_previous_one() {
         assert_eq!(a.unwrap_err().code, "canceled");
         assert!(started.elapsed() < Duration::from_secs(4), "الأولى توقفت قبل أن تنتهي وحدها");
     });
+}
+
+#[test]
+fn meta_line_gives_title_and_thumbnail() {
+    let (t, th) = parse_meta_line(r#"{"title": "عنوان", "thumbnail": "https://i.ytimg.com/a.jpg"}"#).unwrap();
+    assert_eq!(t.as_deref(), Some("عنوان"));
+    assert_eq!(th.as_deref(), Some("https://i.ytimg.com/a.jpg"));
+    assert_eq!(
+        parse_meta_line(r#"{"title": "x", "thumbnail": null}"#),
+        Some((Some("x".into()), None))
+    );
+    assert_eq!(parse_meta_line("NA"), None);
+    assert_eq!(parse_meta_line(r#"{"title": null}"#), None);
 }

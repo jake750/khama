@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { AppError, ConvertRequest, DownloadRequest, JobState } from "../api";
+import type { AppError, ConvertRequest, DownloadRequest, JobState, JobUpdate } from "../api";
 import { formatDuration, formatEta, formatSpeed, formatTimecode } from "../format";
 import { useI18n, type Dict } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
@@ -26,6 +26,18 @@ export interface Job {
   thumbnail?: string | null;
   /** تنزيل مجدول: وقت البدء (ms) */
   at?: number;
+}
+
+/** يدمج تحديثًا من Rust في البطاقة. العنوان من yt-dlp يحلّ محلّ الرابط فقط، لا محلّ عنوان المعاينة،
+ * والصورة لا تُستبدل إن كانت موجودة (T-43). */
+export function mergeUpdate(j: Job, u: JobUpdate): Job {
+  const { title, thumbnail, ...rest } = u;
+  return {
+    ...j,
+    ...rest,
+    title: title && /^https?:\/\//.test(j.title) ? title : j.title,
+    thumbnail: j.thumbnail ?? thumbnail ?? null,
+  };
 }
 
 const ACTIVE: JobState[] = ["queued", "starting", "analyzing", "downloading", "processing", "preparing", "separating", "converting"];

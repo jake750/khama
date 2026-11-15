@@ -13,9 +13,28 @@ use serde::de::DeserializeOwned;
 
 /// يكتب `data` إلى `path` كاملًا أو لا يكتب شيئًا.
 pub fn write_atomic(path: &Path, data: &[u8]) -> io::Result<()> {
+    write_atomic_opts(path, data, false)
+}
+
+/// مثل write_atomic لكن الملف يقرؤه صاحبه فقط (T-32: الكوكيز). على Unix/Android صلاحيات 600؛
+/// على Windows مجلد إعدادات التطبيق (AppData) خاص بالمستخدم أصلًا.
+pub fn write_atomic_private(path: &Path, data: &[u8]) -> io::Result<()> {
+    write_atomic_opts(path, data, true)
+}
+
+fn write_atomic_opts(path: &Path, data: &[u8], private: bool) -> io::Result<()> {
     let tmp = sibling(path, "tmp");
     {
-        let mut f = fs::File::create(&tmp)?;
+        let mut opts = fs::OpenOptions::new();
+        opts.write(true).create(true).truncate(true);
+        #[cfg(unix)]
+        if private {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600);
+        }
+        #[cfg(not(unix))]
+        let _ = private;
+        let mut f = opts.open(&tmp)?;
         f.write_all(data)?;
         f.sync_all()?;
     }
@@ -94,6 +113,16 @@ mod tests {
         write_atomic(&p, b"new").unwrap();
         assert_eq!(fs::read_to_string(&p).unwrap(), "new");
         assert!(!d.join("settings.json.tmp").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn private_file_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = temp_dir("private");
+        let p = d.join("cookies.txt");
+        write_atomic_private(&p, b"x").unwrap();
+        assert_eq!(fs::metadata(&p).unwrap().permissions().mode() & 0o777, 0o600);
     }
 
     #[test]

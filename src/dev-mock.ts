@@ -25,7 +25,7 @@ const settings = {
   watchFolders: [],
   filenameTemplate: "{title}",
   siteFolders: false,
-  rateLimit: 0,
+  rateLimitKb: 0,
   notify: true,
   closeToTray: false,
   watchClipboard: false,

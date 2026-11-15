@@ -167,7 +167,7 @@ pub(super) async fn deliver_with_extras(
     }
     if let Some(dir) = stills_dir {
         let dest = unique_dir(final_dir, &format!("{stem} stills"));
-        // النسخ (حين يكون مجلد المستخدم على قرص آخر) خارج خيوط tokio (T-22)
+        // النسخ (حين يكون مجلد المستخدم على قرص آخر) خارج خيوط tokio (T-23)
         let (from, to) = (dir.clone(), dest.clone());
         blocking(move || {
             if std::fs::rename(&from, &to).is_err() {
@@ -380,6 +380,17 @@ pub(super) async fn fetch(
             }
         } else if let Some(path) = line.strip_prefix("KHAMA_FILE ") {
             file = Some(PathBuf::from(path.trim()));
+        } else if let Some((title, thumbnail)) = line.strip_prefix("KHAMA_META ").and_then(parse_meta_line) {
+            emit(
+                app,
+                JobUpdate {
+                    id,
+                    state: "downloading",
+                    title,
+                    thumbnail,
+                    ..Default::default()
+                },
+            );
         }
     })
     .await?;

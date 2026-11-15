@@ -1,0 +1,21 @@
+import { describe, expect, it } from "vitest";
+import { mergeUpdate, type Job } from "./JobCard";
+
+const job = (title: string, thumbnail?: string): Job => ({ id: 1, type: "download", title, meta: "", state: "starting", thumbnail });
+
+describe("mergeUpdate (T-43)", () => {
+  it("عنوان yt-dlp يحلّ محلّ الرابط", () => {
+    const j = mergeUpdate(job("https://youtu.be/abc"), { id: 1, state: "downloading", title: "عنوان", thumbnail: "t.jpg" });
+    expect(j.title).toBe("عنوان");
+    expect(j.thumbnail).toBe("t.jpg");
+    expect(j.state).toBe("downloading");
+  });
+  it("لا يغيّر عنوان المعاينة ولا صورتها", () => {
+    const j = mergeUpdate(job("من المعاينة", "p.jpg"), { id: 1, state: "downloading", title: "آخر", thumbnail: "t.jpg" });
+    expect(j.title).toBe("من المعاينة");
+    expect(j.thumbnail).toBe("p.jpg");
+  });
+  it("تحديث التقدّم العادي يبقي العنوان", () => {
+    expect(mergeUpdate(job("x"), { id: 1, state: "downloading", percent: 40 })).toMatchObject({ title: "x", percent: 40 });
+  });
+});

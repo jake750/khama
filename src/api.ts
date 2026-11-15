@@ -31,7 +31,8 @@ export interface Settings {
   filenameTemplate: string;
   siteFolders: boolean;
   /** حدّ السرعة بالميغابايت/ثانية (0 = بلا حدّ) */
-  rateLimit: number;
+  /** كيلوبايت/ثانية، 0 = بلا حدّ */
+  rateLimitKb: number;
   notify: boolean;
   closeToTray: boolean;
   watchClipboard: boolean;
@@ -246,6 +247,9 @@ export interface JobUpdate {
   file?: string;
   error?: AppError;
   markers?: [number, number][];
+  /** العنوان والصورة من yt-dlp أثناء التنزيل */
+  title?: string;
+  thumbnail?: string;
 }
 
 export interface ToolsInfo {

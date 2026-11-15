@@ -135,7 +135,7 @@ pub struct DownloadRequest {
 struct JobOptions {
     /// قالب yt-dlp لاسم الملف، بلا لاحقة المقطع ولا الامتداد
     template: String,
-    rate_limit: u32,
+    rate_limit_kb: u32,
 }
 
 /// اليوم بصيغة 2026-11-10 (بلا مكتبة تواريخ: خوارزمية التقويم المدني)
@@ -255,6 +255,19 @@ pub struct JobUpdate {
     /// نتائج الكشف (مشاهد، لقطات سوداء، صمت): [بداية، نهاية]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub markers: Option<Vec<[f64; 2]>>,
+    /// عنوان الفيديو وصورته كما طبعهما yt-dlp قبل التنزيل (T-43)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thumbnail: Option<String>,
+}
+
+/// يقرأ سطر KHAMA_META: {"title": ..., "thumbnail": ...}
+pub(super) fn parse_meta_line(rest: &str) -> Option<(Option<String>, Option<String>)> {
+    let v: serde_json::Value = serde_json::from_str(rest.trim()).ok()?;
+    let text = |k: &str| v.get(k).and_then(|x| x.as_str()).filter(|s| !s.is_empty()).map(String::from);
+    let (title, thumbnail) = (text("title"), text("thumbnail"));
+    (title.is_some() || thumbnail.is_some()).then_some((title, thumbnail))
 }
 
 pub(crate) fn emit(app: &AppHandle, u: JobUpdate) {
@@ -278,7 +291,7 @@ pub(crate) fn was_produced(path: &str) -> bool {
     PRODUCED.lock_ok().as_ref().is_some_and(|s| s.contains(path))
 }
 
-/// أقل فاصل بين تحديثين للتقدّم في نفس المرحلة (T-82): yt-dlp وFFmpeg يكتبان عدة أسطر
+/// أقل فاصل بين تحديثين للتقدّم في نفس المرحلة (T-85): yt-dlp وFFmpeg يكتبان عدة أسطر
 /// في الثانية، وكل حدث يعيد رسم الواجهة. 5 تحديثات في الثانية تكفي للعين.
 const PROGRESS_EVERY: Duration = Duration::from_millis(200);
 
@@ -292,6 +305,10 @@ fn should_emit(u: &JobUpdate, now: Instant) -> bool {
     let last = guard.get_or_insert_with(HashMap::new);
     if matches!(u.state, "done" | "error" | "canceled") {
         last.remove(&u.id);
+        return true;
+    }
+    // تحديث يحمل العنوان لا يُتخطّى أبدًا
+    if u.title.is_some() || u.thumbnail.is_some() {
         return true;
     }
     match last.get(&u.id) {

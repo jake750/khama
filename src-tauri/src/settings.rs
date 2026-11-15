@@ -46,7 +46,10 @@ pub struct Settings {
     pub filename_template: String,
     /// مجلد فرعي لكل موقع (YouTube/، Instagram/...)
     pub site_folders: bool,
-    /// حدّ سرعة التنزيل بالميغابايت/ثانية (0 = بلا حدّ)
+    /// حدّ سرعة التنزيل بالكيلوبايت/ثانية (0 = بلا حدّ). بالكيلوبايت ليمكن 512 مثلًا (T-89)
+    pub rate_limit_kb: u32,
+    /// 0.3.1 وما قبله: الحدّ بالميغابايت. يُقرأ فقط ويحوَّل في migrate
+    #[serde(skip_serializing)]
     pub rate_limit: u32,
     /// إشعار من النظام عند انتهاء تنزيل أو فشله
     pub notify: bool,
@@ -113,6 +116,7 @@ impl Default for Settings {
             watch_folders: Vec::new(),
             filename_template: "{title}".into(),
             site_folders: false,
+            rate_limit_kb: 0,
             rate_limit: 0,
             notify: true,
             close_to_tray: true,
@@ -175,6 +179,11 @@ fn migrate(mut s: Settings) -> Settings {
             p.id = p.name.clone();
         }
     }
+    // 0.3.1 وما قبله: rateLimit بالميغابايت
+    if s.rate_limit > 0 && s.rate_limit_kb == 0 {
+        s.rate_limit_kb = s.rate_limit.saturating_mul(1024);
+    }
+    s.rate_limit = 0;
     s
 }
 
@@ -227,7 +236,7 @@ pub fn save_cookies(app: AppHandle, content: String) -> Result<(), AppError> {
     if !out.ends_with('\n') {
         out.push('\n');
     }
-    crate::persist::write_atomic(&cookies_path(&app)?, out.as_bytes())?;
+    crate::persist::write_atomic_private(&cookies_path(&app)?, out.as_bytes())?;
     Ok(())
 }
 
@@ -252,5 +261,15 @@ mod tests {
         let s = migrate(serde_json::from_str(json).unwrap());
         assert_eq!(s.projects[0].id, "قناتي");
         assert_eq!(s.active_project.as_deref(), Some(s.projects[0].id.as_str()));
+    }
+
+    #[test]
+    fn migrate_turns_old_megabyte_limit_into_kilobytes() {
+        let s = migrate(serde_json::from_str(r#"{"rateLimit":5}"#).unwrap());
+        assert_eq!(s.rate_limit_kb, 5 * 1024);
+        let json = serde_json::to_string(&s).unwrap();
+        assert!(json.contains(r#""rateLimitKb":5120"#) && !json.contains(r#""rateLimit":"#));
+        let s = migrate(serde_json::from_str(r#"{"rateLimitKb":512}"#).unwrap());
+        assert_eq!(s.rate_limit_kb, 512);
     }
 }

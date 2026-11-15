@@ -8,7 +8,7 @@ import { ConvertView, defaultOptions, MEDIA_FILTER, type SourceFile } from "./co
 import { DownloadView, newDownloadSession, type StartMeta } from "./components/DownloadView";
 import { HistoryView } from "./components/HistoryView";
 import { Icon, type IconName } from "./components/Icon";
-import { isActive, JobCard, type Job } from "./components/JobCard";
+import { isActive, JobCard, mergeUpdate, type Job } from "./components/JobCard";
 import { SettingsView } from "./components/SettingsView";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { formatTimecode } from "./format";
@@ -198,7 +198,7 @@ export default function App() {
           pending.current.set(u.id, { ...pending.current.get(u.id), ...u });
           return prev;
         }
-        return prev.map((j) => (j.id === u.id ? { ...j, ...u } : j));
+        return prev.map((j) => (j.id === u.id ? mergeUpdate(j, u) : j));
       });
     });
     return () => {
@@ -256,7 +256,8 @@ export default function App() {
   const addJob = useCallback((id: number, job: Omit<Job, "id" | "state">) => {
     const early = pending.current.get(id);
     pending.current.delete(id);
-    setJobs((prev) => [{ id, state: "starting", ...job, ...early } as Job, ...prev]);
+    const fresh = { id, state: "starting", ...job } as Job;
+    setJobs((prev) => [early ? mergeUpdate(fresh, early) : fresh, ...prev]);
   }, []);
 
   const startDownload = useCallback(
