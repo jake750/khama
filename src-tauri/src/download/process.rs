@@ -42,7 +42,7 @@ pub(crate) async fn run_streaming(
     let stdout = child.stdout.take().expect("stdout piped");
     let stderr = child.stderr.take().expect("stderr piped");
 
-    // نجمع stderr في الخلفية (نحتفظ بآخر ~32KB فقط)
+    // نجمع stderr في الخلفية؛ نحتفظ بآخر 2 إلى 4 ميغابايت (انظر أسفل) لأن نتائج كشف المشاهد تأتي فيه (T-64)
     let err_task = tokio::spawn(async move {
         let mut buf = String::new();
         let mut r = BufReader::new(stderr).split(b'\n');

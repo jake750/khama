@@ -1,3 +1,4 @@
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useEffect, useMemo, useState } from "react";
 import { api, type HistoryEntry } from "../api";
 import { useI18n } from "../i18n";
@@ -162,8 +163,7 @@ export function HistoryView(props: {
                     title={t.copyLink}
                     aria-label={t.copyLink}
                     onClick={() =>
-                      navigator.clipboard
-                        .writeText(e.url)
+                      writeText(e.url)
                         .then(() => props.toast(t.toastCopied))
                         .catch(logError("copyLink"))
                     }

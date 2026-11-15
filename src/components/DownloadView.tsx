@@ -232,7 +232,7 @@ export function DownloadView(props: {
       return;
     }
     try {
-      const text = await navigator.clipboard.readText();
+      const text = await readText();
       setUrl(extractUrls(text).join(" ") || text.trim());
     } catch {
       setStartError({ code: "clipboard" });

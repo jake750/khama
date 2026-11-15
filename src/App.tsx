@@ -1,6 +1,7 @@
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, asAppError, type AppError, type ConvertRequest, type DownloadRequest, type JobUpdate, type Settings } from "./api";
@@ -474,8 +475,7 @@ export default function App() {
 
   const copyMarkers = (j: Job) => {
     const text = (j.markers ?? []).map(([s, e]) => (s === e ? formatTimecode(s) : `${formatTimecode(s)}\t${formatTimecode(e)}`)).join("\n");
-    navigator.clipboard
-      .writeText(text)
+    writeText(text)
       .then(() => toast(t.toastCopied))
       .catch(logError("copyMarkers"));
   };
