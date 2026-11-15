@@ -206,3 +206,32 @@ fn produced_files_are_remembered() {
     remember_output(f);
     assert!(was_produced(f));
 }
+
+/// معاينة جديدة من الشاشة توقف السابقة فورًا (T-48). أمر بطيء بدل yt-dlp: ping/sleep خمس ثوانٍ
+#[test]
+fn a_new_screen_probe_cancels_the_previous_one() {
+    let slow = |prog: &str| Tools {
+        ytdlp: PathBuf::from(prog),
+        ytdlp_prefix: vec![],
+        env: vec![],
+        js_runtime: String::new(),
+        ffmpeg: PathBuf::new(),
+        ffprobe: PathBuf::new(),
+        ffmpeg_dir: PathBuf::new(),
+    };
+    #[cfg(windows)]
+    let (tools, long, short) = (slow("ping"), vec!["-n", "6", "127.0.0.1"], vec!["-n", "1", "127.0.0.1"]);
+    #[cfg(unix)]
+    let (tools, long, short) = (slow("sleep"), vec!["5"], vec!["0"]);
+    tauri::async_runtime::block_on(async {
+        let started = Instant::now();
+        let first = run_probe(&tools, &long, true);
+        let second = async {
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            run_probe(&tools, &short, true).await
+        };
+        let (a, _) = tokio::join!(first, second);
+        assert_eq!(a.unwrap_err().code, "canceled");
+        assert!(started.elapsed() < Duration::from_secs(4), "الأولى توقفت قبل أن تنتهي وحدها");
+    });
+}

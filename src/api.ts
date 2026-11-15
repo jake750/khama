@@ -271,7 +271,8 @@ export const api = {
   saveScheduled: (items: ScheduledItem[]) => invoke<void>("save_scheduled", { items }),
   toolsInfo: () => invoke<ToolsInfo>("tools_info"),
   updateYtdlp: () => invoke<{ version?: string; updated: boolean }>("update_ytdlp"),
-  probe: (url: string) => invoke<ProbeInfo>("probe", { url }),
+  /** replace: معاينة شاشة التنزيل؛ كل معاينة جديدة توقف السابقة في Rust */
+  probe: (url: string, opts?: { replace?: boolean }) => invoke<ProbeInfo>("probe", { url, replace: opts?.replace ?? false }),
   /** على الهاتف: ينسخ ملفات اختارها المستخدم (content://) داخل التطبيق ويعيد مساراتها */
   importFiles: (paths: string[]) => invoke<string[]>("import_files", { paths }),
   startDownload: (request: DownloadRequest) => invoke<number>("start_download", { request }),

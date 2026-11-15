@@ -128,7 +128,7 @@ export function DownloadView(props: {
     const timer = setTimeout(async () => {
       setProbe({ status: "loading" });
       try {
-        const info = await api.probe(clean);
+        const info = await api.probe(clean, { replace: true });
         session.lastProbe = { url: clean, info };
         if (token === probeToken.current) {
           setSelected(new Set(info.entries?.map((_, i) => i) ?? []));

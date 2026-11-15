@@ -217,7 +217,7 @@ pub(super) async fn probe_spotify(tools: &Tools, embed: String) -> Result<ProbeI
 /// يقرأ معلومات الرابط (العنوان، الصورة، الدقات المتاحة) دون تنزيل.
 /// رابط قائمة تشغيل: يعيد عناصرها في entries.
 #[tauri::command]
-pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: String) -> Result<ProbeInfo, AppError> {
+pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: String, replace: Option<bool>) -> Result<ProbeInfo, AppError> {
     let url = validate_url(&url)?;
     let s = settings.0.lock_ok().clone();
     let tools = tools::resolve(&app)?;
@@ -230,10 +230,7 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
     args.extend(["-J".to_string(), "--flat-playlist".to_string(), "--".to_string(), url]);
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
 
-    let run = tools::run_ytdlp(&tools, &args);
-    let (ok, out, err) = tokio::time::timeout(Duration::from_secs(90), run)
-        .await
-        .map_err(|_| AppError::new("timeout"))??;
+    let (ok, out, err) = run_probe(&tools, &args, replace.unwrap_or(false)).await?;
     if !ok {
         return Err(friendly_ytdlp_error(&err));
     }
@@ -336,6 +333,54 @@ pub async fn save_thumbnail(app: AppHandle, settings: State<'_, SettingsState>, 
     let done = deliver(&app, &jpg, &dir).await;
     let _ = std::fs::remove_dir_all(&work);
     Ok(done?.to_string_lossy().into_owned())
+}
+
+/// يشغّل yt-dlp للمعاينة (حد 90 ثانية). replace = معاينة شاشة التنزيل: كل معاينة جديدة
+/// توقف السابقة وكل ما شغّلته (T-48)، فكتابة رابط ببطء أو تغييره لا تُراكم عمليات Python.
+pub(super) async fn run_probe(tools: &Tools, args: &[&str], replace: bool) -> Result<(bool, String, String), AppError> {
+    use std::sync::OnceLock;
+    use tokio::io::AsyncReadExt;
+    static LATEST: OnceLock<watch::Sender<u64>> = OnceLock::new();
+    let latest = LATEST.get_or_init(|| watch::channel(0).0);
+    let mut mine = 0;
+    if replace {
+        latest.send_modify(|g| {
+            *g += 1;
+            mine = *g;
+        });
+    }
+    let mut newer = latest.subscribe();
+
+    let mut child = tools::ytdlp_command(tools)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let read = |pipe: Option<Box<dyn tokio::io::AsyncRead + Send + Unpin>>| {
+        tokio::spawn(async move {
+            let mut buf = Vec::new();
+            if let Some(mut p) = pipe {
+                let _ = p.read_to_end(&mut buf).await;
+            }
+            String::from_utf8_lossy(&buf).into_owned()
+        })
+    };
+    let out = read(child.stdout.take().map(|p| Box::new(p) as _));
+    let err = read(child.stderr.take().map(|p| Box::new(p) as _));
+
+    let status = tokio::select! {
+        s = child.wait() => s?,
+        // (داخل async حتى لا يبقى Ref غير القابل للإرسال بين الخيوط)
+        _ = async { let _ = newer.wait_for(|g| replace && *g != mine).await; } => {
+            kill_tree(&mut child).await;
+            return Err(AppError::new("canceled"));
+        }
+        _ = tokio::time::sleep(Duration::from_secs(90)) => {
+            kill_tree(&mut child).await;
+            return Err(AppError::new("timeout"));
+        }
+    };
+    Ok((status.success(), out.await.unwrap_or_default(), err.await.unwrap_or_default()))
 }
 
 #[tauri::command]
