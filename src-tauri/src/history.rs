@@ -76,6 +76,12 @@ pub async fn get_history(app: AppHandle, state: State<'_, HistoryState>) -> Resu
     .map_err(|e| AppError::with_detail("history", e.to_string()))
 }
 
+/// هل هذا الملف في السجلّ؟ (للتحقق من مسارات تطلبها الواجهة)
+pub fn contains_file(app: &AppHandle, file: &str) -> bool {
+    let state = app.state::<HistoryState>();
+    with_list(app, &state, |list| (list.iter().any(|e| e.file == file), false)).unwrap_or(false)
+}
+
 /// معرّف جديد أكبر من كل ما في السجلّ (T-19): لا تصادم حتى لو انتهى تنزيلان في نفس الجزء من الثانية
 fn next_id(list: &[HistoryEntry], now_ms: u64) -> u64 {
     let newest = list.iter().map(|e| e.id).max().unwrap_or(0);

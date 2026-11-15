@@ -33,7 +33,17 @@ export function formatEta(t: Dict, sec?: number | null): string {
   return t.left(formatDuration(sec));
 }
 
-export const isHttpUrl = (s: string) => /^https?:\/\/\S+$/i.test(s.trim());
+/** رابط http/https صالح فيه اسم موقع (تحليل كامل بـ URL، لا مجرد البادئة — T-62) */
+export function isHttpUrl(s: string): boolean {
+  const text = s.trim();
+  if (/\s/.test(text)) return false;
+  try {
+    const u = new URL(text);
+    return (u.protocol === "http:" || u.protocol === "https:") && u.hostname !== "";
+  } catch {
+    return false;
+  }
+}
 
 /** يستخرج كل الروابط من نص ملصوق (قد يحتوي عدة روابط أو نصًا حولها) */
 export function extractUrls(text: string): string[] {

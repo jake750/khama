@@ -3,11 +3,12 @@ use super::*;
 // ======================= بناء أوامر yt-dlp =======================
 
 pub(super) fn validate_url(url: &str) -> Result<String, AppError> {
+    // تحليل كامل للرابط (T-62) لا مجرد البادئة: http/https ومعه اسم موقع
     let url = url.trim();
-    if !(url.starts_with("http://") || url.starts_with("https://")) {
-        return Err(AppError::new("invalidUrl"));
+    match tauri::Url::parse(url) {
+        Ok(u) if matches!(u.scheme(), "http" | "https") && u.host_str().is_some_and(|h| !h.is_empty()) => Ok(url.to_string()),
+        _ => Err(AppError::new("invalidUrl")),
     }
-    Ok(url.to_string())
 }
 
 pub(super) fn cookie_args(app: &AppHandle, s: &Settings) -> Vec<String> {

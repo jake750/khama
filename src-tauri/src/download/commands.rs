@@ -341,6 +341,10 @@ pub async fn save_thumbnail(app: AppHandle, settings: State<'_, SettingsState>, 
 #[tauri::command]
 pub fn reveal_file(app: AppHandle, path: String) -> Result<(), AppError> {
     use tauri_plugin_opener::OpenerExt;
+    // فقط ملفات أنتجها التطبيق: في هذه الجلسة أو في السجلّ (T-33)
+    if !was_produced(&path) && !crate::history::contains_file(&app, &path) {
+        return Err(AppError::with_detail("openFolder", "not a file produced by Khama"));
+    }
     app.opener()
         .reveal_item_in_dir(&path)
         .map_err(|e| AppError::with_detail("openFolder", e.to_string()))

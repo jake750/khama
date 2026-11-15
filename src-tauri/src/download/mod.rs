@@ -258,9 +258,24 @@ pub struct JobUpdate {
 }
 
 pub(crate) fn emit(app: &AppHandle, u: JobUpdate) {
+    if let Some(f) = &u.file {
+        remember_output(f);
+    }
     if should_emit(&u, Instant::now()) {
         let _ = app.emit("job-update", u);
     }
+}
+
+/// الملفات التي أنتجها Rust في هذه الجلسة (T-33): reveal_file يقبلها هي وملفات السجلّ فقط،
+/// فلا تستطيع الواجهة (لو حُقن فيها كود) أن تفتح أي مسار على الجهاز.
+static PRODUCED: Mutex<Option<std::collections::HashSet<String>>> = Mutex::new(None);
+
+pub(crate) fn remember_output(path: &str) {
+    PRODUCED.lock_ok().get_or_insert_with(Default::default).insert(path.to_string());
+}
+
+pub(crate) fn was_produced(path: &str) -> bool {
+    PRODUCED.lock_ok().as_ref().is_some_and(|s| s.contains(path))
 }
 
 /// أقل فاصل بين تحديثين للتقدّم في نفس المرحلة (T-82): yt-dlp وFFmpeg يكتبان عدة أسطر

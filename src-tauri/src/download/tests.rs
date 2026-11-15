@@ -182,3 +182,27 @@ fn unique_names_under_concurrency() {
     assert_eq!(names.len(), 16, "كل عملية أخذت اسمًا مختلفًا");
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn validate_url_parses_the_whole_url() {
+    assert!(validate_url(" https://youtu.be/abc ").is_ok());
+    assert!(validate_url("http://example.com/a?b=c").is_ok());
+    for bad in [
+        "ftp://x.com/a",
+        "https://",
+        "https:// space.com",
+        "javascript:alert(1)",
+        "youtu.be/abc",
+        "file:///C:/x",
+    ] {
+        assert!(validate_url(bad).is_err(), "{bad}");
+    }
+}
+
+#[test]
+fn produced_files_are_remembered() {
+    let f = "C:/khama-test/produced-file.mp4";
+    assert!(!was_produced(f));
+    remember_output(f);
+    assert!(was_produced(f));
+}

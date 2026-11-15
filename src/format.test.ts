@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractUrls, formatDuration, formatTimecode, parseTime } from "./format";
+import { extractUrls, formatDuration, formatTimecode, isHttpUrl, parseTime } from "./format";
 
 describe("formatTimecode", () => {
   it("يعرض أجزاء الثانية", () => {
@@ -57,5 +57,17 @@ describe("extractUrls", () => {
   });
   it("يزيل التكرار", () => {
     expect(extractUrls("https://a.com https://a.com")).toEqual(["https://a.com"]);
+  });
+});
+
+describe("isHttpUrl (T-62)", () => {
+  it("يقبل روابط http/https كاملة", () => {
+    expect(isHttpUrl(" https://youtu.be/abc ")).toBe(true);
+    expect(isHttpUrl("http://example.com/a?b=c")).toBe(true);
+  });
+  it("يرفض غيرها", () => {
+    for (const bad of ["https://", "ftp://x.com", "youtu.be/abc", "javascript:alert(1)", "https://a.com b", ""]) {
+      expect(isHttpUrl(bad)).toBe(false);
+    }
   });
 });
