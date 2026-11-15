@@ -61,15 +61,25 @@ fn with_list<T>(app: &AppHandle, state: &HistoryState, f: impl FnOnce(&mut Vec<H
     Ok(out)
 }
 
+/// async + خيط منفصل (T-21): فحص وجود حتى 1000 ملف لا يجمّد النافذة
+/// (الأوامر المتزامنة في Tauri تعمل على الخيط الرئيسي).
 #[tauri::command]
-pub fn get_history(app: AppHandle, state: State<'_, HistoryState>) -> Result<Vec<HistoryEntry>, AppError> {
-    with_list(&app, &state, |list| {
-        let mut out = list.clone();
+pub async fn get_history(app: AppHandle, state: State<'_, HistoryState>) -> Result<Vec<HistoryEntry>, AppError> {
+    let mut out = with_list(&app, &state, |list| (list.clone(), false))?;
+    tauri::async_runtime::spawn_blocking(move || {
         for e in &mut out {
             e.exists = std::path::Path::new(&e.file).exists();
         }
-        (out, false)
+        out
     })
+    .await
+    .map_err(|e| AppError::with_detail("history", e.to_string()))
+}
+
+/// معرّف جديد أكبر من كل ما في السجلّ (T-19): لا تصادم حتى لو انتهى تنزيلان في نفس الجزء من الثانية
+fn next_id(list: &[HistoryEntry], now_ms: u64) -> u64 {
+    let newest = list.iter().map(|e| e.id).max().unwrap_or(0);
+    newest.max(now_ms.saturating_mul(1000)) + 1
 }
 
 #[tauri::command]
@@ -77,8 +87,12 @@ pub async fn add_history(app: AppHandle, state: State<'_, HistoryState>, mut ent
     if let Some(local) = local_thumbnail(&app, &entry).await {
         entry.thumbnail = Some(local);
     }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
     with_list(&app, &state, |list| {
-        list.retain(|e| e.id != entry.id);
+        entry.id = next_id(list, now);
         list.insert(0, entry);
         list.truncate(MAX_ENTRIES);
         ((), true)
@@ -144,4 +158,40 @@ pub fn save_scheduled(app: AppHandle, items: serde_json::Value) -> Result<(), Ap
     let json = serde_json::to_string(&items).expect("scheduled serialize");
     crate::persist::write_atomic(&scheduled_path(&app)?, json.as_bytes())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn entry(id: u64) -> HistoryEntry {
+        HistoryEntry {
+            id,
+            title: String::new(),
+            url: String::new(),
+            file: String::new(),
+            kind: "video".into(),
+            meta: String::new(),
+            thumbnail: None,
+            date: 0,
+            exists: false,
+        }
+    }
+
+    #[test]
+    fn next_id_is_unique_even_within_the_same_millisecond() {
+        let mut list = vec![];
+        for _ in 0..5 {
+            let id = next_id(&list, 1_000);
+            assert!(list.iter().all(|e: &HistoryEntry| e.id != id));
+            list.insert(0, entry(id));
+        }
+        assert_eq!(list[0].id, 1_000_005);
+    }
+
+    #[test]
+    fn next_id_keeps_growing_if_the_clock_goes_back() {
+        let list = vec![entry(9_000_000)];
+        assert_eq!(next_id(&list, 1), 9_000_001);
+    }
 }

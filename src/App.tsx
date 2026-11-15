@@ -173,7 +173,7 @@ export default function App() {
       info
         .then((p) =>
           api.addHistory({
-            id: Date.now() * 1000 + (Math.abs(job.id) % 1000),
+            id: 0, // يحدده Rust (معرّف فريد)
             title: titleIsUrl ? (p?.title ?? stripExt(name)) : job.title,
             url: request.url,
             file,
