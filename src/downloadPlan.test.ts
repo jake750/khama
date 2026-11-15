@@ -1,0 +1,139 @@
+import { describe, expect, it } from "vitest";
+import type { ProbeInfo } from "./api";
+import { nextClip, planDownloads, scheduledAt, subtitleLangs, type PlanInput } from "./downloadPlan";
+
+const settings: PlanInput["settings"] = {
+  kind: "video",
+  videoFormat: "mp4",
+  audioFormat: "mp3",
+  quality: "1080",
+  editorReady: true,
+  wantSubs: false,
+  subLangs: [],
+  wantThumb: false,
+  wantInfo: false,
+};
+
+const info = (over: Partial<ProbeInfo> = {}): ProbeInfo =>
+  ({
+    title: "فيديو",
+    thumbnail: "t.jpg",
+    duration: 100,
+    isLive: false,
+    subtitles: [],
+    original: false,
+    heights: [1080],
+    ...over,
+  }) as ProbeInfo;
+
+const input = (over: Partial<PlanInput> = {}): PlanInput => ({
+  settings,
+  urls: ["https://youtu.be/a"],
+  info: info(),
+  stills: "off",
+  stems: "off",
+  selected: new Set(),
+  stemsScope: "all",
+  picked: new Set(),
+  clips: null,
+  joinClips: true,
+  timeline: true,
+  canTimeline: true,
+  ...over,
+});
+
+describe("scheduledAt", () => {
+  const now = new Date(2026, 10, 15, 14, 30);
+  it("الآن = بلا جدولة", () => expect(scheduledAt("now", "16:00", now)).toBeUndefined());
+  it("وقت لاحق اليوم", () => expect(scheduledAt("later", "16:00", now)).toBe(new Date(2026, 10, 15, 16, 0).getTime()));
+  it("وقت مضى ← غدًا", () => expect(scheduledAt("later", "09:15", now)).toBe(new Date(2026, 10, 16, 9, 15).getTime()));
+});
+
+describe("subtitleLangs", () => {
+  const subs = [
+    { code: "fr", name: "French", auto: false },
+    { code: "ar", name: "Arabic", auto: false },
+  ];
+  it("بلا ترجمة", () => expect(subtitleLangs({ wantSubs: false, subLangs: ["ar"] }, null)).toEqual([]));
+  it("المختارة المتاحة في الفيديو", () =>
+    expect(subtitleLangs({ wantSubs: true, subLangs: ["ar", "de"] }, info({ subtitles: subs }))).toEqual(["ar"]));
+  it("لا مختارة متاحة ← أول لغة", () =>
+    expect(subtitleLangs({ wantSubs: true, subLangs: ["de"] }, info({ subtitles: subs }))).toEqual(["fr"]));
+  it("بلا معاينة ← المختارة أو en+ar", () => {
+    expect(subtitleLangs({ wantSubs: true, subLangs: [] }, null)).toEqual(["en", "ar"]);
+    expect(subtitleLangs({ wantSubs: true, subLangs: ["de"] }, null)).toEqual(["de"]);
+  });
+});
+
+describe("nextClip", () => {
+  it("بعد آخر مقطع بطول 10%", () => expect(nextClip(100, [{ start: 0, end: 20 }])).toEqual({ start: 20, end: 30 }));
+  it("من البداية إن لم يبقَ وقت", () => expect(nextClip(100, [{ start: 0, end: 95 }])).toEqual({ start: 0, end: 10 }));
+  it("لا يتجاوز 60 ثانية", () => expect(nextClip(3600, []).end).toBe(60));
+});
+
+describe("planDownloads", () => {
+  it("رابط واحد كامل", () => {
+    const [d] = planDownloads(input());
+    expect(d.title).toBe("فيديو");
+    expect(d.request).toMatchObject({ url: "https://youtu.be/a", start: null, end: null, clips: [], stems: null, editorReady: true });
+  });
+
+  it("مقطع واحد جزئي ← start/end", () => {
+    const [d] = planDownloads(input({ clips: [{ start: 10, end: 40 }] }));
+    expect(d.request).toMatchObject({ start: 10, end: 40, clips: [] });
+  });
+
+  it("مقطع يغطي الفيديو كله ← الملف كاملًا", () => {
+    const [d] = planDownloads(input({ clips: [{ start: 0, end: 100 }] }));
+    expect(d.request).toMatchObject({ start: null, end: null });
+  });
+
+  it("عدة مقاطع: دمج أو ملفات منفصلة مع تايم لاين", () => {
+    const clips = [
+      { start: 0, end: 10 },
+      { start: 20, end: 30 },
+    ];
+    expect(planDownloads(input({ clips }))[0].request).toMatchObject({
+      clips: [
+        [0, 10],
+        [20, 30],
+      ],
+      joinClips: true,
+      timeline: false,
+    });
+    expect(planDownloads(input({ clips, joinClips: false }))[0].request).toMatchObject({ joinClips: false, timeline: true });
+    expect(planDownloads(input({ clips, joinClips: false, canTimeline: false }))[0].request.timeline).toBe(false);
+  });
+
+  it("عدة روابط: طلب لكل رابط بالرابط عنوانًا", () => {
+    const urls = ["https://a.com/1", "https://a.com/2"];
+    const plan = planDownloads(input({ urls, info: null, stems: "voice" }));
+    expect(plan.map((p) => p.title)).toEqual(urls);
+    expect(plan.every((p) => p.request.stems === "voice")).toBe(true);
+  });
+
+  it("قائمة تشغيل: المحدَّد فقط بالترتيب، في مجلد باسمها، والموسيقى من المختار", () => {
+    const entries = [0, 1, 2].map((i) => ({ url: `https://a.com/${i}`, title: `عنصر ${i}`, thumbnail: null }));
+    const plan = planDownloads(
+      input({
+        info: info({ title: "قائمتي", entries } as Partial<ProbeInfo>),
+        selected: new Set([2, 0]),
+        stems: "music",
+        stemsScope: "pick",
+        picked: new Set([2]),
+      }),
+    );
+    expect(plan.map((p) => p.title)).toEqual(["عنصر 0", "عنصر 2"]);
+    expect(plan.map((p) => p.request.stems)).toEqual([null, "music"]);
+    expect(plan[0].request.subdir).toBe("قائمتي");
+  });
+
+  it("الملف الأصلي (Drive) بلا تحويل للمونتاج", () => {
+    expect(planDownloads(input({ info: info({ original: true }) }))[0].request).toMatchObject({ original: true, editorReady: false });
+  });
+
+  it("اللقطات للفيديو فقط", () => {
+    expect(planDownloads(input({ stills: "10" }))[0].request.stills).toBe("10");
+    expect(planDownloads(input({ stills: "10", settings: { ...settings, kind: "audio" } }))[0].request.stills).toBeNull();
+  });
+});

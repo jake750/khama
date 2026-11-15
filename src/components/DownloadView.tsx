@@ -7,12 +7,12 @@ import {
   type AudioFormat,
   type DownloadRequest,
   type Kind,
-  type PlaylistEntry,
   type ProbeInfo,
   type Settings,
   type VideoFormat,
 } from "../api";
 import { extractUrls, formatDuration, isHttpUrl } from "../format";
+import { nextClip, planDownloads, scheduledAt, type Stills } from "../downloadPlan";
 import { useI18n } from "../i18n";
 import { ErrorBox, type ErrorFix } from "./ErrorBox";
 import { Icon } from "./Icon";
@@ -26,8 +26,6 @@ import { FolderPicker } from "./FolderPicker";
 const QUALITIES = ["best", "2160", "1440", "1080", "720", "480"] as const;
 
 type ProbeState = { status: "idle" } | { status: "loading" } | { status: "ok"; info: ProbeInfo } | { status: "error"; error: AppError };
-
-type Stills = "off" | "5" | "10" | "scene";
 
 /** آخر رابط لصقناه تلقائيًا من الحافظة: لا نلصقه مرة ثانية بعد أن يمسحه المستخدم */
 let lastAutoPasted = "";
@@ -190,8 +188,6 @@ export function DownloadView(props: {
   // العناصر المحدَّدة التي ستُزال منها الموسيقى
   const stemsCount = !entries || !stemsOn ? 0 : stemsScope === "all" ? selected.size : [...picked].filter((i) => selected.has(i)).length;
   const multi = !!activeClips && activeClips.length > 1;
-  const single = activeClips?.length === 1 ? activeClips[0] : null;
-  const isPartial = !!single && !!duration && (single.start > 0 || single.end < duration - 0.05);
   // الدمج يحتاج ffmpeg على الكمبيوتر؛ على الهاتف تُحفظ المقاطع ملفات منفصلة
   const willJoin = multi && joinClips;
   const original = !!info?.original;
@@ -200,15 +196,6 @@ export function DownloadView(props: {
   // لغات الترجمة لهذا الفيديو: المختارة سابقًا إن توفرت، وإلا الأولى
   const available = info?.subtitles ?? [];
   const chosenSubs = info ? available.filter((l) => s.subLangs.includes(l.code)).map((l) => l.code) : s.subLangs;
-  const subsForRequest = !s.wantSubs
-    ? []
-    : info && !entries
-      ? chosenSubs.length
-        ? chosenSubs
-        : available.slice(0, 1).map((l) => l.code)
-      : s.subLangs.length
-        ? s.subLangs
-        : ["en", "ar"];
   const toggleLang = (code: string) =>
     update({ subLangs: s.subLangs.includes(code) ? s.subLangs.filter((c) => c !== code) : [...s.subLangs, code] });
 
@@ -226,11 +213,7 @@ export function DownloadView(props: {
   const removeClip = (i: number) => setClips((activeClips ?? []).filter((_, j) => j !== i));
   function addClip() {
     if (!duration || !activeClips) return;
-    // المقطع الجديد يبدأ بعد آخر مقطع (أو من البداية إن لم يبقَ وقت)، بطول 10% من الفيديو
-    const len = Math.max(Math.min(duration / 10, 60), Math.min(1, duration));
-    const lastEnd = Math.max(...activeClips.map((c) => c.end));
-    const start = lastEnd + len <= duration ? lastEnd : 0;
-    setClips([...activeClips, { start, end: Math.min(start + len, duration) }]);
+    setClips([...activeClips, nextClip(duration, activeClips)]);
   }
 
   async function paste() {
@@ -275,100 +258,41 @@ export function DownloadView(props: {
     }
   }
 
-  /** وقت البدء المجدول (اليوم، أو غدًا إن مضى الوقت) */
-  function scheduledAt(): number | undefined {
-    if (when !== "later") return undefined;
-    const [h, m] = atTime.split(":").map(Number);
-    const d = new Date();
-    d.setHours(h || 0, m || 0, 0, 0);
-    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
-    return d.getTime();
-  }
-
-  /** الخيارات المشتركة لكل تنزيل */
-  const base = (u: string, opts?: { original?: boolean }): DownloadRequest => ({
-    url: u,
-    kind: s.kind,
-    videoFormat: s.videoFormat,
-    audioFormat: s.audioFormat,
-    quality: s.quality,
-    editorReady: s.editorReady && !opts?.original,
-    start: null,
-    end: null,
-    stems: null,
-    clips: [],
-    joinClips: false,
-    subs: subsForRequest,
-    thumbnail: s.wantThumb,
-    infoFile: s.wantInfo,
-    stills: stills !== "off" && s.kind === "video" ? stills : null,
-    original: !!opts?.original,
-  });
-
-  /** قائمة تشغيل: عملية تنزيل لكل عنصر محدَّد (Rust يشغّل 3 معًا والباقي ينتظر) */
-  async function startPlaylist(list: PlaylistEntry[], folder: string, at?: number) {
-    let firstError: AppError | null = null;
-    for (const i of [...selected].sort((a, b) => a - b)) {
-      const e = list[i];
-      if (!e) continue;
-      const removeHere = stemsOn && (stemsScope === "all" || picked.has(i));
-      try {
-        await props.onStart(
-          { ...base(e.url, { original }), stems: removeHere ? (stems as "voice" | "music") : null, subdir: folder },
-          { title: e.title, thumbnail: e.thumbnail },
-          at,
-        );
-      } catch (err) {
-        firstError ??= asAppError(err);
-      }
-    }
-    if (firstError) throw firstError;
-  }
-
   async function start() {
     const clean = url.trim();
     if (starting || (!multiLinks && !isHttpUrl(clean))) return;
     if (entries && selected.size === 0) return;
     setStarting(true);
     setStartError(null);
-    const at = scheduledAt();
-    try {
-      if (multiLinks) {
-        // عدة روابط: كل رابط عملية مستقلة بنفس الخيارات (العنوان يظهر حين يبدأ)
-        let firstError: AppError | null = null;
-        for (const u of urls) {
-          try {
-            await props.onStart({ ...base(u), stems: stemsOn ? (stems as "voice" | "music") : null }, { title: u }, at);
-          } catch (e) {
-            firstError ??= asAppError(e);
-          }
-        }
-        if (firstError) throw firstError;
-      } else if (entries && info) {
-        await startPlaylist(entries, info.title, at);
-      } else {
-        await props.onStart(
-          {
-            ...base(clean, { original }),
-            start: isPartial ? single!.start : null,
-            end: isPartial ? single!.end : null,
-            stems: stemsOn ? (stems as "voice" | "music") : null,
-            clips: multi ? activeClips!.map((c) => [c.start, c.end] as [number, number]) : [],
-            joinClips: willJoin,
-            timeline: multi && !willJoin && !isMobile && s.kind === "video" && timeline,
-          },
-          { title: info?.title ?? clean, thumbnail: info?.thumbnail },
-          at,
-        );
+    const at = scheduledAt(when, atTime);
+    const plan = planDownloads({
+      settings: s,
+      urls: multiLinks ? urls : [clean],
+      info,
+      stills,
+      stems,
+      selected,
+      stemsScope,
+      picked,
+      clips: activeClips,
+      joinClips,
+      timeline,
+      canTimeline: !isMobile,
+    });
+    // كل طلب يُرسل حتى لو فشل غيره؛ نعرض أول خطأ
+    let firstError: AppError | null = null;
+    for (const d of plan) {
+      try {
+        await props.onStart(d.request, { title: d.title, thumbnail: d.thumbnail }, at);
+      } catch (e) {
+        firstError ??= asAppError(e);
       }
-      setUrl("");
-      setAutoPasted(false);
-      setTrimOn(false);
-    } catch (e) {
-      setStartError(asAppError(e));
-    } finally {
-      setStarting(false);
     }
+    setStarting(false);
+    if (firstError) return setStartError(firstError);
+    setUrl("");
+    setAutoPasted(false);
+    setTrimOn(false);
   }
 
   const qualityLabel = (q: string) => (q === "best" ? t.best : q === "2160" ? "4K" : `${q}p`);
