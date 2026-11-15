@@ -365,7 +365,7 @@ export function DownloadView(props: {
 
   return (
     <div className="card download-card">
-      <div className="hero">
+      <div className="hero motif">
         <div className="card-head">
           <h2>{t.pasteTitle}</h2>
           <p className="faint">{t.pasteSub}</p>

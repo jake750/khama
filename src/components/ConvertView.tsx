@@ -413,7 +413,7 @@ export function ConvertView(props: {
   // ============ بلا ملفات: منطقة الإفلات ============
   if (files.length === 0) {
     return (
-      <div className={`card dropzone ${props.dragging ? "over" : ""}`}>
+      <div className={`card dropzone motif ${props.dragging ? "over" : ""}`}>
         <div className="drop-icon">
           <Icon name="convert" size={24} />
         </div>
