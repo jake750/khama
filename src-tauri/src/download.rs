@@ -88,6 +88,7 @@ pub struct DownloadRequest {
     pub join_clips: bool,
     /// مجلد فرعي داخل مجلد الحفظ (اسم قائمة التشغيل). على الكمبيوتر فقط
     #[serde(default)]
+    #[cfg_attr(mobile, allow(dead_code))]
     pub subdir: Option<String>,
     /// لغات الترجمة المطلوبة (SRT بجانب الملف). فارغ = بلا ترجمة
     #[serde(default)]
@@ -103,6 +104,7 @@ pub struct DownloadRequest {
     pub stills: Option<String>,
     /// مع مقاطع منفصلة: ملف تايم لاين XML يفتح في Premiere و DaVinci. الكمبيوتر فقط
     #[serde(default)]
+    #[cfg_attr(mobile, allow(dead_code))]
     pub timeline: bool,
     /// الملف الأصلي كما هو بلا تحويل صيغة (ملفات Google Drive مثلًا)
     #[serde(default)]
@@ -1022,6 +1024,7 @@ async fn write_timeline(tools: &Tools, clips: &[(PathBuf, (f64, f64))]) -> Resul
     Ok(())
 }
 
+#[cfg(desktop)]
 fn xml_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -1030,6 +1033,7 @@ fn xml_escape(s: &str) -> String {
 }
 
 /// مسار ملف بصيغة file:// (المسافات والرموز مرمّزة)
+#[cfg(desktop)]
 fn file_url(p: &Path) -> String {
     let s = p.to_string_lossy().replace('\\', "/");
     let mut out = String::from(if s.starts_with('/') {
@@ -1046,6 +1050,7 @@ fn file_url(p: &Path) -> String {
     out
 }
 
+#[cfg(desktop)]
 pub fn timeline_xml(clips: &[(PathBuf, (f64, f64))], durations: &[f64], fps: f64, width: u64, height: u64) -> String {
     // timebase عدد صحيح؛ 29.97 و 23.976 تُكتب 30 و 24 مع ntsc=TRUE
     let ntsc = (fps.round() - fps).abs() > 0.01;
@@ -1257,6 +1262,7 @@ async fn finish(
 }
 
 /// النقل إلى مجلد المستخدم (وعلى الهاتف: إلى Download/Khama العام)
+#[cfg_attr(mobile, allow(clippy::needless_return))]
 async fn deliver(app: &AppHandle, file: &Path, final_dir: &Path) -> Result<PathBuf, AppError> {
     let done = move_into(file, final_dir).await?;
     #[cfg(mobile)]

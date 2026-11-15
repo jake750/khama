@@ -202,6 +202,7 @@ pub fn parse_spotify_page(html: &str) -> Result<SpotifyList, AppError> {
 // ======================= اسم مجلد القائمة =======================
 
 /// اسم القائمة → اسم مجلد صالح على كل الأنظمة (أو None إن لم يبقَ منه شيء)
+#[cfg(desktop)]
 pub fn folder_name(name: &str) -> Option<String> {
     let cleaned: String = name
         .chars()

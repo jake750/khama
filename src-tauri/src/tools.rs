@@ -58,6 +58,7 @@ fn managed_ytdlp(app: &AppHandle) -> Result<PathBuf, AppError> {
     Ok(dir.join(format!("yt-dlp{EXE}")))
 }
 
+#[cfg(desktop)]
 fn missing(name: &str, path: &Path) -> AppError {
     AppError::with_param("toolMissing", name, path.display().to_string())
 }

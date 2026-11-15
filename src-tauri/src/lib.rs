@@ -1,8 +1,5 @@
 //! نقطة دخول التطبيق: نسجّل الإضافات والحالة المشتركة والأوامر التي تستدعيها الواجهة.
 
-// نسخة الهاتف تستعمل جزءًا من محرّك الكمبيوتر فقط (لا ffprobe ولا إزالة موسيقى بعد)
-#![cfg_attr(mobile, allow(dead_code, unused_mut))]
-
 #[cfg(desktop)]
 mod background;
 mod convert;
@@ -69,64 +66,45 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
+/// قائمة الأوامر مرة واحدة: المشتركة بين الكمبيوتر والهاتف، وبعدها أوامر خاصة بالمنصة.
+macro_rules! handlers_with {
+    ($($m:ident :: $f:ident),* $(,)?) => {
+        tauri::generate_handler![
+            settings::get_settings,
+            settings::save_settings,
+            settings::default_output_dir,
+            settings::has_saved_cookies,
+            settings::save_cookies,
+            settings::delete_cookies,
+            tools::tools_info,
+            tools::update_ytdlp,
+            download::probe,
+            download::start_download,
+            download::cancel_download,
+            download::reveal_file,
+            download::open_output_dir,
+            download::save_thumbnail,
+            history::get_history,
+            history::add_history,
+            history::remove_history,
+            history::clear_history,
+            history::get_scheduled,
+            history::save_scheduled,
+            convert::analyze_file,
+            convert::hw_encoders,
+            convert::start_convert,
+            convert::import_files,
+            $($m::$f),*
+        ]
+    };
+}
+
 #[cfg(desktop)]
 fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
-    tauri::generate_handler![
-        settings::get_settings,
-        settings::save_settings,
-        settings::default_output_dir,
-        settings::has_saved_cookies,
-        settings::save_cookies,
-        settings::delete_cookies,
-        tools::tools_info,
-        tools::update_ytdlp,
-        download::probe,
-        download::start_download,
-        download::cancel_download,
-        download::reveal_file,
-        download::open_output_dir,
-        download::save_thumbnail,
-        history::get_history,
-        history::add_history,
-        history::remove_history,
-        history::clear_history,
-        history::get_scheduled,
-        history::save_scheduled,
-        background::quit_app,
-        background::set_compact,
-        convert::analyze_file,
-        convert::hw_encoders,
-        convert::start_convert,
-        convert::import_files,
-    ]
+    handlers_with![background::quit_app, background::set_compact]
 }
 
 #[cfg(mobile)]
 fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
-    tauri::generate_handler![
-        settings::get_settings,
-        settings::save_settings,
-        settings::default_output_dir,
-        settings::has_saved_cookies,
-        settings::save_cookies,
-        settings::delete_cookies,
-        tools::tools_info,
-        tools::update_ytdlp,
-        download::probe,
-        download::start_download,
-        download::cancel_download,
-        download::reveal_file,
-        download::open_output_dir,
-        download::save_thumbnail,
-        history::get_history,
-        history::add_history,
-        history::remove_history,
-        history::clear_history,
-        history::get_scheduled,
-        history::save_scheduled,
-        convert::analyze_file,
-        convert::hw_encoders,
-        convert::start_convert,
-        convert::import_files,
-    ]
+    handlers_with![]
 }

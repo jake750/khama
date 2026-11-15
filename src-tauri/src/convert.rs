@@ -1762,6 +1762,7 @@ async fn deliver(app: &AppHandle, dest: PathBuf) -> Result<PathBuf, AppError> {
 
 /// ملفات اختارها المستخدم: على الهاتف تأتي كروابط content:// فننسخها داخل التطبيق أولًا
 #[tauri::command]
+#[cfg_attr(mobile, allow(clippy::needless_return))]
 pub async fn import_files(app: AppHandle, paths: Vec<String>) -> Result<Vec<String>, AppError> {
     #[cfg(mobile)]
     {
@@ -2158,11 +2159,13 @@ mod real {
 
 // ======================= المجلدات المراقَبة =======================
 
+#[cfg(desktop)]
 const MEDIA_EXT: &[&str] = &[
     "mp4", "mov", "mkv", "avi", "mxf", "m4v", "webm", "mts", "m2ts", "wmv", "flv", "3gp", "mpg", "mpeg", "wav", "mp3", "m4a", "aac",
     "flac", "ogg", "opus", "aiff", "aif",
 ];
 
+#[cfg(desktop)]
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WatchHit {
@@ -2173,10 +2176,12 @@ struct WatchHit {
 }
 
 /// مجلد فرعي يُكتب فيه الناتج (حتى لا يلتقطه المراقب مرة أخرى)
+#[cfg(desktop)]
 pub const WATCH_OUT: &str = "Converted";
 
 /// يفحص المجلدات المراقَبة كل 4 ثوانٍ. الملف الجديد يُحوَّل بعد أن يثبت حجمه
 /// (أي انتهى نسخه إلى المجلد). الملفات الموجودة قبل بدء المراقبة لا تُلمس.
+#[cfg(desktop)]
 pub fn spawn_watcher(app: AppHandle) {
     use std::collections::{HashMap, HashSet};
     use tauri::Emitter;

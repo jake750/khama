@@ -101,6 +101,7 @@ const RUNTIME: Option<Asset> = Some(Asset {
     target_os = "macos",
     all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64"))
 )))]
+#[cfg_attr(mobile, allow(dead_code))]
 const RUNTIME: Option<Asset> = None;
 
 /// تنزيل واحد في كل مرة (لو بدأ المستخدم عمليتين معًا)
