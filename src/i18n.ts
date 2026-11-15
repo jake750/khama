@@ -7,6 +7,11 @@ import type { AppError } from "./api";
 export type Lang = "en" | "ar";
 
 const arRules = new Intl.PluralRules("ar");
+
+/** سياسة الأرقام (D-49، T-68): أرقام لاتينية 0-9 في كل الواجهة، حتى العربية، لأن الكود الزمني
+ * وأدوات المونتاج بها. التواريخ والأوقات تمرّ بهذه اللغة ليبقى ترتيبها عربيًا وأرقامها لاتينية.
+ * الإدخال يقبل الأرقام الهندية والفارسية (parseTime). */
+export const numLocale = (lang: string) => `${lang}-u-nu-latn`;
 type ArForms = { zero?: string; one: string; two: string; few: string; many: string; other: string };
 
 /**

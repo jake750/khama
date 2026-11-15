@@ -65,13 +65,20 @@ function trimUrlTail(url: string): string {
   }
 }
 
-/** "1:15" أو "1:02:05" أو "75" أو "1:15.5" ← ثوانٍ. نص غير صالح ← null */
-export function parseTime(text: string): number | null {
+/** "1:15" أو "1:02:05" أو "75" أو "1:15.5" ← ثوانٍ. ومع fps يُقبل أيضًا HH:MM:SS:FF (U-16). نص غير صالح ← null */
+export function parseTime(text: string, fps?: number | null): number | null {
   const parts = text
     .trim()
     .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
     .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
     .split(":");
+  if (parts.length === 4 && fps) {
+    // HH:MM:SS:FF كما في برامج المونتاج
+    const n = Math.round(fps);
+    const [h, m, s, f] = parts;
+    if (![h, m, s, f].every((p) => /^\d+$/.test(p)) || Number(m) >= 60 || Number(s) >= 60 || Number(f) >= n) return null;
+    return Number(h) * 3600 + Number(m) * 60 + Number(s) + Number(f) / fps;
+  }
   if (parts.length > 3) return null;
   const last = parts.length - 1;
   // الكسر مسموح في الجزء الأخير فقط، والدقائق والثواني بعد الجزء الأول أقل من 60
@@ -79,8 +86,20 @@ export function parseTime(text: string): number | null {
   return valid ? parts.reduce((acc, p) => acc * 60 + Number(p), 0) : null;
 }
 
-/** مثل formatDuration لكن يُبقي أجزاء الثانية إن وُجدت: 75.5 ← "1:15.5" */
-export function formatTimecode(sec: number): string {
+/** مثل formatDuration لكن يُبقي أجزاء الثانية إن وُجدت: 75.5 ← "1:15.5".
+ * ومع fps: كود زمني كامل بالإطارات 75.5 @ 24 ← "00:01:15:12" (U-16) */
+export function formatTimecode(sec: number, fps?: number | null): string {
+  if (fps) {
+    const n = Math.round(fps);
+    let whole = Math.floor(Math.max(0, sec) + 1e-6);
+    let ff = Math.round((Math.max(0, sec) - whole) * fps);
+    if (ff >= n) {
+      whole += 1;
+      ff = 0;
+    }
+    const p = (v: number) => String(v).padStart(2, "0");
+    return `${p(Math.floor(whole / 3600))}:${p(Math.floor(whole / 60) % 60)}:${p(whole % 60)}:${p(ff)}`;
+  }
   // التقريب إلى أعشار الثانية أولًا حتى لا يظهر 59.96 كـ "0:59.10"
   const tenths = Math.max(0, Math.round(sec * 10));
   const frac = tenths % 10;

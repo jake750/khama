@@ -15,14 +15,14 @@ export interface PreviewLink {
 }
 
 /** حقل وقت: يقبل الكتابة الحرة ويطبّق القيمة عند الخروج أو Enter */
-function TimeField(props: { label: string; value: number; onCommit: (v: number) => void }) {
-  const [text, setText] = useState(formatTimecode(props.value));
-  useEffect(() => setText(formatTimecode(props.value)), [props.value]);
+function TimeField(props: { label: string; value: number; fps?: number | null; onCommit: (v: number) => void }) {
+  const [text, setText] = useState(formatTimecode(props.value, props.fps));
+  useEffect(() => setText(formatTimecode(props.value, props.fps)), [props.value, props.fps]);
   const commit = () => {
-    const v = parseTime(text);
+    const v = parseTime(text, props.fps);
     if (v != null) props.onCommit(v);
     // نعيد عرض القيمة الفعلية: إن رُفضت القيمة أو عُدّلت، لا يبقى في الحقل رقم لا يطابق الشريط
-    setText(formatTimecode(props.value));
+    setText(formatTimecode(props.value, props.fps));
   };
   return (
     <label className="time-field">
@@ -44,10 +44,17 @@ function TimeField(props: { label: string; value: number; onCommit: (v: number) 
  * شريط اختيار جزء من المدة بمقبضين.
  * الشريط دائمًا من اليسار لليمين (خط الزمن)، حتى في الواجهة العربية.
  */
-export function TrimRange(props: { duration: number; value: Range; onChange: (r: Range) => void; preview?: PreviewLink | null }) {
+export function TrimRange(props: {
+  duration: number;
+  value: Range;
+  onChange: (r: Range) => void;
+  preview?: PreviewLink | null;
+  /** معدل الإطارات إن عُرف: الحقول بكود زمني HH:MM:SS:FF والخطوة إطار واحد (U-16) */
+  fps?: number | null;
+}) {
   const { t } = useI18n();
   const { duration: d, value: r } = props;
-  const step = d > 600 ? 1 : 0.1;
+  const step = props.fps ? 1 / props.fps : d > 600 ? 1 : 0.1;
   const minGap = Math.min(1, d / 10);
   const set = (start: number, end: number) => {
     start = Math.max(0, Math.min(start, d));
@@ -99,12 +106,12 @@ export function TrimRange(props: { duration: number; value: Range; onChange: (r:
         />
       </div>
       <div className="trim-fields">
-        <TimeField label={t.trimStart} value={r.start} onCommit={typeStart} />
+        <TimeField label={t.trimStart} value={r.start} fps={props.fps} onCommit={typeStart} />
         <div className="trim-length">
           <span className="field-label">{t.trimLength}</span>
           <span className="ltr">{formatDuration(r.end - r.start)}</span>
         </div>
-        <TimeField label={t.trimEnd} value={r.end} onCommit={typeEnd} />
+        <TimeField label={t.trimEnd} value={r.end} fps={props.fps} onCommit={typeEnd} />
       </div>
       {props.preview && (
         <div className="trim-here">

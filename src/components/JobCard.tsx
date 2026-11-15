@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import type { AppError, ConvertRequest, DownloadRequest, JobState, JobUpdate } from "../api";
 import { formatDuration, formatEta, formatSpeed, formatTimecode } from "../format";
-import { useI18n, type Dict } from "../i18n";
+import { numLocale, useI18n, type Dict } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
 import { Icon } from "./Icon";
 import { MoreMenu, type MenuItem } from "./MoreMenu";
@@ -44,10 +44,10 @@ export function mergeUpdate(j: Job, u: JobUpdate): Job {
 const ACTIVE: JobState[] = ["queued", "starting", "analyzing", "downloading", "processing", "preparing", "separating", "converting"];
 export const isActive = (j: Job) => ACTIVE.includes(j.state);
 
-function statusText(t: Dict, j: Job): string {
+function statusText(t: Dict, j: Job, lang: string): string {
   switch (j.state) {
     case "scheduled":
-      return t.stScheduled(new Date(j.at ?? 0).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      return t.stScheduled(new Date(j.at ?? 0).toLocaleTimeString(numLocale(lang), { hour: "2-digit", minute: "2-digit" }));
     case "queued":
       return t.stQueued;
     case "starting":
@@ -85,7 +85,7 @@ export function JobCard(props: {
   /** سحب الملف المكتمل إلى برنامج آخر (الكمبيوتر فقط) */
   onDragOut?: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const j = props.job;
   const active = isActive(j);
   // نسبة مجهولة (انتظار/تحضير/معالجة) ← شريط متحرك بدل رقم
@@ -147,11 +147,11 @@ export function JobCard(props: {
       </div>
 
       <div className="job-body">
-        <div className="job-title" title={j.title}>
+        <div className="job-title" dir="auto" title={j.title}>
           {j.state === "done" && fileName ? fileName : j.title}
         </div>
         <div className="job-meta">
-          <span>{statusText(t, j)}</span>
+          <span>{statusText(t, j, lang)}</span>
           {active && j.percent != null && !indeterminate && <span className="ltr">{j.percent.toFixed(1)}%</span>}
           {j.state === "downloading" && j.speed != null && <span>{formatSpeed(t, j.speed)}</span>}
           {(j.state === "downloading" || j.state === "converting") && j.eta != null && <span>{formatEta(t, j.eta)}</span>}

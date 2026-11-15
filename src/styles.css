@@ -3710,3 +3710,30 @@ button.menu-item:hover {
   text-underline-offset: 3px;
   cursor: pointer;
 }
+
+/* =====================================================================
+   العربية والأرقام (القسم 8 من مقترح التصميم)
+   ===================================================================== */
+/* الأجزاء اللاتينية (صيغ، أسماء ملفات، أرقام بوحدات) معزولة عن الجملة العربية حولها،
+   فلا تنقلب «MP4 · 1080p» ولا تقفز النقطة إلى طرف السطر (D-8) */
+.ltr,
+.ltr-num,
+.job-meta > span,
+.specs dd,
+.chip,
+bdi {
+  unicode-bidi: isolate;
+}
+.ltr {
+  direction: ltr;
+}
+/* العنوان يأخذ اتجاهه من حروفه، لكن محاذاته تتبع الصفحة فتبقى القائمة مصطفّة */
+[dir="auto"] {
+  unicode-bidi: plaintext;
+}
+:root[dir="rtl"] [dir="auto"] {
+  text-align: right;
+}
+:root[dir="ltr"] [dir="auto"] {
+  text-align: left;
+}

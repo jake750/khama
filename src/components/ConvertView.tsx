@@ -458,7 +458,7 @@ export function ConvertView(props: {
                 </div>
               )}
               <div className="file-body">
-                <div className="file-name" title={f.path}>
+                <div className="file-name" dir="auto" title={f.path}>
                   {baseName(f.path)}
                 </div>
                 {f.info ? <Specs m={f.info} /> : f.error ? null : <div className="faint">{t.analyzingFile}</div>}
@@ -595,6 +595,7 @@ export function ConvertView(props: {
                     <div>
                       <TrimRange
                         duration={single!.duration!}
+                        fps={single!.video?.fps}
                         value={{ start: opts.start ?? 0, end: opts.end ?? single!.duration! }}
                         onChange={(r) => set({ start: r.start, end: r.end })}
                       />

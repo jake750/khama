@@ -2,7 +2,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { Toast } from "../toast";
 import { useEffect, useMemo, useState } from "react";
 import { api, type HistoryEntry } from "../api";
-import { useI18n } from "../i18n";
+import { numLocale, useI18n } from "../i18n";
 import { isMobile } from "../platform";
 import { Icon } from "./Icon";
 import { logError } from "../log";
@@ -12,12 +12,12 @@ function dayLabel(lang: string, ms: number): string {
   const d = new Date(ms);
   const today = new Date();
   const days = Math.round((new Date(today.toDateString()).getTime() - new Date(d.toDateString()).getTime()) / 86_400_000);
-  const rtf = new Intl.RelativeTimeFormat(lang, { numeric: "auto" });
+  const rtf = new Intl.RelativeTimeFormat(numLocale(lang), { numeric: "auto" });
   if (days <= 1) {
     const s = rtf.format(-days, "day");
     return s.charAt(0).toLocaleUpperCase(lang) + s.slice(1);
   }
-  return d.toLocaleDateString(lang, {
+  return d.toLocaleDateString(numLocale(lang), {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -139,11 +139,11 @@ export function HistoryView(props: {
                   </div>
                 )}
                 <div className="history-body">
-                  <div className="job-title" title={e.title}>
+                  <div className="job-title" dir="auto" title={e.title}>
                     {e.title}
                   </div>
                   <div className="job-meta">
-                    <span>{new Date(e.date).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" })}</span>
+                    <span>{new Date(e.date).toLocaleTimeString(numLocale(lang), { hour: "2-digit", minute: "2-digit" })}</span>
                     <span className="faint">{e.meta}</span>
                     {!e.exists && !isMobile && (
                       <span className="missing-tag">

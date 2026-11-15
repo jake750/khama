@@ -24,6 +24,20 @@ describe("formatDuration", () => {
   });
 });
 
+describe("frame timecode (U-16)", () => {
+  it("formats HH:MM:SS:FF when fps is known", () => {
+    expect(formatTimecode(75.5, 24)).toBe("00:01:15:12");
+    expect(formatTimecode(3661, 25)).toBe("01:01:01:00");
+    expect(formatTimecode(1.999, 30)).toBe("00:00:02:00");
+  });
+  it("parses HH:MM:SS:FF and rejects frames past the rate", () => {
+    expect(parseTime("00:01:15:12", 24)).toBe(75.5);
+    expect(parseTime("00:00:01:25", 25)).toBeNull();
+    expect(parseTime("00:00:01:12")).toBeNull();
+    expect(parseTime("1:15", 24)).toBe(75);
+  });
+});
+
 describe("parseTime", () => {
   it("الصيغ الصالحة", () => {
     expect(parseTime("75")).toBe(75);
