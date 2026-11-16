@@ -102,6 +102,7 @@ jobs:
 
       - name: Rust unit tests
         if: matrix.target != 'x86_64-apple-darwin'
+        timeout-minutes: 20
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0

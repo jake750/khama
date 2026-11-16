@@ -19,7 +19,14 @@ pub(crate) async fn kill_tree(child: &mut Child) {
         }
         #[cfg(unix)]
         {
-            let _ = Command::new("kill").args(["-KILL", &format!("-{pid}")]).status().await;
+            // نداء النظام مباشرة لا أمر kill: نسخة procps على Linux تقرأ «-1234» خيارات
+            // رقمًا رقمًا فتنفّذ kill(-1) وتقتل كل عمليات المستخدم (وكانت تُسقط مشغّل CI).
+            // العملية قائدة مجموعتها (tools::command يضع process_group(0))، فالمجموعة = pid
+            if let Ok(pgid) = libc::pid_t::try_from(pid) {
+                if pgid > 1 {
+                    unsafe { libc::killpg(pgid, libc::SIGKILL) };
+                }
+            }
         }
     }
     let _ = child.start_kill();
