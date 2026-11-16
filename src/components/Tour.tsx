@@ -34,7 +34,7 @@ function findVisible(selector: string): HTMLElement | null {
  * الرسم يغني عن وجود فيديو أو قائمة عند أول فتح.
  */
 export function Tour<Tab extends string>(props: { steps: TourStep<Tab>[]; onTab: (tab: Tab) => void; onClose: () => void }) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const [idx, setIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
   const [searching, setSearching] = useState(true);
@@ -129,8 +129,8 @@ export function Tour<Tab extends string>(props: { steps: TourStep<Tab>[]; onTab:
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       // الأسهم تتبع اتجاه القراءة
-      const fwd = lang === "ar" ? "ArrowLeft" : "ArrowRight";
-      const back = lang === "ar" ? "ArrowRight" : "ArrowLeft";
+      const fwd = "ArrowLeft";
+      const back = "ArrowRight";
       if (e.key === fwd) go(1);
       if (e.key === back) go(-1);
     };

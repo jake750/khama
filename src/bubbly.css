@@ -438,3 +438,70 @@ details[open]::details-content {
 details.extras > summary > svg:last-child {
   transition: transform var(--d-bounce) var(--m-bounce);
 }
+
+/* ---------- تبديل الثيم: دائرة تكبر من مكان الضغط ----------
+   الثيم القديم لقطة ثابتة تحتها، والجديد ينكشف داخل الدائرة.
+   المدة أطول من باقي الحركات عمدًا: الدائرة تقطع الشاشة كلها ويجب أن تُرى وهي تكبر. */
+:root {
+  --d-theme: 700ms;
+  --m-theme: cubic-bezier(0.45, 0, 0.15, 1);
+}
+
+@keyframes theme-reveal {
+  from {
+    clip-path: circle(0 at var(--theme-x) var(--theme-y));
+  }
+  to {
+    clip-path: circle(var(--theme-r) at var(--theme-x) var(--theme-y));
+  }
+}
+
+:root[data-theme-switch]::view-transition-old(root),
+:root[data-theme-switch]::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+:root[data-theme-switch]::view-transition-new(root) {
+  animation: theme-reveal var(--d-theme) var(--m-theme) both;
+}
+
+/* الألوان لا تنتقل وحدها أثناء الكشف، وإلا ظهرت داخل الدائرة ألوان نصفها قديم */
+:root[data-theme-switch] *,
+:root[data-theme-switch] *::before,
+:root[data-theme-switch] *::after {
+  transition: none !important;
+}
+
+/* أيقونة الشمس/القمر تدور وتظهر بارتداد */
+@keyframes theme-icon-in {
+  0% {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.5);
+  }
+  60% {
+    opacity: 1;
+    transform: rotate(8deg) scale(1.12);
+  }
+}
+
+.theme-icon {
+  display: grid;
+  animation: theme-icon-in var(--d-bounce) var(--ease-out);
+}
+
+/* ---------- اللغة الإنجليزية: النصوص فقط تتغيّر ----------
+   التخطيط يبقى من اليمين لليسار، وكل نص يُرتَّب حسب لغته (فلا تقفز النقطة إلى أول الجملة)
+   ويبقى محاذيًا إلى الجهة نفسها التي كان فيها بالعربية. */
+:root[lang="en"] * {
+  unicode-bidi: plaintext;
+}
+
+:root[lang="en"] body,
+:root[lang="en"] :is(.guide-row, .menu-item, .settings-nav button, .preset, .more-menu-list button) {
+  text-align: right;
+}
+
+:root[lang="en"] .trim-fields .time-field:last-child {
+  text-align: left;
+}

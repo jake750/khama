@@ -17,7 +17,7 @@ import { Tour, Welcome, type TourStep } from "./components/Tour";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { formatTimecode } from "./format";
 import { dictionaries, I18n, type Dict } from "./i18n";
-import { AnimatedList, Presence, SlideSwitch, usePresence, useSlidingIndicator } from "./motion";
+import { AnimatedList, Presence, reducedMotion, SlideSwitch, usePresence, useSlidingIndicator } from "./motion";
 import { isMobile } from "./platform";
 import type { Toast, ToastAction } from "./toast";
 import { presetById } from "./presets";
@@ -35,9 +35,39 @@ function useTheme(theme: Settings["theme"] | undefined): "dark" | "light" {
     return () => media.removeEventListener("change", onChange);
   }, [media]);
   const resolved = theme === "system" || !theme ? (systemLight ? "light" : "dark") : theme;
-  // تبديل الثيم فوري: التلاشي البطيء كان يُظهر ألوانًا نصفها قديم (D-79)
+  // تبديل الثيم: دائرة تكبر من مكان الضغط وتكشف الثيم الجديد (bubbly.css).
+  // الثيمان لقطتان كاملتان، فلا تظهر ألوان نصفها قديم كما في التلاشي (D-79)
+  const lastPress = useRef<{ x: number; y: number; at: number } | null>(null);
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", resolved);
+    const onDown = (e: PointerEvent) => (lastPress.current = { x: e.clientX, y: e.clientY, at: performance.now() });
+    window.addEventListener("pointerdown", onDown, true);
+    return () => window.removeEventListener("pointerdown", onDown, true);
+  }, []);
+  const switching = useRef(0);
+  useEffect(() => {
+    const root = document.documentElement;
+    const apply = () => root.setAttribute("data-theme", resolved);
+    const from = root.getAttribute("data-theme");
+    if (!from || from === resolved || reducedMotion() || !document.startViewTransition) return apply();
+    // من مكان آخر ضغطة إن كانت للتوّ، وإلا من وسط الشاشة (اختصار، أو تغيّر ثيم النظام)
+    const p = lastPress.current;
+    const recent = p && performance.now() - p.at < 1500;
+    const x = recent ? p.x : window.innerWidth / 2;
+    const y = recent ? p.y : window.innerHeight / 2;
+    const r = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+    root.style.setProperty("--theme-x", `${x}px`);
+    root.style.setProperty("--theme-y", `${y}px`);
+    root.style.setProperty("--theme-r", `${Math.ceil(r)}px`);
+    root.dataset.themeSwitch = "";
+    const id = ++switching.current;
+    // إن تُخطّي الانتقال (النافذة مخفية مثلًا) يُطبَّق الثيم فورًا، ولا نريد خطأً في السجل
+    const vt = document.startViewTransition(apply);
+    vt.ready.catch(() => {});
+    vt.finished
+      .catch(() => {})
+      .then(() => {
+        if (switching.current === id) delete root.dataset.themeSwitch;
+      });
   }, [resolved]);
   return resolved;
 }
@@ -131,10 +161,11 @@ export default function App() {
   const tabsRef = useRef<HTMLElement>(null);
   const tabPill = useSlidingIndicator(tabsRef, '.tab[aria-current="page"]', `${tab}|${lang}|${compact}`);
 
-  // اللغة تحدد اتجاه الصفحة: العربية من اليمين لليسار
+  // تغيير اللغة يغيّر النصوص فقط: أماكن العناصر ثابتة (تخطيط من اليمين لليسار دائمًا)،
+  // والنص الإنجليزي يُرتَّب داخل مكانه من اليسار لليمين (bubbly.css)
   useEffect(() => {
     document.documentElement.lang = lang;
-    document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+    document.documentElement.dir = "rtl";
     document.title = t.appName;
   }, [lang, t]);
 
@@ -648,7 +679,9 @@ export default function App() {
               aria-label={resolvedTheme === "light" ? t.themeNowLight : t.themeNowDark}
               onClick={() => update({ theme: resolvedTheme === "light" ? "dark" : "light" })}
             >
-              <Icon name={resolvedTheme === "light" ? "sun" : "moon"} size={20} />
+              <span className="theme-icon" key={resolvedTheme}>
+                <Icon name={resolvedTheme === "light" ? "sun" : "moon"} size={20} />
+              </span>
             </button>
           </div>
           {overall != null && (
