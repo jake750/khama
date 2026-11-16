@@ -2046,6 +2046,7 @@ img.file-thumb {
 /* ---------- الشريط العلوي ---------- */
 .topbar-tools {
   display: flex;
+  align-items: center;
   gap: 2px;
 }
 
