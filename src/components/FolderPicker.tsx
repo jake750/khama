@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import { Icon } from "./Icon";
+import { D_ANTICIPATE, usePresence } from "../motion";
 
 /** "C:\Users\me\Downloads" ← "Downloads" (المسار الكامل يظهر عند الوقوف عليه) */
 export const folderName = (p: string) =>
@@ -13,6 +14,7 @@ export const folderName = (p: string) =>
 export function FolderPicker(props: { current: string; recent: string[]; onPick: (dir: string) => void; onChoose: () => void }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
+  const [shown, leaving] = usePresence(open || null, D_ANTICIPATE);
   const box = useRef<HTMLDivElement>(null);
   const others = props.recent.filter((d) => d !== props.current).slice(0, 5);
 
@@ -37,8 +39,8 @@ export function FolderPicker(props: { current: string; recent: string[]; onPick:
         <span className="folder-name ltr">{folderName(props.current)}</span>
         <Icon name="chevron" size={16} />
       </button>
-      {open && (
-        <div className="menu" role="menu">
+      {shown && (
+        <div className="menu" role="menu" data-leaving={leaving || undefined} inert={leaving || undefined}>
           <div className="menu-item current" title={props.current}>
             <Icon name="check" size={16} />
             <span className="ltr">{props.current}</span>

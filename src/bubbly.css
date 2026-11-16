@@ -1,0 +1,440 @@
+/* =====================================================================
+   الحركة «الفقاعية»: طبقة واحدة فوق باقي الملفات، وفيها رموز الحركة كلها.
+   القيم نفسها في motion.tsx (BOUNCE / SOFT / ANTICIPATE): غيّر الاثنين معًا.
+   القاعدة: لا شيء يظهر أو يختفي فجأة، والحركة على transform و opacity فقط.
+   ===================================================================== */
+:root {
+  /* ظهور، فتح، ارتداد بعد الضغط: يتجاوز الهدف قليلًا ثم يستقر */
+  --m-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --d-bounce: 420ms;
+  /* انتقال وتغيّر حجم */
+  --m-soft: cubic-bezier(0.22, 1.2, 0.36, 1);
+  --d-soft: 360ms;
+  /* خروج وإغلاق: يتراجع قليلًا ثم يغادر، وأسرع من الدخول */
+  --m-anticipate: cubic-bezier(0.36, 0, 0.66, -0.56);
+  --d-anticipate: 260ms;
+  /* استجابة الضغط */
+  --d-press: 140ms;
+  /* الفاصل بين عنصر وآخر حين تدخل مجموعة معًا (٨ عناصر على الأكثر) */
+  --stagger: 50ms;
+  --ease-back: var(--m-bounce);
+
+  /* زجاج سائل للأسطح العائمة فقط (قوائم، إشعار، بطاقة الجولة) */
+  --glass-bg: color-mix(in srgb, var(--surface) 72%, transparent);
+  --glass-border: color-mix(in srgb, var(--text) 16%, transparent);
+  --glass-hi: rgb(255 255 255 / 0.1);
+  --glass-lo: rgb(0 0 0 / 0.18);
+}
+
+:root[data-theme="light"] {
+  --glass-hi: rgb(255 255 255 / 0.7);
+  --glass-lo: rgb(0 0 0 / 0.05);
+}
+
+/* ترتيب العنصر في التتابع: لا يُورَّث، فما بعد السابع يأخذ ٧ لا ترتيب أبيه */
+@property --i {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 7;
+}
+
+/* ---------- الضغط: ينكمش تحت الإصبع ويرتدّ عند الإفلات ---------- */
+.btn,
+.icon-btn,
+.tab,
+.segmented button,
+.chip-btn,
+.preset,
+.folder-btn,
+.menu-item,
+.more-menu-list button,
+.more-btn,
+.toast-action,
+.topbar-btn,
+.icon-choice,
+.guide-row,
+.guide-btn,
+.settings-nav button,
+.pl-row,
+.radio {
+  transition:
+    transform var(--d-bounce) var(--m-bounce),
+    background-color 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out),
+    color 0.2s var(--ease-out),
+    box-shadow 0.25s var(--ease-out),
+    opacity 0.2s var(--ease-out),
+    filter 0.2s var(--ease-out);
+}
+
+.btn:active:not(:disabled),
+.icon-btn:active:not(:disabled),
+.tab:active,
+.segmented button:active:not(:disabled),
+.chip-btn:active:not(:disabled),
+.folder-btn:active,
+.more-btn:active,
+.toast-action:active,
+.topbar-btn:active,
+.icon-choice:active:not(:disabled),
+.guide-btn:active {
+  transform: scale(0.94);
+  transition-duration: var(--d-press);
+  transition-timing-function: ease-out;
+}
+
+/* العناصر العريضة تنكمش أقل حتى لا تبدو كأنها تبتعد */
+.btn-lg:active:not(:disabled),
+.preset:active:not(:disabled),
+.preset:hover:active:not(:disabled):not([aria-pressed="true"]),
+.menu-item:active,
+.more-menu-list button:active,
+.guide-row:active,
+.settings-nav button:active,
+.pl-row:active,
+.radio:active {
+  transform: scale(0.97);
+  transition-duration: var(--d-press);
+  transition-timing-function: ease-out;
+}
+
+/* المفتاح: الدائرة ترتدّ عند الوصول */
+.switch::after {
+  transition: transform var(--d-bounce) var(--m-bounce);
+}
+
+.trim-track input[type="range"]::-webkit-slider-thumb {
+  transition: transform var(--d-bounce) var(--m-bounce);
+}
+
+.dropzone {
+  transition:
+    border-color 0.25s var(--ease-out),
+    background-color 0.25s var(--ease-out),
+    transform var(--d-bounce) var(--m-bounce);
+}
+
+.dropzone.over {
+  transform: scale(1.015);
+}
+
+.more-btn svg,
+.guide-chevron {
+  transition: transform var(--d-bounce) var(--m-bounce);
+}
+
+/* ---------- الظهور: يصعد ويتجاوز حجمه قليلًا ثم يستقر ---------- */
+@keyframes rise-in {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.94);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.012);
+  }
+}
+
+/* رسائل الخطأ والتنبيه تُقرأ: تظهر بهدوء بلا ارتداد */
+@keyframes calm-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.alert {
+  animation-name: calm-in;
+}
+
+@keyframes item-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+}
+
+@keyframes toast-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 24px) scale(0.85);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(-50%, -3px) scale(1.03);
+  }
+}
+
+@keyframes toast-out {
+  30% {
+    opacity: 1;
+    transform: translate(-50%, -4px) scale(1.02);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, 16px) scale(0.9);
+  }
+}
+
+.toast {
+  animation: toast-in var(--d-bounce) var(--ease-out);
+}
+
+.toast.leaving {
+  animation: toast-out var(--d-anticipate) ease-in forwards;
+}
+
+/* ---------- التتابع: محتوى الشاشة يدخل عنصرًا بعد عنصر ----------
+   يبدأ بعد أن تختفي الشاشة السابقة (120ms)، وما بعد الثامن يدخل مع الثامن */
+.slide-pane:not([data-out]) > .view > * {
+  animation: rise-in var(--d-bounce) var(--ease-out) backwards;
+  animation-delay: calc(120ms + var(--i, 7) * var(--stagger));
+}
+
+.slide-pane > .view > :nth-child(1),
+.guide > :nth-child(1) {
+  --i: 0;
+}
+.slide-pane > .view > :nth-child(2),
+.guide > :nth-child(2) {
+  --i: 1;
+}
+.slide-pane > .view > :nth-child(3),
+.guide > :nth-child(3) {
+  --i: 2;
+}
+.slide-pane > .view > :nth-child(4),
+.guide > :nth-child(4) {
+  --i: 3;
+}
+.slide-pane > .view > :nth-child(5),
+.guide > :nth-child(5) {
+  --i: 4;
+}
+.slide-pane > .view > :nth-child(6),
+.guide > :nth-child(6) {
+  --i: 5;
+}
+.slide-pane > .view > :nth-child(7),
+.guide > :nth-child(7) {
+  --i: 6;
+}
+
+/* عناصر القوائم المنبثقة تتتابع بعد أن تنفتح القائمة */
+.menu > *,
+.more-menu-list > * {
+  animation: item-in var(--d-soft) var(--m-soft) backwards;
+  animation-delay: calc(40ms + var(--i, 7) * 40ms);
+}
+
+:is(.menu, .more-menu-list) > :nth-child(1) {
+  --i: 0;
+}
+:is(.menu, .more-menu-list) > :nth-child(2) {
+  --i: 1;
+}
+:is(.menu, .more-menu-list) > :nth-child(3) {
+  --i: 2;
+}
+:is(.menu, .more-menu-list) > :nth-child(4) {
+  --i: 3;
+}
+:is(.menu, .more-menu-list) > :nth-child(5) {
+  --i: 4;
+}
+:is(.menu, .more-menu-list) > :nth-child(6) {
+  --i: 5;
+}
+:is(.menu, .more-menu-list) > :nth-child(7) {
+  --i: 6;
+}
+
+/* ---------- القوائم المنبثقة: تنمو من الزر الذي فتحها ----------
+   انتقالات (لا @keyframes) حتى تنعكس من مكانها إن ضُغط الزر في منتصف الحركة */
+.menu,
+.more-menu-list {
+  animation: none;
+  transition:
+    transform var(--d-bounce) var(--m-bounce),
+    opacity 0.16s var(--ease-out);
+}
+
+.menu {
+  transform-origin: bottom left;
+}
+[dir="rtl"] .menu {
+  transform-origin: bottom right;
+}
+.more-menu-list {
+  transform-origin: top right;
+}
+[dir="rtl"] .more-menu-list {
+  transform-origin: top left;
+}
+
+@starting-style {
+  .menu,
+  .more-menu-list {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+.menu[data-leaving],
+.more-menu-list[data-leaving] {
+  opacity: 0;
+  transform: scale(0.9);
+  pointer-events: none;
+  transition:
+    transform var(--d-anticipate) var(--m-anticipate),
+    opacity 0.14s ease-in 0.1s;
+}
+
+/* ---------- النوافذ والطبقات (Presence): دخول بارتداد وخروج بتراجع ---------- */
+.presence {
+  display: contents;
+}
+
+.presence > :is(.update-backdrop, .drop-overlay, .tour) {
+  animation: none;
+  transition: opacity 0.2s var(--ease-out);
+}
+
+.presence > .update-backdrop > .update-card,
+.presence > .drop-overlay > div {
+  animation: none;
+  transition:
+    transform var(--d-bounce) var(--m-bounce),
+    opacity 0.2s var(--ease-out);
+}
+
+@starting-style {
+  .presence > :is(.update-backdrop, .drop-overlay, .tour) {
+    opacity: 0;
+  }
+  .presence > .update-backdrop > .update-card,
+  .presence > .drop-overlay > div {
+    opacity: 0;
+    transform: translateY(14px) scale(0.85);
+  }
+}
+
+.presence[data-leaving] > :is(.update-backdrop, .drop-overlay, .tour) {
+  opacity: 0;
+  transition: opacity 0.18s ease-in 0.08s;
+}
+
+.presence[data-leaving] > .update-backdrop > .update-card,
+.presence[data-leaving] > .drop-overlay > div {
+  opacity: 0;
+  transform: translateY(8px) scale(0.9);
+  transition:
+    transform var(--d-anticipate) var(--m-anticipate),
+    opacity 0.16s ease-in 0.1s;
+}
+
+/* ---------- الزجاج السائل ---------- */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .menu,
+  .more-menu-list,
+  .tour-card {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    border-color: var(--glass-border);
+    box-shadow:
+      inset 0 1px 0 var(--glass-hi),
+      inset 0 -1px 0 var(--glass-lo),
+      var(--shadow-2);
+  }
+
+  .toast {
+    background: color-mix(in srgb, var(--text) 84%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.25),
+      var(--shadow-2);
+  }
+}
+
+.menu,
+.more-menu-list {
+  border-radius: var(--r-md);
+}
+
+.toast {
+  border-radius: 999px;
+}
+
+/* إيقاف الحركة: لا تأخير أيضًا، فيظهر كل شيء في مكانه فورًا */
+:root[data-motion="reduce"] *,
+:root[data-motion="reduce"] *::before,
+:root[data-motion="reduce"] *::after {
+  transition-delay: 0s !important;
+}
+
+/* الإعدادات والدليل: الأقسام نفسها تتتابع (لا الحاوي كله)، ومجموعات السجلّ تدخل بهدوء داخل بطاقتها */
+.slide-pane:not([data-out]) > .view > :is(.settings-layout, .guide) {
+  animation: none;
+}
+
+.slide-pane:not([data-out]) .settings-content > *,
+.slide-pane:not([data-out]) .guide > *,
+.slide-pane:not([data-out]) .settings-nav {
+  animation: rise-in var(--d-bounce) var(--ease-out) backwards;
+  animation-delay: calc(120ms + var(--i, 7) * var(--stagger));
+}
+
+.slide-pane:not([data-out]) .history-group {
+  animation: item-in var(--d-soft) var(--m-soft) backwards;
+  animation-delay: calc(200ms + var(--i, 7) * var(--stagger));
+}
+
+.settings-nav,
+:nth-child(1 of .settings-section, .history-group) {
+  --i: 0;
+}
+:nth-child(2 of .settings-section, .history-group) {
+  --i: 1;
+}
+:nth-child(3 of .settings-section, .history-group) {
+  --i: 2;
+}
+:nth-child(4 of .settings-section, .history-group) {
+  --i: 3;
+}
+:nth-child(5 of .settings-section, .history-group) {
+  --i: 4;
+}
+:nth-child(6 of .settings-section, .history-group) {
+  --i: 5;
+}
+:nth-child(7 of .settings-section, .history-group) {
+  --i: 6;
+}
+
+/* ---------- <details>: ينفتح وينطوي بارتفاعه بدل أن يقفز ----------
+   المحرّكات التي لا تدعم ‎::details-content‎ تفتحه فورًا كما كان */
+details {
+  interpolate-size: allow-keywords;
+}
+
+details::details-content {
+  block-size: 0;
+  opacity: 0;
+  overflow: clip;
+  transition:
+    block-size var(--d-soft) var(--ease-io),
+    opacity 0.2s var(--ease-out),
+    content-visibility var(--d-soft) allow-discrete;
+}
+
+details[open]::details-content {
+  block-size: auto;
+  opacity: 1;
+}
+
+details.extras > summary > svg:last-child {
+  transition: transform var(--d-bounce) var(--m-bounce);
+}

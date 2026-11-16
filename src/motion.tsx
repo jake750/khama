@@ -10,12 +10,21 @@ import {
   type RefObject,
 } from "react";
 
-/* أدوات الحركة: انتقالان فقط، بين التبويبات (SlideSwitch ومؤشّرها) وفي القوائم (AnimatedList) (D-35).
+/* أدوات الحركة: التبويبات (SlideSwitch ومؤشّرها)، القوائم (AnimatedList)، والطبقات (Presence). الرموز مشتركة مع bubbly.css.
    كلها تحرّك transform/opacity أو ارتفاع عنصر واحد، وتحترم «تقليل الحركة». */
 
 export const EASE_OUT = "cubic-bezier(0.16, 1, 0.3, 1)";
 export const EASE_IN = "cubic-bezier(0.7, 0, 0.84, 0)";
 export const EASE_IO = "cubic-bezier(0.65, 0, 0.35, 1)";
+
+/* رموز الحركة «الفقاعية»: المصدر نفسه في bubbly.css (--m-bounce وأخواتها). غيّر الاثنين معًا.
+   bounce للظهور والفتح، soft للانتقال وتغيّر الحجم، anticipate للخروج (يتراجع قليلًا ثم يغادر). */
+export const BOUNCE = "cubic-bezier(0.34, 1.56, 0.64, 1)";
+export const SOFT = "cubic-bezier(0.22, 1.2, 0.36, 1)";
+export const ANTICIPATE = "cubic-bezier(0.36, 0, 0.66, -0.56)";
+export const D_BOUNCE = 420;
+export const D_SOFT = 360;
+export const D_ANTICIPATE = 260;
 
 // الحركة جزء من تصميم التطبيق، فلا نتبع إعداد «تأثيرات الحركة» في ويندوز (كثيرون يطفئونه لتسريع النظام).
 // من يريد إيقافها يضع data-motion="reduce" على الجذر.
@@ -75,7 +84,7 @@ export function useSlidingIndicator(container: RefObject<HTMLElement | null>, se
         { transform: `translate(${from.x}px, ${from.y}px)`, width: `${from.w}px`, height: `${from.h}px` },
         { transform: `translate(${to.x}px, ${to.y}px)`, width: `${to.w}px`, height: `${to.h}px` },
       ],
-      { duration: 220, easing: EASE_OUT },
+      { duration: D_SOFT, easing: SOFT },
     );
   };
 
@@ -193,10 +202,12 @@ function ListItem(props: { state: "in" | "out"; enter: boolean; children: ReactN
     el.style.overflow = "hidden";
     const a = el.animate(
       [
-        { height: "0px", opacity: 0, transform: "translateY(8px) scale(0.985)" },
+        { height: "0px", opacity: 0, transform: "translateY(10px) scale(0.92)", easing: EASE_OUT },
+        // يتجاوز حجمه قليلًا ثم يستقر
+        { height: `${h}px`, opacity: 1, transform: "scale(1.015)", offset: 0.6, easing: EASE_IO },
         { height: `${h}px`, opacity: 1, transform: "none" },
       ],
-      { duration: 420, easing: EASE_OUT },
+      { duration: D_BOUNCE },
     );
     a.onfinish = () => {
       el.style.overflow = "";
@@ -228,8 +239,8 @@ function ListItem(props: { state: "in" | "out"; enter: boolean; children: ReactN
     const a = el.animate(
       [
         { height: `${h}px`, opacity: 1, transform: "none", offset: 0, easing: EASE_OUT },
-        { height: `${h}px`, opacity: 0, transform: "scale(0.97)", offset: 0.35, easing: EASE_IO },
-        { height: "0px", opacity: 0, transform: "scale(0.97)", offset: 1 },
+        { height: `${h}px`, opacity: 0, transform: "scale(0.92)", offset: 0.35, easing: EASE_IO },
+        { height: "0px", opacity: 0, transform: "scale(0.92)", offset: 1 },
       ],
       { duration: 420, fill: "forwards" },
     );
@@ -267,6 +278,20 @@ export function usePresence<T>(value: T | null, exitMs: number): [T | null, bool
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
   return [shown, leaving];
+}
+
+/**
+ * يُبقي طبقة (نافذة حوار، ترحيب، منطقة إفلات) مركّبة حتى تكتمل حركة خروجها.
+ * الدخول والخروج انتقالات CSS (bubbly.css) فتنعكس من مكانها إن عاد المستخدم في منتصفها.
+ */
+export function Presence(props: { show: boolean; ms?: number; children: ReactNode }) {
+  const [shown, leaving] = usePresence(props.show || null, props.ms ?? D_ANTICIPATE);
+  if (!shown) return null;
+  return (
+    <div className="presence" data-leaving={leaving || undefined} inert={leaving || undefined}>
+      {props.children}
+    </div>
+  );
 }
 
 /**
@@ -309,7 +334,7 @@ export function SlideSwitch(props: {
     // الارتفاع ينتقل من القديم إلى الجديد بدل أن يقفز ما تحته
     const h = el.offsetHeight;
     if (ready.current && lastH.current && h !== lastH.current && !reducedMotion()) {
-      el.animate([{ height: `${lastH.current}px` }, { height: `${h}px` }], { duration: 460, easing: EASE_OUT });
+      el.animate([{ height: `${lastH.current}px` }, { height: `${h}px` }], { duration: D_SOFT, easing: SOFT });
     }
     lastH.current = h;
   }, [cur.id]);
@@ -397,7 +422,7 @@ function SlidePane(props: {
           { transform: `translateX(${start}px)`, opacity: fromO < 1 ? fromO : 0 },
           { transform: "none", opacity: 1 },
         ],
-        { duration: 520, delay: fromO < 1 ? 0 : 110, easing: EASE_OUT, fill: "backwards" },
+        { duration: D_BOUNCE, delay: fromO < 1 ? 0 : 110, easing: SOFT, fill: "backwards" },
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

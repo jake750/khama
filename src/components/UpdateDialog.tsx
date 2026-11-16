@@ -4,7 +4,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
-import { EASE_IN, EASE_OUT, reducedMotion, usePresence } from "../motion";
+import { ANTICIPATE, BOUNCE, D_BOUNCE, EASE_IN, EASE_OUT, reducedMotion, usePresence } from "../motion";
 import { isMobile } from "../platform";
 import { Icon } from "./Icon";
 import { logError } from "../log";
@@ -174,21 +174,20 @@ export function UpdateDialog(props: {
       b.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: EASE_OUT });
       c.animate(
         [
-          { opacity: 0, transform: "translateY(14px) scale(0.96)" },
+          { opacity: 0, transform: "translateY(14px) scale(0.85)" },
           { opacity: 1, transform: "none" },
         ],
-        { duration: 460, easing: EASE_OUT },
+        { duration: D_BOUNCE, easing: BOUNCE },
       );
     } else if (leaving && !still) {
       b.animate([{ opacity: 1 }, { opacity: 0 }], { duration: EXIT_MS, easing: EASE_IN, fill: "forwards" });
       c.animate(
         [
-          { opacity: 1, transform: "none" },
-          { opacity: 0, transform: "translateY(8px) scale(0.97)" },
+          { opacity: 1, transform: "none", easing: ANTICIPATE },
+          { opacity: 0, transform: "translateY(8px) scale(0.9)" },
         ],
         {
           duration: EXIT_MS,
-          easing: EASE_IN,
           fill: "forwards",
         },
       );
@@ -202,7 +201,14 @@ export function UpdateDialog(props: {
 
   return (
     <div className="update-backdrop" ref={backdrop} onClick={(e) => e.target === e.currentTarget && close()}>
-      <div className="update-card motif" ref={card} role="dialog" aria-modal="true" aria-labelledby="update-title" aria-describedby="update-body">
+      <div
+        className="update-card motif"
+        ref={card}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="update-title"
+        aria-describedby="update-body"
+      >
         <div className="update-head">
           <span className="update-icon" aria-hidden="true">
             <Icon name="download" size={20} />

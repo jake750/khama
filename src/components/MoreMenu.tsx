@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon, type IconName } from "./Icon";
+import { D_ANTICIPATE, usePresence } from "../motion";
 
 export interface MenuItem {
   label: string;
@@ -10,6 +11,7 @@ export interface MenuItem {
 /** قائمة «⋯» للأفعال الثانوية: تُغلق بالنقر خارجها أو بـ Escape (D-25) */
 export function MoreMenu(props: { label: string; items: MenuItem[] }) {
   const [open, setOpen] = useState(false);
+  const [shown, leaving] = usePresence(open || null, D_ANTICIPATE);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -40,8 +42,8 @@ export function MoreMenu(props: { label: string; items: MenuItem[] }) {
       >
         <Icon name="dots" size={16} />
       </button>
-      {open && (
-        <div className="more-menu-list" role="menu">
+      {shown && (
+        <div className="more-menu-list" role="menu" data-leaving={leaving || undefined} inert={leaving || undefined}>
           {props.items.map((it) => (
             <button
               key={it.label}

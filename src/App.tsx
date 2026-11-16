@@ -17,7 +17,7 @@ import { Tour, Welcome, type TourStep } from "./components/Tour";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { formatTimecode } from "./format";
 import { dictionaries, I18n, type Dict } from "./i18n";
-import { AnimatedList, SlideSwitch, usePresence, useSlidingIndicator } from "./motion";
+import { AnimatedList, Presence, SlideSwitch, usePresence, useSlidingIndicator } from "./motion";
 import { isMobile } from "./platform";
 import type { Toast, ToastAction } from "./toast";
 import { presetById } from "./presets";
@@ -790,14 +790,14 @@ export default function App() {
           </div>
         </main>
 
-        {dragging && tab !== "convert" && (
+        <Presence show={dragging && tab !== "convert"}>
           <div className="drop-overlay">
             <div>
               <Icon name="convert" size={24} />
               <b>{t.dropHere}</b>
             </div>
           </div>
-        )}
+        </Presence>
 
         {toastShown && (
           <div className={`toast ${toastLeaving ? "leaving" : ""}`} role="status">
@@ -819,7 +819,7 @@ export default function App() {
         {/* تحديثات خامة: الكمبيوتر يثبّتها بنفسه، والهاتف يفتح رابط ملف APK الجديد */}
         <UpdateDialog busy={running.length > 0} request={updateRequest} onAvailable={setUpdateVersion} />
 
-        {!settings.acceptedNotice && (
+        <Presence show={!settings.acceptedNotice}>
           <Dialog
             title={t.noticeTitle}
             actions={
@@ -830,9 +830,9 @@ export default function App() {
           >
             <p className="muted">{t.notice}</p>
           </Dialog>
-        )}
+        </Presence>
 
-        {closeAsk && (
+        <Presence show={closeAsk}>
           <Dialog
             title={t.closeAskTitle}
             onClose={() => setCloseAsk(false)}
@@ -858,9 +858,9 @@ export default function App() {
           >
             <p className="muted">{t.closeAskBody(running.length)}</p>
           </Dialog>
-        )}
+        </Presence>
 
-        {shortcuts && (
+        <Presence show={shortcuts}>
           <Dialog
             title={t.shortcutsTitle}
             onClose={() => setShortcuts(false)}
@@ -881,11 +881,15 @@ export default function App() {
               ))}
             </dl>
           </Dialog>
-        )}
+        </Presence>
 
         {/* أول فتح: ترحيب يعرض جولة سريعة على الخصائص */}
-        {!settings.seenTour && !touring && !compact && <Welcome onTour={startTour} onLater={() => update({ seenTour: true })} />}
-        {touring && <Tour steps={tourSteps} onTab={tourTab} onClose={() => setTouring(false)} />}
+        <Presence show={!settings.seenTour && !touring && !compact}>
+          <Welcome onTour={startTour} onLater={() => update({ seenTour: true })} />
+        </Presence>
+        <Presence show={touring}>
+          <Tour steps={tourSteps} onTab={tourTab} onClose={() => setTouring(false)} />
+        </Presence>
       </div>
     </I18n.Provider>
   );
