@@ -1,6 +1,6 @@
 [package]
 name = "khama"
-version = "0.3.8"
+version = "0.3.9"
 description = "أداة تنزيل وسائط للممنتجين — Media downloader for video editors"
 authors = ["jake750"]
 license = "MIT"
