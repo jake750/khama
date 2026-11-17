@@ -196,8 +196,43 @@ fn migrate(mut s: Settings) -> Settings {
         s.rate_limit_kb = s.rate_limit.saturating_mul(1024);
     }
     s.rate_limit = 0;
-    s.parallel_downloads = s.parallel_downloads.clamp(1, 5);
+    sanitize(&mut s);
     s
+}
+
+/// يُرجع القيمة إن كانت من المسموح، وإلا الافتراضية
+fn pick(v: &mut String, allowed: &[&str], fallback: &str) {
+    if !allowed.contains(&v.as_str()) {
+        *v = fallback.into();
+    }
+}
+
+const KINDS: &[&str] = &["video", "audio"];
+const VIDEO_FORMATS: &[&str] = &["mp4", "mov"];
+const AUDIO_FORMATS: &[&str] = &["mp3", "m4a", "wav"];
+const QUALITIES: &[&str] = &["best", "2160", "1440", "1080", "720", "480"];
+
+/// الحقول التي لها قيم محدودة تبقى نصوصًا في JSON (ليقرأها الإصدار الأقدم كما هي)،
+/// لكن أي قيمة غير معروفة تعود إلى الافتراضية بدل أن تُقبل وتُحفظ (T-9).
+/// اخترنا هذا على enum في serde لأن قيمة واحدة خاطئة في enum تُفشل قراءة الملف كله
+/// فتضيع كل الإعدادات، أما هنا فيُصحَّح الحقل الخاطئ وحده.
+fn sanitize(s: &mut Settings) {
+    let d = Settings::default();
+    pick(&mut s.language, &["en", "ar"], &d.language);
+    pick(&mut s.theme, &["dark", "light", "system"], &d.theme);
+    pick(&mut s.kind, KINDS, &d.kind);
+    pick(&mut s.video_format, VIDEO_FORMATS, &d.video_format);
+    pick(&mut s.audio_format, AUDIO_FORMATS, &d.audio_format);
+    pick(&mut s.quality, QUALITIES, &d.quality);
+    pick(&mut s.cookies_mode, &["none", "browser", "file"], &d.cookies_mode);
+    pick(&mut s.convert_dest, &["source", "output"], &d.convert_dest);
+    for p in &mut s.projects {
+        pick(&mut p.kind, KINDS, &d.kind);
+        pick(&mut p.video_format, VIDEO_FORMATS, &d.video_format);
+        pick(&mut p.audio_format, AUDIO_FORMATS, &d.audio_format);
+        pick(&mut p.quality, QUALITIES, &d.quality);
+    }
+    s.parallel_downloads = s.parallel_downloads.clamp(1, 5);
 }
 
 /// المجلد الفعلي للحفظ: ما اختاره المستخدم، وإلا مجلد التنزيلات
@@ -222,7 +257,7 @@ pub fn save_settings(
     queue: tauri::State<crate::download::DownloadQueue>,
     mut settings: Settings,
 ) -> Result<(), AppError> {
-    settings.parallel_downloads = settings.parallel_downloads.clamp(1, 5);
+    sanitize(&mut settings);
     queue.set_limit(settings.parallel_downloads.into());
     let json = serde_json::to_string_pretty(&settings).expect("settings serialize");
     crate::persist::write_atomic(&settings_path(&app)?, json.as_bytes())?;
@@ -336,6 +371,18 @@ mod tests {
         assert_eq!(s.parallel_downloads, 5);
         let s = migrate(serde_json::from_str(r#"{"parallelDownloads":0}"#).unwrap());
         assert_eq!(s.parallel_downloads, 1);
+    }
+
+    #[test]
+    fn unknown_values_fall_back_to_defaults() {
+        let json = r#"{"theme":"purple","kind":"video","quality":"999","cookiesMode":"x","convertDest":"output",
+            "projects":[{"name":"p","outputDir":null,"kind":"gif","videoFormat":"mov","audioFormat":"ogg",
+            "quality":"720","editorReady":true,"filenameTemplate":"{title}"}]}"#;
+        let s = migrate(serde_json::from_str(json).unwrap());
+        assert_eq!((s.theme.as_str(), s.quality.as_str(), s.cookies_mode.as_str()), ("dark", "1080", "none"));
+        assert_eq!((s.kind.as_str(), s.convert_dest.as_str()), ("video", "output"), "القيم الصحيحة تبقى");
+        let p = &s.projects[0];
+        assert_eq!((p.kind.as_str(), p.video_format.as_str(), p.audio_format.as_str(), p.quality.as_str()), ("video", "mov", "mp3", "720"));
     }
 
     #[test]
