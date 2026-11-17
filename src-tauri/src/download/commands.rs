@@ -444,11 +444,7 @@ pub(super) async fn run_probe(tools: &Tools, args: &[&str], replace: bool) -> Re
     }
     let mut newer = latest.subscribe();
 
-    let mut child = tools::ytdlp_command(tools)
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+    let mut child = spawn_tree(tools::ytdlp_command(tools).args(args).stdout(Stdio::piped()).stderr(Stdio::piped()))?;
     let read = |pipe: Option<Box<dyn tokio::io::AsyncRead + Send + Unpin>>| {
         tokio::spawn(async move {
             let mut buf = Vec::new();

@@ -333,3 +333,23 @@ fn resume_dir_is_stable_per_request_and_not_shared() {
     release_job_dir(key);
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// الإلغاء يقتل الأحفاد أيضًا (T-98): ping يعمل تحت cmd ويرث مخرجه، فلو قُتل cmd وحده
+/// لبقي الأنبوب مفتوحًا حتى ينتهي ping بعد 30 ثانية
+#[cfg(windows)]
+#[test]
+fn kill_tree_ends_grandchildren_through_the_job_object() {
+    use tokio::io::AsyncReadExt;
+    tauri::async_runtime::block_on(async {
+        let mut cmd = tokio::process::Command::new("cmd");
+        cmd.args(["/c", "ping -n 30 127.0.0.1"]).stdout(Stdio::piped());
+        let mut child = spawn_tree(&mut cmd).unwrap();
+        let mut out = child.stdout.take().unwrap();
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        let started = Instant::now();
+        kill_tree(&mut child).await;
+        let mut buf = Vec::new();
+        let _ = tokio::time::timeout(Duration::from_secs(10), out.read_to_end(&mut buf)).await;
+        assert!(started.elapsed() < Duration::from_secs(5), "الأنبوب أُغلق: ping قُتل مع cmd");
+    });
+}
