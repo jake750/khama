@@ -90,8 +90,12 @@ jobs:
       - name: Fetch bundled tools (yt-dlp, FFmpeg, Deno)
         run: node scripts/fetch-binaries.mjs ${{ matrix.target }}
 
+      # نسخة Intel تُبنى على جهاز Apple Silicon: Rosetta 2 يشغّل اختباراتها وأدواتها (T-62)
+      - name: Rosetta for Intel macOS
+        if: matrix.target == 'x86_64-apple-darwin'
+        run: softwareupdate --install-rosetta --agree-to-license || true
+
       - name: Smoke-test bundled tools
-        if: matrix.target != 'x86_64-apple-darwin'
         shell: bash
         run: |
           ext=""; [ "$RUNNER_OS" = "Windows" ] && ext=".exe"
@@ -101,9 +105,8 @@ jobs:
           src-tauri/binaries/ffmpeg/bin/ffmpeg$ext -hide_banner -encoders | grep libx264
 
       - name: Rust unit tests
-        if: matrix.target != 'x86_64-apple-darwin'
         timeout-minutes: 20
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }}
 
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         id: tauri
