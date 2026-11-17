@@ -283,6 +283,9 @@ export const api = {
   hasSavedCookies: () => invoke<boolean>("has_saved_cookies"),
   saveCookies: (content: string) => invoke<void>("save_cookies", { content }),
   deleteCookies: () => invoke<void>("delete_cookies"),
+  /** رقم {n} القادم في المشروع النشط، وتصفيره (T-66) */
+  counterNext: () => invoke<number>("counter_next"),
+  resetCounter: () => invoke<number>("reset_counter"),
   getScheduled: () => invoke<ScheduledItem[]>("get_scheduled"),
   saveScheduled: (items: ScheduledItem[]) => invoke<void>("save_scheduled", { items }),
   toolsInfo: () => invoke<ToolsInfo>("tools_info"),

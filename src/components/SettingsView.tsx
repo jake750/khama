@@ -233,6 +233,20 @@ function DownloadsSection(props: { settings: Settings; update: (p: Partial<Setti
   const [tpl, setTpl] = useState(s.filenameTemplate);
   useEffect(() => setTpl(s.filenameTemplate), [s.filenameTemplate]);
   const commit = (v: string) => update({ filenameTemplate: v.trim() || "{title}" });
+  // رقم {n} القادم، يظهر فقط إن كان في القالب (T-66)
+  const usesN = s.filenameTemplate.includes("{n}");
+  const [nextN, setNextN] = useState<number | null>(null);
+  useEffect(() => {
+    if (!usesN) return;
+    let alive = true;
+    api
+      .counterNext()
+      .then((n) => alive && setNextN(n))
+      .catch(logError("counterNext"));
+    return () => {
+      alive = false;
+    };
+  }, [usesN, s.activeProject]);
   return (
     <Section id="downloads" title={t.secDownloads}>
       <div className="setting-row column">
@@ -269,6 +283,18 @@ function DownloadsSection(props: { settings: Settings; update: (p: Partial<Setti
         <div className="faint">
           {t.filenameExample}: <span className="ltr code">{templateExample(tpl, s.siteFolders)}</span>
         </div>
+        {usesN && nextN != null && (
+          <div className="action-row">
+            <span className="faint grow">{t.counterNext(String(nextN).padStart(3, "0"))}</span>
+            <button
+              className="btn btn-sm"
+              disabled={nextN === 1}
+              onClick={() => api.resetCounter().then(setNextN).catch(logError("resetCounter"))}
+            >
+              {t.counterReset}
+            </button>
+          </div>
+        )}
       </div>
       <div className="setting-row">
         <Toggle

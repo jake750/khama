@@ -88,6 +88,7 @@ pub async fn start_download(
             },
         };
         release_slot(id);
+        crate::settings::finish_counter(&app2, id, update.state == "done");
         // بعد خطأ (انقطاع الشبكة مثلًا) يبقى المجلد، فتكمل «أعد المحاولة» من حيث توقّف (T-56)
         if let Ok(dir) = job_dir
             && update.state != "error"

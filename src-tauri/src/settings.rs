@@ -159,16 +159,112 @@ fn settings_path(app: &AppHandle) -> Result<PathBuf, AppError> {
     Ok(config_dir(app)?.join("settings.json"))
 }
 
-/// عدّاد {n} في قالب اسم الملف: يزيد مع كل تنزيل ويبقى بعد إغلاق التطبيق
-pub fn next_counter(app: &AppHandle) -> u64 {
-    static LOCK: Mutex<()> = Mutex::new(());
-    let _g = LOCK.lock_ok();
-    let Ok(p) = config_dir(app).map(|d| d.join("counter.txt")) else {
-        return 1;
-    };
-    let n = fs::read_to_string(&p).ok().and_then(|s| s.trim().parse::<u64>().ok()).unwrap_or(0) + 1;
-    let _ = crate::persist::write_atomic(&p, n.to_string().as_bytes());
-    n
+// ---------------- عدّاد {n} في قالب اسم الملف (T-66) ----------------
+// لكل مشروع عدّاده، والرقم لا يُثبَّت إلا إن نجح التنزيل (الفاشل لا يستهلك رقمًا)، ويمكن تصفيره.
+// تنزيلان يعملان معًا يحجز كلٌّ منهما رقمًا مختلفًا.
+
+/// أرقام كل مشروع: آخر رقم ثُبِّت، والمحجوزة لتنزيلات جارية. المفتاح معرّف المشروع ("" = بلا مشروع)
+#[derive(Default)]
+pub(crate) struct Counters {
+    pub last: std::collections::HashMap<String, u64>,
+    reserved: std::collections::HashMap<String, std::collections::BTreeSet<u64>>,
+}
+
+impl Counters {
+    pub fn next(&self, key: &str) -> u64 {
+        let last = self.last.get(key).copied().unwrap_or(0);
+        let busy = self.reserved.get(key).and_then(|r| r.last().copied()).unwrap_or(0);
+        last.max(busy) + 1
+    }
+    pub fn reserve(&mut self, key: &str) -> u64 {
+        let n = self.next(key);
+        self.reserved.entry(key.into()).or_default().insert(n);
+        n
+    }
+    /// ok = نجح التنزيل فيُثبَّت الرقم، وإلا يُحرَّر
+    pub fn finish(&mut self, key: &str, n: u64, ok: bool) {
+        if let Some(r) = self.reserved.get_mut(key) {
+            r.remove(&n);
+        }
+        if ok {
+            let last = self.last.entry(key.into()).or_insert(0);
+            *last = (*last).max(n);
+        }
+    }
+    pub fn reset(&mut self, key: &str) {
+        self.last.remove(key);
+    }
+}
+
+/// (العدّادات محمّلة؟، العدّادات، العملية ← (المشروع، الرقم))
+type CounterState = (bool, Counters, std::collections::HashMap<u64, (String, u64)>);
+static COUNTERS: Mutex<Option<CounterState>> = Mutex::new(None);
+
+fn with_counters<R>(app: &AppHandle, f: impl FnOnce(&mut Counters, &mut std::collections::HashMap<u64, (String, u64)>) -> R) -> R {
+    let mut guard = COUNTERS.lock_ok();
+    let state = guard.get_or_insert_with(Default::default);
+    if !state.0 {
+        state.0 = true;
+        if let Ok(dir) = config_dir(app) {
+            state.1.last = crate::persist::read_json(&dir.join("counters.json")).or_default_logged("counters.json");
+            // 0.3.9 وما قبله: عدّاد واحد عام في counter.txt
+            let old = dir.join("counter.txt");
+            if let Some(n) = fs::read_to_string(&old).ok().and_then(|s| s.trim().parse::<u64>().ok()) {
+                state.1.last.entry(String::new()).or_insert(n);
+                let _ = fs::remove_file(old);
+            }
+        }
+    }
+    f(&mut state.1, &mut state.2)
+}
+
+fn save_counters(app: &AppHandle, c: &Counters) {
+    if let (Ok(dir), Ok(json)) = (config_dir(app), serde_json::to_vec(&c.last)) {
+        let _ = crate::persist::write_atomic(&dir.join("counters.json"), &json);
+    }
+}
+
+fn project_key(s: &Settings) -> String {
+    s.active_project.clone().unwrap_or_default()
+}
+
+/// يحجز رقم {n} لتنزيل يبدأ
+pub fn reserve_counter(app: &AppHandle, id: u64, s: &Settings) -> u64 {
+    let key = project_key(s);
+    with_counters(app, |c, jobs| {
+        let n = c.reserve(&key);
+        jobs.insert(id, (key, n));
+        n
+    })
+}
+
+/// انتهى التنزيل: نجاح يثبّت رقمه، وفشل أو إلغاء يحرّره
+pub fn finish_counter(app: &AppHandle, id: u64, ok: bool) {
+    with_counters(app, |c, jobs| {
+        if let Some((key, n)) = jobs.remove(&id) {
+            c.finish(&key, n, ok);
+            if ok {
+                save_counters(app, c);
+            }
+        }
+    });
+}
+
+/// الرقم الذي سيأخذه التنزيل القادم في المشروع النشط
+#[tauri::command]
+pub fn counter_next(app: AppHandle, state: tauri::State<SettingsState>) -> u64 {
+    let key = project_key(&state.0.lock_ok());
+    with_counters(&app, |c, _| c.next(&key))
+}
+
+#[tauri::command]
+pub fn reset_counter(app: AppHandle, state: tauri::State<SettingsState>) -> u64 {
+    let key = project_key(&state.0.lock_ok());
+    with_counters(&app, |c, _| {
+        c.reset(&key);
+        save_counters(&app, c);
+        c.next(&key)
+    })
 }
 
 pub fn cookies_path(app: &AppHandle) -> Result<PathBuf, AppError> {
@@ -400,6 +496,19 @@ mod tests {
             ),
             ("video", "mov", "mp3", "720")
         );
+    }
+
+    #[test]
+    fn counter_is_per_project_and_only_successful_downloads_use_a_number() {
+        let mut c = Counters::default();
+        let (a, b) = (c.reserve(""), c.reserve(""));
+        assert_eq!((a, b), (1, 2), "تنزيلان معًا: رقمان مختلفان");
+        c.finish("", b, false);
+        c.finish("", a, true);
+        assert_eq!(c.next(""), 2, "الفاشل لم يستهلك رقمًا");
+        assert_eq!(c.reserve("p1"), 1, "مشروع آخر يبدأ من 1");
+        c.reset("");
+        assert_eq!(c.next(""), 1);
     }
 
     #[test]

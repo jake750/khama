@@ -104,7 +104,11 @@ pub(super) async fn run_job(
     std::fs::create_dir_all(&final_dir).map_err(|e| AppError::with_detail("outputDirCreate", e.to_string()))?;
     let cookies = cookie_args(app, &settings);
     let user_tpl = &settings.filename_template;
-    let n = if user_tpl.contains("{n}") { settings::next_counter(app) } else { 0 };
+    let n = if user_tpl.contains("{n}") {
+        settings::reserve_counter(app, id, &settings)
+    } else {
+        0
+    };
     let opts = JobOptions {
         template: output_template(user_tpl, settings.site_folders, n, &today(req.tz_offset_min)),
         rate_limit_kb: settings.rate_limit_kb,

@@ -157,6 +157,10 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         thumbnail: null,
         issues: ["vfr", "tenBit", "heavyCodec"],
       };
+    case "counter_next":
+      return 4;
+    case "reset_counter":
+      return 1;
     case "new_job_id":
       return nextJob++;
     case "start_download":

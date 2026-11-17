@@ -117,6 +117,8 @@ macro_rules! handlers_with {
             settings::has_saved_cookies,
             settings::save_cookies,
             settings::delete_cookies,
+            settings::counter_next,
+            settings::reset_counter,
             tools::tools_info,
             tools::update_ytdlp,
             download::probe,
