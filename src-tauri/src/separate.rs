@@ -223,6 +223,33 @@ async fn fetch(
 
 /// يتأكد أن ONNX Runtime والنموذج موجودان وسليمان، وينزّلهما إن لزم.
 /// يعيد (مسار المكتبة، مسار النموذج)، أو None إن ألغى المستخدم.
+/// هل ملف النموذج سليم؟ الحجم في كل مرة، والبصمة مرة في كل تشغيل للتطبيق (وكلما تغيّر الملف):
+/// الملف قد يتلف على القرص بعد تنزيله، ونموذج تالف يعطي ضجيجًا أو يُسقط ONNX (T-102).
+/// ~60MB تُحسب في أقل من ثانية على خيط جانبي.
+async fn model_intact(model: &Path) -> bool {
+    use crate::errors::LockExt;
+    static CHECKED: std::sync::Mutex<Option<(u64, std::time::SystemTime)>> = std::sync::Mutex::new(None);
+    let Ok(meta) = std::fs::metadata(model) else {
+        return false;
+    };
+    if meta.len() != MODEL.size {
+        return false;
+    }
+    let stamp = (meta.len(), meta.modified().unwrap_or(std::time::UNIX_EPOCH));
+    if *CHECKED.lock_ok() == Some(stamp) {
+        return true;
+    }
+    let path = model.to_path_buf();
+    let hash = tauri::async_runtime::spawn_blocking(move || sha256_file(&path)).await;
+    let ok = matches!(hash, Ok(Ok(h)) if h == MODEL.sha256);
+    if ok {
+        *CHECKED.lock_ok() = Some(stamp);
+    } else {
+        log::warn!("model hash mismatch, downloading it again");
+    }
+    ok
+}
+
 pub async fn ensure_assets(app: &AppHandle, id: u64, cancel: &mut watch::Receiver<bool>) -> Result<Option<(PathBuf, PathBuf)>, AppError> {
     let _guard = SETUP.lock().await;
     let dir = ai_dir(app)?;
@@ -259,7 +286,7 @@ pub async fn ensure_assets(app: &AppHandle, id: u64, cancel: &mut watch::Receive
         let need = !(lib.exists() && std::fs::read_to_string(&lib_ok).is_ok_and(|s| s.trim() == runtime.sha256));
         (runtime, lib, lib_ok, need)
     };
-    let need_model = !(model.exists() && std::fs::metadata(&model).is_ok_and(|m| m.len() == MODEL.size));
+    let need_model = !model_intact(&model).await;
     if !need_lib && !need_model {
         return Ok(Some((lib, model)));
     }
