@@ -22,7 +22,7 @@ pub async fn start_download(
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
         // ننتظر دورنا إن كانت كل الخانات مشغولة (والإلغاء ممكن أثناء الانتظار)
-        let _slot = match slots.clone().try_acquire_owned() {
+        let slot = match slots.clone().try_acquire_owned() {
             Ok(p) => p,
             Err(_) => {
                 emit(
@@ -43,6 +43,7 @@ pub async fn start_download(
                 }
             }
         };
+        hold_slot(id, slot);
         emit(
             &app2,
             JobUpdate {
@@ -82,6 +83,7 @@ pub async fn start_download(
                 ..Default::default()
             },
         };
+        release_slot(id);
         if let Ok(dir) = job_dir {
             let _ = tokio::fs::remove_dir_all(dir).await;
         }

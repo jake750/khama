@@ -474,6 +474,8 @@ pub(super) async fn finish(
                 ..Default::default()
             },
         );
+        // التنزيل انتهى: نترك خانته لغيره قبل انتظار دور الفصل (T-40)
+        release_slot(id);
         let _turn = tokio::select! {
             g = SEPARATING.lock() => g,
             _ = canceled(cancel) => return Ok(None),

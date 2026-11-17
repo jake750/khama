@@ -122,6 +122,20 @@ impl DownloadQueue {
     }
 }
 
+/// خانة التنزيل لكل عملية جارية. تُحرَّر قبل إزالة الموسيقى (T-40): الفصل له طابوره الخاص
+/// (ملف واحد في كل مرة)، فلا تبقى خانة من خانات التنزيل محجوزة وهو ينتظر دوره أو يعمل.
+static SLOTS: Mutex<Option<HashMap<u64, tokio::sync::OwnedSemaphorePermit>>> = Mutex::new(None);
+
+pub(super) fn hold_slot(id: u64, permit: tokio::sync::OwnedSemaphorePermit) {
+    SLOTS.lock_ok().get_or_insert_with(HashMap::new).insert(id, permit);
+}
+
+/// يحرّر خانة التنزيل (إن كانت ما زالت محجوزة) فيبدأ التنزيل التالي في الطابور
+pub(super) fn release_slot(id: u64) {
+    let permit = SLOTS.lock_ok().as_mut().and_then(|m| m.remove(&id));
+    drop(permit);
+}
+
 /// إزالة الموسيقى ثقيلة على المعالج والذاكرة: ملف واحد في كل مرة
 static SEPARATING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
