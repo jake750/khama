@@ -61,6 +61,30 @@ jobs:
       - name: tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
 
+  # كود أندرويد (mobile.rs وما تحت cfg(mobile)) لا يُبنى إلا عند الإصدار، فينحرف دون أن يلاحظ أحد (T-36).
+  # clippy فقط (بلا ربط ولا توقيع): دقيقة أو اثنتان، ويكشف كسر البناء على الهاتف في كل دفعة.
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          components: clippy
+          targets: aarch64-linux-android
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: src-tauri -> target
+          key: android
+      - name: NDK compilers for build scripts
+        run: |
+          bin="$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo "CC_aarch64_linux_android=$bin/aarch64-linux-android24-clang" >> "$GITHUB_ENV"
+          echo "CXX_aarch64_linux_android=$bin/aarch64-linux-android24-clang++" >> "$GITHUB_ENV"
+          echo "AR_aarch64_linux_android=$bin/llvm-ar" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$bin/aarch64-linux-android24-clang" >> "$GITHUB_ENV"
+      - name: clippy (aarch64-linux-android)
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --lib --target aarch64-linux-android -- -D warnings
+
   audit:
     runs-on: ubuntu-24.04
     steps:
