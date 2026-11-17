@@ -138,8 +138,6 @@ export default function App() {
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   const [updateRequest, setUpdateRequest] = useState(0);
   const [touring, setTouring] = useState(false);
-  // تحديثات وصلت قبل أن نضيف العملية للقائمة (Rust أسرع أحيانًا من الرد)
-  const pending = useRef(new Map<number, JobUpdate>());
   const jobsRef = useRef<Job[]>([]);
   jobsRef.current = jobs;
   const settingsRef = useRef<Settings | null>(null);
@@ -204,13 +202,8 @@ export default function App() {
     const unlisten = api.onJobUpdate((u) => {
       const job = jobsRef.current.find((j) => j.id === u.id);
       if (job && (u.state === "done" || u.state === "error") && job.state !== u.state) onFinished(job, u);
-      setJobs((prev) => {
-        if (!prev.some((j) => j.id === u.id)) {
-          pending.current.set(u.id, { ...pending.current.get(u.id), ...u });
-          return prev;
-        }
-        return prev.map((j) => (j.id === u.id ? mergeUpdate(j, u) : j));
-      });
+      // البطاقة تُضاف قبل أن يبدأ Rust (newJobId)، فلا تحديث يسبقها (T-18)
+      setJobs((prev) => prev.map((j) => (j.id === u.id ? mergeUpdate(j, u) : j)));
     });
     return () => {
       unlisten.then((f) => f());
@@ -307,12 +300,24 @@ export default function App() {
   }, [settings?.outputDir, defaultDir, pickDir]);
 
   const addJob = useCallback((id: number, job: Omit<Job, "id" | "state">) => {
-    const early = pending.current.get(id);
-    pending.current.delete(id);
-    const fresh = { id, state: "starting", ...job } as Job;
     api.rememberJob(id, job).catch(logError("rememberJob"));
-    setJobs((prev) => [early ? mergeUpdate(fresh, early) : fresh, ...prev]);
+    setJobs((prev) => [{ id, state: "starting", ...job } as Job, ...prev]);
   }, []);
+
+  /** يحجز رقمًا، يضيف البطاقة، ثم يبدأ العملية به. إن رفضها Rust تُزال البطاقة ويُرمى الخطأ */
+  const launch = useCallback(
+    async (job: Omit<Job, "id" | "state">, start: (id: number) => Promise<number>) => {
+      const id = await api.newJobId();
+      addJob(id, job);
+      try {
+        await start(id);
+      } catch (e) {
+        setJobs((prev) => prev.filter((j) => j.id !== id));
+        throw e;
+      }
+    },
+    [addJob],
+  );
 
   const startDownload = useCallback(
     async (request: DownloadRequest, meta: StartMeta, at?: number) => {
@@ -329,10 +334,9 @@ export default function App() {
         setJobs((prev) => [{ id: localId, state: "scheduled", at, ...base } as Job, ...prev]);
         return;
       }
-      const id = await api.startDownload(withHistory(request, base));
-      addJob(id, base);
+      await launch(base, (id) => api.startDownload(withHistory(request, base), id));
     },
-    [addJob],
+    [launch],
   );
 
   // فحص أسبوعي لتحديث yt-dlp، لمن فعّله فقط، وليس أثناء تنزيل (T-100)
@@ -414,10 +418,7 @@ export default function App() {
       for (const j of due) {
         const { request, title, meta, thumbnail } = j;
         const base = { type: "download" as const, request, title, meta, thumbnail };
-        api
-          .startDownload(withHistory(request!, base))
-          .then((id) => addJob(id, base))
-          .catch((e) => setJobs((prev) => [{ id: j.id, state: "error", error: asAppError(e), ...base } as Job, ...prev]));
+        launch(base, (id) => api.startDownload(withHistory(request!, base), id)).catch((e) => setJobs((prev) => [{ id: j.id, state: "error", error: asAppError(e), ...base } as Job, ...prev]));
       }
     };
     if (!scheduledLoaded) return;
@@ -429,14 +430,13 @@ export default function App() {
       window.clearInterval(iv);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [addJob, scheduledLoaded]);
+  }, [launch, scheduledLoaded]);
 
   const startConvert = useCallback(
     async (convert: ConvertRequest, title: string, meta: string) => {
-      const id = await api.startConvert(convert);
-      addJob(id, { type: "convert", convert, title, meta });
+      await launch({ type: "convert", convert, title, meta }, (id) => api.startConvert(convert, id));
     },
-    [addJob],
+    [launch],
   );
 
   /** يضيف ملفات للمحوّل ويقرأ معلوماتها */

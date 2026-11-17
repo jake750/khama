@@ -122,6 +122,7 @@ macro_rules! handlers_with {
             download::cancel_download,
             download::remember_job,
             download::list_jobs,
+            download::new_job_id,
             download::reveal_file,
             download::open_output_dir,
             download::save_thumbnail,

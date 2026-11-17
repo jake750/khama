@@ -98,13 +98,16 @@ pub fn spawn_watcher(app: AppHandle) {
                                 ..Default::default()
                             },
                         };
-                        if let Ok(id) = queue_convert(&app, request) {
-                            let hit = WatchHit {
-                                id,
-                                path: path.to_string_lossy().into_owned(),
-                                preset: w.preset.clone(),
-                            };
-                            let _ = app.emit("watch-file", hit);
+                        // نعلن الملف للواجهة قبل أن يبدأ التحويل، فتعرف العملية قبل أول تحديث (T-18)
+                        let id = app.state::<crate::download::Jobs>().next_id.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                        let hit = WatchHit {
+                            id,
+                            path: path.to_string_lossy().into_owned(),
+                            preset: w.preset.clone(),
+                        };
+                        let _ = app.emit("watch-file", hit);
+                        if let Err(e) = queue_convert(&app, request, Some(id)) {
+                            crate::download::emit(&app, crate::download::JobUpdate { id, state: "error", error: Some(e), ..Default::default() });
                         }
                     }
                 }

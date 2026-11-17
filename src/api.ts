@@ -292,8 +292,10 @@ export const api = {
   /** على الهاتف: ينسخ ملفات اختارها المستخدم (content://) داخل التطبيق ويعيد مساراتها */
   importFiles: (paths: string[]) => invoke<string[]>("import_files", { paths }),
   /** نرسل فرق التوقيت ليكون {today} في اسم الملف تاريخ اليوم المحلي */
-  startDownload: (request: DownloadRequest) =>
-    invoke<number>("start_download", { request: { ...request, tzOffsetMin: -new Date().getTimezoneOffset() } }),
+  startDownload: (request: DownloadRequest, id?: number) =>
+    invoke<number>("start_download", { request: { ...request, tzOffsetMin: -new Date().getTimezoneOffset() }, id }),
+  /** رقم لعملية ستبدأ: نضيف بطاقتها أولًا ثم نبدأها به، فلا يسبق تحديثٌ البطاقة (T-18) */
+  newJobId: () => invoke<number>("new_job_id"),
   cancelDownload: (id: number) => invoke<void>("cancel_download", { id }),
   /** بطاقة العملية تُحفظ في Rust لتُستعاد بعد إعادة تحميل الواجهة (T-17) */
   rememberJob: (id: number, card: object) => invoke<void>("remember_job", { id, card }),
@@ -304,7 +306,7 @@ export const api = {
   onJobUpdate: (cb: (u: JobUpdate) => void): Promise<UnlistenFn> => listen<JobUpdate>("job-update", (e) => cb(e.payload)),
   analyzeFile: (path: string) => invoke<MediaInfo>("analyze_file", { path }),
   hwEncoders: () => invoke<string[]>("hw_encoders"),
-  startConvert: (request: ConvertRequest) => invoke<number>("start_convert", { request }),
+  startConvert: (request: ConvertRequest, id?: number) => invoke<number>("start_convert", { request, id }),
   saveThumbnail: (url: string) => invoke<string>("save_thumbnail", { url }),
   getHistory: () => invoke<HistoryEntry[]>("get_history"),
   removeHistory: (id: number) => invoke<void>("remove_history", { id }),

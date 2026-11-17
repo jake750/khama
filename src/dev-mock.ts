@@ -157,9 +157,11 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         thumbnail: null,
         issues: ["vfr", "tenBit", "heavyCodec"],
       };
+    case "new_job_id":
+      return nextJob++;
     case "start_download":
     case "start_convert": {
-      const id = nextJob++;
+      const id = typeof args.id === "number" ? args.id : nextJob++;
       setTimeout(() => fakeJob(id), 50);
       return id;
     }

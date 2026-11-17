@@ -10,14 +10,13 @@ pub async fn start_download(
     queue: State<'_, DownloadQueue>,
     settings: State<'_, SettingsState>,
     request: DownloadRequest,
+    id: Option<u64>,
 ) -> Result<u64, AppError> {
     let mut req = request;
     req.url = validate_url(&req.url)?;
     let (history_url, history_kind, history_start) = (req.url.clone(), req.kind.clone(), req.history.take());
     let settings = settings.0.lock_ok().clone();
-    let id = jobs.next_id.fetch_add(1, Ordering::Relaxed) + 1;
-    let (tx, mut rx) = watch::channel(false);
-    jobs.cancels.lock_ok().insert(id, tx);
+    let (id, mut rx) = jobs.claim(id);
     let slots = queue.0.clone();
 
     let app2 = app.clone();

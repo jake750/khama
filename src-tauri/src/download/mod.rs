@@ -65,6 +65,26 @@ pub struct Jobs {
     pub(crate) cancels: Mutex<HashMap<u64, watch::Sender<bool>>>,
 }
 
+impl Jobs {
+    /// يحجز رقم العملية ويسجّل زر إلغائها. wanted = رقم أخذته الواجهة مسبقًا من new_job_id،
+    /// فتضيف البطاقة قبل أن يبدأ Rust ولا يصل تحديث لعملية لا تعرفها (T-18).
+    pub(crate) fn claim(&self, wanted: Option<u64>) -> (u64, watch::Receiver<bool>) {
+        let mut cancels = self.cancels.lock_ok();
+        let id = wanted
+            .filter(|id| *id > 0 && *id <= self.next_id.load(Ordering::Relaxed) && !cancels.contains_key(id))
+            .unwrap_or_else(|| self.next_id.fetch_add(1, Ordering::Relaxed) + 1);
+        let (tx, rx) = watch::channel(false);
+        cancels.insert(id, tx);
+        (id, rx)
+    }
+}
+
+/// رقم جديد لعملية ستبدأ: الواجهة تضيف بطاقتها أولًا ثم تبدأها بهذا الرقم (T-18)
+#[tauri::command]
+pub fn new_job_id(jobs: tauri::State<Jobs>) -> u64 {
+    jobs.next_id.fetch_add(1, Ordering::Relaxed) + 1
+}
+
 /// عدد التنزيلات التي تعمل معًا افتراضيًا. الباقي ينتظر دوره (مهم مع قوائم التشغيل الطويلة)
 const PARALLEL_DOWNLOADS: usize = 3;
 

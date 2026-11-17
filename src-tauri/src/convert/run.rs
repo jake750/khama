@@ -361,20 +361,18 @@ pub async fn import_files(app: AppHandle, paths: Vec<String>) -> Result<Vec<Stri
 }
 
 #[tauri::command]
-pub async fn start_convert(app: AppHandle, request: ConvertRequest) -> Result<u64, AppError> {
-    queue_convert(&app, request)
+pub async fn start_convert(app: AppHandle, request: ConvertRequest, id: Option<u64>) -> Result<u64, AppError> {
+    queue_convert(&app, request, id)
 }
 
 /// يضع تحويلًا في الطابور ويعيد رقمه. تستدعيه الواجهة ومراقبة المجلدات.
-pub fn queue_convert(app: &AppHandle, request: ConvertRequest) -> Result<u64, AppError> {
+pub fn queue_convert(app: &AppHandle, request: ConvertRequest, id: Option<u64>) -> Result<u64, AppError> {
     let jobs = app.state::<Jobs>();
     let queue = app.state::<ConvertQueue>();
     if preset(&request.preset).is_none() {
         return Err(AppError::with_param("unknownPreset", request.preset.clone(), ""));
     }
-    let id = jobs.next_id.fetch_add(1, Ordering::Relaxed) + 1;
-    let (tx, mut rx) = watch::channel(false);
-    jobs.cancels.lock_ok().insert(id, tx);
+    let (id, mut rx) = jobs.claim(id);
     let sem = queue.0.clone();
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
