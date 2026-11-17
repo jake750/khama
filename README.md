@@ -84,10 +84,12 @@ xattr -dr com.apple.quarantine /Applications/Khama.app
 
 ### Build from source
 
-Requirements: [Node.js](https://nodejs.org) 20+, [Rust](https://rustup.rs) (stable), and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS.
+Requirements: [Node.js](https://nodejs.org) 22+, [Rust](https://rustup.rs) 1.88+, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS.
+The toolchain is recent on purpose (TypeScript 6, Vite 8, React 19, Rust edition 2024); these minimums are the oldest versions CI builds with, and they are enforced: `engines` in `package.json`, `rust-version` in `Cargo.toml`, and `npm run dev` checks Node and missing packages first.
+`@tauri-apps/api` and the Rust `tauri` crate are kept on the same minor version (`~2.12`) because the bridge between them must match.
 
 ```bash
-npm install
+npm ci
 npm run fetch-binaries      # downloads yt-dlp, FFmpeg, Deno and verifies their SHA-256
 npm run tauri dev           # run in development
 npm run tauri build         # build an installer for your system
@@ -204,12 +206,12 @@ xattr -dr com.apple.quarantine /Applications/Khama.app
 
 ### البناء من الكود المصدري
 
-المتطلبات: Node.js 20 أو أحدث، وRust (الإصدار المستقر)، و[متطلبات Tauri](https://tauri.app/start/prerequisites/) لنظامك.
+المتطلبات: Node.js 22 أو أحدث، وRust 1.88 أو أحدث، و[متطلبات Tauri](https://tauri.app/start/prerequisites/) لنظامك. هذه أقدم نسخ يُبنى بها المشروع، ويفرضها `engines` و`rust-version`، و`npm run dev` يفحص نسخة Node والحزم الناقصة قبل التشغيل.
 
 </div>
 
 ```bash
-npm install
+npm ci
 npm run fetch-binaries      # ينزّل yt-dlp و FFmpeg و Deno ويتحقق من بصماتها
 npm run tauri dev           # تشغيل للتطوير
 npm run tauri build         # بناء ملف تثبيت لنظامك
