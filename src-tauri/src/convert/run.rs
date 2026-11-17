@@ -167,7 +167,8 @@ pub(super) async fn run_convert(
             .file_stem()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| "file".into());
-        let temp = dir.join(format!(".khama-{id}-part.{ext}"));
+        let parts = PartDir::new(&dir)?;
+        let temp = parts.0.join(format!("{id}-part.{ext}"));
         let start = o.start.filter(|v| *v > 0.0);
         let ok = separate::process_file(
             app,
@@ -256,9 +257,10 @@ pub(super) async fn run_convert(
     } else {
         format!("{stem} [{}].{}", p.suffix, p.ext)
     };
-    // نكتب باسم مخفي مؤقت في نفس المجلد، ثم نعيد التسمية (لحظية) عند النجاح
-    let temp = dir.join(format!(
-        ".khama-{id}-part{}",
+    // نكتب في مجلد مؤقت مخفي داخل مجلد الحفظ (نفس القرص)، ثم نعيد التسمية (لحظية) عند النجاح
+    let parts = PartDir::new(&dir)?;
+    let temp = parts.0.join(format!(
+        "{id}-part{}",
         if folder_out { String::new() } else { format!(".{}", p.ext) }
     ));
     let target = if folder_out {
@@ -325,6 +327,35 @@ pub(super) async fn run_convert(
         AppError::with_detail("moveFailed", e.to_string())
     })?;
     Ok(Some((deliver(app, dest).await?, None)))
+}
+
+/// مجلد مخفي للملفات غير المكتملة داخل مجلد الحفظ (T-52). كان الملف المؤقت يُكتب في مجلد
+/// الحفظ نفسه باسم يبدأ بنقطة، والنقطة لا تُخفي شيئًا في Windows، فقد يلتقطه برنامج المونتاج
+/// أو مجلد مراقَب. المجلد الفرعي لا يراه المراقِب (غير تكراري)، ويُعلَّم «مخفيًا» في Windows،
+/// ويُحذف حين يفرغ. على نفس القرص لتبقى إعادة التسمية لحظية.
+pub(super) struct PartDir(pub PathBuf);
+
+impl PartDir {
+    pub(super) fn new(dir: &Path) -> Result<Self, AppError> {
+        let p = dir.join(".khama-parts");
+        std::fs::create_dir_all(&p).map_err(|e| AppError::with_detail("outputDirCreate", e.to_string()))?;
+        #[cfg(windows)]
+        {
+            use std::os::windows::ffi::OsStrExt;
+            use windows_sys::Win32::Storage::FileSystem::{FILE_ATTRIBUTE_HIDDEN, SetFileAttributesW};
+            let wide: Vec<u16> = p.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+            // SAFETY: wide مسار منتهٍ بصفر
+            unsafe { SetFileAttributesW(wide.as_ptr(), FILE_ATTRIBUTE_HIDDEN) };
+        }
+        Ok(Self(p))
+    }
+}
+
+impl Drop for PartDir {
+    fn drop(&mut self) {
+        // يفشل إن لم يفرغ (تحويل آخر يعمل في نفس المجلد)، وهذا المطلوب
+        let _ = std::fs::remove_dir(&self.0);
+    }
 }
 
 /// على الهاتف: الناتج (ملف أو مجلد) يُنقل إلى Download/Khama العام

@@ -317,3 +317,18 @@ fn watched_folder_converts_files_that_arrived_while_closed() {
     assert!(!arrived_while_closed(500, Some(1_000)), "كان موجودًا");
     assert!(!arrived_while_closed(2_000, None), "مجلد أُضيف للتو: لا نلمس ما فيه");
 }
+
+#[test]
+fn part_dir_is_removed_once_empty() {
+    let out = std::env::temp_dir().join(format!("khama-parts-{}", std::process::id()));
+    std::fs::create_dir_all(&out).unwrap();
+    {
+        let parts = super::run::PartDir::new(&out).unwrap();
+        assert!(parts.0.is_dir());
+        std::fs::write(parts.0.join("1-part.mp4"), b"x").unwrap();
+        std::fs::rename(parts.0.join("1-part.mp4"), out.join("done.mp4")).unwrap();
+    }
+    assert!(!out.join(".khama-parts").exists());
+    assert!(out.join("done.mp4").exists());
+    let _ = std::fs::remove_dir_all(&out);
+}
