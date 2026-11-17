@@ -136,6 +136,26 @@ pub(super) fn release_slot(id: u64) {
     drop(permit);
 }
 
+/// حدّ مشترك للأعمال الثقيلة على المعالج (T-41): تحويل «جاهز للمونتاج» في التنزيلات،
+/// والمحوّل، وإزالة الموسيقى. لكلٍّ طابوره، لكن بلا هذا الحد قد تعمل كلها معًا وتخنق الجهاز.
+/// العدد: ربع الأنوية، بين 1 و3.
+pub(crate) fn heavy_limit(cores: usize) -> usize {
+    (cores / 4).clamp(1, 3)
+}
+
+static HEAVY: std::sync::LazyLock<Arc<Semaphore>> = std::sync::LazyLock::new(|| {
+    let cores = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+    Arc::new(Semaphore::new(heavy_limit(cores)))
+});
+
+/// ينتظر دور عمل ثقيل. None = أُلغيت العملية أثناء الانتظار
+pub(crate) async fn heavy_turn(cancel: &mut watch::Receiver<bool>) -> Option<tokio::sync::OwnedSemaphorePermit> {
+    tokio::select! {
+        p = HEAVY.clone().acquire_owned() => p.ok(),
+        _ = canceled(cancel) => None,
+    }
+}
+
 /// إزالة الموسيقى ثقيلة على المعالج والذاكرة: ملف واحد في كل مرة
 static SEPARATING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 

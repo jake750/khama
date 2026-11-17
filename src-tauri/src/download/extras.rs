@@ -446,6 +446,9 @@ pub(super) async fn finish(
                     ..Default::default()
                 },
             );
+            let Some(_heavy) = heavy_turn(cancel).await else {
+                return Ok(None);
+            };
             match convert_for_editing(app, id, tools, &file, &dir.join("conv"), &check, cancel).await? {
                 Some(converted) => file = converted,
                 None => return Ok(None),
@@ -479,6 +482,9 @@ pub(super) async fn finish(
         let _turn = tokio::select! {
             g = SEPARATING.lock() => g,
             _ = canceled(cancel) => return Ok(None),
+        };
+        let Some(_heavy) = heavy_turn(cancel).await else {
+            return Ok(None);
         };
         if !separate::process_file(
             app,

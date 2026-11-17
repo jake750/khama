@@ -389,9 +389,14 @@ pub fn queue_convert(app: &AppHandle, request: ConvertRequest, id: Option<u64>) 
             p = sem.acquire_owned() => p.ok(),
             _ = download::canceled(&mut rx) => None,
         };
-        let result = match permit {
-            Some(_) => run_convert(&app2, id, request, &mut rx).await,
-            None => Ok(None),
+        // ثم دورنا في الحدّ المشترك مع التنزيلات (T-41)
+        let heavy = match permit {
+            Some(_) => download::heavy_turn(&mut rx).await,
+            None => None,
+        };
+        let result = match (permit, heavy) {
+            (Some(_), Some(_)) => run_convert(&app2, id, request, &mut rx).await,
+            _ => Ok(None),
         };
         let update = match result {
             Ok(Some((path, markers))) => JobUpdate {

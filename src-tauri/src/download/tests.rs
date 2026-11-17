@@ -301,3 +301,11 @@ fn printed_meta_is_kept_per_job_until_taken() {
     assert_eq!(take_meta(777), (Some("أ".into()), Some("t.jpg".into())));
     assert_eq!(take_meta(777), (None, None));
 }
+
+#[test]
+fn heavy_work_limit_is_a_quarter_of_the_cores() {
+    assert_eq!(heavy_limit(1), 1);
+    assert_eq!(heavy_limit(4), 1);
+    assert_eq!(heavy_limit(8), 2);
+    assert_eq!(heavy_limit(32), 3);
+}
