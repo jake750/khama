@@ -153,6 +153,9 @@ pub(crate) async fn run_streaming(
     let stdout = child.stdout.take().expect("stdout piped");
     let stderr = child.stderr.take().expect("stderr piped");
 
+    // الترميز (T-94): yt-dlp يطبع UTF-8 (PYTHONUTF8=1)، وFFmpeg يطبع المسارات UTF-8 في كل الأنظمة
+    // (على Windows يأخذ وسائطه UTF-16 من النظام ويحوّلها). فـ from_utf8_lossy لا يستبدل إلا بايتات
+    // تالفة فعلًا. اختبار ffmpeg_output_keeps_arabic_file_names يتحقق بالأداة الحقيقية.
     // نجمع stderr في الخلفية؛ نحتفظ بآخر 2 إلى 4 ميغابايت (انظر أسفل) لأن نتائج كشف المشاهد تأتي فيه (T-64)
     let err_task = tokio::spawn(async move {
         let mut buf = String::new();

@@ -356,3 +356,31 @@ fn kill_tree_ends_grandchildren_through_the_job_object() {
         assert!(started.elapsed() < Duration::from_secs(5), "الأنبوب أُغلق: ping قُتل مع cmd");
     });
 }
+
+/// الترميز (T-94): FFmpeg على Windows يأخذ الوسائط UTF-16 من النظام ويطبع المسارات UTF-8،
+/// وyt-dlp يطبع UTF-8 لأننا نضبط PYTHONUTF8=1، فـ from_utf8_lossy لا يفقد شيئًا من العناوين العربية.
+/// يحتاج FFmpeg الحقيقي: KHAMA_FFMPEG=src-tauri/binaries/ffmpeg/bin/ffmpeg cargo test -- --ignored
+#[test]
+#[ignore]
+fn ffmpeg_output_keeps_arabic_file_names() {
+    let ffmpeg = PathBuf::from(std::env::var("KHAMA_FFMPEG").expect("KHAMA_FFMPEG"));
+    let dir = std::env::temp_dir().join(format!("khama-utf8-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("مقطع تجربة — ١.wav");
+    let made = std::process::Command::new(&ffmpeg)
+        .args(["-v", "error", "-y", "-f", "lavfi", "-i", "anullsrc", "-t", "0.1"])
+        .arg(&file)
+        .status()
+        .unwrap();
+    assert!(made.success());
+    let mut cmd = tokio::process::Command::new(&ffmpeg);
+    cmd.arg("-hide_banner").arg("-i").arg(&file);
+    // المرسل يبقى حيًّا: إسقاطه يُعدّ إلغاءً
+    let (_keep, mut cancel) = tokio::sync::watch::channel(false);
+    let out = tauri::async_runtime::block_on(run_streaming(cmd, &mut cancel, |_| {}));
+    let Ok(RunOutcome::Exited { stderr, .. }) = out else {
+        panic!("ffmpeg did not run: {:?}", out.err())
+    };
+    assert!(stderr.contains("مقطع تجربة — ١.wav"), "{stderr}");
+    let _ = std::fs::remove_dir_all(dir);
+}
