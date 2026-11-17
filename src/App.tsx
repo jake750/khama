@@ -3,7 +3,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { isPermissionGranted, sendNotification } from "@tauri-apps/plugin-notification";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, asAppError, type AppError, type ConvertRequest, type DownloadRequest, type JobUpdate, type Settings } from "./api";
 import { ConvertView, defaultOptions, MEDIA_FILTER, type SourceFile } from "./components/ConvertView";
 import { DownloadView, newDownloadSession, type StartMeta } from "./components/DownloadView";
@@ -139,9 +139,7 @@ export default function App() {
   const [updateRequest, setUpdateRequest] = useState(0);
   const [touring, setTouring] = useState(false);
   const jobsRef = useRef<Job[]>([]);
-  jobsRef.current = jobs;
   const settingsRef = useRef<Settings | null>(null);
-  settingsRef.current = settings;
   // التنزيلات المجدولة: بطاقات بـ id سالب (محلي)، تُحفظ في scheduled.json
   const nextLocalId = useRef(-1);
   // حالة شاشة التنزيل التي تبقى بين التبويبات (الرابط والمعاينة)
@@ -152,7 +150,6 @@ export default function App() {
   const i18n = useMemo(() => ({ lang, t: dictionaries[lang] }), [lang]);
   const { t } = i18n;
   const tRef = useRef(t);
-  tRef.current = t;
 
   const resolvedTheme = useTheme(settings?.theme);
   const [toastShown, toastLeaving] = usePresence(toastMsg, 260);
@@ -281,7 +278,13 @@ export default function App() {
     toastTimer.current = window.setTimeout(() => setToastMsg(null), action?.ms ?? 4000);
   }, []);
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
-  saveFailed.current = () => toast(t.settingsSaveFailed);
+  // أحدث القيم للمستمعين والمؤقّتات، تُحدَّث بعد الرسم لا أثناءه
+  useLayoutEffect(() => {
+    jobsRef.current = jobs;
+    settingsRef.current = settings;
+    tRef.current = t;
+    saveFailed.current = () => toast(t.settingsSaveFailed);
+  });
 
   /** مجلد حفظ جديد، ويُضاف لأعلى قائمة «مجلدات استخدمتها مؤخرًا» */
   const pickDir = useCallback(
