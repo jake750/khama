@@ -146,7 +146,7 @@ impl Default for Settings {
 
 pub struct SettingsState(pub Mutex<Settings>);
 
-fn config_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
+pub(crate) fn config_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
     let dir = app
         .path()
         .app_config_dir()

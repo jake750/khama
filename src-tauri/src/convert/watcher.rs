@@ -22,7 +22,7 @@ pub(super) struct WatchHit {
 /// ملفات الوسائط في المجلد (المسار، الحجم). يُستدعى خارج خيوط tokio لأن المجلد قد يكون
 /// على قرص شبكي بطيء (T-23). None = تعذّرت قراءة المجلد.
 #[cfg(desktop)]
-fn list_media(dir: &Path) -> Option<Vec<(PathBuf, u64)>> {
+fn list_media(dir: &Path) -> Option<Vec<(PathBuf, u64, u64)>> {
     let entries = std::fs::read_dir(dir).ok()?;
     Some(
         entries
@@ -35,7 +35,8 @@ fn list_media(dir: &Path) -> Option<Vec<(PathBuf, u64)>> {
                     .and_then(|x| x.to_str())
                     .is_some_and(|x| MEDIA_EXT.contains(&x.to_lowercase().as_str()));
                 let meta = e.metadata().ok().filter(|m| m.is_file())?;
-                (is_media && !hidden).then_some((path, meta.len()))
+                let modified = meta.modified().ok().map(ms_since_epoch).unwrap_or(0);
+                (is_media && !hidden).then_some((path, meta.len(), modified))
             })
             .collect(),
     )
@@ -45,8 +46,31 @@ fn list_media(dir: &Path) -> Option<Vec<(PathBuf, u64)>> {
 #[cfg(desktop)]
 pub const WATCH_OUT: &str = "Converted";
 
+#[cfg(desktop)]
+fn ms_since_epoch(t: std::time::SystemTime) -> u64 {
+    t.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
+/// آخر فحص لكل مجلد مراقَب، يبقى بعد إغلاق التطبيق (T-25)
+#[cfg(desktop)]
+type LastScans = std::collections::HashMap<String, u64>;
+
+#[cfg(desktop)]
+fn scans_path(app: &AppHandle) -> Option<PathBuf> {
+    settings::config_dir(app).ok().map(|d| d.join("watch-scans.json"))
+}
+
+/// أول فحص لمجلد بعد الإقلاع: ملف عُدّل بعد آخر فحص (وصل والتطبيق مغلق) يُحوَّل،
+/// وما قبله عولج أو كان موجودًا. مجلد بلا فحص سابق (أُضيف للتو): لا نلمس ما فيه.
+#[cfg(desktop)]
+pub(super) fn arrived_while_closed(modified_ms: u64, last_scan_ms: Option<u64>) -> bool {
+    last_scan_ms.is_some_and(|last| modified_ms > last)
+}
+
 /// يفحص المجلدات المراقَبة كل 4 ثوانٍ. الملف الجديد يُحوَّل بعد أن يثبت حجمه
-/// (أي انتهى نسخه إلى المجلد). الملفات الموجودة قبل بدء المراقبة لا تُلمس.
+/// (أي انتهى نسخه إلى المجلد). المجلد غير تكراري عمدًا: المجلد الفرعي Converted فيه الناتج.
+/// الاستطلاع لا أحداث النظام (notify) لأن المجلد كثيرًا ما يكون على قرص شبكي أو بطاقة كاميرا
+/// لا تصل منها أحداث التغيير، وقراءة مجلد كل 4 ثوانٍ رخيصة.
 #[cfg(desktop)]
 pub fn spawn_watcher(app: AppHandle) {
     use std::collections::{HashMap, HashSet};
@@ -55,6 +79,13 @@ pub fn spawn_watcher(app: AppHandle) {
         let mut known_dirs: HashSet<PathBuf> = HashSet::new();
         let mut seen: HashSet<PathBuf> = HashSet::new();
         let mut pending: HashMap<PathBuf, (u64, u8)> = HashMap::new();
+        let scans_file = scans_path(&app);
+        let mut last_scans: LastScans = scans_file
+            .as_deref()
+            .map(|p| crate::persist::read_json(p).or_default_logged("watch-scans.json"))
+            .unwrap_or_default();
+        let mut saved_at = Instant::now();
+        let mut queued_any = false;
         loop {
             tokio::time::sleep(Duration::from_secs(4)).await;
             let folders = app.state::<SettingsState>().0.lock_ok().watch_folders.clone();
@@ -66,15 +97,20 @@ pub fn spawn_watcher(app: AppHandle) {
                     let dir = dir.clone();
                     move || list_media(&dir)
                 });
+                let scan_started = ms_since_epoch(std::time::SystemTime::now());
                 let Ok(Some(entries)) = listing.await else {
                     continue;
                 };
                 let first_scan = known_dirs.insert(dir.clone());
-                for (path, size) in entries {
+                let previous_scan = last_scans.insert(w.dir.clone(), scan_started);
+                // ملف حُذف أو نُقل لم يعد في «seen»، فلا تكبر بلا حد
+                seen.retain(|p| p.parent() != Some(dir.as_path()) || entries.iter().any(|(e, _, _)| e == p));
+                pending.retain(|p, _| p.parent() != Some(dir.as_path()) || entries.iter().any(|(e, _, _)| e == p));
+                for (path, size, modified) in entries {
                     if seen.contains(&path) {
                         continue;
                     }
-                    if first_scan {
+                    if first_scan && !arrived_while_closed(modified, previous_scan) {
                         seen.insert(path);
                         continue;
                     }
@@ -106,10 +142,21 @@ pub fn spawn_watcher(app: AppHandle) {
                             preset: w.preset.clone(),
                         };
                         let _ = app.emit("watch-file", hit);
+                        queued_any = true;
                         if let Err(e) = queue_convert(&app, request, Some(id)) {
                             crate::download::emit(&app, crate::download::JobUpdate { id, state: "error", error: Some(e), ..Default::default() });
                         }
                     }
+                }
+            }
+            // نحفظ أوقات الفحص كل دقيقة لا كل 4 ثوانٍ، وفورًا بعد بدء تحويل
+            // (وإلا قد يُحوَّل الملف نفسه مرة أخرى في الإقلاع التالي)
+            if (queued_any || saved_at.elapsed() >= Duration::from_secs(60)) && let Some(p) = &scans_file {
+                saved_at = Instant::now();
+                queued_any = false;
+                last_scans.retain(|d, _| active.iter().any(|w| &w.dir == d));
+                if let Ok(json) = serde_json::to_vec(&last_scans) {
+                    let _ = crate::persist::write_atomic(p, &json);
                 }
             }
         }

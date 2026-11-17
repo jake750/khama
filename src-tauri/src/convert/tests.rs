@@ -308,3 +308,12 @@ fn hw_cache_is_reused_only_for_the_same_key_and_age() {
     assert_eq!(hw_cache_valid(&cache, "0.3.2|10|20", 2_000), None, "إصدار جديد = فحص جديد");
     assert_eq!(hw_cache_valid(&cache, "0.3.1|10|20", 1_000 + HW_CACHE_TTL_MS), None, "انتهت المدة");
 }
+
+#[cfg(desktop)]
+#[test]
+fn watched_folder_converts_files_that_arrived_while_closed() {
+    use super::watcher::arrived_while_closed;
+    assert!(arrived_while_closed(2_000, Some(1_000)), "وصل بعد آخر فحص");
+    assert!(!arrived_while_closed(500, Some(1_000)), "كان موجودًا");
+    assert!(!arrived_while_closed(2_000, None), "مجلد أُضيف للتو: لا نلمس ما فيه");
+}
