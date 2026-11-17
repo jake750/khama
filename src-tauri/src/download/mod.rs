@@ -163,6 +163,12 @@ static SEPARATING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 #[serde(rename_all = "camelCase")]
 pub struct DownloadRequest {
     pub url: String,
+    /// مدة الأغنية كما في سبوتيفاي (ثوانٍ)، لاختيار النتيجة المطابقة من بحث YouTube Music (T-46)
+    #[serde(default)]
+    pub expect_duration: Option<f64>,
+    /// عنوان الأغنية كما في سبوتيفاي، للغرض نفسه
+    #[serde(default)]
+    pub expect_title: Option<String>,
     /// فرق توقيت الجهاز عن UTC بالدقائق (من الواجهة)، ليكون {today} تاريخ اليوم المحلي (T-65)
     #[serde(default)]
     pub tz_offset_min: i32,

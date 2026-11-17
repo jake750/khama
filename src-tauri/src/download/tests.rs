@@ -384,3 +384,37 @@ fn ffmpeg_output_keeps_arabic_file_names() {
     assert!(stderr.contains("مقطع تجربة — ١.wav"), "{stderr}");
     let _ = std::fs::remove_dir_all(dir);
 }
+
+#[test]
+fn spotify_song_picks_the_matching_result() {
+    let hits = |v: &[(&str, &str, Option<f64>)]| {
+        v.iter()
+            .map(|(u, t, d)| SongHit {
+                url: u.to_string(),
+                title: t.to_string(),
+                duration: *d,
+            })
+            .collect::<Vec<_>>()
+    };
+    let r = hits(&[
+        ("live", "Hello (Live at the BBC)", None),
+        ("studio", "Hello", None),
+        ("other", "Hello Again", None),
+    ]);
+    assert_eq!(best_song(&r, Some("Hello"), None).as_deref(), Some("studio"), "العنوان نفسه");
+    let r = hits(&[("a", "Song", Some(260.0)), ("b", "Song", Some(199.0))]);
+    assert_eq!(best_song(&r, Some("Song"), Some(198.8)).as_deref(), Some("b"), "المدة الأقرب");
+    let r = hits(&[("cover", "Song - Live", None), ("x", "Unrelated", None)]);
+    assert_eq!(
+        best_song(&r, Some("Song (Live)"), None).as_deref(),
+        Some("cover"),
+        "الحية مطلوبة فعلًا"
+    );
+    let r = hits(&[("first", "A", None), ("second", "B", None)]);
+    assert_eq!(
+        best_song(&r, Some("Zzz"), None).as_deref(),
+        Some("first"),
+        "لا تطابق: ترتيب YouTube Music"
+    );
+    assert_eq!(best_song(&[], Some("x"), None), None);
+}

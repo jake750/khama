@@ -196,6 +196,9 @@ export interface PlaylistEntry {
 
 export interface DownloadRequest {
   url: string;
+  /** عنوان الأغنية ومدتها في سبوتيفاي: Rust يختار نتيجة بحث YouTube Music المطابقة لهما */
+  expectDuration?: number | null;
+  expectTitle?: string | null;
   kind: Kind;
   videoFormat: VideoFormat;
   audioFormat: AudioFormat;

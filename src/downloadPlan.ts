@@ -111,7 +111,13 @@ export function planDownloads(p: PlanInput): PlannedDownload[] {
         const e = entries[i];
         const removeHere = !!stems && (p.stemsScope === "all" || p.picked.has(i));
         return {
-          request: { ...base(e.url, original), stems: removeHere ? stems : null, subdir: p.info!.title },
+          request: {
+            ...base(e.url, original),
+            stems: removeHere ? stems : null,
+            subdir: p.info!.title,
+            expectDuration: e.duration ?? null,
+            expectTitle: e.title || null,
+          },
           title: e.title,
           thumbnail: e.thumbnail,
         };

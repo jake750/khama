@@ -81,6 +81,96 @@ pub(super) fn release_job_dir(key: Option<String>) {
     }
 }
 
+/// أغنية من سبوتيفاي (T-46): كانت تُنزَّل أول نتيجة لبحث YouTube Music كما هي، فقد تكون
+/// نسخة حية أو غلافًا أو أغنية أخرى. نقرأ أول 5 نتائج (بلا فتح كل واحدة) ونختار الأنسب.
+/// None = نترك البحث كما هو (yt-dlp يأخذ أول نتيجة).
+async fn pick_song(tools: &Tools, cookies: &[String], req: &DownloadRequest) -> Option<String> {
+    if req.expect_title.is_none() && req.expect_duration.is_none() {
+        return None;
+    }
+    let mut args = tools::ytdlp_base_args(tools);
+    args.extend(cookies.iter().cloned());
+    args.extend(["-J", "--flat-playlist", "--playlist-items", "1:5", "--"].map(String::from));
+    args.push(req.url.clone());
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    let (ok, out, _) = run_probe(tools, &args, false).await.ok()?;
+    let json: serde_json::Value = serde_json::from_str(&out).ok().filter(|_| ok)?;
+    let found: Vec<SongHit> = json["entries"]
+        .as_array()?
+        .iter()
+        .filter_map(|e| {
+            Some(SongHit {
+                url: e["url"].as_str().or(e["webpage_url"].as_str())?.to_string(),
+                title: e["title"].as_str().unwrap_or_default().to_string(),
+                duration: e["duration"].as_f64(),
+            })
+        })
+        .collect();
+    best_song(&found, req.expect_title.as_deref(), req.expect_duration)
+}
+
+pub(super) struct SongHit {
+    pub url: String,
+    pub title: String,
+    pub duration: Option<f64>,
+}
+
+/// كلمات تعني نسخة غير الأصلية، إلا إن كانت في عنوان سبوتيفاي نفسه
+const VARIANTS: &[&str] = &[
+    "live",
+    "cover",
+    "remix",
+    "karaoke",
+    "instrumental",
+    "acoustic",
+    "sped up",
+    "slowed",
+    "مباشر",
+    "ريمكس",
+];
+
+fn norm(s: &str) -> String {
+    s.to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { ' ' })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// أعلى نقاطًا: العنوان نفسه، ثم يحتويه، والمدة القريبة (10 ثوانٍ أو 5%) إن عُرفت،
+/// وخصم لنسخة حية أو غلاف لم تُطلب. التعادل لترتيب YouTube Music. لا نتائج = None
+pub(super) fn best_song(found: &[SongHit], title: Option<&str>, duration: Option<f64>) -> Option<String> {
+    let want = title.map(norm).unwrap_or_default();
+    let score = |h: &SongHit| {
+        let got = norm(&h.title);
+        let mut s = 0i32;
+        if !want.is_empty() {
+            if got == want {
+                s += 4;
+            } else if got.contains(&want) {
+                s += 2;
+            }
+            if VARIANTS.iter().any(|v| got.contains(v) && !want.contains(v)) {
+                s -= 5;
+            }
+        }
+        if let (Some(d), Some(e)) = (h.duration, duration) {
+            s += if (d - e).abs() <= (e * 0.05).max(10.0) { 3 } else { -3 };
+        }
+        s
+    };
+    let mut best: Option<(&SongHit, i32)> = None;
+    for h in found {
+        let sc = score(h);
+        if best.is_none_or(|(_, b)| sc > b) {
+            best = Some((h, sc));
+        }
+    }
+    best.map(|(h, _)| h.url.clone())
+}
+
 pub(super) async fn run_job(
     app: &AppHandle,
     id: u64,
@@ -90,6 +180,12 @@ pub(super) async fn run_job(
     cancel: &mut watch::Receiver<bool>,
 ) -> Result<Option<PathBuf>, AppError> {
     let tools = tools::resolve(app)?;
+    let mut req = req;
+    if req.url.starts_with(playlist::MUSIC_SEARCH)
+        && let Some(url) = pick_song(&tools, &cookie_args(app, &settings), &req).await
+    {
+        req.url = url;
+    }
     // على الهاتف: ننهي الملف داخل التطبيق ثم ننقله إلى Download/Khama العام
     #[cfg(mobile)]
     let final_dir = jobs_root(app)?.join("ready");
