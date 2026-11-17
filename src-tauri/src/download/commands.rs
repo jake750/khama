@@ -52,7 +52,11 @@ pub async fn start_download(
                 ..Default::default()
             },
         );
-        let job_dir = jobs_root(&app2).map(|r| r.join(id.to_string()));
+        let claimed = jobs_root(&app2).map(|r| claim_job_dir(&r, id, &req));
+        let (job_dir, dir_key) = match claimed {
+            Ok((d, k)) => (Ok(d), k),
+            Err(e) => (Err(e), None),
+        };
         let result = match &job_dir {
             Ok(dir) => run_job(&app2, id, req, settings, dir, &mut rx).await,
             Err(e) => Err(e.clone()),
@@ -84,9 +88,13 @@ pub async fn start_download(
             },
         };
         release_slot(id);
-        if let Ok(dir) = job_dir {
+        // بعد خطأ (انقطاع الشبكة مثلًا) يبقى المجلد، فتكمل «أعد المحاولة» من حيث توقّف (T-56)
+        if let Ok(dir) = job_dir
+            && update.state != "error"
+        {
             let _ = tokio::fs::remove_dir_all(dir).await;
         }
+        release_job_dir(dir_key);
         app2.state::<Jobs>().cancels.lock_ok().remove(&id);
         let printed = take_meta(id);
         // السجلّ يُكتب هنا في Rust قبل إعلان الانتهاء (T-19): حين تستقبل الواجهة "done" يكون موجودًا

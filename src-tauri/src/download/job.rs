@@ -10,10 +10,66 @@ pub(crate) fn jobs_root(app: &AppHandle) -> Result<PathBuf, AppError> {
         .join("jobs"))
 }
 
-/// يُستدعى عند بدء التطبيق: يحذف بقايا عمليات قديمة (لو أُغلق التطبيق فجأة)
+/// كم يبقى تنزيل منقطع قابلًا للاستكمال
+const RESUME_FOR: std::time::Duration = std::time::Duration::from_secs(3 * 24 * 3600);
+
+/// يُستدعى عند بدء التطبيق: يحذف بقايا عمليات قديمة (لو أُغلق التطبيق فجأة)،
+/// ويُبقي مجلدات التنزيلات المنقطعة الحديثة (r…) ليكمل منها طلب التنزيل نفسه (T-56)
 pub fn clean_stale_jobs(app: &AppHandle) {
-    if let Ok(root) = jobs_root(app) {
-        let _ = std::fs::remove_dir_all(root);
+    let Ok(entries) = jobs_root(app).and_then(|r| std::fs::read_dir(r).map_err(AppError::from)) else {
+        return;
+    };
+    for e in entries.flatten() {
+        let fresh = e
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.elapsed().ok())
+            .is_some_and(|age| age < RESUME_FOR);
+        if !(is_resumable_dir(&e.file_name().to_string_lossy()) && fresh) {
+            let p = e.path();
+            let _ = if p.is_dir() { std::fs::remove_dir_all(p) } else { std::fs::remove_file(p) };
+        }
+    }
+}
+
+pub(super) fn is_resumable_dir(name: &str) -> bool {
+    name.len() == 17 && name.starts_with('r') && name[1..].bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// اسم مجلد العمل لطلب تنزيل: ثابت للطلب نفسه (الرابط والخيارات)، فإن انقطع التنزيل
+/// (إغلاق التطبيق، انقطاع الكهرباء) وطُلب مرة أخرى، وجد yt-dlp ملف .part فأكمل منه (T-56)
+pub(super) fn resume_key(req: &DownloadRequest) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    format!("{req:?}").hash(&mut h);
+    format!("r{:016x}", h.finish())
+}
+
+/// مجلدات عمل مستعملة الآن: طلبان متطابقان معًا لا يتشاركان مجلدًا
+static ACTIVE_DIRS: Mutex<Option<std::collections::HashSet<String>>> = Mutex::new(None);
+
+/// يحجز مجلد العمل. للاستكمال نُبقي ما نزّله yt-dlp (work للأجزاء، out لما اكتمل)
+/// ونحذف ما بعده من مراحل (تحويل، فصل) لتُعاد من أولها
+pub(super) fn claim_job_dir(root: &Path, id: u64, req: &DownloadRequest) -> (PathBuf, Option<String>) {
+    let key = resume_key(req);
+    let mut active = ACTIVE_DIRS.lock_ok();
+    if !active.get_or_insert_with(Default::default).insert(key.clone()) {
+        return (root.join(id.to_string()), None);
+    }
+    let dir = root.join(&key);
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for e in entries.flatten().filter(|e| e.file_name() != "work" && e.file_name() != "out") {
+            let p = e.path();
+            let _ = if p.is_dir() { std::fs::remove_dir_all(p) } else { std::fs::remove_file(p) };
+        }
+    }
+    (dir, Some(key))
+}
+
+pub(super) fn release_job_dir(key: Option<String>) {
+    if let (Some(k), Some(set)) = (key, ACTIVE_DIRS.lock_ok().as_mut()) {
+        set.remove(&k);
     }
 }
 

@@ -309,3 +309,27 @@ fn heavy_work_limit_is_a_quarter_of_the_cores() {
     assert_eq!(heavy_limit(8), 2);
     assert_eq!(heavy_limit(32), 3);
 }
+
+#[test]
+fn resume_dir_is_stable_per_request_and_not_shared() {
+    let req = |url: &str| DownloadRequest { url: url.into(), ..Default::default() };
+    let (a, b) = (resume_key(&req("https://x.com/1")), resume_key(&req("https://x.com/1")));
+    assert_eq!(a, b, "الطلب نفسه = المجلد نفسه");
+    assert_ne!(a, resume_key(&req("https://x.com/2")));
+    assert!(is_resumable_dir(&a));
+    assert!(!is_resumable_dir("ready") && !is_resumable_dir("12"));
+
+    let root = std::env::temp_dir().join(format!("khama-resume-{}", std::process::id()));
+    let r = req("https://x.com/resume-test");
+    let work = root.join(resume_key(&r)).join("work");
+    std::fs::create_dir_all(&work).unwrap();
+    std::fs::write(work.join("v.mp4.part"), b"half").unwrap();
+    std::fs::create_dir_all(root.join(resume_key(&r)).join("conv")).unwrap();
+    let (dir, key) = claim_job_dir(&root, 7, &r);
+    assert!(dir.join("work/v.mp4.part").exists(), "الجزء المنزّل يبقى");
+    assert!(!dir.join("conv").exists(), "المراحل اللاحقة تُعاد");
+    let (other, none) = claim_job_dir(&root, 8, &r);
+    assert_eq!((other, none), (root.join("8"), None), "طلب مطابق يعمل الآن: مجلد خاص");
+    release_job_dir(key);
+    let _ = std::fs::remove_dir_all(&root);
+}
