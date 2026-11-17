@@ -39,6 +39,11 @@ pub(crate) async fn canceled(rx: &mut watch::Receiver<bool>) {
     let _ = rx.wait_for(|c| *c).await;
 }
 
+/// مهلة الصمت: yt-dlp وFFmpeg يطبعان التقدّم عدة مرات في الثانية (--newline، -progress)،
+/// فعملية لم تطبع سطرًا واحدًا 15 دقيقة عالقة، تُقتل ويظهر خطأ بدل انتظار بلا نهاية (T-93).
+/// مهلة صمت لا حدّ للمدة الكلية، فتحويل طويل يبقى سليمًا ما دام يتقدّم.
+const STALL_AFTER: Duration = Duration::from_secs(15 * 60);
+
 /// يشغّل أمرًا، ويمرّر كل سطر من مخرجاته إلى on_line، ويوقفه إن ضغط المستخدم إلغاء
 pub(crate) async fn run_streaming(
     mut cmd: Command,
@@ -71,8 +76,13 @@ pub(crate) async fn run_streaming(
     let mut lines = BufReader::new(stdout).split(b'\n');
     loop {
         tokio::select! {
-            seg = lines.next_segment() => match seg {
-                Ok(Some(l)) => on_line(String::from_utf8_lossy(&l).trim_end_matches('\r')),
+            seg = tokio::time::timeout(STALL_AFTER, lines.next_segment()) => match seg {
+                Ok(Ok(Some(l))) => on_line(String::from_utf8_lossy(&l).trim_end_matches('\r')),
+                // لا سطر واحد طوال المهلة: العملية عالقة (T-93)
+                Err(_) => {
+                    kill_tree(&mut child).await;
+                    return Err(AppError::with_detail("processStalled", format!("no output for {}s", STALL_AFTER.as_secs())));
+                }
                 _ => break,
             },
             _ = canceled(cancel) => {
