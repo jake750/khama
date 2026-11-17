@@ -418,3 +418,35 @@ fn spotify_song_picks_the_matching_result() {
     );
     assert_eq!(best_song(&[], Some("x"), None), None);
 }
+
+/// سبوتيفاي (T-45): نقرأ قائمة الأغاني من صفحة المشغّل المضمَّن، وأي تغيير في سبوتيفاي يكسرها
+/// بصمت. هذا الاختبار يجلب قائمة رسمية حقيقية ويتحقق أن الأسماء والمدد ما زالت تُقرأ.
+/// يعمل أسبوعيًا في .github/workflows/canary.yml، ومحليًا:
+/// KHAMA_YTDLP=src-tauri/binaries/khama-yt-dlp-<triple> cargo test spotify_live -- --ignored
+#[test]
+#[ignore]
+fn spotify_live_embed_page_still_parses() {
+    let tools = Tools {
+        ytdlp: PathBuf::from(std::env::var("KHAMA_YTDLP").expect("KHAMA_YTDLP")),
+        ytdlp_prefix: vec![],
+        env: vec![],
+        js_runtime: String::new(),
+        ffmpeg: PathBuf::new(),
+        ffprobe: PathBuf::new(),
+        ffmpeg_dir: PathBuf::new(),
+    };
+    // «Today's Top Hits» من حساب سبوتيفاي نفسه: لا تُحذف، وفيها 50 أغنية دائمًا
+    let embed = crate::playlist::spotify_embed_url("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M").unwrap();
+    let info = tauri::async_runtime::block_on(probe_spotify(&tools, embed)).expect("spotify page");
+    let entries = info.entries.expect("entries");
+    assert!(entries.len() >= 10, "{} أغنية فقط", entries.len());
+    assert!(
+        entries
+            .iter()
+            .all(|e| !e.title.is_empty() && e.url.starts_with(crate::playlist::MUSIC_SEARCH))
+    );
+    assert!(
+        entries.iter().filter(|e| e.duration.is_some()).count() >= entries.len() / 2,
+        "المدد لم تعد تُقرأ"
+    );
+}

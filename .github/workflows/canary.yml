@@ -1,0 +1,38 @@
+# فحص أسبوعي لما يعتمد على مواقع خارجية وقد ينكسر دون أي تغيير في كودنا (T-45):
+# صفحة سبوتيفاي المضمَّنة، وأسماء الملفات العربية في مخرجات FFmpeg الحقيقي.
+# يفشل = يصل بريد من GitHub لصاحب المستودع. يدويًا: Actions ← Canary ← Run workflow.
+name: Canary
+
+on:
+  schedule:
+    - cron: "17 6 * * 1" # كل اثنين
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Linux system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Bundled tools (yt-dlp, FFmpeg)
+        run: node scripts/fetch-binaries.mjs x86_64-unknown-linux-gnu
+      - name: Live tests
+        env:
+          KHAMA_YTDLP: ${{ github.workspace }}/src-tauri/binaries/khama-yt-dlp-x86_64-unknown-linux-gnu
+          KHAMA_FFMPEG: ${{ github.workspace }}/src-tauri/binaries/ffmpeg/bin/ffmpeg
+          LD_LIBRARY_PATH: ${{ github.workspace }}/src-tauri/binaries/ffmpeg/lib
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib -- --ignored spotify_live ffmpeg_output_keeps
