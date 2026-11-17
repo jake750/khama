@@ -54,6 +54,14 @@ const MODEL: Asset = Asset {
     name: "UVR-MDX-NET-Voc_FT.onnx",
 };
 
+/// نسخ احتياطية للنموذج نفسه (T-39): المصدر الأصلي مستودع طرف ثالث قد يُحذف. كل نسخة تُفحص
+/// بالبصمة نفسها فوق (Hugging Face يعلن البصمة في X-Linked-ETag، وطابقت عند الإضافة 2026-11-17)،
+/// فنسخة معدّلة تُرفض كما يُرفض الأصل.
+const MODEL_MIRRORS: &[&str] = &[
+    "https://huggingface.co/Blane187/all_public_uvr_models/resolve/main/UVR-MDX-NET-Voc_FT.onnx",
+    "https://huggingface.co/AI4future/RVC/resolve/main/UVR-MDX-NET-Voc_FT.onnx",
+];
+
 const ORT_BASE: &str = "https://github.com/microsoft/onnxruntime/releases/download/v1.22.0/";
 
 #[cfg(all(windows, target_arch = "x86_64"))]
@@ -308,11 +316,12 @@ pub async fn ensure_assets(app: &AppHandle, id: u64, cancel: &mut watch::Receive
         if !needed {
             continue;
         }
-        let url = if asset.url.starts_with("http") {
+        let primary = if asset.url.starts_with("http") {
             asset.url.to_string()
         } else {
             format!("{ORT_BASE}{}", asset.url)
         };
+        let mirrors: &[&str] = if asset.name == MODEL.name { MODEL_MIRRORS } else { &[] };
         let tmp = dir.join(format!("{}.download", asset.name));
         let base = done_before;
         let mut on_bytes = |b: u64| {
@@ -329,13 +338,28 @@ pub async fn ensure_assets(app: &AppHandle, id: u64, cancel: &mut watch::Receive
                 );
             }
         };
-        if !fetch(app, &url, &tmp, &mut on_bytes, cancel).await? {
-            return Ok(None);
-        }
-        let hash = sha256_file(&tmp)?;
-        if hash != asset.sha256 {
+        // المصدر الأصلي، ثم النسخ الاحتياطية: أول ملف بالبصمة الصحيحة
+        let mut failure = None;
+        for url in std::iter::once(primary).chain(mirrors.iter().map(|m| m.to_string())) {
+            match fetch(app, &url, &tmp, &mut on_bytes, cancel).await {
+                Ok(false) => return Ok(None),
+                Ok(true) => {}
+                Err(e) => {
+                    log::warn!("{} from {url}: {e:?}", asset.name);
+                    failure = Some(e);
+                    continue;
+                }
+            }
+            let hash = sha256_file(&tmp)?;
+            if hash == asset.sha256 {
+                failure = None;
+                break;
+            }
             let _ = std::fs::remove_file(&tmp);
-            return Err(AppError::with_detail("aiChecksum", format!("{}: {hash}", asset.name)));
+            failure = Some(AppError::with_detail("aiChecksum", format!("{}: {hash}", asset.name)));
+        }
+        if let Some(e) = failure {
+            return Err(e);
         }
         let dest = dir.join(asset.name);
         match asset.member {
