@@ -42,13 +42,26 @@ export function useSlidingIndicator(container: RefObject<HTMLElement | null>, se
     placed: boolean;
     ro: ResizeObserver | null;
     mo: MutationObserver | null;
+    frame: number;
   }>({
     box: null,
     dep: undefined,
     placed: false,
     ro: null,
     mo: null,
+    frame: 0,
   });
+
+  // المراقبون يُطلقون نداءً لكل زر تغيّر حجمه (عشرة أزرار = عشرة قياسات متتالية): نجمعها
+  // في قياس واحد قبل الرسم التالي، فلا تتناوب القراءة والكتابة على التخطيط (T-86)
+  const placeSoon = () => {
+    const s = state.current;
+    if (s.frame) return;
+    s.frame = requestAnimationFrame(() => {
+      s.frame = 0;
+      place(false);
+    });
+  };
 
   const place = (animate: boolean) => {
     const s = state.current;
@@ -100,12 +113,12 @@ export function useSlidingIndicator(container: RefObject<HTMLElement | null>, se
       s.dep = dep;
       if (!box) return;
       // تغيّر الخط/اللغة/حجم النافذة: نعيد القياس بلا حركة
-      s.ro = new ResizeObserver(() => place(false));
+      s.ro = new ResizeObserver(placeSoon);
       s.ro.observe(box);
       // تبديل اتجاه الصفحة (عربي ↔ إنجليزي) يعكس أماكن الخيارات دون أن تتغيّر أحجامها،
       // فلا يلاحظه ResizeObserver: نراقب dir على الصفحة ونعيد القياس
       s.mo?.disconnect();
-      s.mo = new MutationObserver(() => place(false));
+      s.mo = new MutationObserver(placeSoon);
       s.mo.observe(document.documentElement, { attributes: true, attributeFilter: ["dir"] });
       box.querySelectorAll("button").forEach((b) => s.ro?.observe(b));
       place(false);
@@ -121,6 +134,8 @@ export function useSlidingIndicator(container: RefObject<HTMLElement | null>, se
     () => () => {
       state.current.ro?.disconnect();
       state.current.mo?.disconnect();
+      cancelAnimationFrame(state.current.frame);
+      state.current.frame = 0;
       // إن رُكّب المكوّن من جديد (StrictMode يفعل ذلك) نعيد إنشاء المراقبين
       state.current.box = null;
     },
