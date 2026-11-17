@@ -310,6 +310,7 @@ export default function App() {
     const early = pending.current.get(id);
     pending.current.delete(id);
     const fresh = { id, state: "starting", ...job } as Job;
+    api.rememberJob(id, job).catch(logError("rememberJob"));
     setJobs((prev) => [early ? mergeUpdate(fresh, early) : fresh, ...prev]);
   }, []);
 
@@ -357,6 +358,18 @@ export default function App() {
       return;
     }
     api.cancelDownload(j.id);
+  }, []);
+
+  // العمليات التي ما زالت تعمل في Rust بعد إعادة تحميل الواجهة (T-17)
+  useEffect(() => {
+    api
+      .listJobs()
+      .then((live) => {
+        const cards = (live ?? []).filter((j) => typeof j.type === "string") as unknown as Job[];
+        if (!cards.length) return;
+        setJobs((prev) => [...cards.filter((c) => !prev.some((j) => j.id === c.id)), ...prev]);
+      })
+      .catch(logError("listJobs"));
   }, []);
 
   // استرجاع المجدولة المحفوظة عند الفتح (ما فات وقته يبدأ فورًا عبر الفاحص)

@@ -385,11 +385,54 @@ pub(super) fn parse_meta_line(rest: &str) -> Option<(Option<String>, Option<Stri
     (title.is_some() || thumbnail.is_some()).then_some((title, thumbnail))
 }
 
+/// حال كل عملية جارية كما يعرفها Rust (T-17): بطاقة الواجهة + آخر تحديث مدموج.
+/// لو أُعيد تحميل الواجهة (أو فُتحت النافذة من شريط المهام) تستعيد القائمة بـ list_jobs
+/// بدل أن تستمر التنزيلات في الخلفية والواجهة لا تعرف عنها.
+static LIVE: Mutex<Option<HashMap<u64, serde_json::Map<String, serde_json::Value>>>> = Mutex::new(None);
+
+fn track_live(u: &JobUpdate) {
+    let mut guard = LIVE.lock_ok();
+    let live = guard.get_or_insert_with(HashMap::new);
+    if matches!(u.state, "done" | "error" | "canceled") {
+        live.remove(&u.id);
+        return;
+    }
+    if let Ok(serde_json::Value::Object(fields)) = serde_json::to_value(u) {
+        live.entry(u.id).or_default().extend(fields);
+    }
+}
+
+/// الواجهة تسجّل بطاقة العملية (العنوان، الطلب، النوع) لتستعيدها بعد إعادة التحميل
+#[tauri::command]
+pub fn remember_job(jobs: tauri::State<Jobs>, id: u64, card: serde_json::Map<String, serde_json::Value>) {
+    // انتهت قبل أن تصل البطاقة: لا نعيد إحياءها
+    if !jobs.cancels.lock_ok().contains_key(&id) {
+        return;
+    }
+    let mut guard = LIVE.lock_ok();
+    let entry = guard.get_or_insert_with(HashMap::new).entry(id).or_default();
+    // التحديثات أحدث من البطاقة: تبقى فوقها
+    let mut merged = card;
+    merged.insert("id".into(), id.into());
+    merged.extend(std::mem::take(entry));
+    *entry = merged;
+}
+
+/// العمليات التي ما زالت تعمل، الأحدث أولًا
+#[tauri::command]
+pub fn list_jobs() -> Vec<serde_json::Map<String, serde_json::Value>> {
+    let guard = LIVE.lock_ok();
+    let mut v: Vec<_> = guard.iter().flat_map(|m| m.iter()).map(|(id, f)| (*id, f.clone())).collect();
+    v.sort_by(|a, b| b.0.cmp(&a.0));
+    v.into_iter().map(|(_, f)| f).collect()
+}
+
 pub(crate) fn emit(app: &AppHandle, u: JobUpdate) {
     if let Some(f) = &u.file {
         remember_output(f);
     }
     remember_meta(&u);
+    track_live(&u);
     if should_emit(&u, Instant::now()) {
         let _ = app.emit("job-update", u);
     }
@@ -438,6 +481,18 @@ fn should_emit(u: &JobUpdate, now: Instant) -> bool {
 
 #[cfg(test)]
 mod emit_tests {
+    #[test]
+    fn live_jobs_keep_the_latest_state_and_drop_finished_ones() {
+        let id = 9_000_001;
+        track_live(&JobUpdate { id, state: "downloading", percent: Some(10.0), ..Default::default() });
+        track_live(&JobUpdate { id, state: "downloading", percent: Some(40.0), title: Some("t".into()), ..Default::default() });
+        let mine = |v: Vec<serde_json::Map<String, serde_json::Value>>| v.into_iter().find(|f| f["id"] == id);
+        let f = mine(list_jobs()).expect("جارية");
+        assert_eq!((f["percent"].as_f64(), f["title"].as_str()), (Some(40.0), Some("t")));
+        track_live(&JobUpdate { id, state: "done", ..Default::default() });
+        assert!(mine(list_jobs()).is_none());
+    }
+
     use super::*;
 
     fn up(id: u64, state: &'static str) -> JobUpdate {

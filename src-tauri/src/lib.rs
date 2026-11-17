@@ -120,6 +120,8 @@ macro_rules! handlers_with {
             download::probe,
             download::start_download,
             download::cancel_download,
+            download::remember_job,
+            download::list_jobs,
             download::reveal_file,
             download::open_output_dir,
             download::save_thumbnail,

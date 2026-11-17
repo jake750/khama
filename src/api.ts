@@ -295,6 +295,10 @@ export const api = {
   startDownload: (request: DownloadRequest) =>
     invoke<number>("start_download", { request: { ...request, tzOffsetMin: -new Date().getTimezoneOffset() } }),
   cancelDownload: (id: number) => invoke<void>("cancel_download", { id }),
+  /** بطاقة العملية تُحفظ في Rust لتُستعاد بعد إعادة تحميل الواجهة (T-17) */
+  rememberJob: (id: number, card: object) => invoke<void>("remember_job", { id, card }),
+  /** العمليات التي ما زالت تعمل في Rust (بطاقتها + آخر تحديث) */
+  listJobs: () => invoke<Record<string, unknown>[]>("list_jobs"),
   revealFile: (path: string) => invoke<void>("reveal_file", { path }),
   openOutputDir: () => invoke<void>("open_output_dir"),
   onJobUpdate: (cb: (u: JobUpdate) => void): Promise<UnlistenFn> => listen<JobUpdate>("job-update", (e) => cb(e.payload)),
