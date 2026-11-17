@@ -67,6 +67,8 @@ pub fn run() {
             let handle = app.handle().clone();
             let loaded = settings::load(&handle);
             app.state::<download::DownloadQueue>().set_limit(loaded.parallel_downloads.into());
+            #[cfg(desktop)]
+            background::set_clipboard_watch(loaded.watch_clipboard);
             app.manage(settings::SettingsState(Mutex::new(loaded)));
             download::clean_stale_jobs(&handle);
             #[cfg(desktop)]

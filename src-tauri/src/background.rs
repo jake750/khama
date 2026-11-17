@@ -20,6 +20,7 @@ use tauri_plugin_notification::NotificationExt;
 
 use crate::settings::SettingsState;
 
+
 /// هل أخبرنا المستخدم مرة أن خامة ما زالت تعمل في الخلفية؟
 static TOLD_HIDDEN: AtomicBool = AtomicBool::new(false);
 /// إشعار «رابط منسوخ» مرة واحدة في كل تشغيل، لا مع كل رابط (U-82)
@@ -107,19 +108,57 @@ pub fn first_url(text: &str) -> Option<String> {
         .map(String::from)
 }
 
-/// يقرأ الحافظة كل ثانية (إن فعّل المستخدم المراقبة) ويخبر الواجهة بأي رابط جديد
+/// هل مراقبة الحافظة مفعّلة؟ نسخة من الإعداد لا تحتاج قفل الإعدادات كل ثانية (T-24)
+static CLIP_ON: AtomicBool = AtomicBool::new(false);
+static CLIP_THREAD: std::sync::OnceLock<std::thread::Thread> = std::sync::OnceLock::new();
+
+/// تستدعيها قراءة الإعدادات وحفظها. إطفاء المراقبة يوقف الخيط تمامًا (park) حتى تُفعَّل من جديد
+pub fn set_clipboard_watch(on: bool) {
+    CLIP_ON.store(on, Ordering::Relaxed);
+    if on && let Some(t) = CLIP_THREAD.get() {
+        t.unpark();
+    }
+}
+
+/// رقم يتغيّر مع كل نسخ في Windows: لا نقرأ محتوى الحافظة إلا إن تغيّر،
+/// فلا تمرّ كلمة سر منسوخة على خامة كل ثانية (T-24). في الأنظمة الأخرى None = اقرأ دائمًا.
+fn clipboard_seq() -> Option<u32> {
+    #[cfg(windows)]
+    {
+        // SAFETY: دالة بلا وسائط ولا حالة، تُرجع عدّادًا فقط
+        Some(unsafe { windows_sys::Win32::System::DataExchange::GetClipboardSequenceNumber() })
+    }
+    #[cfg(not(windows))]
+    None
+}
+
+/// أطول نص نفحصه: الرابط المنسوخ قصير، والنص الطويل لا نمسح فيه عن روابط
+const CLIP_MAX: usize = 4096;
+
+/// يفحص الحافظة كل ثانية (إن فعّل المستخدم المراقبة) ويخبر الواجهة بأي رابط جديد
 pub fn spawn_clipboard_watcher(app: AppHandle) {
-    std::thread::spawn(move || {
+    let handle = std::thread::spawn(move || {
         let mut last: Option<String> = None;
         let mut primed = false;
+        let mut seq = None;
         loop {
-            std::thread::sleep(Duration::from_millis(1000));
-            let enabled = app.state::<SettingsState>().0.lock_ok().watch_clipboard;
-            if !enabled {
+            if !CLIP_ON.load(Ordering::Relaxed) {
                 primed = false;
+                std::thread::park();
                 continue;
             }
-            let url = app.clipboard().read_text().ok().and_then(|t| first_url(&t));
+            std::thread::sleep(Duration::from_millis(1000));
+            let now = clipboard_seq();
+            if primed && now.is_some() && now == seq {
+                continue;
+            }
+            seq = now;
+            let url = app
+                .clipboard()
+                .read_text()
+                .ok()
+                .filter(|t| t.len() <= CLIP_MAX)
+                .and_then(|t| first_url(&t));
             // أول قراءة بعد التفعيل: ما في الحافظة قديم، لا نقترحه
             if !primed {
                 primed = true;
@@ -151,6 +190,11 @@ pub fn spawn_clipboard_watcher(app: AppHandle) {
             }
         }
     });
+    let _ = CLIP_THREAD.set(handle.thread().clone());
+    // قد تكون المراقبة فُعّلت قبل أن يُسجَّل الخيط
+    if CLIP_ON.load(Ordering::Relaxed) {
+        handle.thread().unpark();
+    }
 }
 
 #[tauri::command]

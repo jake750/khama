@@ -258,6 +258,8 @@ pub fn save_settings(
     mut settings: Settings,
 ) -> Result<(), AppError> {
     sanitize(&mut settings);
+    #[cfg(desktop)]
+    crate::background::set_clipboard_watch(settings.watch_clipboard);
     queue.set_limit(settings.parallel_downloads.into());
     let json = serde_json::to_string_pretty(&settings).expect("settings serialize");
     crate::persist::write_atomic(&settings_path(&app)?, json.as_bytes())?;

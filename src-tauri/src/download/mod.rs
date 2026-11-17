@@ -443,7 +443,7 @@ pub fn remember_job(jobs: tauri::State<Jobs>, id: u64, card: serde_json::Map<Str
 pub fn list_jobs() -> Vec<serde_json::Map<String, serde_json::Value>> {
     let guard = LIVE.lock_ok();
     let mut v: Vec<_> = guard.iter().flat_map(|m| m.iter()).map(|(id, f)| (*id, f.clone())).collect();
-    v.sort_by(|a, b| b.0.cmp(&a.0));
+    v.sort_by_key(|e| std::cmp::Reverse(e.0));
     v.into_iter().map(|(_, f)| f).collect()
 }
 
