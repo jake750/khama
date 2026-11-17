@@ -381,10 +381,25 @@ mod tests {
             "projects":[{"name":"p","outputDir":null,"kind":"gif","videoFormat":"mov","audioFormat":"ogg",
             "quality":"720","editorReady":true,"filenameTemplate":"{title}"}]}"#;
         let s = migrate(serde_json::from_str(json).unwrap());
-        assert_eq!((s.theme.as_str(), s.quality.as_str(), s.cookies_mode.as_str()), ("dark", "1080", "none"));
-        assert_eq!((s.kind.as_str(), s.convert_dest.as_str()), ("video", "output"), "القيم الصحيحة تبقى");
+        assert_eq!(
+            (s.theme.as_str(), s.quality.as_str(), s.cookies_mode.as_str()),
+            ("dark", "1080", "none")
+        );
+        assert_eq!(
+            (s.kind.as_str(), s.convert_dest.as_str()),
+            ("video", "output"),
+            "القيم الصحيحة تبقى"
+        );
         let p = &s.projects[0];
-        assert_eq!((p.kind.as_str(), p.video_format.as_str(), p.audio_format.as_str(), p.quality.as_str()), ("video", "mov", "mp3", "720"));
+        assert_eq!(
+            (
+                p.kind.as_str(),
+                p.video_format.as_str(),
+                p.audio_format.as_str(),
+                p.quality.as_str()
+            ),
+            ("video", "mov", "mp3", "720")
+        );
     }
 
     #[test]

@@ -135,7 +135,11 @@ pub fn spawn_watcher(app: AppHandle) {
                             },
                         };
                         // نعلن الملف للواجهة قبل أن يبدأ التحويل، فتعرف العملية قبل أول تحديث (T-18)
-                        let id = app.state::<crate::download::Jobs>().next_id.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                        let id = app
+                            .state::<crate::download::Jobs>()
+                            .next_id
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                            + 1;
                         let hit = WatchHit {
                             id,
                             path: path.to_string_lossy().into_owned(),
@@ -144,14 +148,24 @@ pub fn spawn_watcher(app: AppHandle) {
                         let _ = app.emit("watch-file", hit);
                         queued_any = true;
                         if let Err(e) = queue_convert(&app, request, Some(id)) {
-                            crate::download::emit(&app, crate::download::JobUpdate { id, state: "error", error: Some(e), ..Default::default() });
+                            crate::download::emit(
+                                &app,
+                                crate::download::JobUpdate {
+                                    id,
+                                    state: "error",
+                                    error: Some(e),
+                                    ..Default::default()
+                                },
+                            );
                         }
                     }
                 }
             }
             // نحفظ أوقات الفحص كل دقيقة لا كل 4 ثوانٍ، وفورًا بعد بدء تحويل
             // (وإلا قد يُحوَّل الملف نفسه مرة أخرى في الإقلاع التالي)
-            if (queued_any || saved_at.elapsed() >= Duration::from_secs(60)) && let Some(p) = &scans_file {
+            if (queued_any || saved_at.elapsed() >= Duration::from_secs(60))
+                && let Some(p) = &scans_file
+            {
                 saved_at = Instant::now();
                 queued_any = false;
                 last_scans.retain(|d, _| active.iter().any(|w| &w.dir == d));

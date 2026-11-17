@@ -418,7 +418,9 @@ export default function App() {
       for (const j of due) {
         const { request, title, meta, thumbnail } = j;
         const base = { type: "download" as const, request, title, meta, thumbnail };
-        launch(base, (id) => api.startDownload(withHistory(request!, base), id)).catch((e) => setJobs((prev) => [{ id: j.id, state: "error", error: asAppError(e), ...base } as Job, ...prev]));
+        launch(base, (id) => api.startDownload(withHistory(request!, base), id)).catch((e) =>
+          setJobs((prev) => [{ id: j.id, state: "error", error: asAppError(e), ...base } as Job, ...prev]),
+        );
       }
     };
     if (!scheduledLoaded) return;

@@ -542,7 +542,8 @@ const en = {
     probeFileFailed: "Couldn't inspect the file after downloading.",
     convertFailed: "The download finished but converting it for editing failed.",
     moveFailed: "Couldn't move the file to the save folder. Check write permission and free space.",
-    processStalled: "The process stopped responding for 15 minutes, so Khama stopped it. Try again; if it keeps happening, copy the details for the report.",
+    processStalled:
+      "The process stopped responding for 15 minutes, so Khama stopped it. Try again; if it keeps happening, copy the details for the report.",
     noOutputFile: "The download finished but the output file wasn't found.",
     joinFailed: "The clips downloaded but joining them into one video failed.",
     timeout: "The site took too long to respond. Check your connection and try again.",

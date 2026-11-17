@@ -28,7 +28,11 @@ pub fn clean_stale_jobs(app: &AppHandle) {
             .is_some_and(|age| age < RESUME_FOR);
         if !(is_resumable_dir(&e.file_name().to_string_lossy()) && fresh) {
             let p = e.path();
-            let _ = if p.is_dir() { std::fs::remove_dir_all(p) } else { std::fs::remove_file(p) };
+            let _ = if p.is_dir() {
+                std::fs::remove_dir_all(p)
+            } else {
+                std::fs::remove_file(p)
+            };
         }
     }
 }
@@ -61,7 +65,11 @@ pub(super) fn claim_job_dir(root: &Path, id: u64, req: &DownloadRequest) -> (Pat
     if let Ok(entries) = std::fs::read_dir(&dir) {
         for e in entries.flatten().filter(|e| e.file_name() != "work" && e.file_name() != "out") {
             let p = e.path();
-            let _ = if p.is_dir() { std::fs::remove_dir_all(p) } else { std::fs::remove_file(p) };
+            let _ = if p.is_dir() {
+                std::fs::remove_dir_all(p)
+            } else {
+                std::fs::remove_file(p)
+            };
         }
     }
     (dir, Some(key))

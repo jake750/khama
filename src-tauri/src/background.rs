@@ -20,7 +20,6 @@ use tauri_plugin_notification::NotificationExt;
 
 use crate::settings::SettingsState;
 
-
 /// هل أخبرنا المستخدم مرة أن خامة ما زالت تعمل في الخلفية؟
 static TOLD_HIDDEN: AtomicBool = AtomicBool::new(false);
 /// إشعار «رابط منسوخ» مرة واحدة في كل تشغيل، لا مع كل رابط (U-82)

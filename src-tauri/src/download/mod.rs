@@ -538,12 +538,27 @@ mod emit_tests {
     #[test]
     fn live_jobs_keep_the_latest_state_and_drop_finished_ones() {
         let id = 9_000_001;
-        track_live(&JobUpdate { id, state: "downloading", percent: Some(10.0), ..Default::default() });
-        track_live(&JobUpdate { id, state: "downloading", percent: Some(40.0), title: Some("t".into()), ..Default::default() });
+        track_live(&JobUpdate {
+            id,
+            state: "downloading",
+            percent: Some(10.0),
+            ..Default::default()
+        });
+        track_live(&JobUpdate {
+            id,
+            state: "downloading",
+            percent: Some(40.0),
+            title: Some("t".into()),
+            ..Default::default()
+        });
         let mine = |v: Vec<serde_json::Map<String, serde_json::Value>>| v.into_iter().find(|f| f["id"] == id);
         let f = mine(list_jobs()).expect("جارية");
         assert_eq!((f["percent"].as_f64(), f["title"].as_str()), (Some(40.0), Some("t")));
-        track_live(&JobUpdate { id, state: "done", ..Default::default() });
+        track_live(&JobUpdate {
+            id,
+            state: "done",
+            ..Default::default()
+        });
         assert!(mine(list_jobs()).is_none());
     }
 

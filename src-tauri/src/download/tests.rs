@@ -312,7 +312,10 @@ fn heavy_work_limit_is_a_quarter_of_the_cores() {
 
 #[test]
 fn resume_dir_is_stable_per_request_and_not_shared() {
-    let req = |url: &str| DownloadRequest { url: url.into(), ..Default::default() };
+    let req = |url: &str| DownloadRequest {
+        url: url.into(),
+        ..Default::default()
+    };
     let (a, b) = (resume_key(&req("https://x.com/1")), resume_key(&req("https://x.com/1")));
     assert_eq!(a, b, "الطلب نفسه = المجلد نفسه");
     assert_ne!(a, resume_key(&req("https://x.com/2")));
