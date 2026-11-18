@@ -198,6 +198,8 @@ const en = {
 
   // ---- المحوّل ----
   tabConvert: "Convert",
+  historyConverted: "Conversions",
+  copySourcePath: "Copy the source file path",
   dropTitle: "Drop video or audio files here",
   pickTitleMobile: "Choose video or audio files",
   importing: "Copying…",
@@ -790,6 +792,8 @@ const ar: Dict = {
 
   // ---- المحوّل ----
   tabConvert: "التحويل",
+  historyConverted: "التحويلات",
+  copySourcePath: "انسخ مسار الملف المصدر",
   dropTitle: "اسحب ملفات الفيديو أو الصوت هنا",
   pickTitleMobile: "اختر ملفات فيديو أو صوت",
   importing: "جارٍ النسخ…",

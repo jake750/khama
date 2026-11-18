@@ -79,7 +79,8 @@ export interface HistoryEntry {
   title: string;
   url: string;
   file: string;
-  kind: Kind;
+  /** "convert" = تحويل (url هو الملف المصدر، meta رقم الـ preset) (U-62) */
+  kind: Kind | "convert";
   meta: string;
   thumbnail?: string | null;
   date: number;

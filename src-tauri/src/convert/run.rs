@@ -406,6 +406,8 @@ pub fn queue_convert(app: &AppHandle, request: ConvertRequest, id: Option<u64>) 
     let (id, mut rx) = jobs.claim(id);
     let sem = queue.0.clone();
     let app2 = app.clone();
+    // للسجلّ: التحويلات (ومنها المجلدات المراقَبة) تُسجَّل كالتنزيلات (U-62، U-75)
+    let (source, preset_id) = (request.inputs.first().cloned().unwrap_or_default(), request.preset.clone());
     tauri::async_runtime::spawn(async move {
         emit(
             &app2,
@@ -459,7 +461,36 @@ pub fn queue_convert(app: &AppHandle, request: ConvertRequest, id: Option<u64>) 
             let _ = tokio::fs::remove_dir_all(root.join(format!("c{id}"))).await;
         }
         app2.state::<Jobs>().cancels.lock_ok().remove(&id);
+        if let Some(file) = update.file.as_deref().filter(|_| update.state == "done") {
+            let entry = convert_history_entry(
+                &source,
+                &preset_id,
+                Path::new(file),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |d| d.as_millis() as u64),
+            );
+            if let Err(e) = crate::history::add_entry(&app2, entry).await {
+                log::error!("history: {e}");
+            }
+        }
         emit(&app2, update);
     });
     Ok(id)
+}
+
+/// عنصر سجلّ لتحويل مكتمل: kind = "convert"، والرابط = الملف المصدر، وmeta = رقم الـ preset
+/// (الواجهة تعرض اسمه بلغة المستخدم)
+pub(super) fn convert_history_entry(source: &str, preset: &str, out: &Path, now_ms: u64) -> crate::history::HistoryEntry {
+    crate::history::HistoryEntry {
+        id: 0,
+        title: out.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default(),
+        url: source.to_string(),
+        file: out.to_string_lossy().into_owned(),
+        kind: "convert".into(),
+        meta: preset.to_string(),
+        thumbnail: None,
+        date: now_ms,
+        exists: true,
+    }
 }

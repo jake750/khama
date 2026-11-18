@@ -7,6 +7,7 @@ import { isMobile } from "../platform";
 import { useConfirm } from "./Dialog";
 import { Icon } from "./Icon";
 import { Segmented } from "./Segmented";
+import { presetById } from "../presets";
 import { logError } from "../log";
 
 /** «اليوم»، «أمس»، أو التاريخ: عنوان كل مجموعة في السجلّ */
@@ -40,7 +41,7 @@ export function HistoryView(props: {
   const [list, setList] = useState<HistoryEntry[] | null>(null);
   const [q, setQ] = useState("");
   // تصفية بالنوع والتاريخ، ورسم أول 100 فقط حتى يطلب المستخدم المزيد (U-63، T-87)
-  const [kind, setKind] = useState<"all" | "video" | "audio">("all");
+  const [kind, setKind] = useState<"all" | "video" | "audio" | "convert">("all");
   const [since, setSince] = useState<"all" | "7" | "30">("all");
   const [limit, setLimit] = useState(100);
   const [brokenThumbs, setBrokenThumbs] = useState<Set<number>>(() => new Set());
@@ -60,7 +61,7 @@ export function HistoryView(props: {
     const from = since === "all" ? 0 : Date.now() - Number(since) * 86_400_000;
     const items = (list ?? [])
       .filter((e) => !needle || [e.title, e.url, e.meta, e.file].some((x) => x.toLowerCase().includes(needle)))
-      .filter((e) => kind === "all" || (kind === "audio") === (e.kind === "audio"))
+      .filter((e) => kind === "all" || (kind === "video" ? e.kind === "video" : e.kind === kind))
       .filter((e) => e.date >= from)
       .slice(0, limit);
     // مجموعات حسب اليوم
@@ -109,7 +110,7 @@ export function HistoryView(props: {
       )}
       {list && list.length > 0 && (
         <div className="row-2 wrap mt-2">
-          <Segmented<"all" | "video" | "audio">
+          <Segmented<"all" | "video" | "audio" | "convert">
             label={t.kind}
             value={kind}
             onChange={setKind}
@@ -117,6 +118,7 @@ export function HistoryView(props: {
               { value: "all", label: t.filterAll },
               { value: "video", label: t.video },
               { value: "audio", label: t.audio },
+              { value: "convert", label: t.historyConverted },
             ]}
           />
           <Segmented<"all" | "7" | "30">
@@ -174,7 +176,7 @@ export function HistoryView(props: {
                   />
                 ) : (
                   <div className={`history-thumb kind-${e.kind === "audio" ? "audio" : "video"}`}>
-                    <Icon name={e.kind === "audio" ? "music" : "film"} size={20} />
+                    <Icon name={e.kind === "audio" ? "music" : e.kind === "convert" ? "convert" : "film"} size={20} />
                   </div>
                 )}
                 <div className="history-body">
@@ -183,7 +185,7 @@ export function HistoryView(props: {
                   </div>
                   <div className="job-meta">
                     <span>{new Date(e.date).toLocaleTimeString(numLocale(lang), { hour: "2-digit", minute: "2-digit" })}</span>
-                    <span className="faint">{e.meta}</span>
+                    <span className="faint">{e.kind === "convert" ? (presetById(e.meta)?.name[lang] ?? e.meta) : e.meta}</span>
                     {!e.exists && !isMobile && (
                       <span className="missing-tag">
                         <Icon name="alert" size={14} /> {t.historyMissing}
@@ -207,13 +209,15 @@ export function HistoryView(props: {
                       <Icon name="folder" size={16} /> {t.showInFolder}
                     </button>
                   )}
-                  <button className="btn btn-sm" onClick={() => props.onDownloadAgain(e)} title={t.downloadAgain}>
-                    <Icon name="retry" size={16} /> <span className="hide-sm">{t.downloadAgain}</span>
-                  </button>
+                  {e.kind !== "convert" && (
+                    <button className="btn btn-sm" onClick={() => props.onDownloadAgain(e)} title={t.downloadAgain}>
+                      <Icon name="retry" size={16} /> <span className="hide-sm">{t.downloadAgain}</span>
+                    </button>
+                  )}
                   <button
                     className="icon-btn sm"
-                    title={t.copyLink}
-                    aria-label={t.copyLink}
+                    title={e.kind === "convert" ? t.copySourcePath : t.copyLink}
+                    aria-label={e.kind === "convert" ? t.copySourcePath : t.copyLink}
                     onClick={() =>
                       writeText(e.url)
                         .then(() => props.toast(t.toastCopied))

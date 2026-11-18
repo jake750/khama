@@ -208,7 +208,7 @@ export default function App() {
       notify(title, name);
     }
     // عنصر السجلّ كتبه Rust قبل إرسال "done" (T-19)؛ نعيد قراءة السجلّ فقط
-    if (u.state === "done" && job.type === "download") setHistoryVersion((v) => v + 1);
+    if (u.state === "done") setHistoryVersion((v) => v + 1);
     // أول ملف مكتمل: نلفت النظر لسحب البطاقة إلى برنامج المونتاج، مرة واحدة فقط (U-38)
     if (u.state === "done" && u.file && !isMobile) {
       try {
@@ -837,7 +837,7 @@ export default function App() {
                     version={historyVersion}
                     onDownloadAgain={(e) => {
                       // نفس النوع والصيغة والجودة لا الرابط وحده (U-40)
-                      update(optionsFromMeta(e.kind, e.meta));
+                      if (e.kind !== "convert") update(optionsFromMeta(e.kind, e.meta));
                       setInject({ url: e.url, n: Date.now() });
                       setTab("download");
                     }}
