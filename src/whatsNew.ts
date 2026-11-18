@@ -15,6 +15,8 @@ export async function announceUpdate(t: Dict, toast: Toast) {
   let current: string;
   try {
     current = await getVersion();
+    // بلا نسخة معروفة (بيئة التطوير مثلًا) لا نعلن شيئًا ولا نحفظ
+    if (!current) return;
     prev = localStorage.getItem(KEY);
     localStorage.setItem(KEY, current);
   } catch {
