@@ -75,6 +75,10 @@ const en = {
   aiDownloadBody: "The first time, Khama downloads an AI model of about 140 MB. It stays on this computer and isn't downloaded again.",
   aiDownloadBodyMobile: "The first time, Khama downloads an AI model of about 67 MB. On mobile data, connect to Wi-Fi first.",
   aiDownloadOk: "Download and continue",
+  lowBatteryTitle: "Battery is low",
+  lowBatteryBody: (pct: number) =>
+    `Battery is at ${pct}% and not charging. AI separation is heavy on a phone and can drain it. Plug in, or continue anyway.`,
+  lowBatteryOk: "Continue anyway",
   stemsHint: "Uses an AI model (about 140 MB, downloaded once). Takes roughly as long as the audio itself.",
   stemsHintMobile:
     "Uses an AI model (about 67 MB, downloaded once). Slow on a phone: several times the length of the audio, and the phone gets warm.",
@@ -649,6 +653,10 @@ const ar: Dict = {
   aiDownloadBody: "أول مرة تُنزّل خامة نموذج ذكاء اصطناعي بحجم 140MB تقريبًا. يبقى على هذا الكمبيوتر ولا يُنزَّل مرة أخرى.",
   aiDownloadBodyMobile: "أول مرة تُنزّل خامة نموذج ذكاء اصطناعي بحجم 67MB تقريبًا. على بيانات الهاتف اتصل بـ Wi-Fi أولًا.",
   aiDownloadOk: "نزّله وتابع",
+  lowBatteryTitle: "البطارية منخفضة",
+  lowBatteryBody: (pct) =>
+    `البطارية ${pct}% ولا تشحن. الفصل بالذكاء الاصطناعي ثقيل على الهاتف وقد يستنزفها. صِلْ الشاحن، أو تابع على أي حال.`,
+  lowBatteryOk: "تابع على أي حال",
   stemsHint: "يستخدم نموذج ذكاء اصطناعي (حوالي 140MB يُنزَّل مرة واحدة). يستغرق وقتًا يقارب مدة الصوت نفسه.",
   stemsHintMobile: "يستخدم نموذج ذكاء اصطناعي (حوالي 67MB يُنزَّل مرة واحدة). بطيء على الهاتف: عدة أضعاف مدة الصوت، ويسخن الجهاز.",
   stPreparing: "تنزيل نموذج الذكاء الاصطناعي (مرة واحدة فقط)",

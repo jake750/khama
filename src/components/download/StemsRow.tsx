@@ -5,6 +5,17 @@ import { api } from "../../api";
 import { useConfirm } from "../Dialog";
 import { Segmented } from "../Segmented";
 
+/** نسبة البطارية إن كانت أقل من 30% والجهاز لا يشحن، وإلا null (أو إن لم يدعمها المتصفح) */
+async function lowBattery(): Promise<number | null> {
+  try {
+    const nav = navigator as Navigator & { getBattery?: () => Promise<{ level: number; charging: boolean }> };
+    const b = await nav.getBattery?.();
+    return b && !b.charging && b.level < 0.3 ? Math.round(b.level * 100) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** إزالة الموسيقى أو الصوت، ولقائمة التشغيل: على كل العناصر أو المختار منها */
 export function StemsRow(props: {
   stems: Stems;
@@ -25,6 +36,9 @@ export function StemsRow(props: {
     if (v !== "off" && stems === "off") {
       const ready = await api.aiReady().catch(() => true);
       if (!ready && !(await confirm(t.aiDownloadTitle, isMobile ? t.aiDownloadBodyMobile : t.aiDownloadBody, t.aiDownloadOk))) return;
+      // الهاتف: الفصل ثقيل ويسخّن الجهاز؛ ببطارية منخفضة بلا شحن ننبّه قبل البدء (U-30)
+      const pct = isMobile ? await lowBattery() : null;
+      if (pct != null && !(await confirm(t.lowBatteryTitle, t.lowBatteryBody(pct), t.lowBatteryOk))) return;
     }
     props.onStems(v);
   };
