@@ -328,7 +328,11 @@ export function DownloadView(props: {
     if (firstError) return setStartError(firstError);
     // الرابط يبقى في الحقل (لتنزيله بصيغة أخرى مثلًا)، مع سطر يؤكّد الإضافة وزر «امسح» (U-10)
     setStartedUrl(clean);
+    // خيارات لمرة واحدة تُصفَّر بعد كل تنزيل، كما يقول سطر «إضافات» (U-9)
     setTrimOn(false);
+    setStems("off");
+    setStills("off");
+    setWhen("now");
   }
 
   const clearUrl = () => {
