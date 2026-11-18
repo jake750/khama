@@ -485,6 +485,18 @@ pub fn reveal_file(app: AppHandle, path: String) -> Result<(), AppError> {
         .map_err(|e| AppError::with_detail("openFolder", e.to_string()))
 }
 
+/// يفتح الملف ببرنامجه الافتراضي (U-64)، بنفس شرط reveal_file: ملفات أنتجها التطبيق فقط
+#[tauri::command]
+pub fn open_file(app: AppHandle, path: String) -> Result<(), AppError> {
+    use tauri_plugin_opener::OpenerExt;
+    if !was_produced(&path) && !crate::history::contains_file(&app, &path) {
+        return Err(AppError::with_detail("openFolder", "not a file produced by Khama"));
+    }
+    app.opener()
+        .open_path(&path, None::<&str>)
+        .map_err(|e| AppError::with_detail("openFolder", e.to_string()))
+}
+
 #[tauri::command]
 pub fn open_output_dir(app: AppHandle, settings: State<'_, SettingsState>) -> Result<(), AppError> {
     use tauri_plugin_opener::OpenerExt;

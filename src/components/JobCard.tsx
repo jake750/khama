@@ -77,6 +77,9 @@ export function JobCard(props: {
   job: Job;
   onCancel: () => void;
   onReveal?: () => void;
+  /** فتح الملف ونسخ مساره (U-64) */
+  onOpen?: () => void;
+  onCopyPath?: () => void;
   onRetry: () => void;
   onRemove: () => void;
   onConvert?: () => void;
@@ -111,6 +114,8 @@ export function JobCard(props: {
   const draggable = j.state === "done" && !!j.file && !!props.onDragOut;
   // الأفعال الثانوية في «⋯»، والظاهر: إظهار، وإلغاء أو إعادة (D-25)
   const extra: MenuItem[] = [];
+  if (j.state === "done" && j.file && props.onOpen) extra.push({ label: t.openFile, icon: "eye", onClick: props.onOpen });
+  if (j.state === "done" && j.file && props.onCopyPath) extra.push({ label: t.copyPath, icon: "copy", onClick: props.onCopyPath });
   if (j.state === "done" && j.file && props.onConvert) extra.push({ label: t.sendToConvert, icon: "convert", onClick: props.onConvert });
   if (j.state === "done" && props.onSplit) extra.push({ label: t.splitHere, icon: "scissors", onClick: props.onSplit });
   if (j.state === "done" && props.onCopyMarkers) extra.push({ label: t.copyTimes, icon: "paste", onClick: props.onCopyMarkers });

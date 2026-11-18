@@ -193,6 +193,16 @@ export function HistoryView(props: {
                 </div>
                 <div className="job-actions">
                   {e.exists && !isMobile && (
+                    <button
+                      className="icon-btn sm"
+                      title={t.openFile}
+                      aria-label={t.openFile}
+                      onClick={() => api.openFile(e.file).catch(logError("openFile"))}
+                    >
+                      <Icon name="eye" size={16} />
+                    </button>
+                  )}
+                  {e.exists && !isMobile && (
                     <button className="btn btn-sm" onClick={() => api.revealFile(e.file).catch(logError("revealFile"))}>
                       <Icon name="folder" size={16} /> {t.showInFolder}
                     </button>

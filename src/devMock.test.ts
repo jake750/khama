@@ -21,6 +21,7 @@ const NULL_IS_FINE = new Set([
   "remember_job",
   "list_jobs",
   "reveal_file",
+  "open_file",
   "open_output_dir",
   "save_thumbnail",
   "free_space",

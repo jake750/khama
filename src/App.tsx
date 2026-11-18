@@ -649,6 +649,12 @@ export default function App() {
     ).catch(logError("splitHere"));
   };
 
+  const copyText = (text: string) => {
+    writeText(text)
+      .then(() => toast(t.toastCopied))
+      .catch(logError("copyText"));
+  };
+
   const copyMarkers = (j: Job) => {
     const text = (j.markers ?? []).map(([s, e]) => (s === e ? formatTimecode(s) : `${formatTimecode(s)}\t${formatTimecode(e)}`)).join("\n");
     writeText(text)
@@ -853,6 +859,8 @@ export default function App() {
                           job={j}
                           onCancel={() => cancel(j)}
                           onReveal={isMobile ? undefined : () => j.file && api.revealFile(j.file)}
+                          onOpen={isMobile ? undefined : () => j.file && api.openFile(j.file).catch(logError("openFile"))}
+                          onCopyPath={isMobile ? undefined : () => j.file && copyText(j.file)}
                           onRetry={() => retry(j)}
                           onRemove={() => setJobs((p) => p.filter((x) => x.id !== j.id))}
                           onConvert={j.type === "download" && j.file ? () => addFiles([j.file!]) : undefined}
