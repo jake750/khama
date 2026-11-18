@@ -49,6 +49,7 @@ const en = {
   upTo: (h: number) => `up to ${h}p`,
   qualityAboveMax: (h: number) => `This video tops out at ${h}p — that's what you'll get.`,
   qualityNeedsConvert: "Above 1080p is rarely H.264, so it will need a conversion that can take a while.",
+  convertAbout: (min: number) => `About ${min} min of converting for this video.`,
   editorReady: "Edit-ready",
   editorReadyHint:
     "Converts to H.264 + AAC at a constant frame rate when needed, so the file drops straight into Premiere, DaVinci or CapCut without audio drift. Turn it off to keep the original file as the site sent it.",
@@ -603,6 +604,7 @@ const ar: Dict = {
   upTo: (h) => `حتى ${h}p`,
   qualityAboveMax: (h) => `أعلى دقة متاحة لهذا الفيديو ${h}p، وستُنزَّل بها.`,
   qualityNeedsConvert: "الدقات الأعلى من 1080p غالبًا ليست H.264، فستحتاج تحويلًا قد يستغرق وقتًا.",
+  convertAbout: (min) => `نحو ${min} د من التحويل لهذا الفيديو.`,
   editorReady: "جاهز للمونتاج",
   editorReadyHint:
     "يحوّل الملف عند الحاجة إلى H.264 + AAC بمعدل إطارات ثابت، فيعمل مباشرة في Premiere و DaVinci و CapCut دون انزياح الصوت. أطفئه لتبقى النسخة الأصلية كما أرسلها الموقع.",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateDownload } from "./estimate";
+import { convertMinutes, estimateDownload } from "./estimate";
 
 const info = {
   videoSizes: [
@@ -24,5 +24,14 @@ describe("estimateDownload (U-36)", () => {
   it("returns null when yt-dlp gave no sizes", () => {
     expect(estimateDownload({ videoSizes: [], audioSize: null }, "video", "1080")).toBeNull();
     expect(estimateDownload({ videoSizes: [], audioSize: null }, "audio", "1080")).toBeNull();
+  });
+});
+
+describe("convertMinutes (U-14)", () => {
+  it("scales with length and resolution", () => {
+    expect(convertMinutes(600, 2160)).toBe(12);
+    expect(convertMinutes(600, 1440)).toBe(7);
+    expect(convertMinutes(20, 2160)).toBe(1);
+    expect(convertMinutes(null, 2160)).toBeNull();
   });
 });

@@ -21,7 +21,7 @@ import { Segmented, Toggle } from "./Segmented";
 import { SlideSwitch } from "../motion";
 import { isMobile, MOBILE_SAVE_DIR } from "../platform";
 import { logError } from "../log";
-import { estimateDownload } from "../estimate";
+import { convertMinutes, estimateDownload } from "../estimate";
 import { TrimRange, type PreviewLink, type Range } from "./TrimRange";
 import { PlaylistPanel } from "./PlaylistPanel";
 import { FolderPicker } from "./FolderPicker";
@@ -322,13 +322,19 @@ export function DownloadView(props: {
   // ولا نغيّر الإعداد المحفوظ (U-13)
   const fellBack = s.kind === "video" && !!maxHeight && s.quality !== "best" && Number(s.quality) > maxHeight;
   const effQuality = fellBack ? (QUALITIES.find((q) => q !== "best" && Number(q) <= maxHeight!) ?? "best") : s.quality;
+  // تحويل طويل بعد التنزيل: تنبيه واضح مع تقدير بالدقائق لا سطر باهت (U-14)
+  const needsConvert =
+    s.kind === "video" && s.editorReady && (s.quality === "best" || Number(s.quality) > 1080) && (maxHeight ?? 2160) > 1080;
+  const convertMin = needsConvert
+    ? convertMinutes(duration, Math.min(maxHeight ?? 2160, s.quality === "best" ? 4320 : Number(s.quality)))
+    : null;
   const qualityHint =
     s.kind !== "video"
       ? null
       : fellBack
         ? t.qualityFellBack(qualityLabel(s.quality), qualityLabel(effQuality))
-        : s.editorReady && (s.quality === "best" || Number(s.quality) > 1080) && (maxHeight ?? 2160) > 1080
-          ? t.qualityNeedsConvert
+        : needsConvert
+          ? t.qualityNeedsConvert + (convertMin ? " " + t.convertAbout(convertMin) : "")
           : null;
   const canStart = (multiLinks || isHttpUrl(url)) && !starting && !(entries && selected.size === 0);
   // اقتراح واحد فقط: من مراقبة الحافظة أو مما وجدناه عند الرجوع للنافذة (U-82)
@@ -615,7 +621,7 @@ export function DownloadView(props: {
                           disabled: q !== "best" && maxHeight != null && Number(q) > maxHeight,
                         }))}
                       />
-                      {qualityHint && <div className={`mt-2 ${fellBack ? "warn-text" : "faint"}`}>{qualityHint}</div>}
+                      {qualityHint && <div className={`mt-2 ${fellBack || needsConvert ? "warn-text" : "faint"}`}>{qualityHint}</div>}
                     </div>
                     {
                       <div>
@@ -634,7 +640,7 @@ export function DownloadView(props: {
           </details>
         )}
         {/* التنبيه يبقى ظاهرًا حتى لو كانت الخيارات مطويّة */}
-        {qualityHint && !original && <div className="faint quality-hint">{qualityHint}</div>}
+        {qualityHint && !original && <div className={`quality-hint ${needsConvert ? "warn-text" : "faint"}`}>{qualityHint}</div>}
 
         {info && !entries && <h3 className="form-section">{t.secPart}</h3>}
         {info && !entries && (

@@ -20,3 +20,13 @@ export function estimateDownload(
   const pick = list.find(([h]) => h <= want) ?? list[list.length - 1];
   return Math.round((pick[1] + (audio ?? 0)) * fraction);
 }
+
+/**
+ * دقائق التحويل التقريبية إلى H.264 بعد التنزيل (U-14): بالمعالج وحده يأخذ 4K نحو 1.2× طول الفيديو،
+ * و1440p نحو 0.7×. تقدير بالمعالج المتوسط؛ تسريع الكارت يجعله أقل. بلا مدة ← null.
+ */
+export function convertMinutes(duration: number | null | undefined, height: number): number | null {
+  if (!duration || duration <= 0) return null;
+  const factor = height >= 2160 ? 1.2 : height > 1080 ? 0.7 : 0.3;
+  return Math.max(1, Math.round((duration * factor) / 60));
+}
