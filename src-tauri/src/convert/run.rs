@@ -125,123 +125,30 @@ pub(super) async fn run_convert(
     }
 
     // ---- الكشف: لا ملف ناتج، فقط قائمة أوقات ----
+    let c = Ctx {
+        app,
+        id,
+        tools: &tools,
+        work: &work,
+    };
     if p.kind == PKind::Detect {
-        if p.id == "detect_silence" && infos[0].audio.is_empty() {
-            return Err(AppError::new("noAudioStream"));
-        }
-        if p.id != "detect_silence" && infos[0].video.is_none() {
-            return Err(AppError::new("noVideoStream"));
-        }
-        let args = detect_args(p.id, &infos[0].path, o);
-        let dur = o.end.unwrap_or(infos[0].duration.unwrap_or(0.0)) - o.start.unwrap_or(0.0);
-        let Some(log) = run_ffmpeg(app, id, &tools, &args, &work, dur, "analyzing", cancel).await? else {
-            return Ok(None);
-        };
-        return Ok(Some((first_path, Some(parse_markers(p.id, &log)))));
+        return run_detect(&c, &p, &infos[0], o, cancel).await;
     }
-
     // ---- إزالة الموسيقى / الصوت البشري ----
     if p.kind == PKind::Stems {
-        let info = &infos[0];
-        if info.audio.is_empty() {
-            return Err(AppError::new("noAudioStream"));
-        }
-        let src_ext = first_path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-        let ext = if info.video.is_some() {
-            if matches!(src_ext.as_str(), "mp4" | "mov" | "mkv" | "webm") {
-                src_ext.as_str()
-            } else {
-                "mp4"
-            }
-        } else {
-            "wav"
-        };
-        let keep = if p.id == "stem_music" {
-            separate::Keep::Music
-        } else {
-            separate::Keep::Voice
-        };
-        let dir = output_dir_for(app, o, &first_path)?;
-        std::fs::create_dir_all(&dir).map_err(|e| AppError::with_detail("outputDirCreate", e.to_string()))?;
-        let stem = first_path
-            .file_stem()
-            .map(|s| s.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "file".into());
-        let parts = PartDir::new(&dir)?;
-        let temp = parts.0.join(format!("{id}-part.{ext}"));
-        let start = o.start.filter(|v| *v > 0.0);
-        let ok = separate::process_file(
-            app,
-            id,
-            &tools,
-            &first_path,
-            &temp,
-            keep,
-            start,
-            o.end,
-            info.duration,
-            &work,
-            cancel,
-        )
-        .await;
-        match ok {
-            Ok(true) => {}
-            Ok(false) => {
-                let _ = std::fs::remove_file(&temp);
-                return Ok(None);
-            }
-            Err(e) => {
-                let _ = std::fs::remove_file(&temp);
-                return Err(e);
-            }
-        }
-        let dest = unique_path(&dir, &format!("{stem} [{}].{ext}", p.suffix));
-        std::fs::rename(&temp, &dest).map_err(|e| {
-            let _ = std::fs::remove_file(&dest);
-            AppError::with_detail("moveFailed", e.to_string())
-        })?;
-        return Ok(Some((deliver(app, dest).await?, None)));
+        return run_stems(&c, &p, &infos[0], o, cancel).await;
     }
 
     let hw = if o.hw { hw_list(app, &tools).await } else { vec![] };
 
     // ---- توحيد الصوت: مرور أول للقياس ----
-    let mut loudnorm = None;
-    if let Some(target) = o.loudness.filter(|_| matches!(p.kind, PKind::Video | PKind::Audio) && !o.mute) {
-        let base = format!("loudnorm=I={target:.1}:TP=-1.5:LRA=11");
-        let mut measure = ConvertOptions {
-            split_at: vec![],
-            ..o.clone()
-        };
-        measure.subtitles = None;
-        measure.timecode = false;
-        let probe_plan = build_plan(
-            &preset("wav").unwrap(),
-            &measure,
-            &infos,
-            &[],
-            Path::new("-"),
-            Some(&format!("{base}:print_format=json")),
-        )?;
-        let mut args = probe_plan.args;
-        // نستبدل الناتج بـ "لا شيء": نريد القياس فقط
-        args.pop();
-        args.extend(["-f", "null", "-"].iter().map(|s| s.to_string()));
-        emit(
-            app,
-            JobUpdate {
-                id,
-                state: "analyzing",
-                percent: Some(0.0),
-                ..Default::default()
-            },
-        );
-        let Some(log) = run_ffmpeg(app, id, &tools, &args, &work, probe_plan.duration, "analyzing", cancel).await? else {
-            return Ok(None);
-        };
-        let measured = parse_loudnorm(&log).ok_or_else(|| AppError::with_detail("loudnessFailed", tail(&log, 10)))?;
-        loudnorm = Some(format!("{base}:{measured}:linear=true"));
-    }
+    let loudnorm = match o.loudness.filter(|_| matches!(p.kind, PKind::Video | PKind::Audio) && !o.mute) {
+        Some(target) => match measure_loudness(&c, o, &infos, target, cancel).await? {
+            Some(l) => Some(l),
+            None => return Ok(None),
+        },
+        None => None,
+    };
 
     // ---- مكان الناتج ----
     let dir = output_dir_for(app, o, &first_path)?;
@@ -493,4 +400,136 @@ pub(super) fn convert_history_entry(source: &str, preset: &str, out: &Path, now_
         date: now_ms,
         exists: true,
     }
+}
+
+type Converted = Result<Option<(PathBuf, Option<Vec<[f64; 2]>>)>, AppError>;
+
+/// ما تحتاجه مراحل التحويل كلها
+struct Ctx<'a> {
+    app: &'a AppHandle,
+    id: u64,
+    tools: &'a Tools,
+    work: &'a Path,
+}
+
+/// الكشف: لا ملف ناتج، فقط قائمة أوقات
+async fn run_detect(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOptions, cancel: &mut watch::Receiver<bool>) -> Converted {
+    if p.id == "detect_silence" && info.audio.is_empty() {
+        return Err(AppError::new("noAudioStream"));
+    }
+    if p.id != "detect_silence" && info.video.is_none() {
+        return Err(AppError::new("noVideoStream"));
+    }
+    let args = detect_args(p.id, &info.path, o);
+    let dur = o.end.unwrap_or(info.duration.unwrap_or(0.0)) - o.start.unwrap_or(0.0);
+    let Some(log) = run_ffmpeg(c.app, c.id, c.tools, &args, c.work, dur, "analyzing", cancel).await? else {
+        return Ok(None);
+    };
+    Ok(Some((PathBuf::from(&info.path), Some(parse_markers(p.id, &log)))))
+}
+
+/// إزالة الموسيقى أو الصوت البشري بالنموذج
+async fn run_stems(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOptions, cancel: &mut watch::Receiver<bool>) -> Converted {
+    let first_path = PathBuf::from(&info.path);
+    if info.audio.is_empty() {
+        return Err(AppError::new("noAudioStream"));
+    }
+    let src_ext = first_path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    let ext = if info.video.is_some() {
+        if matches!(src_ext.as_str(), "mp4" | "mov" | "mkv" | "webm") {
+            src_ext.as_str()
+        } else {
+            "mp4"
+        }
+    } else {
+        "wav"
+    };
+    let keep = if p.id == "stem_music" {
+        separate::Keep::Music
+    } else {
+        separate::Keep::Voice
+    };
+    let dir = output_dir_for(c.app, o, &first_path)?;
+    std::fs::create_dir_all(&dir).map_err(|e| AppError::with_detail("outputDirCreate", e.to_string()))?;
+    let stem = first_path
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "file".into());
+    let parts = PartDir::new(&dir)?;
+    let temp = parts.0.join(format!("{}-part.{ext}", c.id));
+    let start = o.start.filter(|v| *v > 0.0);
+    let ok = separate::process_file(
+        c.app,
+        c.id,
+        c.tools,
+        &first_path,
+        &temp,
+        keep,
+        start,
+        o.end,
+        info.duration,
+        c.work,
+        cancel,
+    )
+    .await;
+    match ok {
+        Ok(true) => {}
+        Ok(false) => {
+            let _ = std::fs::remove_file(&temp);
+            return Ok(None);
+        }
+        Err(e) => {
+            let _ = std::fs::remove_file(&temp);
+            return Err(e);
+        }
+    }
+    let dest = unique_path(&dir, &format!("{stem} [{}].{ext}", p.suffix));
+    std::fs::rename(&temp, &dest).map_err(|e| {
+        let _ = std::fs::remove_file(&dest);
+        AppError::with_detail("moveFailed", e.to_string())
+    })?;
+    Ok(Some((deliver(c.app, dest).await?, None)))
+}
+
+/// توحيد الصوت: مرور أول يقيس الملف ويعيد مرشّح loudnorm بالقياسات (None إن أُلغي)
+async fn measure_loudness(
+    c: &Ctx<'_>,
+    o: &ConvertOptions,
+    infos: &[MediaInfo],
+    target: f64,
+    cancel: &mut watch::Receiver<bool>,
+) -> Result<Option<String>, AppError> {
+    let base = format!("loudnorm=I={target:.1}:TP=-1.5:LRA=11");
+    let mut measure = ConvertOptions {
+        split_at: vec![],
+        ..o.clone()
+    };
+    measure.subtitles = None;
+    measure.timecode = false;
+    let probe_plan = build_plan(
+        &preset("wav").unwrap(),
+        &measure,
+        infos,
+        &[],
+        Path::new("-"),
+        Some(&format!("{base}:print_format=json")),
+    )?;
+    let mut args = probe_plan.args;
+    // نستبدل الناتج بـ "لا شيء": نريد القياس فقط
+    args.pop();
+    args.extend(["-f", "null", "-"].iter().map(|s| s.to_string()));
+    emit(
+        c.app,
+        JobUpdate {
+            id: c.id,
+            state: "analyzing",
+            percent: Some(0.0),
+            ..Default::default()
+        },
+    );
+    let Some(log) = run_ffmpeg(c.app, c.id, c.tools, &args, c.work, probe_plan.duration, "analyzing", cancel).await? else {
+        return Ok(None);
+    };
+    let measured = parse_loudnorm(&log).ok_or_else(|| AppError::with_detail("loudnessFailed", tail(&log, 10)))?;
+    Ok(Some(format!("{base}:{measured}:linear=true")))
 }

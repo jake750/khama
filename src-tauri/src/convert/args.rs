@@ -535,116 +535,35 @@ pub fn build_plan(
 
     // ---- الدمج: توحيد المقاس والمعدل والصوت ثم concat ----
     if merging {
-        let v0 = first.video.as_ref();
-        let (tw, th) = v0.map(|v| (even(v.width as f64), even(v.height as f64))).unwrap_or((1920, 1080));
-        let fps = v0.and_then(|v| v.fps).unwrap_or(30.0);
-        let mut pads = String::new();
         let with_audio = !o.mute && replace_idx.is_none();
-        for (i, info) in infos.iter().enumerate() {
-            if needs_video {
-                if info.video.is_none() {
-                    return Err(AppError::with_param("noVideoStream", info.name.clone(), info.path.clone()));
-                }
-                graph.push(format!(
-                    "[{i}:v:0]scale={tw}:{th}:force_original_aspect_ratio=decrease,pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps:.5},format=yuv420p[mv{i}]"
-                ));
-                pads.push_str(&format!("[mv{i}]"));
-            }
-            if with_audio {
-                let src = silent_idx[i].map(|k| format!("[{k}:a]")).unwrap_or_else(|| format!("[{i}:a:0]"));
-                graph.push(format!("{src}aresample=48000,aformat=channel_layouts=stereo[ma{i}]"));
-                pads.push_str(&format!("[ma{i}]"));
-            }
-        }
-        let vflag = if needs_video { 1 } else { 0 };
-        let aflag = if with_audio { 1 } else { 0 };
-        let mut outs = String::new();
-        if needs_video {
-            outs.push_str("[cv]");
-            vlabel = Some("cv".into());
-        }
-        if with_audio {
-            outs.push_str("[ca]");
-            alabel = Some("ca".into());
-        }
-        graph.push(format!("{pads}concat=n={}:v={vflag}:a={aflag}{outs}", infos.len()));
+        (vlabel, alabel) = merge_graph(infos, needs_video, with_audio, &silent_idx, &mut graph)?;
     }
 
     // ---- فلاتر الصورة ----
     if needs_video {
         let v = first.video.as_ref().expect("checked");
-        // بعد الدمج صارت كل المقاطع بمقاس المقطع الأول
-        let mut chain = video_filters(p, o, v, keep_ts);
         let src = vlabel.clone().map(|l| format!("[{l}]")).unwrap_or_else(|| "[0:v:0]".into());
-        let (ow, _oh) = output_dims(v.width, v.height, o, default_short(p));
-        match p.kind {
-            PKind::Gif => {
-                let fps = o.fps.as_deref().and_then(fps_expr).unwrap_or("15");
-                chain.retain(|f| !f.starts_with("fps="));
-                chain.push(format!("fps={fps}"));
-                let pre = chain.join(",");
-                graph.push(format!(
-                    "{src}{pre},split[g1][g2];[g1]palettegen=stats_mode=diff[pal];[g2][pal]paletteuse=dither=sierra2_4a[vout]"
-                ));
-            }
-            _ => {
-                let mut post: Vec<String> = Vec::new();
-                if let Some(pix) = final_pix(&codec) {
-                    post.push(format!("format={pix}"));
-                }
-                let pre = if chain.is_empty() { "null".to_string() } else { chain.join(",") };
-                if let Some(wi) = wm_idx {
-                    let ww = even(ow as f64 * 0.16);
-                    let pos = overlay_pos(o.watermark_pos.as_deref());
-                    let post = if post.is_empty() { "null".to_string() } else { post.join(",") };
-                    graph.push(format!(
-                        "{src}{pre}[base];[{wi}:v]scale={ww}:-1,format=rgba,colorchannelmixer=aa=0.9[wm];[base][wm]overlay={pos}:format=auto,{post}[vout]"
-                    ));
-                } else {
-                    let all: Vec<String> = std::iter::once(pre).chain(post).collect();
-                    graph.push(format!("{src}{}[vout]", all.join(",")));
-                }
-            }
-        }
+        graph.push(video_graph(p, o, v, keep_ts, &src, &codec, wm_idx));
         vlabel = Some("vout".into());
     }
 
     // ---- فلاتر الصوت ----
     let wants_audio = matches!(p.kind, PKind::Video | PKind::Audio) && !o.mute;
-    if wants_audio {
-        let src = if let Some(r) = replace_idx {
-            Some(format!("[{r}:a:0]"))
-        } else if let Some(l) = &alabel {
-            Some(format!("[{l}]"))
-        } else if !first.audio.is_empty() {
-            Some("[0:a:0]".to_string())
-        } else {
-            None
-        };
-        if let Some(src) = src {
-            let mut af: Vec<String> = Vec::new();
-            if keep_ts && replace_idx.is_none() {
-                af.push("asetpts=PTS-STARTPTS".into());
-            }
-            if let Some(sp) = o.speed.filter(|s| (*s - 1.0).abs() > 1e-3) {
-                af.extend(atempo_chain(sp));
-            }
-            if let Some(ln) = loudnorm {
-                af.push(ln.to_string());
-                // loudnorm يرفع معدل العينة لـ 192kHz داخليًا؛ نرجعه لمعدل المونتاج
-                af.push("aresample=48000".to_string());
-            }
-            if af.is_empty() {
-                af.push("anull".into());
-            }
-            graph.push(format!("{src}{}[aout]", af.join(",")));
-            alabel = Some("aout".into());
-        } else {
-            alabel = None;
-        }
+    let asrc = if !wants_audio {
+        None
+    } else if let Some(r) = replace_idx {
+        Some(format!("[{r}:a:0]"))
+    } else if let Some(l) = &alabel {
+        Some(format!("[{l}]"))
+    } else if !first.audio.is_empty() {
+        Some("[0:a:0]".to_string())
     } else {
-        alabel = None;
-    }
+        None
+    };
+    alabel = asrc.map(|src| {
+        graph.push(audio_graph(o, &src, keep_ts && replace_idx.is_none(), loudnorm));
+        "aout".to_string()
+    });
 
     if !graph.is_empty() {
         a.extend(["-filter_complex".into(), graph.join(";")]);
@@ -708,4 +627,104 @@ pub(super) fn push_split(a: &mut Vec<String>, o: &ConvertOptions, reencode: bool
         "-reset_timestamps".into(),
         "1".into(),
     ]);
+}
+
+/// الدمج: كل مقطع بمقاس الأول ومعدله وصوت 48kHz ستيريو، ثم concat. يعيد تسميتي الصورة والصوت
+fn merge_graph(
+    infos: &[MediaInfo],
+    needs_video: bool,
+    with_audio: bool,
+    silent_idx: &[Option<usize>],
+    graph: &mut Vec<String>,
+) -> Result<(Option<String>, Option<String>), AppError> {
+    let first = &infos[0];
+    let v0 = first.video.as_ref();
+    let (tw, th) = v0.map(|v| (even(v.width as f64), even(v.height as f64))).unwrap_or((1920, 1080));
+    let fps = v0.and_then(|v| v.fps).unwrap_or(30.0);
+    let mut pads = String::new();
+    for (i, info) in infos.iter().enumerate() {
+        if needs_video {
+            if info.video.is_none() {
+                return Err(AppError::with_param("noVideoStream", info.name.clone(), info.path.clone()));
+            }
+            graph.push(format!(
+                "[{i}:v:0]scale={tw}:{th}:force_original_aspect_ratio=decrease,pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps:.5},format=yuv420p[mv{i}]"
+            ));
+            pads.push_str(&format!("[mv{i}]"));
+        }
+        if with_audio {
+            let src = silent_idx[i].map(|k| format!("[{k}:a]")).unwrap_or_else(|| format!("[{i}:a:0]"));
+            graph.push(format!("{src}aresample=48000,aformat=channel_layouts=stereo[ma{i}]"));
+            pads.push_str(&format!("[ma{i}]"));
+        }
+    }
+    let vflag = if needs_video { 1 } else { 0 };
+    let aflag = if with_audio { 1 } else { 0 };
+    let mut outs = String::new();
+    let (mut vlabel, mut alabel) = (None, None);
+    if needs_video {
+        outs.push_str("[cv]");
+        vlabel = Some("cv".into());
+    }
+    if with_audio {
+        outs.push_str("[ca]");
+        alabel = Some("ca".into());
+    }
+    graph.push(format!("{pads}concat=n={}:v={vflag}:a={aflag}{outs}", infos.len()));
+    Ok((vlabel, alabel))
+}
+
+/// سلسلة فلاتر الصورة من `src` إلى [vout]: فلاتر الخيارات، ثم لوحة الألوان للـ GIF
+/// أو العلامة المائية وصيغة البكسل التي يحتاجها المشفّر
+fn video_graph(p: &Preset, o: &ConvertOptions, v: &VideoInfo, keep_ts: bool, src: &str, codec: &[String], wm_idx: Option<usize>) -> String {
+    // بعد الدمج صارت كل المقاطع بمقاس المقطع الأول
+    let mut chain = video_filters(p, o, v, keep_ts);
+    let (ow, _oh) = output_dims(v.width, v.height, o, default_short(p));
+    match p.kind {
+        PKind::Gif => {
+            let fps = o.fps.as_deref().and_then(fps_expr).unwrap_or("15");
+            chain.retain(|f| !f.starts_with("fps="));
+            chain.push(format!("fps={fps}"));
+            let pre = chain.join(",");
+            format!("{src}{pre},split[g1][g2];[g1]palettegen=stats_mode=diff[pal];[g2][pal]paletteuse=dither=sierra2_4a[vout]")
+        }
+        _ => {
+            let mut post: Vec<String> = Vec::new();
+            if let Some(pix) = final_pix(codec) {
+                post.push(format!("format={pix}"));
+            }
+            let pre = if chain.is_empty() { "null".to_string() } else { chain.join(",") };
+            if let Some(wi) = wm_idx {
+                let ww = even(ow as f64 * 0.16);
+                let pos = overlay_pos(o.watermark_pos.as_deref());
+                let post = if post.is_empty() { "null".to_string() } else { post.join(",") };
+                format!(
+                    "{src}{pre}[base];[{wi}:v]scale={ww}:-1,format=rgba,colorchannelmixer=aa=0.9[wm];[base][wm]overlay={pos}:format=auto,{post}[vout]"
+                )
+            } else {
+                let all: Vec<String> = std::iter::once(pre).chain(post).collect();
+                format!("{src}{}[vout]", all.join(","))
+            }
+        }
+    }
+}
+
+/// سلسلة فلاتر الصوت من `src` إلى [aout]: تصفير التوقيت بعد القص، والسرعة، وتوحيد الصوت
+fn audio_graph(o: &ConvertOptions, src: &str, reset_ts: bool, loudnorm: Option<&str>) -> String {
+    let mut af: Vec<String> = Vec::new();
+    if reset_ts {
+        af.push("asetpts=PTS-STARTPTS".into());
+    }
+    if let Some(sp) = o.speed.filter(|s| (*s - 1.0).abs() > 1e-3) {
+        af.extend(atempo_chain(sp));
+    }
+    if let Some(ln) = loudnorm {
+        af.push(ln.to_string());
+        // loudnorm يرفع معدل العينة لـ 192kHz داخليًا؛ نرجعه لمعدل المونتاج
+        af.push("aresample=48000".to_string());
+    }
+    if af.is_empty() {
+        af.push("anull".into());
+    }
+    format!("{src}{}[aout]", af.join(","))
 }

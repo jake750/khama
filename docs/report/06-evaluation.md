@@ -234,7 +234,7 @@ KHAMA_EVAL_DIR=<المجلد> KHAMA_EVAL_OUT=eval.jsonl cargo test --release --m
 |---|---|
 | حجم الكود | نحو 27,600 سطر (TypeScript وCSS وRust)، منها نحو 1,400 سطر للنصوص بلغتين |
 | أكبر الملفات | `i18n.ts` (1,404)، `App.tsx` (1,104)، `separate.rs` (984)، `DownloadView.tsx` (922) |
-| أطول الدوال (Rust) | `build_plan` (270 سطرًا)، `run_convert` (245)، `separate_blocking` (192) |
+| أطول الدوال (Rust) | `build_plan` (189 سطرًا بعد فصل الدمج والصورة والصوت عنها، كانت 270)، `separate_blocking` (192)، `run_convert` (152 بعد فصل الكشف والفصل وقياس الصوت، كانت 245) |
 | أطول المكوّنات (React) | `App` (961)، `DownloadView` (847)، `ConvertView` (542) |
 | التحذيرات | clippy: 0؛ ESLint: 23 (حدّ CI 25) |
 
