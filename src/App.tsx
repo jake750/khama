@@ -245,6 +245,9 @@ export default function App() {
   const saving = useRef(false);
   const queuedSave = useRef<Settings | null>(null);
   const saveFailed = useRef<(e: unknown) => void>(() => {});
+  // «تم الحفظ» مرة كل 10 ثوانٍ على الأكثر، وفي تبويب الإعدادات فقط (U-57)
+  const saveOk = useRef(() => {});
+  const lastSavedNote = useRef(0);
   const flushSave = useCallback(async () => {
     if (saving.current) return;
     saving.current = true;
@@ -254,6 +257,7 @@ export default function App() {
         queuedSave.current = null;
         try {
           await api.saveSettings(next);
+          if (!queuedSave.current) saveOk.current();
         } catch (e) {
           saveFailed.current(e);
         }
@@ -290,6 +294,11 @@ export default function App() {
     tRef.current = t;
     tabNowRef.current = tab;
     saveFailed.current = () => toast(t.settingsSaveFailed);
+    saveOk.current = () => {
+      if (tab !== "settings" || Date.now() - lastSavedNote.current < 10_000) return;
+      lastSavedNote.current = Date.now();
+      toast(t.settingsSaved);
+    };
   });
 
   /** مجلد حفظ جديد، ويُضاف لأعلى قائمة «مجلدات استخدمتها مؤخرًا» */
