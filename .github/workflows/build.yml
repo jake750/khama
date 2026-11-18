@@ -24,8 +24,12 @@ jobs:
       build: ${{ steps.version.outputs.build }}
       release: ${{ steps.version.outputs.release }}
       has_key: ${{ steps.version.outputs.has_key }}
+      notes: ${{ steps.notes.outputs.notes }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # الوسوم والتاريخ كاملين لكتابة «ما الجديد» من الالتزامات منذ آخر إصدار (F-52)
+          fetch-depth: 0
       - id: version
         env:
           KEY: ${{ secrets.KHAMA_KEYSTORE_BASE64 }}
@@ -45,6 +49,17 @@ jobs:
             echo "إصدار $v"
             echo "build=true" >> "$GITHUB_OUTPUT"; echo "release=true" >> "$GITHUB_OUTPUT"
           fi
+      # «ما الجديد»: عناوين الالتزامات منذ آخر وسم، بلا التزامات الإصدار وقائمة المراجعة
+      - id: notes
+        run: |
+          prev=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          range=${prev:+$prev..HEAD}
+          {
+            echo "notes<<KHAMA_NOTES_END"
+            echo "## What's new · ما الجديد"
+            git log --no-merges --pretty='- %s' ${range:-HEAD} | grep -v -e '^- REMAINING' -e '^- الإصدار' | head -40 || true
+            echo "KHAMA_NOTES_END"
+          } >> "$GITHUB_OUTPUT"
 
   build:
     needs: check
@@ -125,6 +140,7 @@ jobs:
           args: --target ${{ matrix.target }} ${{ runner.os == 'Linux' && '--verbose' || '' }} ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' && '--config src-tauri/tauri.updater.conf.json' || '' }}
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || (needs.check.outputs.release == 'true' && 'v__VERSION__' || '') }}
           releaseName: "Khama v__VERSION__"
+          releaseBody: ${{ needs.check.outputs.notes }}
           releaseDraft: false
           prerelease: false
 
