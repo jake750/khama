@@ -141,6 +141,43 @@ const RULES: &[(&[&str], &str)] = &[
     ),
 ];
 
+/// أسباب فشل FFmpeg الشائعة (U-42): بدل «فشل التحويل» العامة، سبب وحلّ.
+/// تُفحص بالترتيب على stderr كاملًا بحروف صغيرة.
+const FFMPEG_RULES: &[(&[&str], &str)] = &[
+    (&["no space left", "not enough space", "disk full"], "diskFull"),
+    (&["permission denied", "access is denied"], "permission"),
+    (&["not divisible by 2", "width not divisible", "height not divisible"], "oddSize"),
+    (&["moov atom not found", "invalid data found when processing input"], "fileCorrupt"),
+    (
+        &["does not contain any stream", "output file is empty", "matches no streams"],
+        "noStreams",
+    ),
+    // آخرها: أي فشل والترميز بكرت الشاشة مستعمل، بعد استبعاد الأسباب المحددة فوقه
+    (
+        &[
+            "no nvenc capable devices",
+            "openencodesessionex failed",
+            "cannot load nvcuda",
+            "cannot load libcuda",
+            "nvenc",
+            "_amf",
+            "_qsv",
+            "videotoolbox",
+        ],
+        "hwEncoder",
+    ),
+];
+
+/// سبب فشل FFmpeg إن عرفناه، وإلا fallback (encodeFailed أو convertFailed أو postprocess)
+pub fn ffmpeg_error(stderr: &str, fallback: &'static str, detail_lines: usize) -> AppError {
+    let lower = stderr.to_lowercase();
+    let code = FFMPEG_RULES
+        .iter()
+        .find(|(needles, _)| needles.iter().any(|n| lower.contains(n)))
+        .map_or(fallback, |(_, code)| *code);
+    AppError::with_detail(code, tail(stderr, detail_lines))
+}
+
 /// يحوّل مخرجات الخطأ الخام من yt-dlp إلى رمز خطأ + التفاصيل.
 pub fn friendly_ytdlp_error(raw: &str) -> AppError {
     // نأخذ سطور ERROR تحديدًا إن وُجدت، فهي الأدق
@@ -157,6 +194,10 @@ pub fn friendly_ytdlp_error(raw: &str) -> AppError {
         .find(|(needles, _)| needles.iter().any(|n| contains_word(&lower, n)))
         .map(|(_, code)| *code)
         .unwrap_or("unknown");
+    // فشل المعالجة بعد التنزيل: FFmpeg يطبع سببه في السطور التي قبل ERROR (U-42)
+    if code == "postprocess" {
+        return ffmpeg_error(raw, "postprocess", 12);
+    }
     AppError::with_detail(code, tail(&focus, 12))
 }
 
@@ -282,6 +323,36 @@ mod tests {
         assert!(contains_word("errno 13] permission denied", "permission denied"));
         assert!(contains_word("use --cookies to", "--cookies"));
         assert!(!contains_word("signatures", "signature"));
+    }
+
+    #[test]
+    fn ffmpeg_causes() {
+        let code = |e: &str| ffmpeg_error(e, "encodeFailed", 5).code;
+        assert_eq!(
+            code(
+                "[mov] moov atom not found
+x.mp4: Invalid data found when processing input"
+            ),
+            "fileCorrupt"
+        );
+        assert_eq!(code("[h264_nvenc] OpenEncodeSessionEx failed: out of memory"), "hwEncoder");
+        assert_eq!(
+            code(
+                "[libx264] width not divisible by 2 (1081x720)
+Error while opening encoder"
+            ),
+            "oddSize"
+        );
+        assert_eq!(code("av_interleaved_write_frame(): No space left on device"), "diskFull");
+        assert_eq!(code("something else entirely"), "encodeFailed");
+        assert_eq!(
+            friendly_ytdlp_error(
+                "[h264_nvenc] No NVENC capable devices found
+ERROR: Postprocessing: Conversion failed!"
+            )
+            .code,
+            "hwEncoder"
+        );
     }
 
     #[test]

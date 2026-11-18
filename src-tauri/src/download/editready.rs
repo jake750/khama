@@ -125,6 +125,6 @@ pub(super) async fn convert_for_editing(
     match outcome {
         RunOutcome::Canceled => Ok(None),
         RunOutcome::Exited { success: true, .. } => Ok(Some(output)),
-        RunOutcome::Exited { stderr, .. } => Err(AppError::with_detail("convertFailed", tail(&stderr, 10))),
+        RunOutcome::Exited { stderr, .. } => Err(crate::errors::ffmpeg_error(&stderr, "convertFailed", 10)),
     }
 }

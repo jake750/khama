@@ -79,7 +79,7 @@ pub(super) async fn run_ffmpeg(
     match outcome {
         RunOutcome::Canceled => Ok(None),
         RunOutcome::Exited { success: true, stderr } => Ok(Some(stderr)),
-        RunOutcome::Exited { stderr, .. } => Err(AppError::with_detail("encodeFailed", tail(&stderr, 14))),
+        RunOutcome::Exited { stderr, .. } => Err(crate::errors::ffmpeg_error(&stderr, "encodeFailed", 14)),
     }
 }
 

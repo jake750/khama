@@ -24,6 +24,9 @@ function rustErrorCodes(): Set<string> {
     if (file.endsWith("errors.rs")) {
       const rules = src.slice(src.indexOf("const RULES"), src.indexOf("];", src.indexOf("const RULES")));
       for (const m of rules.matchAll(/\],\s*"([A-Za-z]+)",?\s*\)/g)) codes.add(m[1]);
+      // أسباب FFmpeg (U-42)
+      const ff = src.slice(src.indexOf("const FFMPEG_RULES"), src.indexOf("];", src.indexOf("const FFMPEG_RULES")));
+      for (const m of ff.matchAll(/\],\s*"([A-Za-z]+)",?\s*\)/g)) codes.add(m[1]);
     }
   }
   return codes;
