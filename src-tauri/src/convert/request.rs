@@ -3,6 +3,7 @@ use super::*;
 // ======================= الطلب =======================
 
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase", default)]
 pub struct ConvertOptions {
     /// "high" | "balanced" | "small"
@@ -71,6 +72,7 @@ impl Default for ConvertOptions {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct ConvertRequest {
     /// أكثر من ملف = دمجها بالترتيب في ملف واحد

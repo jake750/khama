@@ -268,6 +268,7 @@ pub async fn ensure_managed_ytdlp(app: &AppHandle) -> Result<(), AppError> {
 // ---------------- أوامر تستدعيها الواجهة ----------------
 
 #[derive(Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct ToolsInfo {
     ytdlp: Option<String>,

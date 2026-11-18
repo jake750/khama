@@ -15,6 +15,7 @@ use crate::errors::AppError;
 
 /// عنصر في القائمة: url هو ما يُعطى لـ yt-dlp عند التنزيل
 #[derive(Debug, Clone, Serialize, PartialEq)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct Entry {
     pub url: String,

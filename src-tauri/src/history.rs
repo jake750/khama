@@ -12,6 +12,7 @@ use crate::errors::AppError;
 const MAX_ENTRIES: usize = 1000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct HistoryEntry {
     pub id: u64,

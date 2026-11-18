@@ -73,3 +73,7 @@ opt-level = 3
 opt-level = 3
 [profile.dev.package.khama]
 opt-level = 2
+
+[dev-dependencies]
+# يولّد أنواع TypeScript من هياكل Rust في الاختبارات فقط، ليفحص tsc أن api.ts لم يبتعد عنها (T-53)
+ts-rs = { version = "12", features = ["serde-json-impl", "no-serde-warnings"] }

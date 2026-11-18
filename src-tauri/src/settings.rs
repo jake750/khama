@@ -15,6 +15,7 @@ use tauri::{AppHandle, Manager};
 use crate::errors::AppError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     /// نسخة بنية الملف (M-36). ملف قديم بلا هذا الحقل = 0، وmigrate ترفعه خطوة خطوة إلى SETTINGS_VERSION
@@ -64,6 +65,7 @@ pub struct Settings {
     pub rate_limit_kb: u32,
     /// 0.3.1 وما قبله: الحدّ بالميغابايت. يُقرأ فقط ويحوَّل في migrate
     #[serde(skip_serializing)]
+    #[cfg_attr(test, ts(skip))]
     pub rate_limit: u32,
     /// إشعار من النظام عند انتهاء تنزيل أو فشله
     pub notify: bool,
@@ -92,6 +94,7 @@ pub struct Settings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     /// معرّف ثابت لا يتغيّر بتغيّر الاسم. الإعدادات القديمة بلا معرّف: يُستخدم الاسم (انظر migrate)
@@ -110,6 +113,7 @@ pub struct Project {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct WatchFolder {
     pub dir: String,

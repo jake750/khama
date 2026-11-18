@@ -3,6 +3,7 @@ use super::*;
 // ======================= معلومات الملف =======================
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct VideoInfo {
     pub codec: String,
@@ -19,6 +20,7 @@ pub struct VideoInfo {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct AudioInfo {
     pub codec: String,
@@ -27,6 +29,7 @@ pub struct AudioInfo {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct MediaInfo {
     pub path: String,

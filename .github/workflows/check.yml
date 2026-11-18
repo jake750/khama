@@ -60,6 +60,9 @@ jobs:
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - name: tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+      # T-53: cargo test يعيد توليد src/bindings من هياكل Rust؛ أي فرق يعني أنها لم تُحدَّث
+      - name: Rust types match src/bindings
+        run: git diff --exit-code -- src/bindings
 
   # كود أندرويد (mobile.rs وما تحت cfg(mobile)) لا يُبنى إلا عند الإصدار، فينحرف دون أن يلاحظ أحد (T-36).
   # clippy فقط (بلا ربط ولا توقيع): دقيقة أو اثنتان، ويكشف كسر البناء على الهاتف في كل دفعة.

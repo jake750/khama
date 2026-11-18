@@ -130,6 +130,7 @@ pub fn cancel_download(jobs: State<'_, Jobs>, id: u64) {
 }
 
 #[derive(Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct ProbeInfo {
     pub(super) title: String,
@@ -218,6 +219,7 @@ fn disk_free(p: &std::path::Path) -> Option<u64> {
 }
 
 #[derive(Serialize, Debug, PartialEq)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct SubLang {
     pub(super) code: String,

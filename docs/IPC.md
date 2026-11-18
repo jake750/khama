@@ -54,3 +54,7 @@ The React interface only talks to Rust through `src/api.ts`. Every command below
 2. Change the wrapper and types in `src/api.ts`.
 3. Mirror it in `src/dev-mock.ts`, so the interface still runs in a plain browser.
 4. Update this table.
+
+**Shared types.** The structs that cross the boundary (`Settings`, `DownloadRequest`, `JobUpdate`, `MediaInfo`, `ConvertOptions`…) derive `ts_rs::TS` in test builds, and `cargo test` writes them to `src/bindings/` (do not edit those files). `src/api.ts` keeps its own hand-written types because they use exact unions where Rust has `String`, but `src/ipcTypes.check.ts` makes `tsc` fail when a field exists on one side only, and CI fails if `src/bindings/` is out of date. So after changing a struct: `cargo test`, then fix what `tsc` reports.
+
+الهياكل المشتركة تولَّد إلى `src/bindings/` عند `cargo test`، و`tsc` يفشل إن اختلفت أسماء الحقول بينها وبين `api.ts`.

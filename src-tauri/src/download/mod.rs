@@ -180,6 +180,7 @@ pub(crate) async fn heavy_turn(cancel: &mut watch::Receiver<bool>) -> Option<tok
 static SEPARATING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[derive(Debug, Clone, Default, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadRequest {
     pub url: String,
@@ -364,6 +365,7 @@ fn ts_name(sec: f64) -> String {
 
 /// تحديث تستقبله الواجهة. الحقول الفارغة لا تُرسل، فتدمجها الواجهة مع ما لديها.
 #[derive(Debug, Clone, Default, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct JobUpdate {
     pub id: u64,
@@ -395,6 +397,7 @@ pub struct JobUpdate {
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct HistoryStart {
     #[serde(default)]

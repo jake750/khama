@@ -7,6 +7,7 @@
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct AppError {
     /// رمز الخطأ، يُترجم في الواجهة
     pub code: &'static str,
