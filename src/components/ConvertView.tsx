@@ -301,6 +301,7 @@ export function ConvertView(props: {
   const set = (patch: Partial<ConvertOptions>) => setOpts((o) => ({ ...o, ...patch }));
 
   const ready = files.filter((f) => f.info);
+  const audioOnly = ready.filter((f) => !f.info!.video).length;
   const loading = files.some((f) => !f.info && !f.error);
   const single = ready.length === 1 ? ready[0].info! : null;
   const fits = (p: PresetDef) => ready.every((f) => presetFits(p, f.info));
@@ -632,6 +633,8 @@ export function ConvertView(props: {
 
               {tab === "picture" && (
                 <section>
+                  {/* ملفات صوت فقط بين الفيديوهات: خيارات الصورة لا تمسّها (U-92) */}
+                  {audioOnly > 0 && audioOnly < ready.length && <div className="faint mb-2">{t.pictureSkipsAudio(audioOnly)}</div>}
                   <div className="pick-grid">
                     <Pick
                       label={t.size}
