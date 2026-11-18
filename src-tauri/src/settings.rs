@@ -61,6 +61,8 @@ pub struct Settings {
     pub close_to_tray: bool,
     /// اقتراح تنزيل أي رابط يُنسخ (حتى والتطبيق في الخلفية)
     pub watch_clipboard: bool,
+    /// البحث عن تحديث لخامة عند الفتح (يتصل بـ GitHub). يمكن إطفاؤه (F-51)
+    pub check_updates: bool,
     /// آخر مجلدات حفظ استُخدمت (الأحدث أولًا)
     pub recent_dirs: Vec<String>,
     /// إضافات التنزيل المختارة آخر مرة
@@ -134,6 +136,7 @@ impl Default for Settings {
             notify: true,
             close_to_tray: true,
             watch_clipboard: false,
+            check_updates: true,
             recent_dirs: Vec::new(),
             want_subs: false,
             sub_langs: Vec::new(),

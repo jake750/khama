@@ -15,9 +15,9 @@ Paste a link, pick a format, and get a file that drops straight into Premiere, D
 
 ## English
 
-### Features (phase 1)
+### Downloading
 
-- **Paste a link, download at the best quality**: YouTube and 1,000+ sites supported by [yt-dlp](https://github.com/yt-dlp/yt-dlp).
+- **Paste a link, download at the best quality**: YouTube and 1,000+ sites supported by [yt-dlp](https://github.com/yt-dlp/yt-dlp). Instagram, TikTok and X often need cookies (Settings → Cookies) and break more often when they change.
 - **Video or audio**: MP4 / MOV, or MP3 / AAC (M4A) / WAV.
 - **Quality**: Best, 4K, 1440p, 1080p, 720p, 480p. Options above what the video offers are disabled after the link preview loads.
 - **Edit-ready** (on by default): the output is always **H.264 + AAC at a constant frame rate**. Khama picks native H.264 streams when available, and only re-encodes when it has to (for example 4K VP9/AV1).
@@ -26,15 +26,15 @@ Paste a link, pick a format, and get a file that drops straight into Premiere, D
 - **English or Arabic UI** (full RTL), dark or light theme. Errors are explained in plain language, with the raw technical details one click away.
 - **Cookies** (optional): read from your browser, or paste/import a `cookies.txt`. Useful for age-restricted videos or YouTube's "are you a bot?" check.
 - **Download only a part**: pick a start and end, and only that section is downloaded (frame-accurate).
-- **Remove music or voice with AI**: keep only the dialogue (or only the music) of a download or any local file. The model (~140 MB) is downloaded once, on first use, and runs fully offline.
+- **AI clean-up (remove music or voice)**: keep only the dialogue (or only the music) of a download or any local file. The model (~140 MB) is downloaded once, on first use, and runs fully offline.
 - **Update yt-dlp in one click**. Sites change often, and this is the usual fix when downloads start failing.
-- **Private by design**: no analytics, no telemetry. Khama only contacts the sites you download from, plus GitHub to check for Khama updates at launch and when you press "Update yt-dlp".
+- **Private by design**: no analytics, no telemetry. Khama only contacts the sites you download from, plus GitHub (api.github.com) to check for Khama updates once per launch and when you press "Update yt-dlp". That check shows GitHub your IP address; you can turn it off in Settings → Background.
 
 ### Converter
 
 A built-in encoder for files already on your computer. Drag files in, pick what you want to *do* (not a codec), and go.
 
-- **For editing**: Edit-ready H.264 (fixes phone VFR sync), ProRes Proxy/LT/422/HQ/4444, DNxHR LB/SQ/HQ/HQX (best for free DaVinci Resolve), light 540p proxies.
+- **For editing**: H.264 for editing (always re-encodes; fixes phone VFR sync), ProRes Proxy/LT/422/HQ/4444, DNxHR LB/SQ/HQ/HQX (best for free DaVinci Resolve), light 540p proxies.
 - **For publishing**: YouTube, Reels/TikTok/Shorts (auto 9:16 crop), small files for WhatsApp, H.265, AV1, WebM, GIF.
 - **Audio**: WAV, MP3, AAC, FLAC, Opus, and AI music/voice removal.
 - **Tools**: rewrap without re-encoding, grab a frame, PNG sequence, find scene cuts / black frames / silences, then split at those points.
@@ -144,9 +144,9 @@ MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-l
 
 **خامة** أداة تنزيل وسائط على سطح المكتب، مصمّمة للممنتجين: الصق رابطًا، واختر الصيغة، فيصلك ملف جاهز للسحب مباشرة إلى Premiere أو DaVinci Resolve أو CapCut.
 
-### المميزات (المرحلة الأولى)
+### التنزيل
 
-- **الصق رابطًا وحمّله بأعلى جودة متاحة**، من يوتيوب وأكثر من ألف موقع يدعمها yt-dlp.
+- **الصق رابطًا وحمّله بأعلى جودة متاحة**، من يوتيوب وأكثر من ألف موقع يدعمها yt-dlp. إنستغرام وتيك توك وX تحتاج الكوكيز غالبًا، وتتعطّل أكثر حين تتغيّر.
 - **فيديو أو صوت**: MP4 / MOV، أو MP3 / AAC (M4A) / WAV.
 - **اختيار الجودة**: الأفضل، 4K، 1440p، 1080p، 720p، 480p. تُعطَّل الدقات غير المتوفرة بعد ظهور معاينة الرابط.
 - **«جاهز للمونتاج»** (مفعّل افتراضيًا): الناتج دائمًا **H.264 + AAC بمعدل إطارات ثابت**. تختار خامة ترميز H.264 الأصلي حين يتوفر، ولا تحوّل إلا عند الضرورة (مثل 4K بترميز VP9 أو AV1).
@@ -155,15 +155,15 @@ MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-l
 - **واجهة بالإنجليزية أو العربية** (RTL كاملة)، بثيم داكن أو فاتح. رسائل الخطأ مفهومة، والتفاصيل التقنية متاحة بنقرة.
 - **الكوكيز** (اختيارية): من متصفحك مباشرة، أو بلصق ملف `cookies.txt` أو استيراده. تفيد مع الفيديوهات المقيّدة بالعمر، أو حين يسأل يوتيوب «هل أنت روبوت؟».
 - **تحميل جزء فقط**: حدّد البداية والنهاية، ويُحمَّل هذا الجزء وحده بدقة الإطار.
-- **إزالة الموسيقى أو الصوت البشري بالذكاء الاصطناعي**: أبقِ الحوار وحده (أو الموسيقى وحدها) لأي تنزيل أو ملف على جهازك. النموذج (حوالي 140MB) يُنزَّل مرة واحدة عند أول استخدام، ويعمل بلا إنترنت بعدها.
+- **التنظيف بالذكاء الاصطناعي (إزالة الموسيقى أو الصوت البشري)**: أبقِ الحوار وحده (أو الموسيقى وحدها) لأي تنزيل أو ملف على جهازك. النموذج (حوالي 140MB) يُنزَّل مرة واحدة عند أول استخدام، ويعمل بلا إنترنت بعدها.
 - **تحديث yt-dlp بنقرة واحدة**: المواقع تتغيّر كثيرًا، وهذا غالبًا هو الحل حين يبدأ التنزيل بالفشل.
-- **الخصوصية**: لا تحليلات ولا تتبّع. تتصل خامة فقط بالمواقع التي تنزّل منها، وبـ GitHub للبحث عن تحديثات خامة عند فتحها، وحين تضغط «تحديث yt-dlp».
+- **الخصوصية**: لا تحليلات ولا تتبّع. تتصل خامة فقط بالمواقع التي تنزّل منها، وبـ GitHub (api.github.com) للبحث عن تحديثات خامة مرة عند كل فتح، وحين تضغط «تحديث yt-dlp». هذا الفحص يُري GitHub عنوان IP الخاص بك، ويمكنك إطفاؤه من الإعدادات ← الخلفية.
 
 ### المحوّل
 
 محوّل مدمج للملفات الموجودة على جهازك: اسحب الملفات، واختر **ماذا تريد أن تفعل** (لا الكودك)، وابدأ.
 
-- **للمونتاج**: H.264 جاهز للمونتاج (يصلح تزامن فيديو الجوال)، وProRes بكل درجاته، وDNxHR (الأفضل لـ DaVinci Resolve المجاني)، وبروكسي خفيف.
+- **للمونتاج**: H.264 للمونتاج (يعيد الترميز دائمًا؛ يصلح تزامن فيديو الجوال)، وProRes بكل درجاته، وDNxHR (الأفضل لـ DaVinci Resolve المجاني)، وبروكسي خفيف.
 - **للنشر**: يوتيوب، ريلز/تيك توك/شورتس (قص 9:16 تلقائي)، حجم صغير لواتساب، H.265، AV1، WebM، GIF.
 - **صوت**: WAV وMP3 وAAC وFLAC وOpus، وإزالة الموسيقى أو الصوت بالذكاء الاصطناعي.
 - **أدوات**: تغيير الحاوية بلا إعادة ترميز، التقاط إطار، سلسلة صور، كشف المشاهد والشاشات السوداء والصمت ثم التقسيم عندها.

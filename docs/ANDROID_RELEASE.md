@@ -43,6 +43,6 @@ Check the signature: `apksigner verify --print-certs <apk>` (in `build-tools` in
 
 ## Things to keep in mind
 - The mobile build uses `youtubedl-android`, so the APK is GPL-3 (the desktop build stays MIT). See `THIRD_PARTY_NOTICES.md`.
-- Converting and AI clean-up are hidden on the phone (`isMobile` in `src/platform.ts`).
+- Converting and AI clean-up work on the phone too: the converter uses the phone's video chip when it passes a test, and AI clean-up uses a smaller model (about 67 MB). Desktop-only: folder picker, drag-out, tray and watch folders (`isMobile` in `src/platform.ts`).
 - The in-app update check (branch `claude/magical-matsumoto-b7411c`, not yet merged into `main` when this was written) compares the version against the latest GitHub release and opens its APK. For it to work: publish a release whose tag is the new version and attach `app-arm64-release.apk` to it.
 - The desktop updater needs a separate key: `C:/Users/foura/.tauri/khama.key` (its password is not recorded here), plus `pubkey` in `tauri.conf.json` and the GitHub secrets `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.

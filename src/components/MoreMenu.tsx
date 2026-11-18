@@ -6,6 +6,8 @@ export interface MenuItem {
   label: string;
   icon: IconName;
   onClick: () => void;
+  /** شرح يظهر عند الوقوف على العنصر */
+  title?: string;
 }
 
 /** قائمة «⋯» للأفعال الثانوية: تُغلق بالنقر خارجها أو بـ Escape (D-25) */
@@ -48,6 +50,7 @@ export function MoreMenu(props: { label: string; items: MenuItem[] }) {
             <button
               key={it.label}
               type="button"
+              title={it.title}
               role="menuitem"
               onClick={() => {
                 setOpen(false);

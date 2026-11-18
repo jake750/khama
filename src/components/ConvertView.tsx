@@ -3,7 +3,17 @@ import { useMemo, useState } from "react";
 import { api, asAppError, type AppError, type ConvertOptions, type ConvertRequest, type MediaInfo, type Settings } from "../api";
 import { formatBytes, formatDuration } from "../format";
 import { useI18n, type Dict } from "../i18n";
-import { estimateSize, GROUPS, presetById, presetFits, PRESETS, suggestPreset, type PresetDef, type PresetGroup } from "../presets";
+import {
+  estimateSize,
+  GROUPS,
+  presetById,
+  presetFits,
+  PRESETS,
+  suggestPreset,
+  suggestReason,
+  type PresetDef,
+  type PresetGroup,
+} from "../presets";
 import { ErrorBox } from "./ErrorBox";
 import { Icon, type IconName } from "./Icon";
 import { AnimatedList, SlideSwitch } from "../motion";
@@ -21,6 +31,14 @@ async function pickFiles(multiple: boolean, filter: { name: string; extensions: 
   const list = Array.isArray(p) ? p : typeof p === "string" ? [p] : [];
   if (!list.length || !isMobile) return list;
   return api.importFiles(list);
+}
+
+/** معدل البت التقريبي لمستوى الجودة: «≈ 16 Mbps عند 1080p» أو «320 kbps» */
+function qualityRate(p: PresetDef, q: ConvertOptions["quality"]): string | undefined {
+  const v = typeof p.mbps1080 === "object" ? p.mbps1080[q] : undefined;
+  if (v != null) return `≈ ${v} Mbps @ 1080p`;
+  const a = typeof p.kbps === "object" ? p.kbps[q] : undefined;
+  return a != null ? `${a} kbps` : undefined;
 }
 
 /** ملف في قائمة المحوّل */
@@ -306,6 +324,7 @@ export function ConvertView(props: {
   const single = ready.length === 1 ? ready[0].info! : null;
   const fits = (p: PresetDef) => ready.every((f) => presetFits(p, f.info));
   const suggestion = single ? suggestPreset(single.issues) : null;
+  const reason = single ? suggestReason(single.issues) : null;
 
   const kind = preset.kind;
   const showPicture = ["video", "gif", "frame", "sequence"].includes(kind);
@@ -568,6 +587,7 @@ export function ConvertView(props: {
                   {p.id === suggestion && (
                     <span className="preset-suggested">
                       <Icon name="check" size={16} /> {t.suggestedFor}
+                      {reason && ` · ${t.suggestWhy[reason.issue]}`}
                     </span>
                   )}
                   {/* سبب التعطيل مكتوب لا في title، فيظهر على الهاتف أيضًا (D-86) */}
@@ -587,11 +607,12 @@ export function ConvertView(props: {
                   label={t.quality}
                   value={opts.quality}
                   onChange={(quality) => set({ quality })}
-                  options={[
-                    { value: "high", label: t.qualityHigh },
-                    { value: "balanced", label: t.qualityBalanced },
-                    { value: "small", label: t.qualitySmall },
-                  ]}
+                  // الرقم خلف كل مستوى للمحترف: معدل البت التقريبي عند 1080p أو للصوت (F-13)
+                  options={(["high", "balanced", "small"] as const).map((q) => ({
+                    value: q,
+                    label: { high: t.qualityHigh, balanced: t.qualityBalanced, small: t.qualitySmall }[q],
+                    title: qualityRate(preset, q),
+                  }))}
                 />
               </div>
             )}
@@ -750,6 +771,9 @@ export function ConvertView(props: {
                       onChange={(replaceAudio) => set({ replaceAudio })}
                     />
                   </div>
+                  {/* ما يكلّفه كل خيار مكتوبًا تحته (F-40، F-41) */}
+                  {opts.loudness != null && <div className="faint mt-2">{t.loudHint}</div>}
+                  {opts.replaceAudio && <div className="faint mt-2">{t.replaceAudioHint}</div>}
                   {kind === "video" && <Toggle checked={opts.mute} onChange={(mute) => set({ mute })} title={t.mute} />}
                 </section>
               )}

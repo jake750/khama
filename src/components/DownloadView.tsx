@@ -371,6 +371,12 @@ export function DownloadView(props: {
     input.current?.focus();
   };
 
+  const formatNote =
+    s.kind === "video"
+      ? s.videoFormat === "mov"
+        ? t.movTooltip
+        : null
+      : (({ m4a: t.aacTooltip, wav: t.wavNote, original: t.audioOriginalTooltip } as Record<string, string>)[s.audioFormat] ?? null);
   const qualityLabel = (q: string) => (q === "best" ? t.best : q === "2160" ? "4K" : `${q}p`);
   // الدقة المختارة أعلى مما يوفّره الفيديو: نستعمل أقرب دقة أقل منها لهذا الرابط فقط،
   // ولا نغيّر الإعداد المحفوظ (U-13)
@@ -683,8 +689,8 @@ export function DownloadView(props: {
                       value={s.videoFormat}
                       onChange={(videoFormat) => update({ videoFormat })}
                       options={[
-                        { value: "mp4", label: "MP4" },
-                        { value: "mov", label: "MOV" },
+                        { value: "mp4", label: "MP4", title: t.mp4Tooltip },
+                        { value: "mov", label: "MOV", title: t.movTooltip },
                       ]}
                     />
                   ) : (
@@ -701,6 +707,8 @@ export function DownloadView(props: {
                     />
                   )}
                 </SlideSwitch>
+                {/* الشرح ظاهرًا لا في title فقط، فالهاتف لا يعرض title (F-24، F-25) */}
+                {formatNote && <div className="faint mt-2">{formatNote}</div>}
               </div>
 
               <div className="collapse slide-x" data-open={s.kind === "video"} aria-hidden={s.kind !== "video" || undefined}>
@@ -715,6 +723,7 @@ export function DownloadView(props: {
                         options={QUALITIES.map((q) => ({
                           value: q,
                           label: qualityLabel(q),
+                          title: q === "best" ? t.bestTooltip : undefined,
                           // بعد جلب معلومات الرابط: نعطّل الدقات الأعلى من المتاح
                           disabled: q !== "best" && maxHeight != null && Number(q) > maxHeight,
                         }))}

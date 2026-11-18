@@ -40,6 +40,7 @@ export interface Settings {
   notify: boolean;
   closeToTray: boolean;
   watchClipboard: boolean;
+  checkUpdates: boolean;
   recentDirs: string[];
   wantSubs: boolean;
   subLangs: string[];

@@ -380,6 +380,14 @@ function BackgroundSection(props: { settings: Settings; update: (p: Partial<Sett
           </div>
         </>
       )}
+      <div className="setting-row">
+        <Toggle
+          checked={s.checkUpdates}
+          onChange={(checkUpdates) => update({ checkUpdates })}
+          title={t.checkUpdates}
+          hint={t.checkUpdatesHint}
+        />
+      </div>
     </Section>
   );
 }

@@ -77,6 +77,8 @@ export function UpdateDialog(props: {
   busy: boolean;
   /** يزيد حين يضغط المستخدم «ثبّت التحديث» في الإعدادات */
   request: number;
+  /** البحث عند الفتح مسموح (إعداد «البحث عن تحديثات»، F-51) */
+  enabled: boolean;
   /** وُجد تحديث: شارة على «الإعدادات» بدل نافذة عند الإقلاع */
   onAvailable: (version: string | null) => void;
 }) {
@@ -92,7 +94,7 @@ export function UpdateDialog(props: {
   useEffect(() => {
     // StrictMode يركّب ويفكّ ثم يركّب في التطوير: الإلغاء يمسح المؤقّت الأول،
     // والعلَم يُرفع عند انطلاق الفحص فعلًا، فيحدث مرة واحدة فقط
-    if (started.current) return;
+    if (started.current || !props.enabled) return;
     const timer = window.setTimeout(() => {
       started.current = true;
       (isMobile ? checkMobile() : checkDesktop())
@@ -103,6 +105,7 @@ export function UpdateDialog(props: {
         .catch(() => {}); // بلا اتصال، أو لا يوجد إصدار منشور بعد
     }, CHECK_DELAY_MS);
     return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- مرة عند الفتح فقط
   }, []);
 
   // تُفتح النافذة فقط حين يطلبها المستخدم، ولا أثناء تنزيل

@@ -146,7 +146,7 @@ export function JobCard(props: {
   if (j.state === "done" && j.file && props.onOpen) extra.push({ label: t.openFile, icon: "eye", onClick: props.onOpen });
   if (j.state === "done" && j.file && props.onCopyPath) extra.push({ label: t.copyPath, icon: "copy", onClick: props.onCopyPath });
   if (j.state === "done" && j.file && props.onConvert) extra.push({ label: t.sendToConvert, icon: "convert", onClick: props.onConvert });
-  if (j.state === "done" && props.onSplit) extra.push({ label: t.splitHere, icon: "scissors", onClick: props.onSplit });
+  if (j.state === "done" && props.onSplit) extra.push({ label: t.splitHere, icon: "scissors", onClick: props.onSplit, title: t.splitHint });
   if (j.state === "done" && props.onCopyMarkers) extra.push({ label: t.copyTimes, icon: "paste", onClick: props.onCopyMarkers });
   if (j.state === "done" && props.onCopyChapters) extra.push({ label: t.copyChapters, icon: "copy", onClick: props.onCopyChapters });
   // مرحلة شريط التقدّم: تنزيل، ثم معالجة، ثم ذكاء اصطناعي (D-93)

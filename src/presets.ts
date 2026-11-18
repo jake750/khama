@@ -35,10 +35,10 @@ export const PRESETS: PresetDef[] = [
     ext: "mp4",
     quality: true,
     hw: true,
-    name: { en: "Edit-ready H.264", ar: "H.264 جاهز للمونتاج" },
+    name: { en: "H.264 for editing", ar: "H.264 للمونتاج" },
     desc: {
-      en: "Constant frame rate, opens everywhere. Fixes phone VFR sync issues.",
-      ar: "معدل إطارات ثابت ويفتح في كل البرامج. يصلح مشاكل تزامن فيديو الجوال.",
+      en: "Always re-encodes to H.264 at a constant frame rate. Opens everywhere and fixes phone VFR sync issues.",
+      ar: "يعيد الترميز دائمًا إلى H.264 بمعدل إطارات ثابت. يفتح في كل البرامج ويصلح مشاكل تزامن فيديو الجوال.",
     },
     mbps1080: { high: 16, balanced: 11, small: 6 },
   }),
@@ -50,7 +50,10 @@ export const PRESETS: PresetDef[] = [
     quality: false,
     hw: false,
     name: { en: "ProRes 422", ar: "ProRes 422" },
-    desc: { en: "Smooth scrubbing in Premiere and Final Cut. Big files.", ar: "تقليب سلس في Premiere وFinal Cut. ملفات كبيرة." },
+    desc: {
+      en: "Smooth scrubbing in Premiere and Final Cut. Big files. On Windows it opens in Premiere and Resolve but not in the built-in video player.",
+      ar: "تقليب سلس في Premiere وFinal Cut. ملفات كبيرة. على Windows يُفتح في Premiere وResolve لكن لا يعمل في مشغّل الفيديو المدمج.",
+    },
     mbps1080: 147,
   }),
   P({
@@ -61,7 +64,10 @@ export const PRESETS: PresetDef[] = [
     quality: false,
     hw: false,
     name: { en: "ProRes 422 HQ", ar: "ProRes 422 HQ" },
-    desc: { en: "Higher quality for grading and heavy effects.", ar: "جودة أعلى للتلوين والمؤثرات الثقيلة." },
+    desc: {
+      en: "Higher quality for grading and heavy effects. On Windows it opens in Premiere and Resolve but not in the built-in video player.",
+      ar: "جودة أعلى للتلوين والمؤثرات الثقيلة. على Windows يُفتح في Premiere وResolve لكن لا يعمل في مشغّل الفيديو المدمج.",
+    },
     mbps1080: 220,
   }),
   P({
@@ -72,7 +78,10 @@ export const PRESETS: PresetDef[] = [
     quality: false,
     hw: false,
     name: { en: "ProRes LT", ar: "ProRes LT" },
-    desc: { en: "Lighter ProRes for long timelines.", ar: "ProRes أخف للتايملاين الطويل." },
+    desc: {
+      en: "Lighter ProRes for long timelines. On Windows it opens in Premiere and Resolve but not in the built-in video player.",
+      ar: "ProRes أخف للتايملاين الطويل. على Windows يُفتح في Premiere وResolve لكن لا يعمل في مشغّل الفيديو المدمج.",
+    },
     mbps1080: 102,
   }),
   P({
@@ -83,7 +92,10 @@ export const PRESETS: PresetDef[] = [
     quality: false,
     hw: false,
     name: { en: "ProRes 4444", ar: "ProRes 4444" },
-    desc: { en: "Keeps transparency (alpha). For motion graphics.", ar: "يحافظ على الشفافية (Alpha). للموشن جرافيك." },
+    desc: {
+      en: "Keeps transparency (alpha). For motion graphics. On Windows it opens in Premiere and Resolve but not in the built-in video player.",
+      ar: "يحافظ على الشفافية (Alpha). للموشن جرافيك. على Windows يُفتح في Premiere وResolve لكن لا يعمل في مشغّل الفيديو المدمج.",
+    },
     mbps1080: 330,
   }),
   P({
@@ -95,8 +107,8 @@ export const PRESETS: PresetDef[] = [
     hw: false,
     name: { en: "DNxHR SQ", ar: "DNxHR SQ" },
     desc: {
-      en: "Best choice for free DaVinci Resolve on Windows and Linux.",
-      ar: "أفضل خيار لـ DaVinci Resolve المجاني على Windows وLinux.",
+      en: "Best choice for free DaVinci Resolve on Windows and Linux: the free version can't read H.264 or AAC on Linux, and DNxHR edits smoothly everywhere.",
+      ar: "أفضل خيار لـ DaVinci Resolve المجاني على Windows وLinux: النسخة المجانية لا تقرأ H.264 ولا AAC على Linux، وDNxHR سلس في كل مكان.",
     },
     mbps1080: 145,
   }),
@@ -119,7 +131,10 @@ export const PRESETS: PresetDef[] = [
     quality: false,
     hw: false,
     name: { en: "DNxHR HQX 10-bit", ar: "DNxHR HQX ‏10-bit" },
-    desc: { en: "Keeps 10-bit color for HDR and log footage.", ar: "يحافظ على ألوان 10-bit للقطات HDR وLog." },
+    desc: {
+      en: "Keeps 10-bit color for HDR and log footage. From an ordinary 8-bit source it only makes a bigger file: use HQ instead.",
+      ar: "يحافظ على ألوان 10-bit للقطات HDR وLog. من مصدر 8-bit عادي لا يعطي إلا ملفًا أكبر: استعمل HQ بدله.",
+    },
     mbps1080: 220,
   }),
   P({
@@ -322,8 +337,8 @@ export const PRESETS: PresetDef[] = [
     hw: false,
     name: { en: "Rewrap to MP4", ar: "تغيير الحاوية إلى MP4" },
     desc: {
-      en: "No re-encoding, takes seconds. Trims cut at the nearest keyframe.",
-      ar: "بلا إعادة ترميز، ثوانٍ فقط. القص عند أقرب إطار مفتاحي.",
+      en: "No re-encoding, takes seconds. A trim lands on the nearest keyframe, which can be a few seconds off.",
+      ar: "بلا إعادة ترميز، ثوانٍ فقط. القص يقع على أقرب إطار مفتاحي، وقد يبتعد بضع ثوانٍ.",
     },
   }),
   P({
@@ -334,7 +349,10 @@ export const PRESETS: PresetDef[] = [
     quality: false,
     hw: false,
     name: { en: "Rewrap to MOV", ar: "تغيير الحاوية إلى MOV" },
-    desc: { en: "Same streams in a MOV file.", ar: "نفس المحتوى داخل ملف MOV." },
+    desc: {
+      en: "Same streams in a MOV file, no re-encoding. A trim lands on the nearest keyframe.",
+      ar: "نفس المحتوى داخل ملف MOV بلا إعادة ترميز. القص يقع على أقرب إطار مفتاحي.",
+    },
   }),
   P({
     id: "rewrap_mkv",
@@ -344,7 +362,10 @@ export const PRESETS: PresetDef[] = [
     quality: false,
     hw: false,
     name: { en: "Rewrap to MKV", ar: "تغيير الحاوية إلى MKV" },
-    desc: { en: "Holds any codec.", ar: "يقبل أي كودك." },
+    desc: {
+      en: "Holds any codec, no re-encoding. A trim lands on the nearest keyframe.",
+      ar: "يقبل أي كودك، بلا إعادة ترميز. القص يقع على أقرب إطار مفتاحي.",
+    },
   }),
   P({
     id: "frame_png",
@@ -374,7 +395,10 @@ export const PRESETS: PresetDef[] = [
     quality: false,
     hw: false,
     name: { en: "Find scene cuts", ar: "كشف تغيّر المشاهد" },
-    desc: { en: "Lists every cut. Then split the file at those points.", ar: "يعرض كل قطع، ويمكنك تقسيم الملف عندها." },
+    desc: {
+      en: "Lists every cut (a picture change above 32%) as marks on the file's card. Copy them, or split the file at those points.",
+      ar: "يعرض كل قطع (تغيّر في الصورة فوق 32%) علامات على بطاقة الملف. انسخها، أو قسّم الملف عندها.",
+    },
   }),
   P({
     id: "detect_black",
@@ -384,7 +408,10 @@ export const PRESETS: PresetDef[] = [
     quality: false,
     hw: false,
     name: { en: "Find black frames", ar: "كشف الشاشات السوداء" },
-    desc: { en: "Finds black gaps (dropped signal, leftover slates).", ar: "يجد الفراغات السوداء (انقطاع، أو بقايا في البداية والنهاية)." },
+    desc: {
+      en: "Finds black gaps of 0.3 s or more (dropped signal, leftover slates) and lists them on the file's card.",
+      ar: "يجد الفراغات السوداء من 0.3 ث فأكثر (انقطاع، أو بقايا في البداية والنهاية) ويعرضها على بطاقة الملف.",
+    },
   }),
   P({
     id: "detect_silence",
@@ -394,7 +421,10 @@ export const PRESETS: PresetDef[] = [
     quality: false,
     hw: false,
     name: { en: "Find silences", ar: "كشف الصمت" },
-    desc: { en: "Finds pauses — handy for cutting talking-head videos.", ar: "يجد فترات السكوت، مفيد لتقطيع فيديوهات الكلام." },
+    desc: {
+      en: "Finds pauses quieter than −40 dB for 0.6 s or more and lists them on the file's card. Handy for cutting talking-head videos.",
+      ar: "يجد فترات السكوت (أهدأ من −40 dB لمدة 0.6 ث فأكثر) ويعرضها على بطاقة الملف. مفيد لتقطيع فيديوهات الكلام.",
+    },
   }),
 ];
 
@@ -413,9 +443,19 @@ export function presetFits(p: PresetDef, m?: MediaInfo | null): boolean {
 
 /** اقتراح تلقائي حسب مشاكل الملف */
 export function suggestPreset(issues: Issue[]): string | null {
-  if (issues.includes("resolveFreeAudio")) return "dnxhr_sq";
-  if (issues.includes("hdr")) return "dnxhr_hqx";
-  if (issues.includes("vfr") || issues.includes("heavyCodec")) return "edit_h264";
+  return suggestReason(issues)?.preset ?? null;
+}
+
+/** الاقتراح وسببه: المشكلة التي جعلتنا نقترحه، لتُكتب بجانبه (F-38) */
+export function suggestReason(issues: Issue[]): { preset: string; issue: Issue } | null {
+  for (const [issue, preset] of [
+    ["resolveFreeAudio", "dnxhr_sq"],
+    ["hdr", "dnxhr_hqx"],
+    ["vfr", "edit_h264"],
+    ["heavyCodec", "edit_h264"],
+  ] as const) {
+    if (issues.includes(issue)) return { preset, issue };
+  }
   return null;
 }
 

@@ -1017,7 +1017,7 @@ export default function App() {
         )}
 
         {/* تحديثات خامة: الكمبيوتر يثبّتها بنفسه، والهاتف يفتح رابط ملف APK الجديد */}
-        <UpdateDialog busy={running.length > 0} request={updateRequest} onAvailable={setUpdateVersion} />
+        <UpdateDialog enabled={settings.checkUpdates} busy={running.length > 0} request={updateRequest} onAvailable={setUpdateVersion} />
 
         <Presence show={!settings.acceptedNotice}>
           <Dialog
