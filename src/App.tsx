@@ -84,6 +84,10 @@ function downloadMeta(t: Dict, r: DownloadRequest): string {
   return `${r.videoFormat.toUpperCase()} · ${r.quality === "best" ? t.best : r.quality === "2160" ? "4K" : r.quality + "p"}`;
 }
 
+function activeProjectName(s: Settings | null): string | null {
+  return s?.projects.find((p) => p.id === s.activeProject)?.name ?? null;
+}
+
 const MEDIA_EXT = new Set(MEDIA_FILTER.extensions);
 const isMedia = (p: string) => MEDIA_EXT.has(p.split(".").pop()?.toLowerCase() ?? "");
 const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p;
@@ -349,7 +353,8 @@ export default function App() {
         request,
         title: meta.title,
         thumbnail: meta.thumbnail,
-        meta: downloadMeta(tRef.current, request),
+        // المشروع النشط يظهر على البطاقة وفي السجلّ (U-83)
+        meta: [downloadMeta(tRef.current, request), activeProjectName(settingsRef.current)].filter(Boolean).join(" · "),
         lastError: meta.lastError,
       };
       if (at && at > Date.now()) {
