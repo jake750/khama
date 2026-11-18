@@ -224,6 +224,18 @@ pub async fn ensure_managed_ytdlp(app: &AppHandle) -> Result<(), AppError> {
         .map_err(|e| AppError::with_detail("toolsSetup", e.to_string()))?
 }
 
+/// تسخين بعد الإقلاع (U-96): أول تشغيل لـ yt-dlp يفكّ Python ويقرأ مئات الملفات من القرص،
+/// فتكون أول معاينة أبطأ بثوانٍ. نشغّل --version مرة في الخلفية بعد أن تهدأ الواجهة،
+/// فتأتي المعاينة الأولى والملفات في ذاكرة النظام.
+pub fn warm_up(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        if let Ok(tools) = resolve(&app) {
+            let _ = run_ytdlp(&tools, &["--version"]).await;
+        }
+    });
+}
+
 /// أول تشغيل (أو بعد تحديث التطبيق): انسخ yt-dlp المضمّن إلى مجلد البيانات
 /// إن لم يكن موجودًا هناك، أو إن كانت النسخة المضمّنة أحدث.
 #[cfg(desktop)]

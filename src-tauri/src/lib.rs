@@ -99,6 +99,8 @@ pub fn run() {
                 if let Err(e) = tools::ensure_managed_ytdlp(&handle).await {
                     log::error!("ensure_managed_ytdlp: {e:?}");
                 }
+                // بعد تجهيزه لا قبله: على Windows تشغيله أثناء نسخه يقفل الملف
+                tools::warm_up(handle);
             });
             Ok(())
         })
