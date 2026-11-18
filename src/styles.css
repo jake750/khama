@@ -1864,6 +1864,17 @@ img.file-thumb {
   overscroll-behavior: contain;
 }
 
+.pl-search {
+  flex: 1 1 140px;
+  max-width: 220px;
+  height: 32px;
+}
+
+.pl-none {
+  margin: 0;
+  padding: var(--s-3) var(--s-4);
+}
+
 .pl-more {
   display: block;
   width: 100%;
