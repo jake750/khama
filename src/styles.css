@@ -1864,6 +1864,12 @@ img.file-thumb {
   overscroll-behavior: contain;
 }
 
+.pl-more {
+  display: block;
+  width: 100%;
+  margin-top: var(--s-1);
+}
+
 .pl-row {
   display: flex;
   align-items: center;

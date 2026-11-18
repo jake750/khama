@@ -1,8 +1,10 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import type { PlaylistEntry } from "../api";
 import { formatDuration } from "../format";
 import { useI18n } from "../i18n";
 import { Icon } from "./Icon";
+
+const PAGE = 200;
 
 /**
  * عناصر قائمة التشغيل: تختار ما يُنزَّل (الكل افتراضيًا).
@@ -19,6 +21,8 @@ export function PlaylistPanel(props: {
   const { t } = useI18n();
   const { entries, selected, picked } = props;
   const all = selected.size === entries.length;
+  // قناة فيها آلاف الفيديوهات: نرسم 200 ثم «اعرض المزيد»، لا الكل دفعة واحدة (T-44)
+  const [shown, setShown] = useState(PAGE);
 
   const toggle = (set: Set<number>, i: number) => {
     const next = new Set(set);
@@ -37,7 +41,7 @@ export function PlaylistPanel(props: {
         </button>
       </div>
       <ul className="pl-list">
-        {entries.map((e, i) => {
+        {entries.slice(0, shown).map((e, i) => {
           const on = selected.has(i);
           const sub = [e.uploader, formatDuration(e.duration)].filter(Boolean).join(" · ");
           return (
@@ -74,6 +78,11 @@ export function PlaylistPanel(props: {
           );
         })}
       </ul>
+      {shown < entries.length && (
+        <button className="btn btn-sm btn-ghost pl-more" onClick={() => setShown((n) => n + PAGE)}>
+          {t.plShowMore(Math.min(PAGE, entries.length - shown), entries.length - shown)}
+        </button>
+      )}
     </div>
   );
 }

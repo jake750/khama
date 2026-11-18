@@ -114,6 +114,16 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       const url = String(args.url);
       if (url.includes("bad")) throw { code: "unavailable", detail: "ERROR: [youtube] xyz: Video unavailable" };
       await new Promise((r) => setTimeout(r, 700));
+      // قائمة تشغيل كبيرة لتجربة «اعرض المزيد»
+      if (url.includes("list="))
+        return {
+          title: "قائمة طويلة",
+          site: "YouTube",
+          heights: [1080, 720],
+          isLive: false,
+          subtitles: [],
+          entries: Array.from({ length: 450 }, (_, i) => ({ url: `https://youtu.be/v${i}`, title: `فيديو ${i + 1}`, duration: 60 + i })),
+        };
       return {
         title: "كيف تصوّر لقطات سينمائية بهاتفك — دليل كامل للمبتدئين",
         thumbnail: thumb("cine"),
