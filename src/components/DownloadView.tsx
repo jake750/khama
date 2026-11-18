@@ -748,6 +748,13 @@ export function DownloadView(props: {
                     aria-label={t.previewLabel}
                   />
                 )}
+                {/* الموقع لا يعطي رابط معاينة: نقول ذلك ونشرح كيف تُعرف الأوقات بدل قص أعمى صامت (U-17) */}
+                {activeClips && !info.previewUrl && (
+                  <div className="alert info">
+                    <Icon name="info" size={16} />
+                    <span>{t.trimNoPreview}</span>
+                  </div>
+                )}
                 {duration &&
                   (activeClips ?? [{ start: 0, end: duration }]).map((c, i) => (
                     <div className="clip" key={i}>
