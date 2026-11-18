@@ -3862,3 +3862,16 @@ kbd {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* ترتيب ملفات الدمج (U-50) */
+.file-order {
+  display: flex;
+  flex-direction: column;
+}
+.file-order .icon-btn {
+  height: 22px;
+}
+.flip-y {
+  display: inline-flex;
+  transform: scaleY(-1);
+}

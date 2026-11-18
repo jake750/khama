@@ -311,6 +311,12 @@ export function ConvertView(props: {
   const showAudio = kind === "video" || kind === "audio";
   const showBurn = kind === "video";
   const canTrim = !!single?.duration;
+  const move = (i: number, by: -1 | 1) =>
+    props.setFiles((prev) => {
+      const next = [...prev];
+      [next[i], next[i + by]] = [next[i + by], next[i]];
+      return next;
+    });
   const canMerge = ready.length > 1 && ["video", "audio", "gif"].includes(kind);
   const tabs = (
     [showPicture && "picture", canTrim && "trim", showBurn && "burn", (showAudio || kind === "copy") && "audio"] as (OptTab | false)[]
@@ -450,7 +456,7 @@ export function ConvertView(props: {
           </button>
         </div>
         <AnimatedList className="file-list">
-          {files.map((f) => (
+          {files.map((f, i) => (
             <div className="file-row" key={f.path}>
               {f.info?.thumbnail ? (
                 <img className="file-thumb" src={f.info.thumbnail} alt="" />
@@ -475,9 +481,27 @@ export function ConvertView(props: {
                 )}
                 {f.error && <ErrorBox error={f.error} compact />}
               </div>
+              {/* «دمج» يجمعها بهذا الترتيب، فيمكن تغييره (U-50) */}
+              {files.length > 1 && (
+                <div className="file-order">
+                  <button className="icon-btn sm" title={t.moveUp} aria-label={t.moveUp} disabled={i === 0} onClick={() => move(i, -1)}>
+                    <span className="flip-y">
+                      <Icon name="chevron" size={16} />
+                    </span>
+                  </button>
+                  <button
+                    className="icon-btn sm"
+                    title={t.moveDown}
+                    aria-label={t.moveDown}
+                    disabled={i === files.length - 1}
+                    onClick={() => move(i, 1)}
+                  >
+                    <Icon name="chevron" size={16} />
+                  </button>
+                </div>
+              )}
               <button
                 className="icon-btn sm"
-
                 title={t.removeFile}
                 aria-label={t.removeFile}
                 onClick={() => props.setFiles((prev) => prev.filter((x) => x.path !== f.path))}
