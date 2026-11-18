@@ -23,6 +23,10 @@ import type { Toast, ToastAction } from "./toast";
 import { presetById } from "./presets";
 import { logError } from "./log";
 import { nextTheme } from "./theme";
+import { limiter } from "./limit";
+
+/** تحليل الملفات المضافة للمحوّل: 4 في كل مرة (U-93) */
+const analyzeTurn = limiter(4);
 
 type Tab = "download" | "convert" | "history" | "settings" | "guide";
 
@@ -467,8 +471,7 @@ export default function App() {
     setFiles((prev) => {
       const fresh = media.filter((p) => !prev.some((f) => f.path === p));
       for (const p of fresh) {
-        api
-          .analyzeFile(p)
+        analyzeTurn(() => api.analyzeFile(p))
           .then((info) => setFiles((cur) => cur.map((f) => (f.path === p ? { ...f, info } : f))))
           .catch((e) => setFiles((cur) => cur.map((f) => (f.path === p ? { ...f, error: asAppError(e) } : f))));
       }
