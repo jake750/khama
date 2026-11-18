@@ -156,7 +156,7 @@ export const PRESETS: PresetDef[] = [
     quality: false,
     hw: false,
     name: { en: "ProRes Proxy", ar: "ProRes Proxy" },
-    desc: { en: "Full-res proxy that edits fast on any machine.", ar: "بروكسي بنفس الدقة، يشتغل بسرعة على أي جهاز." },
+    desc: { en: "Full-res proxy that edits fast on any machine.", ar: "بروكسي بنفس الدقة، يعمل بسرعة على أي جهاز." },
     mbps1080: 45,
   }),
   P({
@@ -294,7 +294,7 @@ export const PRESETS: PresetDef[] = [
     quality: true,
     hw: false,
     name: { en: "MP3", ar: "MP3" },
-    desc: { en: "Plays everywhere.", ar: "يشتغل في كل مكان." },
+    desc: { en: "Plays everywhere.", ar: "يعمل في كل مكان." },
     kbps: { high: 320, balanced: 256, small: 160 },
   }),
   P({

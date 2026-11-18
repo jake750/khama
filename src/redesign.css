@@ -1776,3 +1776,20 @@ details.extras .schedule-row {
   height: 20px;
   border-radius: 999px;
 }
+
+/* مسرد الدليل (F-75) */
+.glossary {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 16px 20px;
+}
+
+.glossary dt {
+  font-weight: var(--fw-semi);
+}
+
+.glossary dd {
+  margin: 2px 0 0;
+  font-size: var(--fs-meta);
+}

@@ -4,6 +4,7 @@
 
 **Raw footage, timeline-ready.** A desktop media downloader built for video editors.
 Paste a link, pick a format, and get a file that drops straight into Premiere, DaVinci Resolve or CapCut.
+*Khama* (خامة) is Arabic for "raw material", the footage you start an edit with.
 
 [English](#english) · [العربية](#العربية)
 
@@ -66,8 +67,15 @@ Grab the installer for your system from the [Releases](../../releases) page:
 | macOS (Apple Silicon) | `Khama_x.y.z_aarch64.dmg` |
 | macOS (Intel) | `Khama_x.y.z_x64.dmg` |
 | Linux | `.AppImage`, `.deb` or `.rpm` |
+| Android (phone) | `Khama_x.y.z_android-arm64.apk` |
 
 Everything Khama needs (yt-dlp, FFmpeg, Deno) is bundled. There is nothing else to install.
+
+**Linux**: the `.deb` is for Ubuntu, Debian and Mint, the `.rpm` for Fedora and openSUSE. The `.AppImage` runs anywhere without installing: make it executable (`chmod +x`) and open it.
+
+**Android**: open the `.apk` on the phone. Android asks once to allow installs from your browser or file manager ("Install unknown apps"); allow it, then install. The phone version downloads, trims, converts and runs AI clean-up (slower than a computer). Desktop-only: choosing the save folder (files go to `Download/Khama`), dragging files out, the tray, watch folders and the mini window.
+
+**Updating yt-dlp** (Settings → Tools) is safe and takes seconds: it fetches the official release from GitHub. Do it whenever downloads from a site start failing, or about once a month.
 
 #### macOS: opening an unsigned app
 
@@ -77,7 +85,7 @@ Khama isn't signed with an Apple Developer certificate yet, so macOS will warn y
 2. Open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to the Khama message.
 3. Confirm with **Open**. You only need to do this once.
 
-If macOS says the app "is damaged", run this once in Terminal:
+If macOS says the app "is damaged", run this once in Terminal. It removes the "downloaded from the internet" flag macOS put on Khama, and changes nothing else:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Khama.app
@@ -143,11 +151,11 @@ MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-l
 <img src="docs/screenshot-ar.png" alt="واجهة خامة بالعربية" width="760">
 </div>
 
-**خامة** أداة تنزيل وسائط على سطح المكتب، مصمّمة للممنتجين: الصق رابطًا، واختر الصيغة، فيصلك ملف جاهز للسحب مباشرة إلى Premiere أو DaVinci Resolve أو CapCut.
+**خامة** أداة تنزيل وسائط على سطح المكتب، مصمّمة لمحرّري الفيديو: الصق رابطًا، واختر الصيغة، فيصلك ملف جاهز للسحب مباشرة إلى Premiere أو DaVinci Resolve أو CapCut.
 
 ### التنزيل
 
-- **الصق رابطًا وحمّله بأعلى جودة متاحة**، من يوتيوب وأكثر من ألف موقع يدعمها yt-dlp. إنستغرام وتيك توك وX تحتاج الكوكيز غالبًا، وتتعطّل أكثر حين تتغيّر.
+- **الصق رابطًا ونزّله بأعلى جودة متاحة**، من يوتيوب وأكثر من ألف موقع يدعمها yt-dlp. إنستغرام وتيك توك وX تحتاج الكوكيز غالبًا، وتتعطّل أكثر حين تتغيّر.
 - **فيديو أو صوت**: MP4 / MOV، أو MP3 / AAC (M4A) / WAV.
 - **اختيار الجودة**: الأفضل، 4K، 1440p، 1080p، 720p، 480p. تُعطَّل الدقات غير المتوفرة بعد ظهور معاينة الرابط.
 - **«جاهز للمونتاج»** (مفعّل افتراضيًا): الناتج دائمًا **H.264 + AAC بمعدل إطارات ثابت**. تختار خامة ترميز H.264 الأصلي حين يتوفر، ولا تحوّل إلا عند الضرورة (مثل 4K بترميز VP9 أو AV1).
@@ -155,7 +163,7 @@ MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-l
 - **مجلد حفظ** تختاره أنت، ويُحفظ اختيارك.
 - **واجهة بالإنجليزية أو العربية** (RTL كاملة)، بثيم داكن أو فاتح. رسائل الخطأ مفهومة، والتفاصيل التقنية متاحة بنقرة.
 - **الكوكيز** (اختيارية): من متصفحك مباشرة، أو بلصق ملف `cookies.txt` أو استيراده. تفيد مع الفيديوهات المقيّدة بالعمر، أو حين يسأل يوتيوب «هل أنت روبوت؟».
-- **تحميل جزء فقط**: حدّد البداية والنهاية، ويُحمَّل هذا الجزء وحده. القص دقيق بالإطار: الثواني القليلة حول كل قطع يُعاد ترميزها، فيأخذ وقتًا أطول قليلًا.
+- **تنزيل جزء فقط**: حدّد البداية والنهاية، ويُنزَّل هذا الجزء وحده. القص دقيق بالإطار: الثواني القليلة حول كل قطع يُعاد ترميزها، فيأخذ وقتًا أطول قليلًا.
 - **التنظيف بالذكاء الاصطناعي (إزالة الموسيقى أو الصوت البشري)**: أبقِ الحوار وحده (أو الموسيقى وحدها) لأي تنزيل أو ملف على جهازك. النموذج (حوالي 140MB) يُنزَّل مرة واحدة عند أول استخدام، ويعمل بلا إنترنت بعدها.
 - **تحديث yt-dlp بنقرة واحدة**: المواقع تتغيّر كثيرًا، وهذا غالبًا هو الحل حين يبدأ التنزيل بالفشل.
 - **الخصوصية**: لا تحليلات ولا تتبّع. تتصل خامة فقط بالمواقع التي تنزّل منها، وبـ GitHub (api.github.com) للبحث عن تحديثات خامة مرة عند كل فتح، وحين تضغط «تحديث yt-dlp». هذا الفحص يُري GitHub عنوان IP الخاص بك، ويمكنك إطفاؤه من الإعدادات ← الخلفية.
@@ -172,7 +180,7 @@ MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-l
 - **خيارات**: قص، مقاس، قص لنسبة، معدل إطارات، سرعة، تدوير، إزالة التداخل، تقليل التشويش، HDR ← SDR، ملفات LUT، ترجمة مطبوعة (تدعم العربية)، شعار، تايم كود، توحيد مستوى الصوت، استبدال الصوت أو حذفه، ودمج عدة ملفات.
 - **فحص ذكي** لكل ملف مع اقتراح الصيغة المناسبة، و**تسريع بكرت الشاشة**، وطابور وتقدير للحجم والوقت، و**مجلدات مراقَبة** تحوّل كل ملف جديد تلقائيًا.
 
-### للممنتج (جديد في 0.2)
+### لمحرّر الفيديو (جديد في 0.2)
 
 - **اسحب التنزيل المكتمل مباشرة إلى Premiere أو DaVinci Resolve أو CapCut**، من قائمة التنزيلات أو من السجلّ.
 - **الترجمة بصيغة SRT** مقصوصة على الجزء الذي تنزّله، و**الصورة المصغّرة JPG** بأعلى دقة، و**ملف معلومات المصدر** (‎.txt) فيه الرابط وصاحب المحتوى والتواريخ لذكر المصدر.
@@ -186,7 +194,13 @@ MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-l
 
 ### التثبيت
 
-حمّل ملف التثبيت المناسب لنظامك من صفحة [الإصدارات](../../releases) (الجدول في القسم الإنجليزي أعلاه). كل الأدوات التي تحتاجها خامة (yt-dlp وFFmpeg وDeno) مضمّنة داخلها، فلا داعي لتثبيت أي شيء آخر.
+نزّل ملف التثبيت المناسب لنظامك من صفحة [الإصدارات](../../releases) (الجدول في القسم الإنجليزي أعلاه). كل الأدوات التي تحتاجها خامة (yt-dlp وFFmpeg وDeno) مضمّنة داخلها، فلا داعي لتثبيت أي شيء آخر.
+
+**Linux**: ملف `.deb` لـ Ubuntu وDebian وMint، و`.rpm` لـ Fedora وopenSUSE. أما `.AppImage` فيعمل في أي توزيعة بلا تثبيت: اجعله قابلًا للتشغيل (`chmod +x`) ثم افتحه.
+
+**أندرويد**: افتح ملف `Khama_x.y.z_android-arm64.apk` على الهاتف. سيطلب أندرويد مرة واحدة السماح بالتثبيت من المتصفح أو مدير الملفات («تثبيت التطبيقات غير المعروفة»)؛ اسمح ثم ثبّت. نسخة الهاتف تنزّل وتقص وتحوّل وتنظّف بالذكاء الاصطناعي (أبطأ من الكمبيوتر). على الكمبيوتر فقط: اختيار مجلد الحفظ (الملفات تذهب إلى `Download/Khama`)، وسحب الملفات للخارج، وشريط المهام، والمجلدات المراقَبة، والنافذة المصغّرة.
+
+**تحديث yt-dlp** (الإعدادات ← الأدوات) آمن ويأخذ ثوانٍ: يجلب الإصدار الرسمي من GitHub. افعله كلما بدأ التنزيل من موقع ما يفشل، أو مرة في الشهر تقريبًا.
 
 #### macOS: فتح تطبيق غير موقّع
 
@@ -196,7 +210,7 @@ MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-l
 2. افتح **إعدادات النظام ← الخصوصية والأمان**، وانزل للأسفل، واضغط **افتح على أي حال** (Open Anyway) بجانب رسالة Khama.
 3. أكّد بالضغط على **فتح**. تحتاج هذا مرة واحدة فقط.
 
-إن قال macOS إن التطبيق «تالف»، شغّل هذا الأمر مرة واحدة في Terminal:
+إن قال macOS إن التطبيق «تالف»، شغّل هذا الأمر مرة واحدة في Terminal. هو يزيل علامة «نُزّل من الإنترنت» التي وضعها macOS على خامة، ولا يغيّر شيئًا آخر:
 
 </div>
 

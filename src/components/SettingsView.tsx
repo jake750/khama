@@ -562,6 +562,8 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
                 <span>{isWindows ? t.chromeNoteWindows : t.chromeNote}</span>
               </div>
             )}
+            {/* Safari يحتاج إذنًا من النظام (F-66) */}
+            {s.cookiesBrowser === "safari" && <div className="faint mt-2">{t.safariNote}</div>}
           </div>
         )}
 

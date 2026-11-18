@@ -49,9 +49,26 @@ export function GuideView(props: { onGo: (tab: GuideTab, section?: string) => vo
           </div>
         </section>
       ))}
+
+      {/* مسرد مختصر للمصطلحات الإنجليزية في الواجهة (F-75) */}
+      <section className="guide-group" aria-labelledby="guide-glossary">
+        <h3 id="guide-glossary">{t.glossaryTitle}</h3>
+        <dl className="card glossary">
+          {GLOSSARY.map((term) => (
+            <div key={term}>
+              <dt>
+                <bdi>{term}</bdi>
+              </dt>
+              <dd className="muted">{t.glossary[term]}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
     </div>
   );
 }
+
+const GLOSSARY = ["Preset", "H.264 / HEVC", "ProRes / DNxHR", "CFR / VFR", "HDR / SDR", "LUT", "LUFS", "Proxy", "Keyframe", "Cookies"];
 
 function Entry(props: {
   entry: GuideEntry;
