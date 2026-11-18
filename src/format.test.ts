@@ -73,6 +73,13 @@ describe("extractUrls", () => {
   it("يزيل التكرار", () => {
     expect(extractUrls("https://a.com https://a.com")).toEqual(["https://a.com"]);
   });
+  it("يُسقط روابط الحسابات حين يوجد معها فيديو (U-66)", () => {
+    expect(extractUrls("by https://x.com/someone https://x.com/someone/status/123 on https://www.youtube.com/@chan")).toEqual([
+      "https://x.com/someone/status/123",
+    ]);
+    expect(extractUrls("https://www.youtube.com/@chan")).toEqual(["https://www.youtube.com/@chan"]);
+    expect(extractUrls("https://www.instagram.com/me https://www.instagram.com/reel/abc")).toEqual(["https://www.instagram.com/reel/abc"]);
+  });
 });
 
 describe("isHttpUrl (T-70)", () => {

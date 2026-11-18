@@ -51,8 +51,29 @@ export function isHttpUrl(s: string): boolean {
 
 /** يستخرج كل الروابط من نص ملصوق (قد يحتوي عدة روابط أو نصًا حولها) */
 export function extractUrls(text: string): string[] {
-  const found = (text.match(/https?:\/\/[^\s"'<>]+/gi) ?? []).map(trimUrlTail);
-  return Array.from(new Set(found));
+  const found = Array.from(new Set((text.match(/https?:\/\/[^\s"'<>]+/gi) ?? []).map(trimUrlTail)));
+  // فقرة ملصوقة فيها رابط الفيديو ورابط صاحبه: نُسقط روابط الحسابات والقنوات (U-66).
+  // رابط قناة وحده يبقى (قد يريد المستخدم تنزيل القناة كلها)
+  if (found.length < 2) return found;
+  const media = found.filter((u) => !isProfileUrl(u));
+  return media.length ? media : found;
+}
+
+/** صفحة حساب أو قناة، لا فيديو: youtube.com/@x، x.com/user، instagram.com/user، tiktok.com/@user */
+function isProfileUrl(url: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return false;
+  }
+  const host = u.hostname.replace(/^(www|m|mobile)\./, "");
+  const parts = u.pathname.split("/").filter(Boolean);
+  if (host === "youtube.com")
+    return (parts.length === 1 && parts[0].startsWith("@")) || (parts.length === 2 && ["channel", "c", "user"].includes(parts[0]));
+  if (host === "x.com" || host === "twitter.com" || host === "instagram.com") return parts.length === 1;
+  if (host === "tiktok.com") return parts.length === 1 && parts[0].startsWith("@");
+  return false;
 }
 
 /** يحذف علامات الترقيم الملتصقة بآخر الرابط، ويُبقي القوس الختامي إن كان له قوس مفتوح داخل الرابط */
