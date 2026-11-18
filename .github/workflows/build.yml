@@ -144,6 +144,18 @@ jobs:
           releaseDraft: false
           prerelease: false
 
+      # حجم كل ملف تثبيت في ملخص التشغيل، لنرى أثر كل اعتمادية بين إصدار وآخر (M-68)
+      - name: Installer sizes
+        shell: bash
+        run: |
+          echo "### ${{ matrix.target }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "| File | Size |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for f in src-tauri/target/${{ matrix.target }}/release/bundle/{nsis/*.exe,dmg/*.dmg,appimage/*.AppImage,deb/*.deb,rpm/*.rpm}; do
+            [ -f "$f" ] && echo "| $(basename "$f") | $(( $(wc -c < "$f") / 1048576 )) MB |" >> "$GITHUB_STEP_SUMMARY"
+          done
+          true
+
       - name: Upload installers
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -209,6 +221,7 @@ jobs:
           cp src-tauri/gen/android/app/build/outputs/apk/arm64/release/app-arm64-release.apk "out/Khama_${v}_android-arm64.apk"
           apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
           "$apksigner" verify --print-certs out/*.apk | head -3
+          echo "### Android: $(basename out/*.apk) $(( $(wc -c < out/*.apk) / 1048576 )) MB" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -226,3 +239,29 @@ jobs:
             sleep 30
           done
           gh release upload "$v" out/*.apk --clobber
+
+  # قائمة مكوّنات البرنامج (SBOM) مع كل إصدار: حزم npm بصيغة CycloneDX، وcrates Rust برخصها،
+  # والأدوات المضمّنة (yt-dlp وFFmpeg GPL وDeno) بنسخها وبصماتها (M-44)
+  sbom:
+    needs: [check, build]
+    if: needs.check.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --silent --ignore-scripts
+      - name: Generate
+        run: |
+          v=$(jq -r .version src-tauri/tauri.conf.json)
+          mkdir -p sbom
+          npm sbom --sbom-format cyclonedx --omit dev > "sbom/Khama_${v}_sbom-npm.cdx.json"
+          cargo metadata --format-version 1 --locked --manifest-path src-tauri/Cargo.toml             | jq '[.packages[] | {name, version, license, source}] | sort_by(.name)' > "sbom/Khama_${v}_sbom-rust.json"
+          cp scripts/binaries.lock.json "sbom/Khama_${v}_sbom-bundled-tools.json"
+          ls -l sbom
+      - name: Attach to the release
+        run: gh release upload "v$(jq -r .version src-tauri/tauri.conf.json)" sbom/* --clobber

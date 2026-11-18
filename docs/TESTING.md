@@ -1,0 +1,110 @@
+# Testing · الاختبار
+
+## What runs by itself · ما يعمل آليًا
+
+| When | What | Where |
+|---|---|---|
+| Every commit (pre-commit hook) | Prettier on staged files, `tsc`, `cargo fmt --check` | `.githooks/pre-commit` |
+| Every push (`check.yml`) | Types, ESLint, Prettier, Vitest (interface logic, RTL rules, translations, dev-mock coverage), interface size budget, Rust tests and Clippy on Linux, Android compile | GitHub Actions |
+| Every release (`build.yml`) | Rust tests on Windows, macOS ×2 and Linux; bundled FFmpeg checked for its encoders; every installer built from clean; APK signature verified | GitHub Actions |
+| Every Monday (`canary.yml`) | Real downloads from YouTube and four other sites with the pinned yt-dlp | GitHub Actions |
+
+```bash
+npx vitest run
+```
+
+```bash
+cargo test -q --manifest-path src-tauri/Cargo.toml
+```
+
+## Test files · ملفات الاختبار
+
+```bash
+sh scripts/make-samples.sh
+```
+
+Builds `samples/` (git ignores it) with FFmpeg: no downloads, the same files on every machine.
+
+| File | Checks |
+|---|---|
+| `01-cfr-1080p-h264.mp4` | Every preset on a plain source |
+| `02-vfr-phone.mp4` | Variable frame rate: the suggestion is "H.264 for editing", and the output is constant frame rate |
+| `03-hdr-10bit-hevc.mkv` | HDR is detected; the HDR hint shows; SDR output isn't washed out |
+| `04-prores4444-alpha.mov` | ProRes 4444 keeps the transparent half transparent |
+| `05-cuts-black-silence.mp4` | Scene cuts near 3 s and 6 s, black frames 3–4 s, silence 6–8 s |
+| `06-quiet.wav`, `06-loud.wav` | Loudness normalisation brings both near the target |
+| `07-rotated-phone.mp4` | A 90° rotation flag: output is upright |
+| `08-اسم عربي … 🎬 ….mp4` | Arabic, emoji, `&` and brackets in the name survive every preset and the history |
+
+**AI clean-up** needs real speech over music, which can't be generated. Use the same three clips every time, kept outside the repository: a voice over loud music, a voice over quiet background music, and music with no voice (should come out nearly silent). Listen to all three after any change to `separate.rs`.
+
+## Before every minor release · قبل كل إصدار minor
+
+Patch releases rely on the automatic checks plus a quick try of what changed. Minor releases also go through this list on at least Windows and one other system. Record the result in the table below.
+
+**Download**
+- [ ] YouTube video, 1080p MP4: file opens in a player and in an editor
+- [ ] Audio only, MP3 and WAV
+- [ ] Trim 0:10–0:20: the file is ~10 s
+- [ ] Two clips from one video, then "merge"
+- [ ] A playlist of 10+: all queued, the queue limit respected
+- [ ] Subtitles as SRT
+- [ ] A link that fails (private video): clear message and the right button
+- [ ] Cancel mid-download: no leftover `.part` files
+- [ ] Schedule a download for 2 minutes later, close and reopen the app: it still runs
+
+**Converter**
+- [ ] Every sample above with its check
+- [ ] Graphics-card option on a machine that has one
+- [ ] Watch folder: drop a file in, it converts once
+
+**App**
+- [ ] Both languages, right-to-left layout correct, light and dark
+- [ ] Settings survive a restart
+- [ ] "Update yt-dlp"
+- [ ] Tray, notification, mini window (desktop)
+
+**Install and upgrade**
+- [ ] Fresh install on a machine without Khama: opens, first download works
+- [ ] Install over the previous release with its settings and history: both survive, nothing asks again
+- [ ] The in-app updater offers and installs the new version
+- [ ] Uninstall (Windows with "Delete the application data"): the folders in [DATA.md](DATA.md) are gone
+
+**Hard conditions**
+- [ ] **Network cut**: unplug mid-download. Expect a `network` error with "Try again", and the retry resumes. Same during the AI model download: no half model is used (SHA-256 check).
+- [ ] **Disk full**: save to a nearly full USB stick. Expect `diskFull`, no broken file left, and the free-space warning before starting.
+- [ ] **Load**: paste 100 links at once, and a 1000-item playlist. Expect the interface to stay responsive, the queue limit to hold, and memory to stay under ~500 MB.
+- [ ] **Bad names**: a video titled with `<>:"/\|?*` and emoji saves on Windows.
+
+## Systems · الأنظمة
+
+What was tested by hand, on which release. Fill one row per run.
+
+| System | Version tested | Release | Date | Result | Notes |
+|---|---|---|---|---|---|
+| Windows 11 x64 | | | | | |
+| Windows 10 x64 | | | | | |
+| macOS Apple Silicon | | | | | |
+| macOS Intel | | | | | |
+| Ubuntu 22.04+ (deb / AppImage) | | | | | |
+| Fedora (rpm) | | | | | |
+| Android (phone model, Android version) | | | | | |
+
+### Android
+
+Phones differ more than computers. For each release that changes Android code or youtubedl-android, try at least one phone running Android 9–11 and one running 13+:
+
+- [ ] Install over the previous APK (same signing key): data stays
+- [ ] YouTube download to `Download/Khama`, audio only, a trim
+- [ ] "Update yt-dlp"
+- [ ] Share a link from the YouTube app into Khama
+- [ ] AI clean-up on a short clip (slow is fine; a crash is not)
+- [ ] Rotate the phone, switch to another app and back during a download
+
+## Test log · محضر الاختبار
+
+For anything tested by hand that isn't in the lists above, keep one line per check so it can be repeated:
+
+| Date | Release | System | Link or file | Steps | Expected | Result | Screenshot |
+|---|---|---|---|---|---|---|---|
+| | | | | | | | |

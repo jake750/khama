@@ -43,6 +43,8 @@ export interface Settings {
   checkUpdates: boolean;
   /** نسخة بنية settings.json (M-36)، يديرها Rust */
   schemaVersion?: number;
+  /** لا ملف إعدادات بعد (M-8) */
+  firstRun?: boolean;
   recentDirs: string[];
   wantSubs: boolean;
   subLangs: string[];

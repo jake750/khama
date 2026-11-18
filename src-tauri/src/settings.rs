@@ -16,6 +16,9 @@ pub struct Settings {
     /// نسخة بنية الملف (M-36). ملف قديم بلا هذا الحقل = 0، وmigrate ترفعه خطوة خطوة إلى SETTINGS_VERSION
     #[serde(default)]
     pub schema_version: u32,
+    /// لا ملف إعدادات بعد: الواجهة تختار لغة النظام في أول تشغيل (M-8). لا يُقرأ من الملف ولا يُكتب فيه
+    #[serde(skip_deserializing, skip_serializing_if = "std::ops::Not::not")]
+    pub first_run: bool,
     /// مجلد الحفظ. فارغ = مجلد التنزيلات الافتراضي للنظام
     pub output_dir: Option<String>,
     /// لغة الواجهة: "en" (الافتراضية) | "ar"
@@ -115,6 +118,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             schema_version: SETTINGS_VERSION,
+            first_run: false,
             output_dir: None,
             language: "en".into(),
             theme: "dark".into(),
@@ -284,7 +288,13 @@ pub fn cookies_path(app: &AppHandle) -> Result<PathBuf, AppError> {
 
 pub fn load(app: &AppHandle) -> Settings {
     match settings_path(app) {
-        Ok(p) => migrate(crate::persist::read_json(&p).or_default_logged("settings.json")),
+        Ok(p) => match crate::persist::read_json::<Settings>(&p) {
+            crate::persist::Loaded::Missing => Settings {
+                first_run: true,
+                ..Settings::default()
+            },
+            loaded => migrate(loaded.or_default_logged("settings.json")),
+        },
         Err(_) => Settings::default(),
     }
 }
