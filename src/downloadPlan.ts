@@ -10,6 +10,9 @@ export interface Clip {
 }
 
 /** وقت البدء المجدول بتوقيت الجهاز: اليوم، أو غدًا إن مضى الوقت. "now" ← undefined */
+/** حدود السرعة المعروضة (KB/s)، في الإعدادات وفي إضافات التنزيل (U-56) */
+export const RATES = [0, 512, 1024, 5120, 10240, 25600];
+
 export function scheduledAt(when: "now" | "later", atTime: string, now = new Date(), days = 0): number | undefined {
   if (when !== "later") return undefined;
   const [h, m] = atTime.split(":").map(Number);

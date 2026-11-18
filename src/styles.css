@@ -2361,7 +2361,8 @@ details.extras[open] > summary > svg:last-child {
 }
 
 /* ---------- البدء: الآن أو لاحقًا ---------- */
-.schedule-row {
+.schedule-row,
+.rate-row {
   margin-top: var(--s-4);
 }
 

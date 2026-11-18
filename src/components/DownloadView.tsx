@@ -13,7 +13,7 @@ import {
   type VideoFormat,
 } from "../api";
 import { extractUrls, formatBytes, formatDuration, isHttpUrl } from "../format";
-import { nextClip, planDownloads, scheduledAt, type Stills } from "../downloadPlan";
+import { nextClip, planDownloads, RATES, scheduledAt, type Stills } from "../downloadPlan";
 import { useI18n } from "../i18n";
 import { ErrorBox, type ErrorFix } from "./ErrorBox";
 import { Icon } from "./Icon";
@@ -730,7 +730,7 @@ export function DownloadView(props: {
           original={original}
           stills={stills}
           onStills={setStills}
-          more={[stems !== "off" && t.stemsShort, when === "later" && t.scheduleShort]}
+          more={[stems !== "off" && t.stemsShort, when === "later" && t.scheduleShort, s.rateLimitKb > 0 && t.speedLimit(s.rateLimitKb)]}
         >
           {!original && (
             <StemsRow
@@ -744,6 +744,16 @@ export function DownloadView(props: {
             />
           )}
           <ScheduleRow when={when} onWhen={setWhen} atTime={atTime} onAtTime={setAtTime} atDay={atDay} onAtDay={setAtDay} />
+          {/* حد السرعة هنا أيضًا: يُحتاج أثناء مكالمة فيديو، لا في الإعدادات (U-56) */}
+          <div className="rate-row">
+            <span className="field-label">{t.rateLimit}</span>
+            <Segmented<string>
+              label={t.rateLimit}
+              value={String(s.rateLimitKb)}
+              onChange={(v) => update({ rateLimitKb: Number(v) })}
+              options={RATES.map((r) => ({ value: String(r), label: r ? t.speedLimit(r) : t.rateOff }))}
+            />
+          </div>
         </ExtrasPanel>
       </div>
 

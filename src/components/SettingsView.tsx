@@ -22,6 +22,7 @@ import { Icon, type IconName } from "./Icon";
 import { Segmented, Toggle } from "./Segmented";
 import { isMobile, isWindows, MOBILE_SAVE_DIR } from "../platform";
 import { logError } from "../log";
+import { RATES } from "../downloadPlan";
 
 // المتصفحات التي يستطيع yt-dlp قراءة الكوكيز منها، حسب النظام
 const isMac = navigator.userAgent.includes("Mac");
@@ -228,7 +229,6 @@ function templateExample(tpl: string, siteFolders: boolean): string {
 
 const TOKENS = ["{title}", "{uploader}", "{date}", "{today}", "{site}", "{id}", "{res}", "{n}"];
 /** كيلوبايت/ثانية */
-const RATES = [0, 512, 1024, 5120, 10240, 25600];
 
 function DownloadsSection(props: { settings: Settings; update: (p: Partial<Settings>) => void }) {
   const { t } = useI18n();
