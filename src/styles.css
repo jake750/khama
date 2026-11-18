@@ -3906,3 +3906,12 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* اسم المشروع وما فيه (U-34) */
+.project-name {
+  display: grid;
+  min-width: 0;
+}
+.project-summary {
+  font-size: var(--fs-cap);
+}

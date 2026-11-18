@@ -381,6 +381,22 @@ function ProjectsSection(props: { settings: Settings; update: (p: Partial<Settin
   const { t } = useI18n();
   const { settings: s, update } = props;
   const [name, setName] = useState("");
+  // إعادة التسمية في مكانها (U-34)
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+  const rename = () => {
+    const n = renaming?.name.trim();
+    if (renaming && n) update({ projects: s.projects.map((x) => (x.id === renaming.id ? { ...x, name: n } : x)) });
+    setRenaming(null);
+  };
+  // ما في المشروع، سطرًا مختصرًا: النوع والصيغة والجودة
+  const summary = (p: (typeof s.projects)[number]) =>
+    [
+      p.kind === "audio" ? (p.audioFormat === "original" ? t.audioOriginal : p.audioFormat.toUpperCase()) : p.videoFormat.toUpperCase(),
+      p.kind === "video" && (p.quality === "best" ? t.best : p.quality === "2160" ? "4K" : `${p.quality}p`),
+      p.kind === "video" && p.editorReady && t.editorReady,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   const snapshot = (id: string, n: string) => snapshotProject(s, id, n);
   const save = () => {
     const n = name.trim();
@@ -396,7 +412,22 @@ function ProjectsSection(props: { settings: Settings; update: (p: Partial<Settin
       {s.projects.length === 0 && <p className="faint">{t.projectsEmpty}</p>}
       {s.projects.map((p) => (
         <div className="watch-row project-row" key={p.id}>
-          <b className={s.activeProject === p.id ? "accent" : undefined}>{p.name}</b>
+          {renaming?.id === p.id ? (
+            <input
+              className="input"
+              autoFocus
+              value={renaming.name}
+              aria-label={t.renameProject}
+              onChange={(e) => setRenaming({ id: p.id, name: e.target.value })}
+              onKeyDown={(e) => (e.key === "Enter" ? rename() : e.key === "Escape" && setRenaming(null))}
+              onBlur={rename}
+            />
+          ) : (
+            <span className="project-name">
+              <b className={s.activeProject === p.id ? "accent" : undefined}>{p.name}</b>
+              <span className="faint project-summary">{summary(p)}</span>
+            </span>
+          )}
           {!isMobile && (
             <span className="path ltr faint" title={p.outputDir ?? props.outputDir}>
               {p.outputDir ?? props.outputDir}
@@ -410,6 +441,9 @@ function ProjectsSection(props: { settings: Settings; update: (p: Partial<Settin
             }}
           >
             {t.updateProject}
+          </button>
+          <button className="btn btn-sm btn-ghost" onClick={() => setRenaming({ id: p.id, name: p.name })}>
+            {t.renameProject}
           </button>
           <button
             className="icon-btn sm"
