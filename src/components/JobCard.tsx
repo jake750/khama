@@ -113,6 +113,8 @@ export function JobCard(props: {
   queuePos?: [number, number];
   onCopyMarkers?: () => void;
   onCopyChapters?: () => void;
+  /** تنزيل في الطابور: ابدأه الآن دون انتظار دوره (U-11) */
+  onStartNow?: () => void;
   /** سحب الملف المكتمل إلى برنامج آخر (الكمبيوتر فقط) */
   onDragOut?: () => void;
 }) {
@@ -140,6 +142,7 @@ export function JobCard(props: {
   const draggable = j.state === "done" && !!j.file && !!props.onDragOut;
   // الأفعال الثانوية في «⋯»، والظاهر: إظهار، وإلغاء أو إعادة (D-25)
   const extra: MenuItem[] = [];
+  if (j.state === "queued" && props.onStartNow) extra.push({ label: t.skipQueue, icon: "download", onClick: props.onStartNow });
   if (j.state === "done" && j.file && props.onOpen) extra.push({ label: t.openFile, icon: "eye", onClick: props.onOpen });
   if (j.state === "done" && j.file && props.onCopyPath) extra.push({ label: t.copyPath, icon: "copy", onClick: props.onCopyPath });
   if (j.state === "done" && j.file && props.onConvert) extra.push({ label: t.sendToConvert, icon: "convert", onClick: props.onConvert });

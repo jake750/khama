@@ -130,6 +130,26 @@ pub(super) fn hold_slot(id: u64, permit: tokio::sync::OwnedSemaphorePermit) {
     SLOTS.lock_ok().get_or_insert_with(HashMap::new).insert(id, permit);
 }
 
+/// «ابدأ الآن» لتنزيل في الطابور (U-11): يتخطّى انتظار الخانة ويعمل فوق العدد المحدد مرة واحدة.
+/// المفتاح رقم العملية، ويُزال حين تبدأ أو تُلغى
+static JUMPS: Mutex<Option<HashMap<u64, Arc<tokio::sync::Notify>>>> = Mutex::new(None);
+
+pub(super) fn jump_signal(id: u64) -> Arc<tokio::sync::Notify> {
+    JUMPS.lock_ok().get_or_insert_with(HashMap::new).entry(id).or_default().clone()
+}
+
+pub(super) fn forget_jump(id: u64) {
+    JUMPS.lock_ok().as_mut().map(|m| m.remove(&id));
+}
+
+#[tauri::command]
+pub fn start_now(id: u64) {
+    // notify_one يحفظ الإشارة إن لم يكن أحد ينتظر بعد
+    if let Some(n) = JUMPS.lock_ok().as_ref().and_then(|m| m.get(&id)) {
+        n.notify_one();
+    }
+}
+
 /// يحرّر خانة التنزيل (إن كانت ما زالت محجوزة) فيبدأ التنزيل التالي في الطابور
 pub(super) fn release_slot(id: u64) {
     let permit = SLOTS.lock_ok().as_mut().and_then(|m| m.remove(&id));

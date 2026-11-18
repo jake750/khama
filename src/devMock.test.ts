@@ -24,6 +24,7 @@ const NULL_IS_FINE = new Set([
   "open_file",
   "cancel_probe",
   "read_links_file",
+  "start_now",
   "open_output_dir",
   "save_thumbnail",
   "free_space",

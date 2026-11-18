@@ -452,3 +452,13 @@ fn spotify_live_embed_page_still_parses() {
         "المدد لم تعد تُقرأ"
     );
 }
+
+#[tokio::test]
+async fn start_now_wakes_a_queued_job_even_if_pressed_first() {
+    let jump = jump_signal(9_001);
+    start_now(9_001);
+    // notify_one يحفظ الإشارة: الانتظار بعدها ينتهي فورًا (U-11)
+    tokio::time::timeout(Duration::from_secs(1), jump.notified()).await.expect("woken");
+    forget_jump(9_001);
+    start_now(9_001); // بعد النسيان: لا شيء ولا انهيار
+}

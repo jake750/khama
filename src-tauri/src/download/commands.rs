@@ -23,8 +23,9 @@ pub async fn start_download(
     tauri::async_runtime::spawn(async move {
         // ننتظر دورنا إن كانت كل الخانات مشغولة (والإلغاء ممكن أثناء الانتظار)
         let slot = match slots.clone().try_acquire_owned() {
-            Ok(p) => p,
+            Ok(p) => Some(p),
             Err(_) => {
+                let jump = jump_signal(id);
                 emit(
                     &app2,
                     JobUpdate {
@@ -33,17 +34,24 @@ pub async fn start_download(
                         ..Default::default()
                     },
                 );
-                tokio::select! {
-                    p = slots.acquire_owned() => p.expect("semaphore never closed"),
+                let got = tokio::select! {
+                    p = slots.acquire_owned() => Some(p.expect("semaphore never closed")),
+                    // «ابدأ الآن»: بلا خانة، فوق العدد المحدد (U-11)
+                    _ = jump.notified() => None,
                     _ = canceled(&mut rx) => {
+                        forget_jump(id);
                         app2.state::<Jobs>().cancels.lock_ok().remove(&id);
                         emit(&app2, JobUpdate { id, state: "canceled", ..Default::default() });
                         return;
                     }
-                }
+                };
+                forget_jump(id);
+                got
             }
         };
-        hold_slot(id, slot);
+        if let Some(slot) = slot {
+            hold_slot(id, slot);
+        }
         emit(
             &app2,
             JobUpdate {

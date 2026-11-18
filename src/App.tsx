@@ -943,6 +943,7 @@ export default function App() {
                           }
                           onSplit={j.markers?.length ? () => split(j) : undefined}
                           queuePos={j.state === "queued" ? [queuedIds.indexOf(j.id) + 1, queuedIds.length] : undefined}
+                          onStartNow={j.type === "download" ? () => api.startNow(j.id).catch(logError("startNow")) : undefined}
                           onCopyMarkers={j.markers?.length ? () => copyMarkers(j) : undefined}
                           onCopyChapters={
                             j.markers?.length

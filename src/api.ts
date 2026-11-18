@@ -324,6 +324,7 @@ export const api = {
   openFile: (path: string) => invoke<void>("open_file", { path }),
   aiReady: () => invoke<boolean>("ai_ready"),
   cancelProbe: () => invoke<void>("cancel_probe"),
+  startNow: (id: number) => invoke<void>("start_now", { id }),
   readLinksFile: (path: string) => invoke<string>("read_links_file", { path }),
   openOutputDir: () => invoke<void>("open_output_dir"),
   onJobUpdate: (cb: (u: JobUpdate) => void): Promise<UnlistenFn> => listen<JobUpdate>("job-update", (e) => cb(e.payload)),
