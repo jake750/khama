@@ -851,7 +851,11 @@ export function DownloadView(props: {
             recent={s.recentDirs}
             onPick={props.onPickDir}
             onChoose={props.onChooseDir}
-            sub={s.siteFolders ? (info?.site ?? t.siteFolderAny) : null}
+            sub={
+              [s.kindFolders && (s.kind === "audio" ? "Audio" : "Video"), s.siteFolders && (info?.site ?? t.siteFolderAny)]
+                .filter(Boolean)
+                .join("/") || null
+            }
           />
         )}
         <span className="spacer" />

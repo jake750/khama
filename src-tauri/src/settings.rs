@@ -48,6 +48,8 @@ pub struct Settings {
     pub filename_template: String,
     /// مجلد فرعي لكل موقع (YouTube/، Instagram/...)
     pub site_folders: bool,
+    /// مجلد فرعي لكل نوع: Video/ وAudio/ (U-88)
+    pub kind_folders: bool,
     /// حدّ سرعة التنزيل بالكيلوبايت/ثانية (0 = بلا حدّ). بالكيلوبايت ليمكن 512 مثلًا (T-89)
     pub rate_limit_kb: u32,
     /// 0.3.1 وما قبله: الحدّ بالميغابايت. يُقرأ فقط ويحوَّل في migrate
@@ -126,6 +128,7 @@ impl Default for Settings {
             watch_folders: Vec::new(),
             filename_template: "{title}".into(),
             site_folders: false,
+            kind_folders: false,
             rate_limit_kb: 0,
             rate_limit: 0,
             notify: true,

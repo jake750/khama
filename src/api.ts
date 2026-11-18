@@ -32,6 +32,8 @@ export interface Settings {
   /** قالب اسم الملف: {title} {uploader} {date} {today} {site} {id} {res} {n} */
   filenameTemplate: string;
   siteFolders: boolean;
+  /** مجلد فرعي لكل نوع: Video/ وAudio/ (U-88) */
+  kindFolders: boolean;
   /** حدّ السرعة بالميغابايت/ثانية (0 = بلا حدّ) */
   /** كيلوبايت/ثانية، 0 = بلا حدّ */
   rateLimitKb: number;

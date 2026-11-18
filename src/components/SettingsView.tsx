@@ -202,7 +202,7 @@ function Section(props: { id: string; title: string; intro?: string; children: R
 }
 
 /** مثال حيّ لقالب اسم الملف (نفس قواعد Rust: output_template) */
-function templateExample(tpl: string, siteFolders: boolean): string {
+function templateExample(tpl: string, siteFolders: boolean, kindFolders: boolean): string {
   const d = new Date();
   const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   let x = (tpl.trim() || "{title}").replace(/[/\\:*?"<>|]/g, "_");
@@ -224,7 +224,7 @@ function templateExample(tpl: string, siteFolders: boolean): string {
     .join("1080p")
     .split("{n}")
     .join("001");
-  return `${siteFolders ? "Youtube/" : ""}${x}.mp4`;
+  return `${kindFolders ? "Video/" : ""}${siteFolders ? "Youtube/" : ""}${x}.mp4`;
 }
 
 const TOKENS = ["{title}", "{uploader}", "{date}", "{today}", "{site}", "{id}", "{res}", "{n}"];
@@ -284,7 +284,7 @@ function DownloadsSection(props: { settings: Settings; update: (p: Partial<Setti
           ))}
         </div>
         <div className="faint">
-          {t.filenameExample}: <span className="ltr code">{templateExample(tpl, s.siteFolders)}</span>
+          {t.filenameExample}: <span className="ltr code">{templateExample(tpl, s.siteFolders, s.kindFolders)}</span>
         </div>
         {usesN && nextN != null && (
           <div className="action-row">
@@ -305,6 +305,14 @@ function DownloadsSection(props: { settings: Settings; update: (p: Partial<Setti
           onChange={(siteFolders) => update({ siteFolders })}
           title={t.siteFolders}
           hint={t.siteFoldersHint}
+        />
+      </div>
+      <div className="setting-row">
+        <Toggle
+          checked={s.kindFolders}
+          onChange={(kindFolders) => update({ kindFolders })}
+          title={t.kindFolders}
+          hint={t.kindFoldersHint}
         />
       </div>
       <div className="setting-row">

@@ -191,7 +191,11 @@ pub(super) async fn run_job(
     let final_dir = jobs_root(app)?.join("ready");
     #[cfg(desktop)]
     let final_dir = {
-        let base = settings::resolve_output_dir(app, &settings)?;
+        let mut base = settings::resolve_output_dir(app, &settings)?;
+        // الصوت والفيديو كلٌّ في مجلده إن طلب المستخدم ذلك (U-88)
+        if settings.kind_folders {
+            base = base.join(if req.kind == "audio" { "Audio" } else { "Video" });
+        }
         match req.subdir.as_deref().and_then(playlist::folder_name) {
             Some(sub) => base.join(sub),
             None => base,
