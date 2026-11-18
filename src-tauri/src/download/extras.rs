@@ -469,20 +469,25 @@ pub(super) async fn finish(
             .unwrap_or_else(|| "mp4".into());
         let tag = if keep == separate::Keep::Voice { "no music" } else { "music only" };
         let out = sep_dir.join(format!("{stem} [{tag}].{ext}"));
-        emit(
-            app,
-            JobUpdate {
-                id,
-                state: "separating",
-                ..Default::default()
-            },
-        );
+        // الفصل واحد في كل مرة: إن كان غيره يفصل الآن تقول البطاقة «تنتظر دور الذكاء الاصطناعي»
+        // لا «جارٍ الفصل» (U-71)، ثم تتحوّل حين يأتي دورها
+        let busy = SEPARATING.try_lock().is_err();
+        let separating = |stage| JobUpdate {
+            id,
+            state: "separating",
+            stage,
+            ..Default::default()
+        };
+        emit(app, separating(busy.then_some("wait")));
         // التنزيل انتهى: نترك خانته لغيره قبل انتظار دور الفصل (T-40)
         release_slot(id);
         let _turn = tokio::select! {
             g = SEPARATING.lock() => g,
             _ = canceled(cancel) => return Ok(None),
         };
+        if busy {
+            emit(app, separating(None));
+        }
         let Some(_heavy) = heavy_turn(cancel).await else {
             return Ok(None);
         };

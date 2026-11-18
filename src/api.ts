@@ -255,7 +255,7 @@ export interface ScheduledItem {
 export interface JobUpdate {
   id: number;
   state: JobState;
-  stage?: "video" | "audio" | "file";
+  stage?: "video" | "audio" | "file" | "wait";
   percent?: number;
   speed?: number;
   eta?: number;

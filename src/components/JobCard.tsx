@@ -16,7 +16,7 @@ export interface Job {
   request?: DownloadRequest;
   convert?: ConvertRequest;
   state: JobState;
-  stage?: "video" | "audio" | "file";
+  stage?: "video" | "audio" | "file" | "wait";
   percent?: number;
   speed?: number;
   eta?: number;
@@ -45,6 +45,8 @@ export function mergeUpdate(j: Job, u: JobUpdate): Job {
   return {
     ...j,
     ...rest,
+    // «تنتظر دور الفصل» تزول حين يبدأ الفصل فعلًا (Rust لا يرسل stage حينها) (U-71)
+    ...(u.state === "separating" && !u.stage ? { stage: undefined } : {}),
     title: title && /^https?:\/\//.test(j.title) ? title : j.title,
     thumbnail: j.thumbnail ?? thumbnail ?? null,
   };
@@ -77,7 +79,7 @@ function statusText(t: Dict, j: Job, lang: string, queuePos?: [number, number]):
     case "preparing":
       return t.stPreparing;
     case "separating":
-      return t.stSeparating;
+      return j.stage === "wait" ? t.stSeparatingWait : t.stSeparating;
     case "converting":
       return j.type === "convert" ? t.stEncoding : t.stConverting;
     case "done":
