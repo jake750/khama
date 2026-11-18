@@ -10,7 +10,7 @@ import { DownloadView, newDownloadSession, type StartMeta } from "./components/D
 import { GuideView } from "./components/GuideView";
 import { HistoryView } from "./components/HistoryView";
 import { Icon, type IconName } from "./components/Icon";
-import { Dialog } from "./components/Dialog";
+import { Dialog, useConfirm } from "./components/Dialog";
 import { isActive, JobCard, mergeUpdate, type Job } from "./components/JobCard";
 import { SettingsView } from "./components/SettingsView";
 import { Tour, Welcome, type TourStep } from "./components/Tour";
@@ -22,6 +22,7 @@ import { isMobile } from "./platform";
 import type { Toast, ToastAction } from "./toast";
 import { presetById } from "./presets";
 import { logError } from "./log";
+import { nextTheme } from "./theme";
 
 type Tab = "download" | "convert" | "history" | "settings" | "guide";
 
@@ -121,6 +122,7 @@ export default function App() {
   const [bootError, setBootError] = useState<AppError | null>(null);
   const [defaultDir, setDefaultDir] = useState("");
   const [tab, setTab] = useState<Tab>("download");
+  const tabNowRef = useRef<Tab>("download");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [files, setFiles] = useState<SourceFile[]>([]);
   const [hw, setHw] = useState<string[] | null>(null);
@@ -150,6 +152,7 @@ export default function App() {
   const i18n = useMemo(() => ({ lang, t: dictionaries[lang] }), [lang]);
   const { t } = i18n;
   const tRef = useRef(t);
+  const [confirmNode, confirm] = useConfirm();
 
   const resolvedTheme = useTheme(settings?.theme);
   const [toastShown, toastLeaving] = usePresence(toastMsg, 260);
@@ -186,7 +189,9 @@ export default function App() {
     const tt = tRef.current;
     const s = settingsRef.current;
     const name = u.file ? baseName(u.file) : job.title;
-    if (s?.notify && (document.hidden || !document.hasFocus())) {
+    // لا يراها إن كانت النافذة في الخلفية، أو كان في تبويب آخر لا تظهر فيه بطاقتها (U-86)
+    const cardShown = tabNowRef.current === (job.type === "convert" ? "convert" : "download");
+    if (s?.notify && (document.hidden || !document.hasFocus() || !cardShown)) {
       const title = u.state === "error" ? tt.notifyFailed : job.type === "convert" ? tt.notifyConvertDone : tt.notifyDone;
       notify(title, name);
     }
@@ -283,6 +288,7 @@ export default function App() {
     jobsRef.current = jobs;
     settingsRef.current = settings;
     tRef.current = t;
+    tabNowRef.current = tab;
     saveFailed.current = () => toast(t.settingsSaveFailed);
   });
 
@@ -646,6 +652,7 @@ export default function App() {
 
   return (
     <I18n.Provider value={i18n}>
+      {confirmNode}
       <div className={`app ${compact ? "compact" : ""}`}>
         <header className="topbar">
           <div className="brand">
@@ -693,9 +700,11 @@ export default function App() {
             )}
             <button
               className="icon-btn ghost"
-              title={resolvedTheme === "light" ? t.themeNowLight : t.themeNowDark}
+              title={
+                (resolvedTheme === "light" ? t.themeNowLight : t.themeNowDark) + (settings?.theme === "system" ? t.themeFollowsSystem : "")
+              }
               aria-label={resolvedTheme === "light" ? t.themeNowLight : t.themeNowDark}
-              onClick={() => update({ theme: resolvedTheme === "light" ? "dark" : "light" })}
+              onClick={() => update({ theme: nextTheme(resolvedTheme, window.matchMedia("(prefers-color-scheme: light)").matches) })}
             >
               <span className="theme-icon" key={resolvedTheme}>
                 <Icon name={resolvedTheme === "light" ? "sun" : "moon"} size={20} />
@@ -798,7 +807,9 @@ export default function App() {
                       {activeShown.length > 1 && (
                         <button
                           className="btn btn-sm btn-ghost danger-text"
-                          onClick={() => window.confirm(t.cancelAllConfirm(activeShown.length)) && activeShown.forEach(cancel)}
+                          onClick={async () =>
+                            (await confirm(t.cancelAll, t.cancelAllConfirm(activeShown.length))) && activeShown.forEach(cancel)
+                          }
                         >
                           <Icon name="x" size={16} /> {t.cancelAll}
                         </button>

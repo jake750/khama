@@ -409,7 +409,7 @@ export function DownloadView(props: {
             placeholder={t.urlPlaceholder}
             value={url}
             spellCheck={false}
-            autoFocus
+            autoFocus={!isMobile}
             onChange={(e) => {
               setUrl(e.target.value);
               setStartedUrl(null);

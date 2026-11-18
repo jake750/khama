@@ -174,7 +174,14 @@ export function JobCard(props: {
         </div>
 
         {active && (
-          <div className={`progress phase-${phase} ${indeterminate ? "indeterminate" : ""}`}>
+          <div
+            className={`progress phase-${phase} ${indeterminate ? "indeterminate" : ""}`}
+            role="progressbar"
+            aria-label={j.title}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={indeterminate ? undefined : Math.round(j.percent ?? 0)}
+          >
             <div style={{ width: `${j.percent ?? 0}%` }} />
           </div>
         )}

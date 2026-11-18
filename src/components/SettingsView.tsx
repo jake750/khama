@@ -17,6 +17,7 @@ import {
 import { snapshotProject } from "../projects";
 import { useI18n } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
+import { useConfirm } from "./Dialog";
 import { Icon, type IconName } from "./Icon";
 import { Segmented, Toggle } from "./Segmented";
 import { isMobile, MOBILE_SAVE_DIR } from "../platform";
@@ -43,6 +44,7 @@ export function SettingsView(props: {
   onTour: () => void;
 }) {
   const { t } = useI18n();
+  const [confirmNode, confirm] = useConfirm();
   const { settings: s, update } = props;
   const [current, setCurrent] = useState("general");
   const root = useRef<HTMLDivElement>(null);
@@ -175,12 +177,13 @@ export function SettingsView(props: {
 
         {!isMobile && (
           <div className="settings-quit">
-            <button className="btn btn-danger" onClick={() => window.confirm(t.quitConfirm) && api.quitApp()}>
+            <button className="btn btn-danger" onClick={async () => (await confirm(t.quit, t.quitConfirm)) && api.quitApp()}>
               <Icon name="x" size={16} /> {t.quit}
             </button>
           </div>
         )}
       </div>
+      {confirmNode}
     </div>
   );
 }

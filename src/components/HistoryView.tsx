@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, type HistoryEntry } from "../api";
 import { numLocale, useI18n } from "../i18n";
 import { isMobile } from "../platform";
+import { useConfirm } from "./Dialog";
 import { Icon } from "./Icon";
 import { Segmented } from "./Segmented";
 import { logError } from "../log";
@@ -35,6 +36,7 @@ export function HistoryView(props: {
   toast: Toast;
 }) {
   const { t, lang } = useI18n();
+  const [confirmNode, confirm] = useConfirm();
   const [list, setList] = useState<HistoryEntry[] | null>(null);
   const [q, setQ] = useState("");
   // تصفية بالنوع والتاريخ، ورسم أول 100 فقط حتى يطلب المستخدم المزيد (U-63، T-87)
@@ -79,13 +81,14 @@ export function HistoryView(props: {
   };
 
   const clear = async () => {
-    if (!window.confirm(t.historyConfirmClear)) return;
+    if (!(await confirm(t.historyClear, t.historyConfirmClear))) return;
     await api.clearHistory().catch(logError("clearHistory"));
     setList([]);
   };
 
   return (
     <div className="card history">
+      {confirmNode}
       <div className="history-head">
         <div>
           <h2>{t.historyTitle}</h2>
