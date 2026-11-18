@@ -873,7 +873,15 @@ export default function App() {
                           onCopyPath={isMobile ? undefined : () => j.file && copyText(j.file)}
                           onRetry={() => retry(j)}
                           onRemove={() => setJobs((p) => p.filter((x) => x.id !== j.id))}
-                          onConvert={j.type === "download" && j.file ? () => addFiles([j.file!]) : undefined}
+                          onConvert={
+                            j.type === "download" && j.file
+                              ? () => {
+                                  // ينقلك للمحوّل؛ والإشعار يقول ما حدث ويعيدك بنقرة (U-54)
+                                  addFiles([j.file!]);
+                                  toast(t.sentToConvert, { label: t.backToDownloads, run: () => setTab("download"), ms: 5000 });
+                                }
+                              : undefined
+                          }
                           onSplit={j.markers?.length ? () => split(j) : undefined}
                           queuePos={j.state === "queued" ? [queuedIds.indexOf(j.id) + 1, queuedIds.length] : undefined}
                           onCopyMarkers={j.markers?.length ? () => copyMarkers(j) : undefined}
