@@ -29,6 +29,13 @@ export interface Job {
   at?: number;
 }
 
+/** المجلد الذي فيه الملف، بآخر جزأين فقط ليبقى قصيرًا */
+function parentDir(path: string): string {
+  const sep = path.includes("\\") ? "\\" : "/";
+  const parts = path.split(/[\\/]/).slice(0, -1);
+  return parts.length > 2 ? "…" + sep + parts.slice(-2).join(sep) : parts.join(sep);
+}
+
 /** يدمج تحديثًا من Rust في البطاقة. العنوان من yt-dlp يحلّ محلّ الرابط فقط، لا محلّ عنوان المعاينة،
  * والصورة لا تُستبدل إن كانت موجودة (T-43). */
 export function mergeUpdate(j: Job, u: JobUpdate): Job {
@@ -161,11 +168,17 @@ export function JobCard(props: {
       </div>
 
       <div className="job-body">
-        <div className="job-title" dir="auto" title={j.title}>
+        <div className="job-title" dir="auto" title={j.state === "done" && j.file ? j.file : j.title}>
           {j.state === "done" && fileName ? fileName : j.title}
         </div>
         <div className="job-meta">
           <span>{statusText(t, j, lang, props.queuePos)}</span>
+          {/* التحويل «بجانب الأصل» يكتب في مجلد لا يعرفه المستخدم من البطاقة (U-72) */}
+          {j.state === "done" && j.type === "convert" && j.file && (
+            <span className="job-dir ltr" title={j.file}>
+              {parentDir(j.file)}
+            </span>
+          )}
           {active && j.percent != null && !indeterminate && <span className="ltr">{j.percent.toFixed(1)}%</span>}
           {j.state === "downloading" && j.speed != null && <span>{formatSpeed(t, j.speed)}</span>}
           {(j.state === "downloading" || j.state === "converting") && j.eta != null && <span>{formatEta(t, j.eta)}</span>}

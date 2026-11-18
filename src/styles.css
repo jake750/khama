@@ -639,6 +639,13 @@ details.tech pre {
   font-size: var(--fs-meta);
 }
 
+.job-dir {
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .job-actions {
   display: flex;
   gap: var(--s-1);
