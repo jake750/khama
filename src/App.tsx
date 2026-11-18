@@ -632,7 +632,13 @@ export default function App() {
       </div>
     );
 
-  if (!settings) return null;
+  // شاشة إقلاع بالشعار بدل نافذة فارغة حتى تصل الإعدادات (D-87)
+  if (!settings)
+    return (
+      <div className="boot" aria-busy="true">
+        <img src="/logo.svg" alt="" />
+      </div>
+    );
 
   const outputDir = settings.outputDir || defaultDir;
   const shown = jobs.filter((j) => (tab === "convert" ? j.type === "convert" : j.type === "download"));

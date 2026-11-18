@@ -50,9 +50,16 @@ export function ExtrasPanel(props: {
               {available.map((l) => {
                 const on = chosen.length ? chosen.includes(l.code) : l === available[0];
                 return (
-                  <button key={l.code} className="chip-btn" aria-pressed={on} onClick={() => toggleLang(l.code)}>
+                  <button
+                    key={l.code}
+                    className="chip-btn"
+                    aria-pressed={on}
+                    onClick={() => toggleLang(l.code)}
+                    title={l.auto ? t.subsAutoHint : undefined}
+                  >
                     {l.name}
-                    {l.auto && <small>{t.subsAuto}</small>}
+                    {/* الآلية أقل دقة من اليدوية: شارة ظاهرة لا نص صغير (D-95) */}
+                    {l.auto && <small className="auto-tag">{t.subsAuto}</small>}
                   </button>
                 );
               })}

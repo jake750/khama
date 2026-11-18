@@ -213,8 +213,33 @@
 }
 
 .preview-action {
-  margin-top: 8px;
-  margin-inline-start: -12px;
+  margin-top: 10px;
+}
+
+.meta-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.meta-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: var(--fs-meta);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* أسطر الشرح لا تتجاوز طولًا مريحًا للقراءة على النوافذ العريضة (D-78) */
+p.faint,
+.hint,
+.field-hint {
+  max-width: 75ch;
 }
 
 /* الخيارات قبل أن يُلصق رابط: باهتة، وتتضح عند الاقتراب منها */
@@ -1561,4 +1586,40 @@ details.extras .schedule-row {
     width: 28px;
     height: 28px;
   }
+}
+
+/* شاشة الإقلاع (D-87) */
+.boot {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+}
+
+.boot img {
+  width: 56px;
+  height: 56px;
+  opacity: 0.85;
+  animation: boot-pulse 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes boot-pulse {
+  from {
+    transform: scale(0.94);
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot img {
+    animation: none;
+  }
+}
+
+/* شارة الترجمة الآلية (D-95) */
+.chip-btn small.auto-tag {
+  padding: 1px 6px;
+  border: 1px dashed color-mix(in srgb, var(--warn) 60%, transparent);
+  border-radius: var(--r-pill);
+  color: var(--warn);
+  font-weight: var(--fw-semi);
 }

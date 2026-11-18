@@ -577,16 +577,21 @@ export function DownloadView(props: {
           {info.thumbnail ? <img className="thumb" src={info.thumbnail} alt="" /> : <div className="thumb" />}
           <div className="preview-body">
             <div className="preview-title">{info.title}</div>
-            <div className="faint">
+            {/* شارات منفصلة بدل سطر واحد بنقاط فاصلة (D-74) */}
+            <div className="meta-tags">
               {(entries
                 ? [t.plItems(entries.length), info.uploader, info.site]
                 : [info.uploader, formatDuration(info.duration), info.site, maxHeight ? t.upTo(maxHeight) : null]
               )
                 .filter(Boolean)
-                .join(" · ")}
+                .map((x, i) => (
+                  <span key={i} className="meta-tag" dir="auto">
+                    {x}
+                  </span>
+                ))}
             </div>
             {info.thumbnail && !entries && (
-              <button className="btn btn-sm btn-ghost preview-action" onClick={saveThumb} disabled={savingThumb}>
+              <button className="btn btn-sm preview-action" onClick={saveThumb} disabled={savingThumb}>
                 <Icon name="image" size={16} /> {t.saveThumb}
               </button>
             )}
