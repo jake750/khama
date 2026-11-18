@@ -38,6 +38,14 @@ Builds `samples/` (git ignores it) with FFmpeg: no downloads, the same files on 
 
 **AI clean-up** needs real speech over music, which can't be generated. Use the same three clips every time, kept outside the repository: a voice over loud music, a voice over quiet background music, and music with no voice (should come out nearly silent). Listen to all three after any change to `separate.rs`.
 
+`separate.rs` has two guards: `stft_roundtrip` (always runs) checks that STFT then inverse STFT gives back the same signal, and `separates_voice_from_music` (manual) mixes a voice file with a music file, separates them with the real model, and fails if the result isn't much closer to the original voice than the mix was. Run it after any change to the STFT, chunking or model settings:
+
+```bash
+KHAMA_AI=<folder with onnxruntime and the .onnx model> KHAMA_VOICE=voice.wav KHAMA_MUSIC=music.wav cargo test --manifest-path src-tauri/Cargo.toml separates_voice_from_music -- --ignored --nocapture
+```
+
+The model folder is Khama's own `ai/` folder ([DATA.md](DATA.md)) once AI clean-up has been used.
+
 ## Before every minor release · قبل كل إصدار minor
 
 Patch releases rely on the automatic checks plus a quick try of what changed. Minor releases also go through this list on at least Windows and one other system. Record the result in the table below.

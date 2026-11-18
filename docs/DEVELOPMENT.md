@@ -96,6 +96,7 @@ flowchart LR
 | [RELEASING.md](RELEASING.md) | Versions, releases, rollback. |
 | [RISKS.md](RISKS.md) | What could break Khama and the plan for each. |
 | [SECURITY.md](SECURITY.md) | Content policy and file-access limits. |
+| [ACCESSIBILITY.md](ACCESSIBILITY.md) | Accessibility review and what is left. |
 | [PRESETS.md](PRESETS.md) | Converter presets compared. |
 | [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) | Colors, type, motion. |
 | [DEPENDENCIES.md](DEPENDENCIES.md) | Every dependency and why. |
@@ -109,5 +110,7 @@ flowchart LR
 | `npm run fetch-binaries` | After cloning, and after changing `scripts/binaries.lock.json`. |
 | `npm run release` | Ship a new version ([RELEASING.md](RELEASING.md)). |
 | `npm run size` | After `vite build`: fails if the interface grew past its budget. |
+| `node scripts/code-metrics.mjs` | Before a minor release: lists the longest functions and largest files. A function past ~80 lines (React views excepted, their JSX is long by nature) or a file past ~800 gets split when next touched. Today the long ones are `build_plan`, `run_convert` and `separate_blocking` in Rust, and `DownloadView` and `App` in the interface. |
+| `sh scripts/make-samples.sh` | Builds the converter test files ([TESTING.md](TESTING.md)). |
 | `scripts/changelog.sh` | Rebuilds `CHANGELOG.md`; `release` runs it. |
 | `scripts/android-adaptive-icon.py` | Only when the logo changes, after `tauri icon`. Needs Python 3 with `pip install pillow numpy`. Usage is in the file's first lines. |

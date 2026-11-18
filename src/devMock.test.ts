@@ -14,6 +14,7 @@ const mocked = new Set([...read("./dev-mock.ts").matchAll(/case "([a-z_]+)"/g)].
 /** أوامر لا تحتاج بيانات تجريبية: الرد الافتراضي (null) يكفي لمعاينة الواجهة */
 const NULL_IS_FINE = new Set([
   "save_settings",
+  "export_settings",
   "save_scheduled",
   "save_cookies",
   "delete_cookies",

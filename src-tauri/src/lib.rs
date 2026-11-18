@@ -115,6 +115,8 @@ macro_rules! handlers_with {
         tauri::generate_handler![
             settings::get_settings,
             settings::save_settings,
+            settings::export_settings,
+            settings::read_settings_file,
             settings::default_output_dir,
             settings::has_saved_cookies,
             settings::save_cookies,

@@ -10,6 +10,9 @@ import "./redesign.css";
 import "./guide.css";
 import "./bubbly.css";
 import App from "./App";
+import { installFocusTrap } from "./focusTrap";
+
+installFocusTrap();
 
 // في المتصفح فقط (npm run dev): بيانات تجريبية بدل Rust لمعاينة التصميم. لا تدخل في نسخة التطبيق.
 const ready = import.meta.env.DEV ? import("./dev-mock") : Promise.resolve();

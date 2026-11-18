@@ -99,6 +99,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
   await new Promise((r) => setTimeout(r, 120));
   switch (cmd) {
     case "get_settings":
+    case "read_settings_file":
       return structuredClone(settings);
     case "default_output_dir":
       return "C:\\Users\\me\\Downloads";

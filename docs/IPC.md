@@ -10,6 +10,8 @@ The React interface only talks to Rust through `src/api.ts`. Every command below
 |---|---|---|---|
 | `get_settings` | — | `Settings` | Runs migrations on first read. |
 | `save_settings` | `settings` | — | Atomic write. |
+| `export_settings` | `path` | — | Backup file of settings and projects (no cookies). |
+| `read_settings_file` | `path` | `Settings` | Reads a backup, migrated and sanitised; fails with `settingsFile` if it isn't one. The interface then saves it. |
 | `default_output_dir` | — | `string \| null` | The system Downloads folder. |
 | `has_saved_cookies` / `save_cookies` / `delete_cookies` | `content` (save) | `boolean` / — | `cookies.txt` in the config folder. |
 | `counter_next` / `reset_counter` | — | `number` | The `{n}` file-name counter. |

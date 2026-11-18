@@ -58,6 +58,7 @@ The interface looks the code up in `t.errors` (`src/i18n.ts`, English and Arabic
 | `postprocess` | The download finished but processing the file (merge/convert) failed. Try again with Edit-ready off, or check the technical details. | — |
 | `history` | Couldn't read the download history. Your files are safe; clearing the history in this tab starts a fresh one. | — |
 | `extractorOutdated` | The site changed and this yt-dlp version no longer understands it. Update yt-dlp in Settings → Tools and retry. | Update yt-dlp |
+| `settingsFile` | This file isn't a Khama settings backup, or it's damaged. Choose the file you exported from Settings. | — |
 | `unknown` | Something unexpected went wrong. Check the technical details, and try updating yt-dlp in Settings. | Update yt-dlp |
 | `io` | A file couldn't be read or written. Check the drive is connected and has space, then try again. | — |
 | `dataDir` | Couldn't locate the app data folder. | — |

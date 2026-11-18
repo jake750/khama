@@ -291,6 +291,9 @@ export function asAppError(e: unknown): AppError {
 export const api = {
   getSettings: () => invoke<Settings>("get_settings"),
   saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
+  /** نسخة احتياطية من الإعدادات في ملف (M-99) */
+  exportSettings: (path: string) => invoke<void>("export_settings", { path }),
+  readSettingsFile: (path: string) => invoke<Settings>("read_settings_file", { path }),
   defaultOutputDir: () => invoke<string | null>("default_output_dir"),
   hasSavedCookies: () => invoke<boolean>("has_saved_cookies"),
   saveCookies: (content: string) => invoke<void>("save_cookies", { content }),

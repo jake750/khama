@@ -2076,6 +2076,12 @@ img.file-thumb {
 .brand-name {
   font-size: var(--fs-card);
 }
+/* اسم التطبيق هو عنوان الصفحة الوحيد (h1) لقارئ الشاشة، بشكل النص نفسه (M-29) */
+h1.brand-name {
+  margin: 0;
+  font-weight: inherit;
+  line-height: inherit;
+}
 
 /* ---------- الشريط العلوي ---------- */
 .topbar-tools {

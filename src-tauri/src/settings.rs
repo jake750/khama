@@ -3,7 +3,11 @@
 //! لا شيء يُرسل لأي خادم.
 
 use crate::errors::LockExt;
-use std::{fs, path::PathBuf, sync::Mutex};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
@@ -390,6 +394,34 @@ pub fn save_settings(
     Ok(())
 }
 
+/// نسخة احتياطية من الإعدادات والمشاريع في ملف يختاره المستخدم (M-99). الكوكيز لا تُصدَّر
+#[tauri::command]
+pub fn export_settings(state: tauri::State<SettingsState>, path: String) -> Result<(), AppError> {
+    let json = serde_json::to_string_pretty(&*state.0.lock_ok()).expect("settings serialize");
+    crate::persist::write_atomic(Path::new(&path), json.as_bytes())?;
+    Ok(())
+}
+
+/// يقرأ ملف إعدادات مصدَّرًا ويرجعه بعد الترقية والتنقية؛ الواجهة تحفظه بـ save_settings
+#[tauri::command]
+pub fn read_settings_file(path: String) -> Result<Settings, AppError> {
+    let text = fs::read_to_string(&path)?;
+    let mut s = parse_backup(&text)?;
+    sanitize(&mut s);
+    Ok(s)
+}
+
+fn parse_backup(text: &str) -> Result<Settings, AppError> {
+    let v: serde_json::Value = serde_json::from_str(text).map_err(|e| AppError::with_detail("settingsFile", e.to_string()))?;
+    // ملف JSON آخر (ليس إعدادات خامة) يُرفض بدل أن يمحو الإعدادات بالقيم الافتراضية
+    if !v.as_object().is_some_and(|o| o.contains_key("language") && o.contains_key("theme")) {
+        return Err(AppError::with_detail("settingsFile", "not a Khama settings file"));
+    }
+    serde_json::from_value(v)
+        .map(migrate)
+        .map_err(|e| AppError::with_detail("settingsFile", e.to_string()))
+}
+
 #[tauri::command]
 pub fn default_output_dir(app: AppHandle) -> Option<String> {
     app.path().download_dir().ok().map(|p| p.to_string_lossy().into_owned())
@@ -473,6 +505,16 @@ mod tests {
         assert_eq!(s.projects[0].id, "قناتي");
         assert_eq!(s.active_project.as_deref(), Some(s.projects[0].id.as_str()));
         assert_eq!(s.schema_version, SETTINGS_VERSION, "الملف القديم يُرفع إلى النسخة الحالية");
+    }
+
+    #[test]
+    fn backup_file_is_checked() {
+        assert!(parse_backup("not json").is_err());
+        assert!(parse_backup(r#"{"a": 1}"#).is_err(), "JSON ليس لخامة");
+        let s = parse_backup(r#"{"language": "ar", "theme": "light", "rateLimit": 2}"#).unwrap();
+        assert_eq!(s.language, "ar");
+        assert_eq!(s.rate_limit_kb, 2048, "ملف قديم يُرقّى");
+        assert_eq!(s.schema_version, SETTINGS_VERSION);
     }
 
     #[test]

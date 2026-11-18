@@ -757,7 +757,7 @@ export default function App() {
         <header className="topbar">
           <div className="brand">
             <img className="brand-mark" src="/logo.svg" alt="" />
-            <span className="brand-name">{t.appName}</span>
+            <h1 className="brand-name">{t.appName}</h1>
           </div>
           <nav className="tabs" ref={tabsRef}>
             <span className="tab-pill" ref={tabPill} aria-hidden="true" />

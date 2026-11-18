@@ -1,4 +1,4 @@
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import type { Toast } from "../toast";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -15,7 +15,7 @@ import {
   type WatchFolder,
 } from "../api";
 import { snapshotProject } from "../projects";
-import { useI18n } from "../i18n";
+import { errorText, useI18n } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
 import { useConfirm } from "./Dialog";
 import { Icon, type IconName } from "./Icon";
@@ -97,6 +97,27 @@ export function SettingsView(props: {
     { id: "about", label: t.secAbout, icon: "info", show: true },
   ];
 
+  // نسخة احتياطية من الإعدادات (M-99)
+  const exportBackup = async () => {
+    const path = await save({ defaultPath: "khama-settings.json", filters: [{ name: "JSON", extensions: ["json"] }] });
+    if (!path) return;
+    api
+      .exportSettings(path)
+      .then(() => props.toast(t.settingsExported))
+      .catch((e) => props.toast(errorText(t, asAppError(e))));
+  };
+  const importBackup = async () => {
+    const path = await open({ multiple: false, filters: [{ name: "JSON", extensions: ["json"] }] });
+    if (typeof path !== "string") return;
+    api
+      .readSettingsFile(path)
+      .then((imported) => {
+        update(imported);
+        props.toast(t.settingsImported);
+      })
+      .catch((e) => props.toast(errorText(t, asAppError(e))));
+  };
+
   const go = (id: string, smooth = true) => {
     setCurrent(id);
     root.current?.querySelector(`#set-${id}`)?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
@@ -175,6 +196,22 @@ export function SettingsView(props: {
               </div>
             )}
           </div>
+          {!isMobile && (
+            <div className="setting-row">
+              <div className="min-w-0">
+                <div>{t.backupTitle}</div>
+                <div className="faint">{t.backupHint}</div>
+              </div>
+              <div className="row-2">
+                <button className="btn" onClick={exportBackup}>
+                  {t.exportSettings}
+                </button>
+                <button className="btn" onClick={importBackup}>
+                  {t.importSettings}
+                </button>
+              </div>
+            </div>
+          )}
         </Section>
 
         <DownloadsSection settings={s} update={update} />
@@ -517,6 +554,7 @@ function ProjectsSection(props: { settings: Settings; update: (p: Partial<Settin
         <input
           className="input wide"
           value={name}
+          aria-label={t.projectName}
           placeholder={t.projectName}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && save()}

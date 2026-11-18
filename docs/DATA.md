@@ -42,6 +42,10 @@ Every JSON file is written atomically (`persist.rs`: write to `.tmp`, then renam
 
 Unknown fields are ignored and missing ones take their defaults (`#[serde(default)]`), so older and newer versions can read each other's file.
 
+## Moving to another computer · النقل إلى جهاز آخر
+
+Settings → General → Back up settings exports settings and projects to one JSON file and imports it on the other machine. Saved cookies, history and the AI model are not included.
+
 ## Clean uninstall · إزالة نظيفة
 
 - **Windows**: the uninstaller has a "Delete the application data" box. Ticked, it removes the Config and Data folders.
