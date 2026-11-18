@@ -194,6 +194,7 @@ export default function App() {
         .catch(() => setHw([]));
   }, [tab, hw]);
 
+  const dragTip = useRef(() => {});
   /** عند انتهاء عملية: إشعار (إن كانت النافذة في الخلفية) + إضافتها للسجلّ */
   const onFinished = useCallback((job: Job, u: JobUpdate) => {
     const tt = tRef.current;
@@ -207,6 +208,17 @@ export default function App() {
     }
     // عنصر السجلّ كتبه Rust قبل إرسال "done" (T-19)؛ نعيد قراءة السجلّ فقط
     if (u.state === "done" && job.type === "download") setHistoryVersion((v) => v + 1);
+    // أول ملف مكتمل: نلفت النظر لسحب البطاقة إلى برنامج المونتاج، مرة واحدة فقط (U-38)
+    if (u.state === "done" && u.file && !isMobile) {
+      try {
+        if (!localStorage.getItem("khama.dragTip")) {
+          localStorage.setItem("khama.dragTip", "1");
+          dragTip.current();
+        }
+      } catch {
+        // بلا تخزين: لا تلميح، ولا شيء ينكسر
+      }
+    }
   }, []);
 
   // نستمع لأحداث التقدّم القادمة من Rust
@@ -312,6 +324,7 @@ export default function App() {
     tRef.current = t;
     tabNowRef.current = tab;
     saveFailed.current = () => toast(t.settingsSaveFailed);
+    dragTip.current = () => toast(t.dragTip, { label: t.gotIt, run: () => {}, ms: 9000 });
     saveOk.current = () => {
       if (tab !== "settings" || Date.now() - lastSavedNote.current < 10_000) return;
       lastSavedNote.current = Date.now();
@@ -496,9 +509,9 @@ export default function App() {
   }, []);
 
   /** سحب ملف مكتمل إلى Premiere/DaVinci/CapCut أو إلى أي مجلد */
-  const dragOut = useCallback(async (file: string) => {
+  const dragOut = useCallback(async (file: string | string[]) => {
     try {
-      await startDrag({ item: [file], icon: await getDragIcon() });
+      await startDrag({ item: Array.isArray(file) ? file : [file], icon: await getDragIcon() });
     } catch {
       // سحب فاشل لا يحتاج رسالة
     }
@@ -623,6 +636,7 @@ export default function App() {
   const outputDir = settings.outputDir || defaultDir;
   const shown = jobs.filter((j) => (tab === "convert" ? j.type === "convert" : j.type === "download"));
   const finished = shown.filter((j) => !isActive(j) && j.state !== "scheduled");
+  const doneFiles = shown.filter((j) => j.state === "done" && j.file).map((j) => j.file!);
 
   /** إزالة عمليات من القائمة مع «تراجع» لمدة 5 ثوانٍ (U-20، U-91) */
   const removeJobs = (gone: Job[]) => {
@@ -874,6 +888,22 @@ export default function App() {
                         >
                           <Icon name="x" size={16} /> {t.cancelAll}
                         </button>
+                      )}
+                      {/* كل الملفات المكتملة بسحبة واحدة إلى برنامج المونتاج (U-99) */}
+                      {!isMobile && doneFiles.length > 1 && (
+                        <div
+                          className="btn btn-sm drag-all"
+                          role="button"
+                          tabIndex={-1}
+                          draggable
+                          title={t.dragAllHint}
+                          onDragStart={(e) => {
+                            e.preventDefault();
+                            void dragOut(doneFiles);
+                          }}
+                        >
+                          <Icon name="grip" size={16} /> {t.dragAll(doneFiles.length)}
+                        </div>
                       )}
                       {finished.length > 0 && (
                         <button className="btn btn-sm btn-ghost" onClick={() => removeJobs(finished)}>

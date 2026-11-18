@@ -3885,3 +3885,11 @@ kbd {
   display: inline-flex;
   transform: scaleY(-1);
 }
+
+/* سحب كل الملفات المكتملة (U-99) */
+.drag-all {
+  cursor: grab;
+}
+.drag-all:active {
+  cursor: grabbing;
+}
