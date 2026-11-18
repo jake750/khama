@@ -1623,3 +1623,66 @@ details.extras .schedule-row {
   color: var(--warn);
   font-weight: var(--fw-semi);
 }
+
+/* حالة التنزيلات الفارغة: سطر واحد هادئ (D-51) */
+.empty-state.compact {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  column-gap: 10px;
+  padding: 14px 16px;
+}
+
+.empty-state.compact .empty-art {
+  margin: 0;
+}
+
+.empty-state.compact p.faint {
+  flex-basis: 100%;
+}
+
+/* تدريج شريط القص (D-102) */
+.trim-ticks {
+  position: relative;
+  height: 18px;
+  margin-top: 2px;
+  color: var(--text-faint);
+  font-size: var(--fs-cap);
+  font-variant-numeric: tabular-nums;
+}
+
+.trim-ticks span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  padding-top: 5px;
+  white-space: nowrap;
+}
+
+.trim-ticks span::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 1px;
+  height: 4px;
+  background: var(--border);
+}
+
+.trim-ticks span:first-child {
+  transform: none;
+}
+
+.trim-ticks span:first-child::before {
+  left: 0;
+}
+
+.trim-ticks span.end {
+  transform: translateX(-100%);
+}
+
+.trim-ticks span.end::before {
+  left: auto;
+  right: 0;
+}

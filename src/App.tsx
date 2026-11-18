@@ -94,22 +94,35 @@ const MEDIA_EXT = new Set(MEDIA_FILTER.extensions);
 const isMedia = (p: string) => MEDIA_EXT.has(p.split(".").pop()?.toLowerCase() ?? "");
 const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p;
 
-/** صورة صغيرة تتبع المؤشر أثناء سحب ملف إلى برنامج آخر (الشعار، PNG بصيغة data URL) */
-let dragIcon: Promise<string> | null = null;
-function getDragIcon(): Promise<string> {
-  dragIcon ??= new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const c = document.createElement("canvas");
-      c.width = c.height = 64;
-      c.getContext("2d")!.drawImage(img, 0, 0, 64, 64);
-      resolve(c.toDataURL("image/png"));
-    };
-    img.onerror = () =>
-      resolve("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=");
-    img.src = "/logo.png";
-  });
-  return dragIcon;
+/** صورة صغيرة تتبع المؤشر أثناء سحب ملف إلى برنامج آخر: الصورة المصغّرة للفيديو إن وُجدت (D-69)، وإلا الشعار */
+const dragIcons = new Map<string, Promise<string>>();
+const BLANK_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+function getDragIcon(thumb?: string | null): Promise<string> {
+  const src = thumb || "/logo.png";
+  let icon = dragIcons.get(src);
+  if (!icon) {
+    icon = new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        try {
+          const c = document.createElement("canvas");
+          // مصغّرة 16:9 أو مربع للشعار
+          c.width = thumb ? 112 : 64;
+          c.height = 64;
+          c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+          resolve(c.toDataURL("image/png"));
+        } catch {
+          // صورة من موقع لا يسمح بقراءتها: نعود للشعار
+          resolve(thumb ? getDragIcon() : BLANK_PNG);
+        }
+      };
+      img.onerror = () => resolve(thumb ? getDragIcon() : BLANK_PNG);
+      img.src = src;
+    });
+    dragIcons.set(src, icon);
+  }
+  return icon;
 }
 
 /** إشعار من النظام (يطلب الإذن مرة واحدة) */
@@ -510,9 +523,9 @@ export default function App() {
   }, []);
 
   /** سحب ملف مكتمل إلى Premiere/DaVinci/CapCut أو إلى أي مجلد */
-  const dragOut = useCallback(async (file: string | string[]) => {
+  const dragOut = useCallback(async (file: string | string[], thumbnail?: string | null) => {
     try {
-      await startDrag({ item: Array.isArray(file) ? file : [file], icon: await getDragIcon() });
+      await startDrag({ item: Array.isArray(file) ? file : [file], icon: await getDragIcon(thumbnail) });
     } catch {
       // سحب فاشل لا يحتاج رسالة
     }
@@ -847,7 +860,7 @@ export default function App() {
                       setInject({ url: e.url, n: Date.now() });
                       setTab("download");
                     }}
-                    onDragOut={isMobile ? undefined : (file) => dragOut(file)}
+                    onDragOut={isMobile ? undefined : (file, thumb) => dragOut(file, thumb)}
                     toast={toast}
                   />
                 )}
@@ -919,9 +932,10 @@ export default function App() {
                       )}
                     </div>
                     {shown.length === 0 && (
-                      <div className="empty-state">
+                      // سطر مضغوط لا كتلة كبيرة: يقع تحت النموذج ولا يُرى غالبًا إلا بالتمرير (D-51)
+                      <div className="empty-state compact">
                         <div className="empty-art">
-                          <Icon name={tab === "convert" ? "convert" : "download"} size={24} />
+                          <Icon name={tab === "convert" ? "convert" : "download"} size={20} />
                         </div>
                         <p>{tab === "convert" ? t.convertJobsEmpty : t.jobsEmpty}</p>
                         {tab === "download" && !isMobile && <p className="faint">{t.jobsEmptyHint}</p>}
@@ -963,7 +977,7 @@ export default function App() {
                                   )
                               : undefined
                           }
-                          onDragOut={!isMobile && j.file ? () => dragOut(j.file!) : undefined}
+                          onDragOut={!isMobile && j.file ? () => dragOut(j.file!, j.thumbnail) : undefined}
                         />
                       ))}
                     </AnimatedList>

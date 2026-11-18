@@ -21,6 +21,16 @@ export function formatSpeed(t: Dict, bps?: number | null): string {
 }
 
 /** 75 ← "1:15" ، 3725 ← "1:02:05" */
+/** علامات زمنية مستديرة تحت شريط القص: ما بين 3 و6 علامات بخطوة مألوفة (D-102) */
+export function timeTicks(duration: number): number[] {
+  if (!(duration > 0)) return [];
+  const steps = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400];
+  const step = steps.find((x) => duration / x <= 6) ?? Math.ceil(duration / 6);
+  const out: number[] = [];
+  for (let v = 0; v <= duration + 1e-9; v += step) out.push(v);
+  return out;
+}
+
 export function formatDuration(sec?: number | null): string {
   if (sec == null || !isFinite(sec)) return "";
   const s = Math.round(sec);

@@ -710,7 +710,7 @@ export function DownloadView(props: {
                           disabled: q !== "best" && maxHeight != null && Number(q) > maxHeight,
                         }))}
                       />
-                      {qualityHint && <div className={`mt-2 ${fellBack || needsConvert ? "warn-text" : "faint"}`}>{qualityHint}</div>}
+                      {qualityHint && <div className={`mt-2 ${fellBack || needsConvert ? "warn-text" : "muted"}`}>{qualityHint}</div>}
                     </div>
                     {
                       <div>
@@ -729,7 +729,7 @@ export function DownloadView(props: {
           </details>
         )}
         {/* التنبيه يبقى ظاهرًا حتى لو كانت الخيارات مطويّة */}
-        {qualityHint && !original && <div className={`quality-hint ${needsConvert ? "warn-text" : "faint"}`}>{qualityHint}</div>}
+        {qualityHint && !original && <div className={`quality-hint ${needsConvert ? "warn-text" : "muted"}`}>{qualityHint}</div>}
 
         {info && !entries && <h3 className="form-section">{t.secPart}</h3>}
         {info && !entries && (
@@ -851,7 +851,6 @@ export function DownloadView(props: {
       </div>
 
       <div className="action-row">
-        <ProjectPicker settings={s} update={update} toast={props.toast} />
         {isMobile ? (
           <div className="save-to">
             <Icon name="folder" size={16} />
@@ -870,6 +869,8 @@ export function DownloadView(props: {
             }
           />
         )}
+        {/* بعد منتقي المجلد: ظهوره مع أول مشروع لا يُزيح المجلد من مكانه (D-77) */}
+        <ProjectPicker settings={s} update={update} toast={props.toast} />
         <span className="spacer" />
         {expected != null && (
           <span className="estimate ltr-num" title={t.estimateHint}>

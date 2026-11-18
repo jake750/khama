@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { formatDuration, formatTimecode, parseTime } from "../format";
+import { formatDuration, formatTimecode, parseTime, timeTicks } from "../format";
 import { useI18n } from "../i18n";
 import { Icon } from "./Icon";
 
@@ -104,6 +104,14 @@ export function TrimRange(props: {
           aria-label={t.trimEnd}
           onChange={(e) => set(r.start, Number(e.target.value))}
         />
+      </div>
+      {/* تدريج زمني تحت الشريط (D-102) */}
+      <div className="trim-ticks" dir="ltr" aria-hidden="true">
+        {timeTicks(d).map((v) => (
+          <span key={v} className={v > 0 && v / d > 0.9 ? "end" : undefined} style={{ left: pct(v) }}>
+            {formatDuration(v)}
+          </span>
+        ))}
       </div>
       <div className="trim-fields">
         <TimeField label={t.trimStart} value={r.start} fps={props.fps} onCommit={typeStart} />
