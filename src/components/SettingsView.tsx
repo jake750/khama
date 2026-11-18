@@ -20,7 +20,7 @@ import { ErrorBox } from "./ErrorBox";
 import { useConfirm } from "./Dialog";
 import { Icon, type IconName } from "./Icon";
 import { Segmented, Toggle } from "./Segmented";
-import { isMobile, MOBILE_SAVE_DIR } from "../platform";
+import { isMobile, isWindows, MOBILE_SAVE_DIR } from "../platform";
 import { logError } from "../log";
 
 // المتصفحات التي يستطيع yt-dlp قراءة الكوكيز منها، حسب النظام
@@ -505,7 +505,13 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
                 </option>
               ))}
             </select>
-            {s.cookiesBrowser !== "firefox" && s.cookiesBrowser !== "safari" && <div className="faint mt-2">{t.chromeNote}</div>}
+            {/* منذ Chrome 127 «التشفير المرتبط بالتطبيق» يمنع قراءتها على Windows غالبًا (U-19) */}
+            {s.cookiesBrowser !== "firefox" && s.cookiesBrowser !== "safari" && (
+              <div className={isWindows ? "alert warn mt-2" : "faint mt-2"}>
+                {isWindows && <Icon name="alert" size={16} />}
+                <span>{isWindows ? t.chromeNoteWindows : t.chromeNote}</span>
+              </div>
+            )}
           </div>
         )}
 

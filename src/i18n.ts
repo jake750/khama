@@ -143,6 +143,8 @@ const en = {
   browser: "Browser",
   recommended: "recommended",
   chromeNote: "Chrome, Edge and Brave encrypt cookies on Windows; if it fails, use Firefox or paste them manually.",
+  chromeNoteWindows:
+    "On Windows, Chrome, Edge and Brave (since 2024) lock their cookies to themselves, so reading them usually fails. Use Firefox, or export a cookies.txt and paste it.",
   cookiesPlaceholder: "Paste cookies.txt contents here (Netscape format)…",
   importFile: "Import from file",
   saveCookies: "Save cookies",
@@ -693,6 +695,8 @@ const ar: Dict = {
   browser: "المتصفح",
   recommended: "موصى به",
   chromeNote: "Chrome و Edge و Brave تشفّر الكوكيز على Windows؛ إن فشلت القراءة استخدم Firefox أو الصقها يدويًا.",
+  chromeNoteWindows:
+    "على Windows، يقفل Chrome وEdge وBrave (منذ 2024) كوكيزها على نفسها، فقراءتها تفشل غالبًا. استعمل Firefox، أو صدّر ملف cookies.txt والصقه.",
   cookiesPlaceholder: "الصق محتوى cookies.txt هنا (صيغة Netscape)…",
   importFile: "استيراد من ملف",
   saveCookies: "حفظ الكوكيز",

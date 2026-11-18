@@ -14,5 +14,14 @@ function detectMobile(): boolean {
  * الفرق في ما يخص سطح المكتب فقط: المجلدات المراقَبة والوضع المصغّر والخلفية (T-80) */
 export const isMobile = detectMobile();
 
+/** Windows: يهمّ لتنبيه كوكيز Chrome (U-19) */
+export const isWindows = (() => {
+  try {
+    return platform() === "windows";
+  } catch {
+    return /Windows/i.test(navigator.userAgent);
+  }
+})();
+
 /** مكان الحفظ كما يراه المستخدم على الهاتف */
 export const MOBILE_SAVE_DIR = "Download/Khama";
