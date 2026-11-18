@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, asAppError, type AppError, type ConvertOptions, type ConvertRequest, type MediaInfo, type Settings } from "../api";
 import { formatBytes, formatDuration } from "../format";
 import { useI18n, type Dict } from "../i18n";
@@ -403,6 +403,30 @@ export function ConvertView(props: {
     return sum || null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, preset, opts, trimOn, s.convertHw]);
+
+  // الصيغ بجودة ثابتة يتبع حجمها تعقيد الصورة: نقيسه بتحويل ثلاث شرائح قصيرة (A-30)
+  const [measured, setMeasured] = useState<{ key: string; bytes: number } | null>(null);
+  const sampleKey =
+    !isMobile && ready.length === 1 && preset.kind === "video"
+      ? JSON.stringify([ready[0].path, preset.id, effective(ready[0].info)])
+      : null;
+  useEffect(() => {
+    if (!sampleKey) return;
+    const [path, id, o] = JSON.parse(sampleKey) as [string, string, ConvertOptions];
+    let live = true;
+    const timer = setTimeout(() => {
+      api
+        .sampleEstimate(path, id, o)
+        .then((b) => live && b && setMeasured({ key: sampleKey, bytes: b }))
+        .catch(() => {});
+    }, 800);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [sampleKey]);
+  const exact = measured && measured.key === sampleKey ? measured.bytes : null;
+  const shown = exact ?? estimate;
 
   const meta = () =>
     [preset.name[lang], preset.quality ? { high: t.qualityHigh, balanced: t.qualityBalanced, small: t.qualitySmall }[opts.quality] : null]
@@ -814,9 +838,9 @@ export function ConvertView(props: {
             </div>
           )}
           <span className="spacer" />
-          {estimate != null && (
-            <span className="estimate ltr-num" title={t.estimateHint}>
-              {t.estimate(formatBytes(t, estimate))}
+          {shown != null && (
+            <span className="estimate ltr-num" title={exact ? t.estimateMeasuredHint : t.estimateHint}>
+              {t.estimate(formatBytes(t, shown))}
             </span>
           )}
           {canMerge && (

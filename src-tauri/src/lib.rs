@@ -146,6 +146,7 @@ macro_rules! handlers_with {
             history::get_scheduled,
             history::save_scheduled,
             convert::analyze_file,
+            convert::sample_estimate,
             convert::hw_encoders,
             convert::start_convert,
             convert::import_files,

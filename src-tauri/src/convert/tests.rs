@@ -296,6 +296,63 @@ mod real {
         assert!(failures.is_empty(), "failed: {failures:?}");
     }
 
+    /// دقة التقدير بالقياس (sample_estimate) مقابل الأحجام الحقيقية التي كتبها presets_eval.
+    /// KHAMA_EVAL_DIR=<المجلد نفسه> KHAMA_EVAL_OUT=<ملف presets_eval> cargo test --release -- --ignored sampled_estimate_eval --nocapture
+    #[test]
+    #[ignore]
+    fn sampled_estimate_eval() {
+        let dir = PathBuf::from(std::env::var("KHAMA_EVAL_DIR").expect("KHAMA_EVAL_DIR"));
+        let rows = std::fs::read_to_string(std::env::var("KHAMA_EVAL_OUT").expect("KHAMA_EVAL_OUT")).unwrap();
+        let tmp = std::env::temp_dir().join("khama-eval");
+        std::fs::create_dir_all(&tmp).unwrap();
+        let mut errs: std::collections::BTreeMap<String, Vec<f64>> = Default::default();
+        for line in rows.lines() {
+            let r: Value = serde_json::from_str(line).unwrap();
+            let (file, id, quality) = (
+                r["file"].as_str().unwrap(),
+                r["preset"].as_str().unwrap(),
+                r["quality"].as_str().unwrap(),
+            );
+            let actual = r["bytes"].as_f64().unwrap();
+            let info = probe(&dir.join(file));
+            let p = preset(id).unwrap();
+            let opts = ConvertOptions {
+                quality: quality.into(),
+                ..Default::default()
+            };
+            let full = build_plan(&p, &opts, std::slice::from_ref(&info), &[], Path::new("x"), None)
+                .unwrap()
+                .duration;
+            let (mut bytes, mut secs) = (0u64, 0.0);
+            for (s, e) in sample_windows(0.0, info.duration.unwrap()) {
+                let o = ConvertOptions {
+                    start: Some(s),
+                    end: Some(e),
+                    ..opts.clone()
+                };
+                let out = tmp.join(format!("sample.{}", p.ext));
+                let plan = build_plan(&p, &o, std::slice::from_ref(&info), &[], &out, None).unwrap();
+                let r = Std::new(bin("ffmpeg")).args(&plan.args).output().unwrap();
+                assert!(r.status.success());
+                bytes += std::fs::metadata(&out).unwrap().len();
+                secs += plan.duration;
+            }
+            let est = bytes as f64 * full / secs;
+            let err = (est - actual) / actual * 100.0;
+            println!("{file} | {id} | {quality} | {:.1} | {:.1} | {err:.0}", est / 1e6, actual / 1e6);
+            errs.entry(format!("{id} {quality}")).or_default().push(err);
+        }
+        println!("preset | mean error % | mean |error| %");
+        for (k, v) in errs {
+            let n = v.len() as f64;
+            println!(
+                "{k} | {:.0} | {:.0}",
+                v.iter().sum::<f64>() / n,
+                v.iter().map(|e| e.abs()).sum::<f64>() / n
+            );
+        }
+    }
+
     /// تقييم الصيغ للتقرير (A-30 A-31): الحجم الحقيقي، وSSIM مقابل الأصل، والزمن.
     /// KHAMA_EVAL_DIR=<مجلد ملفات> KHAMA_EVAL_OUT=<ملف jsonl> [KHAMA_REPEAT=3] cargo test --release -- --ignored presets_eval
     /// ثم: KHAMA_EVAL_OUT=<الملف نفسه> npx vitest run src/estimate.eval.test.ts
@@ -476,4 +533,15 @@ fn vfr_output_uses_average_rate() {
     // ملف بمعدل ثابت لا يُضاف له مرشّح
     let plan = build_plan(&p, &ConvertOptions::default(), &[video(1280, 720)], &[], Path::new("o.mov"), None).unwrap();
     assert!(!joined(&plan).contains("fps="));
+}
+
+#[test]
+fn estimate_windows() {
+    // مقطع قصير: شريحة واحدة هي المقطع كله
+    assert_eq!(sample_windows(0.0, 5.0), vec![(0.0, 5.0)]);
+    // مقطع طويل: ثلاث شرائح داخل الحدود
+    let w = sample_windows(10.0, 70.0);
+    assert_eq!(w.len(), 3);
+    assert!(w.iter().all(|(s, e)| *s >= 10.0 && *e <= 70.0 && (e - s - 1.5).abs() < 1e-9));
+    assert!((w[1].0 - 39.25).abs() < 1e-9);
 }

@@ -38,6 +38,8 @@ mod args;
 pub use args::*;
 mod detect;
 pub use detect::*;
+mod estimate;
+pub use estimate::*;
 mod run;
 pub use run::*;
 #[cfg(test)]

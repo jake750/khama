@@ -146,6 +146,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     // المحوّل في المتصفح: اختيار ملف وهمي وتحليله
     case "plugin:dialog|open":
       return ["C:\\Users\\me\\Videos\\clip-phone.mp4"];
+    case "sample_estimate":
+      return 41_500_000;
     case "analyze_file":
       return {
         path: String(args.path),

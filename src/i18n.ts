@@ -318,6 +318,7 @@ const en = {
   destOutput: "In the save folder",
   estimate: (s: string) => `≈ ${s}`,
   estimateHint: "Rough estimate from a typical bitrate. Busy or very calm footage can be up to about half or double this.",
+  estimateMeasuredHint: "Measured by converting three short slices of this file with these settings.",
   convertBtn: (n: number) => (n > 1 ? `Convert ${n} files` : "Convert"),
   mergeBtn: "Merge into one",
   mergeHint:
@@ -1006,6 +1007,7 @@ const ar: Dict = {
   destOutput: "في مجلد الحفظ",
   estimate: (s: string) => `≈ ${s}`,
   estimateHint: "تقدير تقريبي من معدل بت نموذجي. اللقطات المزدحمة أو الهادئة جدًا قد تصل إلى نصفه أو ضعفه.",
+  estimateMeasuredHint: "مقيس بتحويل ثلاث شرائح قصيرة من هذا الملف بهذه الإعدادات.",
   convertBtn: (n: number) => (n > 1 ? `حوّل ${arCount(n, { ...arFiles, two: "الملفين" })}` : "حوّل"),
   mergeBtn: "ادمجها في ملف واحد",
   mergeHint:

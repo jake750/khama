@@ -328,6 +328,9 @@ export const api = {
   openOutputDir: () => invoke<void>("open_output_dir"),
   onJobUpdate: (cb: (u: JobUpdate) => void): Promise<UnlistenFn> => listen<JobUpdate>("job-update", (e) => cb(e.payload)),
   analyzeFile: (path: string) => invoke<MediaInfo>("analyze_file", { path }),
+  /** الحجم المتوقع بتحويل ثلاث شرائح قصيرة (null إن أُلغي بطلب أحدث) */
+  sampleEstimate: (path: string, presetId: string, options: ConvertOptions) =>
+    invoke<number | null>("sample_estimate", { path, presetId, options }),
   hwEncoders: () => invoke<string[]>("hw_encoders"),
   startConvert: (request: ConvertRequest, id?: number) => invoke<number>("start_convert", { request, id }),
   saveThumbnail: (url: string) => invoke<string>("save_thumbnail", { url }),
