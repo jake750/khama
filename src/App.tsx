@@ -24,6 +24,7 @@ import { presetById } from "./presets";
 import { logError } from "./log";
 import { nextTheme } from "./theme";
 import { limiter } from "./limit";
+import { announceUpdate } from "./whatsNew";
 import { optionsFromMeta } from "./downloadPlan";
 
 /** تحليل الملفات المضافة للمحوّل: 4 في كل مرة (U-93) */
@@ -296,6 +297,14 @@ export default function App() {
     toastTimer.current = window.setTimeout(() => setToastMsg(null), action?.ms ?? 4000);
   }, []);
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
+
+  // «ما الجديد» بعد التحديث، بلغة المستخدم: ننتظر الإعدادات (U-59)
+  const announced = useRef(false);
+  useEffect(() => {
+    if (!settings || announced.current) return;
+    announced.current = true;
+    void announceUpdate(t, toast);
+  }, [settings, t, toast]);
   // أحدث القيم للمستمعين والمؤقّتات، تُحدَّث بعد الرسم لا أثناءه
   useLayoutEffect(() => {
     jobsRef.current = jobs;
