@@ -27,6 +27,27 @@ pub(super) fn fps_expr(f: &str) -> Option<&'static str> {
 }
 
 /// atempo يقبل 0.5–2 فقط، فنركّب أكثر من واحد للسرعات الأبعد
+/// أقرب معدل قياسي لمتوسط معدل ملف VFR. دون هذا يأخذ `-fps_mode cfr` المعدل
+/// الاسمي (r_frame_rate)، وهو في ملفات الهاتف غالبًا 60 أو 90 مع أن المتوسط نحو 30،
+/// فيكرّر الإطارات ويضاعف حجم ProRes وDNxHR.
+pub(super) fn standard_fps(avg: f64) -> &'static str {
+    const RATES: [(f64, &str); 8] = [
+        (24000.0 / 1001.0, "24000/1001"),
+        (24.0, "24"),
+        (25.0, "25"),
+        (30000.0 / 1001.0, "30000/1001"),
+        (30.0, "30"),
+        (50.0, "50"),
+        (60000.0 / 1001.0, "60000/1001"),
+        (60.0, "60"),
+    ];
+    RATES
+        .iter()
+        .min_by(|a, b| (a.0 - avg).abs().total_cmp(&(b.0 - avg).abs()))
+        .map(|r| r.1)
+        .unwrap_or("30")
+}
+
 pub(super) fn atempo_chain(speed: f64) -> Vec<String> {
     let mut v = Vec::new();
     let mut s = speed;
@@ -339,6 +360,8 @@ pub(super) fn video_filters(p: &Preset, o: &ConvertOptions, v: &VideoInfo, keep_
     }
     if let Some(r) = o.fps.as_deref().and_then(fps_expr) {
         f.push(format!("fps={r}"));
+    } else if let Some(avg) = v.fps.filter(|_| v.vfr) {
+        f.push(format!("fps={}", standard_fps(avg)));
     }
     if let Some(sp) = o.speed.filter(|s| (*s - 1.0).abs() > 1e-3) {
         f.push(format!("setpts=PTS/{sp:.4}"));

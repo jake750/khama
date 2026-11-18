@@ -459,3 +459,21 @@ fn editor_issues_flags_what_editors_cant_read() {
     assert!(editor_issues(mp4, "mov", ["pcm_s24le"].into_iter()).is_empty(), "PCM سليم في MOV");
     assert!(editor_issues(mp4, "mp4", ["aac"].into_iter()).is_empty());
 }
+
+#[test]
+fn vfr_output_uses_average_rate() {
+    assert_eq!(standard_fps(25.66), "25");
+    assert_eq!(standard_fps(29.9), "30000/1001");
+    assert_eq!(standard_fps(59.7), "60000/1001");
+    let mut m = video(1280, 720);
+    if let Some(v) = m.video.as_mut() {
+        v.fps = Some(25.66);
+        v.vfr = true;
+    }
+    let p = preset("dnxhr_sq").unwrap();
+    let plan = build_plan(&p, &ConvertOptions::default(), &[m], &[], Path::new("o.mov"), None).unwrap();
+    assert!(joined(&plan).contains("fps=25"), "{}", joined(&plan));
+    // ملف بمعدل ثابت لا يُضاف له مرشّح
+    let plan = build_plan(&p, &ConvertOptions::default(), &[video(1280, 720)], &[], Path::new("o.mov"), None).unwrap();
+    assert!(!joined(&plan).contains("fps="));
+}
