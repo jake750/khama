@@ -30,3 +30,4 @@ dist-ssr
 # مجلدات عمل المساعد (git worktrees) لا تُرفع (M-74)
 .claude/worktrees/
 samples/
+dist-release/
