@@ -75,6 +75,8 @@ Everything Khama needs (yt-dlp, FFmpeg, Deno) is bundled. There is nothing else 
 
 **Android**: open the `.apk` on the phone. Android asks once to allow installs from your browser or file manager ("Install unknown apps"); allow it, then install. The phone version downloads, trims, converts and runs AI clean-up (slower than a computer). Desktop-only: choosing the save folder (files go to `Download/Khama`), dragging files out, the tray, watch folders and the mini window.
 
+**Portable use**: Khama keeps its settings and history in your user folder (AppData on Windows, Application Support on macOS), not next to the app, so it doesn't run as a portable app from a USB stick.
+
 **Updating yt-dlp** (Settings → Tools) is safe and takes seconds: it fetches the official release from GitHub. Do it whenever downloads from a site start failing, or about once a month.
 
 #### macOS: opening an unsigned app
@@ -199,6 +201,8 @@ MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-l
 **Linux**: ملف `.deb` لـ Ubuntu وDebian وMint، و`.rpm` لـ Fedora وopenSUSE. أما `.AppImage` فيعمل في أي توزيعة بلا تثبيت: اجعله قابلًا للتشغيل (`chmod +x`) ثم افتحه.
 
 **أندرويد**: افتح ملف `Khama_x.y.z_android-arm64.apk` على الهاتف. سيطلب أندرويد مرة واحدة السماح بالتثبيت من المتصفح أو مدير الملفات («تثبيت التطبيقات غير المعروفة»)؛ اسمح ثم ثبّت. نسخة الهاتف تنزّل وتقص وتحوّل وتنظّف بالذكاء الاصطناعي (أبطأ من الكمبيوتر). على الكمبيوتر فقط: اختيار مجلد الحفظ (الملفات تذهب إلى `Download/Khama`)، وسحب الملفات للخارج، وشريط المهام، والمجلدات المراقَبة، والنافذة المصغّرة.
+
+**الاستخدام المحمول**: تحفظ خامة إعداداتها وسجلّها في مجلد المستخدم (AppData على Windows وApplication Support على macOS) لا بجانب التطبيق، فلا تعمل كتطبيق محمول من ذاكرة USB.
 
 **تحديث yt-dlp** (الإعدادات ← الأدوات) آمن ويأخذ ثوانٍ: يجلب الإصدار الرسمي من GitHub. افعله كلما بدأ التنزيل من موقع ما يفشل، أو مرة في الشهر تقريبًا.
 

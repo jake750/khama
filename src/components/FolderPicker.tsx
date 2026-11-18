@@ -22,6 +22,8 @@ export function FolderPicker(props: {
   recent: string[];
   onPick: (dir: string) => void;
   onChoose: () => void;
+  /** إزالة مجلد من «الأخيرة» (F-91) */
+  onForget?: (dir: string) => void;
   /** مجلد الموقع الفرعي إن كان «مجلد لكل موقع» مفعّلًا (U-84) */
   sub?: string | null;
 }) {
@@ -64,19 +66,25 @@ export function FolderPicker(props: {
           </div>
           {others.length > 0 && <div className="menu-label">{t.recentFolders}</div>}
           {others.map((d) => (
-            <button
-              key={d}
-              role="menuitem"
-              className="menu-item"
-              title={d}
-              onClick={() => {
-                props.onPick(d);
-                setOpen(false);
-              }}
-            >
-              <Icon name="folder" size={16} />
-              <span className="ltr">{d}</span>
-            </button>
+            <div key={d} className="menu-row">
+              <button
+                role="menuitem"
+                className="menu-item"
+                title={d}
+                onClick={() => {
+                  props.onPick(d);
+                  setOpen(false);
+                }}
+              >
+                <Icon name="folder" size={16} />
+                <span className="ltr">{d}</span>
+              </button>
+              {props.onForget && (
+                <button className="icon-btn sm" title={t.forgetFolder} aria-label={t.forgetFolder} onClick={() => props.onForget!(d)}>
+                  <Icon name="x" size={14} />
+                </button>
+              )}
+            </div>
           ))}
           <div className="menu-sep" />
           <button

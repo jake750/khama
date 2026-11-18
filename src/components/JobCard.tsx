@@ -74,12 +74,15 @@ function statusText(t: Dict, j: Job, lang: string, queuePos?: [number, number]):
         }),
       );
     case "queued":
-      return queuePos && queuePos[1] > 1 ? t.stQueuedAt(queuePos[0], queuePos[1]) : t.stQueued;
+      // لماذا ينتظر: الحد معلن بجانب الحالة (F-97)
+      return `${queuePos && queuePos[1] > 1 ? t.stQueuedAt(queuePos[0], queuePos[1]) : t.stQueued} · ${j.type === "convert" ? t.queueLimitConvert : t.queueLimitDownload}`;
     case "starting":
       return t.stStarting;
     case "analyzing":
       return t.stAnalyzing;
     case "downloading":
+      // الصورة ثم الصوت كل منهما من 0%: «الجزء 1 من 2» يمنع ظنّ أن التنزيل بدأ من جديد (F-89). تنزيل صوت فقط جزء واحد
+      if (j.request?.kind === "audio") return t.stDownloading;
       return j.stage === "video" ? t.stDownloadingVideo : j.stage === "audio" ? t.stDownloadingAudio : t.stDownloading;
     case "processing":
       return t.stProcessing;

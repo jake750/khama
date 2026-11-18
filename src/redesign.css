@@ -1793,3 +1793,41 @@ details.extras .schedule-row {
   margin: 2px 0 0;
   font-size: var(--fs-meta);
 }
+
+/* روابط «حول» (F-85) */
+.about-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 12px;
+  color: var(--text-dim);
+  font-size: var(--fs-meta);
+}
+
+/* مجلد أخير مع زر إزالته (F-91) */
+.menu-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.menu-row .menu-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.menu-row .icon-btn {
+  opacity: 0;
+}
+
+.menu-row:hover .icon-btn,
+.menu-row .icon-btn:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .menu-row .icon-btn {
+    opacity: 1;
+  }
+}

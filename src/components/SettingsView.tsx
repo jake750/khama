@@ -23,6 +23,36 @@ import { Segmented, Toggle } from "./Segmented";
 import { isMobile, isWindows, MOBILE_SAVE_DIR } from "../platform";
 import { logError } from "../log";
 import { RATES } from "../downloadPlan";
+import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
+
+const REPO = "https://github.com/jake750/khama";
+const openUrl = (url: string) => void invoke("plugin:opener|open_url", { url }).catch(logError("openUrl"));
+
+/** نسخة خامة وروابط الكود والرخصة وإشعارات الطرف الثالث (F-84، F-85، F-86) */
+function AboutLinks() {
+  const { t } = useI18n();
+  const [version, setVersion] = useState<string | null>(null);
+  useEffect(() => {
+    getVersion()
+      .then(setVersion)
+      .catch(() => setVersion(null));
+  }, []);
+  return (
+    <div className="about-links">
+      {version && <span className="ltr-num">{t.aboutVersion(version)}</span>}
+      <button className="btn btn-sm btn-ghost" onClick={() => openUrl(`${REPO}/`)}>
+        {t.aboutSource}
+      </button>
+      <button className="btn btn-sm btn-ghost" onClick={() => openUrl(`${REPO}/blob/main/LICENSE`)}>
+        {t.aboutLicense}
+      </button>
+      <button className="btn btn-sm btn-ghost" onClick={() => openUrl(`${REPO}/blob/main/THIRD_PARTY_NOTICES.md`)}>
+        {t.aboutNotices}
+      </button>
+    </div>
+  );
+}
 
 // المتصفحات التي يستطيع yt-dlp قراءة الكوكيز منها، حسب النظام
 const isMac = navigator.userAgent.includes("Mac");
@@ -173,6 +203,7 @@ export function SettingsView(props: {
             </div>
           </div>
           <p className="muted mt-1 mb-2">{t.aboutBody}</p>
+          <AboutLinks />
           <p className="faint m-0">{t.notice}</p>
         </Section>
 
@@ -251,7 +282,7 @@ function DownloadsSection(props: { settings: Settings; update: (p: Partial<Setti
     };
   }, [usesN, s.activeProject]);
   return (
-    <Section id="downloads" title={t.secDownloads}>
+    <Section id="downloads" title={t.secDownloads} intro={t.downloadsIntro}>
       <div className="setting-row column">
         <div>
           <div>{t.filenameTitle}</div>

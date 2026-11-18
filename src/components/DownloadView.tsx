@@ -376,7 +376,9 @@ export function DownloadView(props: {
       ? s.videoFormat === "mov"
         ? t.movTooltip
         : null
-      : (({ m4a: t.aacTooltip, wav: t.wavNote, original: t.audioOriginalTooltip } as Record<string, string>)[s.audioFormat] ?? null);
+      : (({ mp3: t.mp3Note, m4a: t.aacTooltip, wav: t.wavNote, original: t.audioOriginalTooltip } as Record<string, string>)[
+          s.audioFormat
+        ] ?? null);
   const qualityLabel = (q: string) => (q === "best" ? t.best : q === "2160" ? "4K" : `${q}p`);
   // الدقة المختارة أعلى مما يوفّره الفيديو: نستعمل أقرب دقة أقل منها لهذا الرابط فقط،
   // ولا نغيّر الإعداد المحفوظ (U-13)
@@ -890,6 +892,7 @@ export function DownloadView(props: {
             recent={s.recentDirs}
             onPick={props.onPickDir}
             onChoose={props.onChooseDir}
+            onForget={(d) => update({ recentDirs: s.recentDirs.filter((x) => x !== d) })}
             sub={
               [s.kindFolders && (s.kind === "audio" ? "Audio" : "Video"), s.siteFolders && (info?.site ?? t.siteFolderAny)]
                 .filter(Boolean)

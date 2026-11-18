@@ -434,6 +434,8 @@ export const PRESETS: PresetDef[] = [
   }),
 ];
 
+// قاعدة الأسماء (F-95): أسماء الصيغ والكودكات تبقى كما هي (ProRes 422 HQ، DNxHR SQ)،
+// والأسماء التي تصف غرضًا تُترجم (H.264 للمونتاج، يوتيوب)، والأوصاف تُترجم دائمًا.
 export const presetById = (id: string) => PRESETS.find((p) => p.id === id);
 
 export const GROUPS: PresetGroup[] = ["edit", "publish", "audio", "tools"];
