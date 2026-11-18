@@ -146,3 +146,20 @@ export function planDownloads(p: PlanInput): PlannedDownload[] {
     },
   ];
 }
+
+/**
+ * «نزّله مرة أخرى» من السجلّ (U-40): نستعيد النوع والصيغة والجودة من نص البطاقة
+ * («MP4 · 1080p»، «MP3»، «AAC»…). ما لا نفهمه يُترك كما هو في الإعدادات.
+ */
+export function optionsFromMeta(kind: Settings["kind"], meta: string): Partial<Settings> {
+  const [fmt = "", q = ""] = meta.split("·").map((x) => x.trim().toLowerCase());
+  if (kind === "audio") {
+    const audioFormat = fmt === "aac" ? "m4a" : fmt;
+    return audioFormat === "mp3" || audioFormat === "m4a" || audioFormat === "wav" ? { kind, audioFormat } : { kind };
+  }
+  const out: Partial<Settings> = { kind };
+  if (fmt === "mp4" || fmt === "mov") out.videoFormat = fmt;
+  if (q === "4k") out.quality = "2160";
+  else if (/^\d{3,4}p$/.test(q)) out.quality = q.slice(0, -1);
+  return out;
+}

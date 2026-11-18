@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProbeInfo } from "./api";
-import { nextClip, planDownloads, scheduledAt, subtitleLangs, type PlanInput } from "./downloadPlan";
+import { nextClip, optionsFromMeta, planDownloads, scheduledAt, subtitleLangs, type PlanInput } from "./downloadPlan";
 
 const settings: PlanInput["settings"] = {
   kind: "video",
@@ -135,5 +135,18 @@ describe("planDownloads", () => {
   it("اللقطات للفيديو فقط", () => {
     expect(planDownloads(input({ stills: "10" }))[0].request.stills).toBe("10");
     expect(planDownloads(input({ stills: "10", settings: { ...settings, kind: "audio" } }))[0].request.stills).toBeNull();
+  });
+});
+
+describe("optionsFromMeta (U-40)", () => {
+  it("restores kind, format and quality from the history line", () => {
+    expect(optionsFromMeta("video", "MP4 · 1080p")).toEqual({ kind: "video", videoFormat: "mp4", quality: "1080" });
+    expect(optionsFromMeta("video", "MOV · 4K")).toEqual({ kind: "video", videoFormat: "mov", quality: "2160" });
+    expect(optionsFromMeta("audio", "AAC")).toEqual({ kind: "audio", audioFormat: "m4a" });
+    expect(optionsFromMeta("audio", "WAV")).toEqual({ kind: "audio", audioFormat: "wav" });
+  });
+  it("leaves what it can't read", () => {
+    expect(optionsFromMeta("video", "ملف Drive")).toEqual({ kind: "video" });
+    expect(optionsFromMeta("video", "MP4 · Best")).toEqual({ kind: "video", videoFormat: "mp4" });
   });
 });

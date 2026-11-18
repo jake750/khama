@@ -24,6 +24,7 @@ import { presetById } from "./presets";
 import { logError } from "./log";
 import { nextTheme } from "./theme";
 import { limiter } from "./limit";
+import { optionsFromMeta } from "./downloadPlan";
 
 /** تحليل الملفات المضافة للمحوّل: 4 في كل مرة (U-93) */
 const analyzeTurn = limiter(4);
@@ -784,8 +785,10 @@ export default function App() {
                 {tab === "history" && (
                   <HistoryView
                     version={historyVersion}
-                    onDownloadAgain={(url) => {
-                      setInject({ url, n: Date.now() });
+                    onDownloadAgain={(e) => {
+                      // نفس النوع والصيغة والجودة لا الرابط وحده (U-40)
+                      update(optionsFromMeta(e.kind, e.meta));
+                      setInject({ url: e.url, n: Date.now() });
                       setTab("download");
                     }}
                     onDragOut={isMobile ? undefined : (file) => dragOut(file)}

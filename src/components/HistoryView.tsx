@@ -31,7 +31,7 @@ function dayLabel(lang: string, ms: number): string {
 export function HistoryView(props: {
   /** يتغيّر بعد كل تنزيل مكتمل، فنعيد القراءة */
   version: number;
-  onDownloadAgain: (url: string) => void;
+  onDownloadAgain: (e: HistoryEntry) => void;
   onDragOut?: (file: string, thumbnail?: string | null) => void;
   toast: Toast;
 }) {
@@ -207,7 +207,7 @@ export function HistoryView(props: {
                       <Icon name="folder" size={16} /> {t.showInFolder}
                     </button>
                   )}
-                  <button className="btn btn-sm" onClick={() => props.onDownloadAgain(e.url)} title={t.downloadAgain}>
+                  <button className="btn btn-sm" onClick={() => props.onDownloadAgain(e)} title={t.downloadAgain}>
                     <Icon name="retry" size={16} /> <span className="hide-sm">{t.downloadAgain}</span>
                   </button>
                   <button
