@@ -258,6 +258,11 @@ async fn model_intact(model: &Path) -> bool {
     ok
 }
 
+/// الثواني الباقية بنسبة ما مضى إلى ما أُنجز. قبل 2% أو أول 3 ثوانٍ التقدير قفزات، فلا نعرضه
+pub(crate) fn separation_eta(elapsed: f64, percent: f64) -> Option<f64> {
+    (percent >= 2.0 && elapsed >= 3.0 && percent < 100.0).then(|| elapsed * (100.0 - percent) / percent)
+}
+
 /// هل النموذج (والمكتبة على الكمبيوتر) موجودان؟ فحص سريع بالوجود والحجم لا بالبصمة،
 /// لتسأل الواجهة قبل تنزيل ~140MB أول مرة (U-29). ensure_assets يبقى الفحص الكامل.
 #[tauri::command]
@@ -785,15 +790,19 @@ pub async fn process_file(
     });
     let span = end.or(duration).map(|e| e - start.unwrap_or(0.0)).filter(|s| *s > 0.0);
     let total = span.map(|s| s * SR as f64);
+    let began = std::time::Instant::now();
     let ok = loop {
         tokio::select! {
             r = &mut handle => break r.map_err(|e| AppError::with_detail("aiRun", e.to_string()))??,
             _ = tokio::time::sleep(Duration::from_millis(400)) => {
                 if let Some(t) = total {
+                    let percent = (progress.load(Ordering::Relaxed) as f64 / t * 100.0).min(100.0);
                     emit(app, JobUpdate {
                         id,
                         state: "separating",
-                        percent: Some((progress.load(Ordering::Relaxed) as f64 / t * 100.0).min(100.0)),
+                        percent: Some(percent),
+                        // الوقت الباقي من السرعة الفعلية لا من «بقدر طول الصوت» (U-41)
+                        eta: separation_eta(began.elapsed().as_secs_f64(), percent),
                         ..Default::default()
                     });
                 }
@@ -875,6 +884,15 @@ pub async fn process_file(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn separation_eta_from_real_speed() {
+        // 25% في 60 ثانية ← 180 ثانية باقية
+        assert_eq!(separation_eta(60.0, 25.0), Some(180.0));
+        assert_eq!(separation_eta(2.0, 50.0), None, "أول 3 ثوانٍ");
+        assert_eq!(separation_eta(30.0, 1.0), None, "قبل 2%");
+        assert_eq!(separation_eta(30.0, 100.0), None);
+    }
 
     /// STFT ثم iSTFT يجب أن يعيد الإشارة نفسها (للترددات تحت dim_f)
     #[test]

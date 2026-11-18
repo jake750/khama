@@ -47,6 +47,8 @@ export function mergeUpdate(j: Job, u: JobUpdate): Job {
     ...rest,
     // «تنتظر دور الفصل» تزول حين يبدأ الفصل فعلًا (Rust لا يرسل stage حينها) (U-71)
     ...(u.state === "separating" && !u.stage ? { stage: undefined } : {}),
+    // مرحلة جديدة: الوقت الباقي للمرحلة السابقة لا يصلح لها
+    ...(u.state !== j.state && u.eta == null ? { eta: undefined } : {}),
     title: title && /^https?:\/\//.test(j.title) ? title : j.title,
     thumbnail: j.thumbnail ?? thumbnail ?? null,
   };
@@ -194,7 +196,9 @@ export function JobCard(props: {
           )}
           {active && j.percent != null && !indeterminate && <span className="ltr">{j.percent.toFixed(1)}%</span>}
           {j.state === "downloading" && j.speed != null && <span>{formatSpeed(t, j.speed)}</span>}
-          {(j.state === "downloading" || j.state === "converting") && j.eta != null && <span>{formatEta(t, j.eta)}</span>}
+          {(j.state === "downloading" || j.state === "converting" || j.state === "separating") && j.eta != null && (
+            <span>{formatEta(t, j.eta)}</span>
+          )}
           <span className="faint">
             {j.meta}
             {r?.end != null && (
