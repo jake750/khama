@@ -41,6 +41,8 @@ export interface Settings {
   closeToTray: boolean;
   watchClipboard: boolean;
   checkUpdates: boolean;
+  /** نسخة بنية settings.json (M-36)، يديرها Rust */
+  schemaVersion?: number;
   recentDirs: string[];
   wantSubs: boolean;
   subLangs: string[];

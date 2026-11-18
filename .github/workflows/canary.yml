@@ -36,3 +36,24 @@ jobs:
           KHAMA_FFMPEG: ${{ github.workspace }}/src-tauri/binaries/ffmpeg/bin/ffmpeg
           LD_LIBRARY_PATH: ${{ github.workspace }}/src-tauri/binaries/ffmpeg/lib
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib -- --ignored spotify_live ffmpeg_output_keeps
+      # المستخرجات الشائعة ما زالت تفهم صفحاتها (M-22): --simulate يقرأ الصفحة ويختار الصيغ دون تنزيل.
+      # روابط عامة ثابتة من اختبارات yt-dlp نفسها؛ إن حُذف أحدها فاستبدله برابط عام آخر من الموقع نفسه.
+      - name: Popular extractors
+        env:
+          YTDLP: ${{ github.workspace }}/src-tauri/binaries/khama-yt-dlp-x86_64-unknown-linux-gnu
+        run: |
+          fail=0
+          for u in \
+            "https://vimeo.com/76979871" \
+            "https://www.dailymotion.com/video/x5kesuj" \
+            "https://soundcloud.com/ethmusic/lostin-powers-she-so-heavy" \
+            "http://archive.org/details/XD300-23_68HighlightsAResearchCntAugHumanIntellect"; do
+            if "$YTDLP" --simulate --no-warnings --quiet "$u"; then echo "ok   $u"; else echo "FAIL $u"; fail=1; fi
+          done
+          exit $fail
+      # يوتيوب يطلب «لست روبوتًا» من خوادم GitHub أحيانًا، فلا نُفشل الفحص كله بسببه
+      - name: YouTube extractor
+        continue-on-error: true
+        env:
+          YTDLP: ${{ github.workspace }}/src-tauri/binaries/khama-yt-dlp-x86_64-unknown-linux-gnu
+        run: '"$YTDLP" --simulate --no-warnings "https://www.youtube.com/watch?v=jNQXAC9IVRw"'

@@ -1,0 +1,18 @@
+#!/bin/sh
+# فحص سريع قبل كل commit (M-43): التنسيق للملفات المضافة فقط، وأنواع TypeScript إن تغيّر src.
+# يُفعَّل تلقائيًا بـ npm install (سكربت prepare). لتجاوزه مرة: git commit --no-verify
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+web=$(echo "$staged" | grep -E '\.(ts|tsx|css|json|md|mjs)$' || true)
+if [ -n "$web" ]; then
+  echo "$web" | xargs npx --no-install prettier --check --log-level warn || {
+    echo "شغّل: npx prettier --write <الملفات> ثم أضفها من جديد"; exit 1; }
+fi
+if echo "$staged" | grep -qE '^src/.*\.tsx?$'; then
+  npx --no-install tsc --noEmit || exit 1
+fi
+if echo "$staged" | grep -qE '\.rs$'; then
+  cargo fmt --manifest-path src-tauri/Cargo.toml --check || {
+    echo "شغّل: cargo fmt --manifest-path src-tauri/Cargo.toml"; exit 1; }
+fi

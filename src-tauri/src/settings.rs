@@ -13,6 +13,9 @@ use crate::errors::AppError;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
+    /// نسخة بنية الملف (M-36). ملف قديم بلا هذا الحقل = 0، وmigrate ترفعه خطوة خطوة إلى SETTINGS_VERSION
+    #[serde(default)]
+    pub schema_version: u32,
     /// مجلد الحفظ. فارغ = مجلد التنزيلات الافتراضي للنظام
     pub output_dir: Option<String>,
     /// لغة الواجهة: "en" (الافتراضية) | "ar"
@@ -111,6 +114,7 @@ pub struct WatchFolder {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            schema_version: SETTINGS_VERSION,
             output_dir: None,
             language: "en".into(),
             theme: "dark".into(),
@@ -286,19 +290,25 @@ pub fn load(app: &AppHandle) -> Settings {
 }
 
 /// ترقية إعدادات الإصدارات السابقة
+/// نسخة بنية settings.json الحالية. أي تغيير لا يكفيه serde(default) يرفعها ويضيف خطوة في migrate
+pub const SETTINGS_VERSION: u32 = 1;
+
 fn migrate(mut s: Settings) -> Settings {
-    // 0.3.1 وما قبله: المشروع يُعرَّف باسمه، وactive_project يحمل الاسم.
-    // نجعل المعرّف = الاسم فيبقى المشروع النشط مختارًا كما هو.
-    for p in &mut s.projects {
-        if p.id.is_empty() {
-            p.id = p.name.clone();
+    if s.schema_version < 1 {
+        // 0.3.1 وما قبله: المشروع يُعرَّف باسمه، وactive_project يحمل الاسم.
+        // نجعل المعرّف = الاسم فيبقى المشروع النشط مختارًا كما هو.
+        for p in &mut s.projects {
+            if p.id.is_empty() {
+                p.id = p.name.clone();
+            }
+        }
+        // 0.3.1 وما قبله: rateLimit بالميغابايت
+        if s.rate_limit > 0 && s.rate_limit_kb == 0 {
+            s.rate_limit_kb = s.rate_limit.saturating_mul(1024);
         }
     }
-    // 0.3.1 وما قبله: rateLimit بالميغابايت
-    if s.rate_limit > 0 && s.rate_limit_kb == 0 {
-        s.rate_limit_kb = s.rate_limit.saturating_mul(1024);
-    }
     s.rate_limit = 0;
+    s.schema_version = SETTINGS_VERSION;
     sanitize(&mut s);
     s
 }
@@ -452,6 +462,15 @@ mod tests {
         let s = migrate(serde_json::from_str(json).unwrap());
         assert_eq!(s.projects[0].id, "قناتي");
         assert_eq!(s.active_project.as_deref(), Some(s.projects[0].id.as_str()));
+        assert_eq!(s.schema_version, SETTINGS_VERSION, "الملف القديم يُرفع إلى النسخة الحالية");
+    }
+
+    #[test]
+    fn current_files_skip_old_migrations() {
+        // ملف بالنسخة الحالية: rateLimit القديم لا يُحوَّل مرة ثانية
+        let json = format!(r#"{{"schemaVersion":{SETTINGS_VERSION},"rateLimit":5,"rateLimitKb":0}}"#);
+        let s = migrate(serde_json::from_str(&json).unwrap());
+        assert_eq!(s.rate_limit_kb, 0);
     }
 
     #[test]

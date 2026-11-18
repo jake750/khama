@@ -26,3 +26,6 @@ dist-ssr
 # نسخ المثبّت في جذر المشروع للاستعمال المحلي فقط
 /*-setup.exe
 /*.apk
+
+# مجلدات عمل المساعد (git worktrees) لا تُرفع (M-74)
+.claude/worktrees/

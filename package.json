@@ -4,6 +4,7 @@
   "version": "0.3.15",
   "type": "module",
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks || true",
     "predev": "node scripts/check-deps.mjs",
     "dev": "vite",
     "build": "tsc && vite build",
