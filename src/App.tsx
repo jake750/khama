@@ -350,6 +350,7 @@ export default function App() {
         title: meta.title,
         thumbnail: meta.thumbnail,
         meta: downloadMeta(tRef.current, request),
+        lastError: meta.lastError,
       };
       if (at && at > Date.now()) {
         // مجدول: بطاقة تنتظر؛ يبدؤها فاحص المواعيد أدناه في وقتها
@@ -458,8 +459,8 @@ export default function App() {
   }, [launch, scheduledLoaded]);
 
   const startConvert = useCallback(
-    async (convert: ConvertRequest, title: string, meta: string) => {
-      await launch({ type: "convert", convert, title, meta }, (id) => api.startConvert(convert, id));
+    async (convert: ConvertRequest, title: string, meta: string, lastError?: AppError) => {
+      await launch({ type: "convert", convert, title, meta, lastError }, (id) => api.startConvert(convert, id));
     },
     [launch],
   );
@@ -626,8 +627,8 @@ export default function App() {
   const retry = (j: Job) => {
     setJobs((p) => p.filter((x) => x.id !== j.id));
     if (j.type === "download" && j.request)
-      startDownload(j.request, { title: j.title, thumbnail: j.thumbnail }).catch(logError("retryDownload"));
-    if (j.type === "convert" && j.convert) startConvert(j.convert, j.title, j.meta).catch(logError("retryConvert"));
+      startDownload(j.request, { title: j.title, thumbnail: j.thumbnail, lastError: j.error }).catch(logError("retryDownload"));
+    if (j.type === "convert" && j.convert) startConvert(j.convert, j.title, j.meta, j.error).catch(logError("retryConvert"));
   };
 
   /** من نتائج الكشف: نقاط القطع = بداية المشهد، أو منتصف الفراغ الأسود/الصامت */

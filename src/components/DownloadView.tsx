@@ -54,6 +54,8 @@ export const newDownloadSession = (): DownloadSession => ({ draftUrl: "", lastPr
 export interface StartMeta {
   title: string;
   thumbnail?: string | null;
+  /** إعادة محاولة: خطأ المحاولة السابقة يبقى ظاهرًا (U-61) */
+  lastError?: AppError;
 }
 
 export function DownloadView(props: {

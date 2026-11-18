@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import type { AppError, ConvertRequest, DownloadRequest, JobState, JobUpdate } from "../api";
 import { formatDuration, formatEta, formatSpeed, formatTimecode } from "../format";
-import { numLocale, useI18n, type Dict } from "../i18n";
+import { errorText, numLocale, useI18n, type Dict } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
 import { Icon } from "./Icon";
 import { MoreMenu, type MenuItem } from "./MoreMenu";
@@ -22,6 +22,8 @@ export interface Job {
   eta?: number;
   file?: string;
   error?: AppError;
+  /** خطأ المحاولة السابقة عند «أعد» (U-61) */
+  lastError?: AppError;
   markers?: [number, number][];
   /** صورة الفيديو (من المعاينة) */
   thumbnail?: string | null;
@@ -220,6 +222,11 @@ export function JobCard(props: {
         )}
 
         {j.state === "error" && j.error && <ErrorBox error={j.error} compact />}
+        {j.lastError && active && (
+          <div className="faint job-last-error">
+            {t.lastAttempt}: {errorText(t, j.lastError)}
+          </div>
+        )}
       </div>
 
       <div className="job-actions">
