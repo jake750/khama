@@ -541,16 +541,21 @@ export default function App() {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
+  // المصغّرة للصق الروابط فقط، فتفتح على التنزيل؛ والعودة ترجع للتبويب الذي كنت فيه (U-53)
+  const tabBeforeCompact = useRef<Tab>("download");
   const toggleCompact = useCallback(() => {
     const next = !compact;
     api
       .setCompact(next)
       .then(() => {
         setCompact(next);
-        if (next) setTab("download");
+        if (next) {
+          tabBeforeCompact.current = tab;
+          setTab("download");
+        } else setTab(tabBeforeCompact.current);
       })
       .catch(logError("setCompact"));
-  }, [compact]);
+  }, [compact, tab]);
 
   /** الجولة تبدّل التبويب بنفسها (دالة ثابتة حتى لا تعيد الخطوة الحالية) */
   const tourTab = useCallback((x: Tab) => setTab(x), []);
