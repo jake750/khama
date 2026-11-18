@@ -295,6 +295,96 @@ mod real {
         }
         assert!(failures.is_empty(), "failed: {failures:?}");
     }
+
+    /// تقييم الصيغ للتقرير (A-30 A-31): الحجم الحقيقي، وSSIM مقابل الأصل، والزمن.
+    /// KHAMA_EVAL_DIR=<مجلد ملفات> KHAMA_EVAL_OUT=<ملف jsonl> [KHAMA_REPEAT=3] cargo test --release -- --ignored presets_eval
+    /// ثم: KHAMA_EVAL_OUT=<الملف نفسه> npx vitest run src/estimate.eval.test.ts
+    #[test]
+    #[ignore]
+    fn presets_eval() {
+        use std::io::Write;
+        let dir = PathBuf::from(std::env::var("KHAMA_EVAL_DIR").expect("KHAMA_EVAL_DIR"));
+        let out_file = std::env::var("KHAMA_EVAL_OUT").expect("KHAMA_EVAL_OUT");
+        let repeat: usize = std::env::var("KHAMA_REPEAT").ok().and_then(|v| v.parse().ok()).unwrap_or(1);
+        let tmp = std::env::temp_dir().join("khama-eval");
+        std::fs::create_dir_all(&tmp).unwrap();
+        let mut log = std::fs::File::create(&out_file).unwrap();
+        let cases = [
+            ("edit_h264", "high"),
+            ("edit_h264", "balanced"),
+            ("edit_h264", "small"),
+            ("youtube", "balanced"),
+            ("whatsapp", "balanced"),
+            ("h265", "balanced"),
+            ("av1", "balanced"),
+            ("webm", "balanced"),
+            ("prores_proxy", "balanced"),
+            ("prores_422", "balanced"),
+            ("dnxhr_sq", "balanced"),
+            ("proxy", "balanced"),
+        ];
+        let mut files: Vec<PathBuf> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().path()).collect();
+        files.sort();
+        for file in files {
+            let info = probe(&file);
+            if info.video.is_none() {
+                continue;
+            }
+            for (id, quality) in cases {
+                let Some(p) = preset(id) else { continue };
+                let opts = ConvertOptions {
+                    quality: quality.into(),
+                    ..Default::default()
+                };
+                let target = tmp.join(format!("out.{}", p.ext));
+                let plan = build_plan(&p, &opts, std::slice::from_ref(&info), &[], &target, None).unwrap();
+                let mut secs = Vec::new();
+                for _ in 0..repeat {
+                    let t0 = Instant::now();
+                    let r = Std::new(bin("ffmpeg")).args(&plan.args).output().unwrap();
+                    assert!(r.status.success(), "{id} {}", tail(&String::from_utf8_lossy(&r.stderr), 4));
+                    secs.push(t0.elapsed().as_secs_f64());
+                }
+                let bytes = std::fs::metadata(&target).unwrap().len();
+                // SSIM مقابل الأصل بعد إعادة القياس إلى أبعاده (الصيغ التي تقص الصورة تُستثنى)
+                let v = info.video.as_ref().unwrap();
+                let r = Std::new(bin("ffmpeg"))
+                    .args(["-hide_banner", "-i"])
+                    .arg(&target)
+                    .arg("-i")
+                    .arg(&file)
+                    .args([
+                        "-lavfi",
+                        &format!(
+                            "[0:v]scale={}:{}:flags=bicubic,format=yuv420p[a];[1:v]format=yuv420p[b];[a][b]ssim",
+                            v.width, v.height
+                        ),
+                        "-f",
+                        "null",
+                        "-",
+                    ])
+                    .output()
+                    .unwrap();
+                let err = String::from_utf8_lossy(&r.stderr);
+                let ssim = err
+                    .split("All:")
+                    .nth(1)
+                    .and_then(|s| s.split_whitespace().next())
+                    .and_then(|s| s.parse::<f64>().ok());
+                let line = serde_json::json!({
+                    "file": file.file_name().unwrap().to_string_lossy(),
+                    "preset": id,
+                    "quality": quality,
+                    "media": info,
+                    "bytes": bytes,
+                    "secs": secs,
+                    "ssim": ssim,
+                });
+                writeln!(log, "{line}").unwrap();
+                println!("{id:<13} {quality:<8} {:>8} KB  ssim={ssim:?}  {secs:.1?}s", bytes / 1024);
+            }
+        }
+    }
 }
 
 #[test]

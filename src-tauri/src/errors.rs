@@ -85,6 +85,9 @@ const RULES: &[(&[&str], &str)] = &[
     (
         &[
             "video unavailable",
+            "video is unavailable",
+            // «[dailymotion] x0000000: Not found.» (A-53)؛ بالنقطتين حتى لا تطابق «ffmpeg not found»
+            ": not found.",
             "has been removed",
             "no longer available",
             "does not exist",
@@ -223,6 +226,47 @@ pub fn tail(text: &str, n: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// دقة تصنيف الأخطاء على رسائل yt-dlp حقيقية (A-53). كل ملف في المجلد: <رقم>_<الرمز المتوقع>.txt
+    /// وفيه stderr كما خرج من yt-dlp. KHAMA_ERRS=<مجلد> cargo test -- --ignored classify_real_errors --nocapture
+    #[test]
+    #[ignore]
+    fn classify_real_errors() {
+        let dir = std::env::var("KHAMA_ERRS").expect("KHAMA_ERRS");
+        let mut files: Vec<_> = std::fs::read_dir(dir).unwrap().map(|e| e.unwrap().path()).collect();
+        files.sort();
+        let (mut n, mut right) = (0, 0);
+        for f in files {
+            let text = std::fs::read_to_string(&f).unwrap();
+            let name = f.file_stem().unwrap().to_string_lossy().into_owned();
+            let expected = name.split_once('_').map(|x| x.1).unwrap_or("");
+            if expected == "ok" || text.trim().is_empty() {
+                continue;
+            }
+            let got = friendly_ytdlp_error(&text).code;
+            n += 1;
+            right += usize::from(got == expected);
+            println!("{} {name:<28} -> {got}", if got == expected { "✓" } else { "✗" });
+        }
+        println!("{right}/{n} correct");
+    }
+
+    /// رسائل حقيقية صُنّفت «unknown» في تقييم A-53
+    #[test]
+    fn maps_real_unavailable_messages() {
+        assert_eq!(
+            friendly_ytdlp_error("ERROR: [youtube] aaaaaaaaaaa: This video is unavailable").code,
+            "unavailable"
+        );
+        assert_eq!(
+            friendly_ytdlp_error("ERROR: [dailymotion] x0000000: Not found.").code,
+            "unavailable"
+        );
+        assert_ne!(
+            friendly_ytdlp_error("ERROR: ffmpeg not found. Please install or provide the path").code,
+            "unavailable"
+        );
+    }
 
     #[test]
     fn maps_unsupported_url() {

@@ -43,8 +43,8 @@ jobs:
           YTDLP: ${{ github.workspace }}/src-tauri/binaries/khama-yt-dlp-x86_64-unknown-linux-gnu
         run: |
           fail=0
+          # Vimeo removed 2026-11: its public pages now ask yt-dlp to sign in (loginRequired)
           for u in \
-            "https://vimeo.com/76979871" \
             "https://www.dailymotion.com/video/x5kesuj" \
             "https://soundcloud.com/ethmusic/lostin-powers-she-so-heavy" \
             "http://archive.org/details/XD300-23_68HighlightsAResearchCntAugHumanIntellect"; do

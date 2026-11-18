@@ -11,7 +11,7 @@ processes and does not link to them, so each keeps its own license.
 | **Deno** (`khama-deno`) | MIT | https://github.com/denoland/deno |
 | **ONNX Runtime** 1.22 (downloaded on first use of music removal, not bundled) | MIT | https://github.com/microsoft/onnxruntime |
 | **UVR-MDX-NET-Voc_FT** model (downloaded on first use, not bundled) | Released by the Ultimate Vocal Remover project; see its terms | https://github.com/Anjok07/ultimatevocalremovergui — file from https://github.com/TRvlvr/model_repo |
-| **IBM Plex Sans Arabic** (font) | SIL Open Font License 1.1 | https://github.com/IBM/plex |
+| **IBM Plex Sans Arabic** (font) | SIL Open Font License 1.1. The full license ships inside the app (`licenses/IBM-Plex-Sans-Arabic-OFL.txt` in the bundled interface) and is in `public/licenses/` here. | https://github.com/IBM/plex |
 | **Tauri** | MIT / Apache-2.0 | https://github.com/tauri-apps/tauri |
 | **React** | MIT | https://github.com/facebook/react |
 

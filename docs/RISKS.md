@@ -8,7 +8,7 @@ Likelihood and impact: **H** high, **M** medium, **L** low.
 
 | # | Risk | L | I | Early warning | Plan |
 |---|---|---|---|---|---|
-| R1 | **A site changes and yt-dlp stops working** (YouTube most often) | H | H | `canary.yml` downloads from YouTube and four other sites every Monday; users report `extractorOutdated`. | "Update yt-dlp" in Settings fetches the fix in seconds without a Khama release. The error message points to it. Ship a release with the new pinned yt-dlp within a week. |
+| R1 | **A site changes and yt-dlp stops working** (YouTube most often) | H | H | `canary.yml` downloads from YouTube and three other sites every Monday; users report `extractorOutdated`. | "Update yt-dlp" in Settings fetches the fix in seconds without a Khama release. The error message points to it. Ship a release with the new pinned yt-dlp within a week. |
 | R2 | **YouTube needs something new** (sign-in, tokens, a JavaScript runtime change) | M | H | yt-dlp issue tracker, canary failures that an update doesn't fix. | Follow yt-dlp's documented workaround (as with Deno, [DECISIONS.md](DECISIONS.md) D4). Cookies from the browser already cover sign-in checks. |
 | R3 | **yt-dlp or FFmpeg release is broken or compromised** | L | H | `fetch-binaries` fails its SHA-256 check. | Binaries are pinned in `scripts/binaries.lock.json` and checked at build time; the in-app update only takes yt-dlp's official GitHub release. Pin back to the last good version. |
 | R4 | **The AI model's download source disappears** (GitHub repo of a third party) | M | M | `ai_ready` downloads fail with `aiDownload`. | Mirrors are listed in `separate.rs`, and the model is checked by SHA-256 whatever the source. Copy the model to Khama's own release assets as a last mirror. |
