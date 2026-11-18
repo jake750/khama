@@ -629,8 +629,10 @@ export default function App() {
   const split = (j: Job) => {
     if (!j.convert || !j.markers?.length) return;
     const input = j.convert.inputs[0];
-    // نعيد الترميز (بجودة عالية) حتى يكون القطع دقيقًا بالإطار، لا عند أقرب إطار مفتاحي
-    const preset = "edit_h264";
+    // نعيد الترميز حتى يكون القطع دقيقًا بالإطار، لا عند أقرب إطار مفتاحي.
+    // بنفس عائلة المصدر: ProRes يبقى ProRes وDNxHR يبقى DNxHR، لا H.264 بصمت (U-39)
+    const codec = files.find((f) => f.path === input)?.info?.video?.codec ?? "";
+    const preset = codec === "prores" ? "prores_hq" : codec === "dnxhd" ? "dnxhr_hq" : "edit_h264";
     const splitAt = j.markers.map(([s, e]) => (s === e ? s : (s + e) / 2));
     startConvert(
       {
@@ -646,7 +648,7 @@ export default function App() {
         },
       },
       baseName(input),
-      t.splitHere,
+      `${t.splitHere} · ${presetById(preset)?.name[lang] ?? preset}`,
     ).catch(logError("splitHere"));
   };
 
