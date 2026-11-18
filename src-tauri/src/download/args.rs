@@ -31,8 +31,11 @@ pub fn format_args(req: &DownloadRequest) -> Vec<String> {
         // الملف الأصلي كما رفعه صاحبه (Google Drive: صيغة "source")
         a.extend(["-f", "source/b"].map(String::from));
     } else if req.kind == "audio" {
+        // "original" = الصوت كما رُفع بلا تحويل (U-95): WAV من مصدر AAC لا يحسّن شيئًا.
+        // «best» في yt-dlp يستخرج المسار الصوتي كما هو دون إعادة ترميز
         let fmt = match req.audio_format.as_str() {
             "m4a" | "wav" => req.audio_format.as_str(),
+            "original" => "best",
             _ => "mp3",
         };
         a.extend(["-f", "ba/b", "-x", "--audio-format", fmt, "--audio-quality", "0"].map(String::from));

@@ -626,6 +626,7 @@ export function DownloadView(props: {
                         { value: "mp3", label: "MP3" },
                         { value: "m4a", label: "AAC", title: t.aacTooltip },
                         { value: "wav", label: "WAV" },
+                        { value: "original", label: t.audioOriginal, title: t.audioOriginalTooltip },
                       ]}
                     />
                   )}

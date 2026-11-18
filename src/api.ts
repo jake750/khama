@@ -6,7 +6,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export type Kind = "video" | "audio";
 export type VideoFormat = "mp4" | "mov";
-export type AudioFormat = "mp3" | "m4a" | "wav";
+export type AudioFormat = "mp3" | "m4a" | "wav" | "original";
 export type Theme = "dark" | "light" | "system";
 export type Language = "en" | "ar";
 export type CookiesMode = "none" | "browser" | "file";

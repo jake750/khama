@@ -306,7 +306,7 @@ fn pick(v: &mut String, allowed: &[&str], fallback: &str) {
 
 const KINDS: &[&str] = &["video", "audio"];
 const VIDEO_FORMATS: &[&str] = &["mp4", "mov"];
-const AUDIO_FORMATS: &[&str] = &["mp3", "m4a", "wav"];
+const AUDIO_FORMATS: &[&str] = &["mp3", "m4a", "wav", "original"];
 const QUALITIES: &[&str] = &["best", "2160", "1440", "1080", "720", "480"];
 
 /// الحقول التي لها قيم محدودة تبقى نصوصًا في JSON (ليقرأها الإصدار الأقدم كما هي)،

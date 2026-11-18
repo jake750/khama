@@ -163,8 +163,10 @@ export function planDownloads(p: PlanInput): PlannedDownload[] {
 export function optionsFromMeta(kind: Settings["kind"], meta: string): Partial<Settings> {
   const [fmt = "", q = ""] = meta.split("·").map((x) => x.trim().toLowerCase());
   if (kind === "audio") {
-    const audioFormat = fmt === "aac" ? "m4a" : fmt;
-    return audioFormat === "mp3" || audioFormat === "m4a" || audioFormat === "wav" ? { kind, audioFormat } : { kind };
+    const audioFormat = fmt === "aac" ? "m4a" : fmt === "original" || fmt === "الأصلي" ? "original" : fmt;
+    return audioFormat === "mp3" || audioFormat === "m4a" || audioFormat === "wav" || audioFormat === "original"
+      ? { kind, audioFormat }
+      : { kind };
   }
   const out: Partial<Settings> = { kind };
   if (fmt === "mp4" || fmt === "mov") out.videoFormat = fmt;

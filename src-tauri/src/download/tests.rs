@@ -130,6 +130,8 @@ fn video_best_without_editor_ready() {
 fn audio_wav() {
     let a = format_args(&req("audio", "wav", "best", true));
     assert!(a.windows(2).any(|w| w[0] == "--audio-format" && w[1] == "wav"));
+    let a = format_args(&req("audio", "original", "best", true));
+    assert!(a.windows(2).any(|w| w[0] == "--audio-format" && w[1] == "best"), "بلا تحويل (U-95)");
 }
 
 #[test]

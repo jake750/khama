@@ -81,7 +81,8 @@ function useTheme(theme: Settings["theme"] | undefined): "dark" | "light" {
 
 function downloadMeta(t: Dict, r: DownloadRequest): string {
   if (r.original) return t.driveFile;
-  if (r.kind === "audio") return r.audioFormat === "m4a" ? "AAC" : r.audioFormat.toUpperCase();
+  if (r.kind === "audio")
+    return r.audioFormat === "m4a" ? "AAC" : r.audioFormat === "original" ? t.audioOriginal : r.audioFormat.toUpperCase();
   return `${r.videoFormat.toUpperCase()} · ${r.quality === "best" ? t.best : r.quality === "2160" ? "4K" : r.quality + "p"}`;
 }
 
