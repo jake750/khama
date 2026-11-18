@@ -130,6 +130,7 @@ macro_rules! handlers_with {
             download::reveal_file,
             download::open_file,
             download::cancel_probe,
+            download::read_links_file,
             separate::ai_ready,
             download::open_output_dir,
             download::save_thumbnail,

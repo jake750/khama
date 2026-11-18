@@ -15,7 +15,7 @@ import { isActive, JobCard, mergeUpdate, type Job } from "./components/JobCard";
 import { SettingsView } from "./components/SettingsView";
 import { Tour, Welcome, type TourStep } from "./components/Tour";
 import { UpdateDialog } from "./components/UpdateDialog";
-import { formatTimecode, youtubeChapters } from "./format";
+import { extractUrls, formatTimecode, youtubeChapters } from "./format";
 import { dictionaries, I18n, type Dict } from "./i18n";
 import { AnimatedList, Presence, reducedMotion, SlideSwitch, usePresence, useSlidingIndicator } from "./motion";
 import { isMobile } from "./platform";
@@ -513,6 +513,18 @@ export default function App() {
       else if (p.type === "leave") setDragging(false);
       else if (p.type === "drop") {
         setDragging(false);
+        // ملف .txt فيه روابط يذهب لحقل التنزيل، لا للمحوّل (U-51)
+        const texts = p.paths.filter((x) => x.toLowerCase().endsWith(".txt"));
+        if (texts.length) {
+          Promise.all(texts.map((x) => api.readLinksFile(x).catch(() => "")))
+            .then((all) => {
+              const links = extractUrls(all.join(" "));
+              if (!links.length) return;
+              setInject({ url: links.join(" "), n: Date.now() });
+              setTab("download");
+            })
+            .catch(logError("readLinksFile"));
+        }
         addFiles(p.paths);
       }
     });

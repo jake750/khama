@@ -494,6 +494,18 @@ pub fn reveal_file(app: AppHandle, path: String) -> Result<(), AppError> {
         .map_err(|e| AppError::with_detail("openFolder", e.to_string()))
 }
 
+/// ملف نصي فيه روابط أُفلت على التطبيق (U-51): نقرأ .txt فقط وحتى 1MB، والواجهة تستخرج الروابط
+#[tauri::command]
+pub fn read_links_file(path: String) -> Result<String, AppError> {
+    let p = Path::new(&path);
+    let is_txt = p.extension().is_some_and(|e| e.eq_ignore_ascii_case("txt"));
+    let small = std::fs::metadata(p).is_ok_and(|m| m.is_file() && m.len() <= 1_048_576);
+    if !is_txt || !small {
+        return Err(AppError::with_detail("linksFile", "only .txt up to 1MB"));
+    }
+    Ok(String::from_utf8_lossy(&std::fs::read(p)?).into_owned())
+}
+
 /// يفتح الملف ببرنامجه الافتراضي (U-64)، بنفس شرط reveal_file: ملفات أنتجها التطبيق فقط
 #[tauri::command]
 pub fn open_file(app: AppHandle, path: String) -> Result<(), AppError> {
