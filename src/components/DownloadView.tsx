@@ -419,9 +419,15 @@ export function DownloadView(props: {
             aria-label={t.urlAria}
           />
           {url ? (
-            <button className="url-action" onClick={clearUrl} title={t.clearLink} aria-label={t.clearLink}>
-              <Icon name="x" size={20} />
-            </button>
+            <>
+              <button className="url-action" onClick={clearUrl} title={t.clearLink} aria-label={t.clearLink}>
+                <Icon name="x" size={20} />
+              </button>
+              {/* لاستبدال الرابط بلصقة واحدة، بلا مسح أولًا (U-81) */}
+              <button className="url-action" onClick={paste} title={t.pasteReplace} aria-label={t.pasteReplace}>
+                <Icon name="paste" size={20} />
+              </button>
+            </>
           ) : (
             <button className="url-action paste" onClick={paste} title={t.pasteTooltip}>
               <Icon name="paste" size={20} /> <span>{t.paste}</span>
