@@ -3898,3 +3898,11 @@ kbd {
   margin-top: var(--s-3);
   font-size: var(--fs-cap);
 }
+
+.job-source,
+.job-last-error {
+  font-size: var(--fs-meta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

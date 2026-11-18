@@ -22,6 +22,8 @@ export interface Job {
   eta?: number;
   file?: string;
   error?: AppError;
+  /** أغنية سبوتيفاي: عنوان ما اختير لها من YouTube Music، لتُكتشف المطابقة الخاطئة (U-18) */
+  source?: string;
   /** خطأ المحاولة السابقة عند «أعد» (U-61) */
   lastError?: AppError;
   markers?: [number, number][];
@@ -38,6 +40,8 @@ function parentDir(path: string): string {
   return parts.length > 2 ? "…" + sep + parts.slice(-2).join(sep) : parts.join(sep);
 }
 
+const MUSIC_SEARCH = "https://music.youtube.com/search?q=";
+
 /** يدمج تحديثًا من Rust في البطاقة. العنوان من yt-dlp يحلّ محلّ الرابط فقط، لا محلّ عنوان المعاينة،
  * والصورة لا تُستبدل إن كانت موجودة (T-43). */
 export function mergeUpdate(j: Job, u: JobUpdate): Job {
@@ -50,6 +54,7 @@ export function mergeUpdate(j: Job, u: JobUpdate): Job {
     // مرحلة جديدة: الوقت الباقي للمرحلة السابقة لا يصلح لها
     ...(u.state !== j.state && u.eta == null ? { eta: undefined } : {}),
     title: title && /^https?:\/\//.test(j.title) ? title : j.title,
+    source: title && j.request?.url.startsWith(MUSIC_SEARCH) ? title : j.source,
     thumbnail: j.thumbnail ?? thumbnail ?? null,
   };
 }
@@ -237,6 +242,11 @@ export function JobCard(props: {
         )}
 
         {j.state === "error" && j.error && <ErrorBox error={j.error} compact />}
+        {j.source && j.source !== j.title && (
+          <div className="faint job-source" dir="auto" title={j.source}>
+            {t.matchedFrom(j.source)}
+          </div>
+        )}
         {j.lastError && active && (
           <div className="faint job-last-error">
             {t.lastAttempt}: {errorText(t, j.lastError)}
