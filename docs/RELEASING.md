@@ -35,6 +35,8 @@ Then `build.yml` takes over, from a clean machine every time:
 2. **build**: Windows, macOS (Apple Silicon and Intel), Linux (AppImage, deb, rpm) and the signed Android APK, each with pinned, checksum-verified yt-dlp, FFmpeg and Deno.
 3. **publish**: the GitHub release (not a draft) with every file, `latest.json` for the updater, an SBOM, and the `vX.Y.Z` tag on the release commit. The job summary lists each installer's size.
 
+**Don't push changes to `.github/workflows/` while a release is building.** tauri-action creates the tag on the release commit, and GitHub refuses ("Resource not accessible by integration") to let the workflow token create a tag whose workflow files differ from `main`'s. Every platform then fails at the last step (this lost 0.3.15). If it happens, don't re-run: release the next patch from the current `main`.
+
 Never tag, build release files on a laptop, or upload by hand: a local build carries that machine's state, and the tag must point at exactly what CI built.
 
 Every `vX.Y.Z` tag matches a "الإصدار X.Y.Z" commit and the version inside the app; the updater reads `latest.json` from the latest release.
