@@ -230,7 +230,7 @@ export function DownloadView(props: {
   const removeClip = (i: number) => setClips((activeClips ?? []).filter((_, j) => j !== i));
   function addClip() {
     if (!duration || !activeClips) return;
-    setClips([...activeClips, nextClip(duration, activeClips)]);
+    setClips([...activeClips, nextClip(duration, activeClips, preview?.now())]);
   }
 
   async function paste() {

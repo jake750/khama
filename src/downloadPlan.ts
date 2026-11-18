@@ -36,10 +36,14 @@ export function subtitleLangs(s: Pick<Settings, "wantSubs" | "subLangs">, info: 
 }
 
 /** مقطع جديد بعد آخر مقطع (أو من البداية إن لم يبقَ وقت)، بطول 10% من الفيديو (1 إلى 60 ثانية) */
-export function nextClip(duration: number, clips: Clip[]): Clip {
+export function nextClip(duration: number, clips: Clip[], playhead?: number | null): Clip {
   const len = Math.max(Math.min(duration / 10, 60), Math.min(1, duration));
   const lastEnd = clips.length ? Math.max(...clips.map((c) => c.end)) : 0;
-  const start = lastEnd + len <= duration ? lastEnd : 0;
+  // من موضع التشغيل في المعاينة إن وُجد (U-47)، وإلا بعد آخر مقطع
+  const atHead = playhead != null && playhead > 0 && playhead < duration;
+  const from = atHead ? playhead : lastEnd;
+  // لا يتسع: قرب النهاية ينتهي عندها، وبعد آخر مقطع يرجع للبداية
+  const start = from + len <= duration ? from : atHead ? Math.max(0, duration - len) : 0;
   return { start, end: Math.min(start + len, duration) };
 }
 

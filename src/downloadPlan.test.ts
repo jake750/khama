@@ -71,6 +71,8 @@ describe("nextClip", () => {
   it("بعد آخر مقطع بطول 10%", () => expect(nextClip(100, [{ start: 0, end: 20 }])).toEqual({ start: 20, end: 30 }));
   it("من البداية إن لم يبقَ وقت", () => expect(nextClip(100, [{ start: 0, end: 95 }])).toEqual({ start: 0, end: 10 }));
   it("لا يتجاوز 60 ثانية", () => expect(nextClip(3600, []).end).toBe(60));
+  it("من موضع التشغيل (U-47)", () => expect(nextClip(100, [{ start: 0, end: 20 }], 50)).toEqual({ start: 50, end: 60 }));
+  it("موضع قرب النهاية ينتهي عندها", () => expect(nextClip(100, [], 97)).toEqual({ start: 90, end: 100 }));
 });
 
 describe("planDownloads", () => {
