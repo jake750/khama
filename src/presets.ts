@@ -246,7 +246,10 @@ export const PRESETS: PresetDef[] = [
     quality: false,
     hw: false,
     name: { en: "GIF", ar: "GIF" },
-    desc: { en: "Optimized palette, 15 fps, 360p.", ar: "ألوان محسّنة، 15 إطارًا، 360p." },
+    desc: {
+      en: "256-color palette built from the clip, 15 fps, 360p. Change the frame rate and size below. Keep it short: GIFs get big fast.",
+      ar: "لوحة 256 لونًا مبنية من المقطع، 15 إطارًا، 360p. غيّر الإطارات والمقاس في الأسفل. اجعله قصيرًا: GIF يكبر بسرعة.",
+    },
   }),
 
   // ---------- صوت ----------
@@ -385,7 +388,10 @@ export const PRESETS: PresetDef[] = [
     quality: false,
     hw: false,
     name: { en: "Image sequence (PNG)", ar: "سلسلة صور (PNG)" },
-    desc: { en: "Every frame as a PNG in a folder.", ar: "كل إطار كصورة PNG داخل مجلد." },
+    desc: {
+      en: "Every frame as a PNG (name_00001.png …) in a new folder named after the file. 10 s at 30 fps is 300 files.",
+      ar: "كل إطار كصورة PNG (الاسم_00001.png …) في مجلد جديد باسم الملف. 10 ث بـ 30 إطارًا = 300 ملف.",
+    },
   }),
   P({
     id: "detect_scenes",

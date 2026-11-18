@@ -645,10 +645,11 @@ function ToolsSection(props: { toast: Toast; settings: Settings; update: (p: Par
     }
   }
 
-  const tools: [string, string | null | undefined][] = [
-    ["yt-dlp", info?.ytdlp],
-    ["FFmpeg", info?.ffmpeg],
-    [isMobile ? "QuickJS" : "Deno", info?.deno],
+  // ما يفعله كل أداة، فلا يبدو محرّك JavaScript غريبًا بينها (F-53)
+  const tools: [string, string | null | undefined, string][] = [
+    ["yt-dlp", info?.ytdlp, t.toolRoleYtdlp],
+    ["FFmpeg", info?.ffmpeg, t.toolRoleFfmpeg],
+    [isMobile ? "QuickJS" : "Deno", info?.deno, t.toolRoleJs],
   ];
 
   return (
@@ -658,9 +659,10 @@ function ToolsSection(props: { toast: Toast; settings: Settings; update: (p: Par
           <ErrorBox error={infoError} />
         ) : (
           <div className="tools-grid">
-            {tools.map(([name, v]) => (
-              <div key={name} className="tool">
+            {tools.map(([name, v, role]) => (
+              <div key={name} className="tool" title={role}>
                 <b>{name}</b>
+                <span className="faint block">{role}</span>
                 <span className="faint ltr block ellipsis">{info ? (v ?? "—") : "…"}</span>
               </div>
             ))}

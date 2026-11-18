@@ -637,6 +637,8 @@ export function DownloadView(props: {
           onPicked={setPicked}
         />
       )}
+      {/* أين تذهب العناصر (F-56) */}
+      {entries && info?.title && <div className="faint mt-2">{t.plFolderNote(info.title)}</div>}
 
       {!ready && (
         <div className="faint options-locked">
@@ -756,7 +758,7 @@ export function DownloadView(props: {
               checked={trimOn && !info.isLive}
               onChange={setTrimOn}
               title={t.trimToggle}
-              hint={info.isLive ? t.trimLive : t.trimHint}
+              hint={info.isLive ? `${t.trimLive} ${t.liveNote}` : t.trimHint}
             />
             <div className="collapse" data-open={!!activeClips}>
               <div>

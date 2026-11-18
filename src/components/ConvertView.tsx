@@ -726,6 +726,9 @@ export function ConvertView(props: {
                     <Toggle checked={opts.tonemap} onChange={(tonemap) => set({ tonemap })} title={t.tonemap} hint={t.tonemapHint} />
                   </div>
                   <FilePick label={t.lut} value={opts.lut} extensions={["cube"]} onChange={(lut) => set({ lut })} />
+                  {/* ما يفعله كل خيار بالضبط (F-45، F-46) */}
+                  {opts.lut && <div className="faint mt-2">{t.lutHint}</div>}
+                  {opts.speed != null && opts.speed !== 1 && <div className="faint mt-2">{t.speedHint}</div>}
                 </section>
               )}
 
@@ -746,6 +749,8 @@ export function ConvertView(props: {
                     />
                     {opts.watermark && <PosGrid value={opts.watermarkPos ?? "br"} onChange={(watermarkPos) => set({ watermarkPos })} />}
                   </div>
+                  {opts.subtitles && <div className="faint mt-2">{t.subtitlesHint}</div>}
+                  {opts.watermark && <div className="faint mt-2">{t.watermarkHint}</div>}
                   <Toggle checked={opts.timecode} onChange={(timecode) => set({ timecode })} title={t.timecode} hint={t.timecodeHint} />
                 </section>
               )}
