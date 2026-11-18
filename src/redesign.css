@@ -1700,3 +1700,26 @@ details.extras .schedule-row {
   max-width: 420px;
   text-align: center;
 }
+
+/* اختيار الوقت بقائمتين (D-89) */
+.time-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* قوائم select الأصلية بألوان التطبيق قدر ما يسمح النظام (D-88) */
+.select {
+  accent-color: var(--accent);
+}
+
+.select option {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.select option:checked {
+  background: var(--accent-soft);
+  color: var(--text);
+}

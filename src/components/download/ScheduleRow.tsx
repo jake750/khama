@@ -6,6 +6,10 @@ import { Segmented } from "../Segmented";
 
 export type When = "now" | "later";
 
+const pad = (n: number) => String(n).padStart(2, "0");
+const HOURS = Array.from({ length: 24 }, (_, i) => pad(i));
+const MINUTES = Array.from({ length: 12 }, (_, i) => pad(i * 5));
+
 /** متى يبدأ التنزيل: الآن أو في ساعة محددة */
 export function ScheduleRow(props: {
   when: When;
@@ -18,6 +22,7 @@ export function ScheduleRow(props: {
 }) {
   const { t, lang } = useI18n();
   const { when, atTime } = props;
+  const [hh = "00", mm = "00"] = atTime.split(":");
   const loc = numLocale(lang);
   // لحظة فتح الصف: تكفي لأسماء الأيام والتاريخ المعروض
   const [now] = useState(() => new Date());
@@ -26,7 +31,14 @@ export function ScheduleRow(props: {
   const at = scheduledAt(when, atTime, now, props.atDay);
   // التاريخ كاملًا وبتوقيت الجهاز صراحة (U-85)
   const atText = at
-    ? new Date(at).toLocaleString(loc, { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })
+    ? new Date(at).toLocaleString(loc, {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      })
     : atTime;
   return (
     <div className="schedule-row">
@@ -63,13 +75,30 @@ export function ScheduleRow(props: {
           </select>
         )}
         {when === "later" && (
-          <input
-            className="input time-input ltr"
-            type="time"
-            value={atTime}
-            onChange={(e) => props.onAtTime(e.target.value)}
-            aria-label={t.startLater}
-          />
+          // ساعة ودقيقة بقائمتين بنظام 24 ساعة: مربع الوقت الأصلي يختلف شكله بين الأنظمة وبعضها 12 ساعة (D-89)
+          <span className="time-pick ltr" role="group" aria-label={t.startLater}>
+            <select
+              className="select select-sm"
+              value={hh}
+              aria-label={t.hourLabel}
+              onChange={(e) => props.onAtTime(`${e.target.value}:${mm}`)}
+            >
+              {HOURS.map((h) => (
+                <option key={h}>{h}</option>
+              ))}
+            </select>
+            <span aria-hidden="true">:</span>
+            <select
+              className="select select-sm"
+              value={mm}
+              aria-label={t.minuteLabel}
+              onChange={(e) => props.onAtTime(`${hh}:${e.target.value}`)}
+            >
+              {(MINUTES.includes(mm) ? MINUTES : [...MINUTES, mm].sort()).map((m) => (
+                <option key={m}>{m}</option>
+              ))}
+            </select>
+          </span>
         )}
       </div>
       {when === "later" && <div className="faint mt-2">{t.scheduleHint(atText)}</div>}
