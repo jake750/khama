@@ -119,7 +119,8 @@ impl Default for Settings {
             cookies_browser: "firefox".into(),
             accepted_notice: false,
             seen_tour: false,
-            convert_dest: "source".into(),
+            // في مجلد الحفظ افتراضيًا: «بجانب الأصل» قد يكتب ProRes ضخمًا على بطاقة الكاميرا نفسها (U-23)
+            convert_dest: "output".into(),
             convert_preset: "edit_h264".into(),
             convert_hw: true,
             watch_folders: Vec::new(),

@@ -20,7 +20,7 @@ const settings = {
   cookiesBrowser: "chrome",
   acceptedNotice: true,
   seenTour: false,
-  convertDest: "source",
+  convertDest: "output",
   convertPreset: "editing",
   convertHw: false,
   watchFolders: [],
