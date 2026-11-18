@@ -754,7 +754,13 @@ export function DownloadView(props: {
             <span className="path ltr">{MOBILE_SAVE_DIR}</span>
           </div>
         ) : (
-          <FolderPicker current={props.outputDir} recent={s.recentDirs} onPick={props.onPickDir} onChoose={props.onChooseDir} />
+          <FolderPicker
+            current={props.outputDir}
+            recent={s.recentDirs}
+            onPick={props.onPickDir}
+            onChoose={props.onChooseDir}
+            sub={s.siteFolders ? (info?.site ?? t.siteFolderAny) : null}
+          />
         )}
         <span className="spacer" />
         {expected != null && (

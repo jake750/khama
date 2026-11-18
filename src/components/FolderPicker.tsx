@@ -11,7 +11,14 @@ export const folderName = (p: string) =>
     .pop() || p;
 
 /** زر مجلد الحفظ: اسم المجلد فقط، وقائمة بآخر المجلدات المستخدمة */
-export function FolderPicker(props: { current: string; recent: string[]; onPick: (dir: string) => void; onChoose: () => void }) {
+export function FolderPicker(props: {
+  current: string;
+  recent: string[];
+  onPick: (dir: string) => void;
+  onChoose: () => void;
+  /** مجلد الموقع الفرعي إن كان «مجلد لكل موقع» مفعّلًا (U-84) */
+  sub?: string | null;
+}) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [shown, leaving] = usePresence(open || null, D_ANTICIPATE);
@@ -36,7 +43,10 @@ export function FolderPicker(props: { current: string; recent: string[]; onPick:
       <button className="folder-btn" onClick={() => setOpen((o) => !o)} title={props.current} aria-expanded={open} aria-haspopup="menu">
         <Icon name="folder" size={16} />
         <span className="faint">{t.saveTo}</span>
-        <span className="folder-name ltr">{folderName(props.current)}</span>
+        <span className="folder-name ltr">
+          {folderName(props.current)}
+          {props.sub && <span className="faint">/{props.sub}</span>}
+        </span>
         <Icon name="chevron" size={16} />
       </button>
       {shown && (
