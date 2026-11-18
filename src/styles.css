@@ -3893,3 +3893,8 @@ kbd {
 .drag-all:active {
   cursor: grabbing;
 }
+
+.extras-memory {
+  margin-top: var(--s-3);
+  font-size: var(--fs-cap);
+}

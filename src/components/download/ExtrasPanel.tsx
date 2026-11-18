@@ -82,6 +82,8 @@ export function ExtrasPanel(props: {
         )}
       </div>
       {props.children && <div className="extras-more">{props.children}</div>}
+      {/* ما يبقى وما يُصفَّر بعد كل تنزيل، بدل أن يكتشفه المستخدم بالتجربة (U-9) */}
+      <div className="faint extras-memory">{t.extrasMemory}</div>
     </details>
   );
 }
