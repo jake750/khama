@@ -265,7 +265,7 @@ impl Drop for PartDir {
     }
 }
 
-/// على الهاتف: الناتج (ملف أو مجلد) يُنقل إلى Download/Khama العام
+/// على الهاتف: الناتج (ملف أو مجلد) يُنقل إلى مجلد الحفظ العام
 pub(super) async fn deliver(app: &AppHandle, dest: PathBuf) -> Result<PathBuf, AppError> {
     #[cfg(mobile)]
     return crate::mobile::publish_any(app, dest).await;

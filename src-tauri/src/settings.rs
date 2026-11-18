@@ -91,6 +91,10 @@ pub struct Settings {
     pub ytdlp_weekly: bool,
     /// آخر فحص لتحديث yt-dlp (ms منذ 1970)
     pub ytdlp_checked_at: u64,
+    /// أندرويد: المجلد العام الذي تُحفظ فيه الملفات (Download وMovies وMusic وDCIM وPictures، U-76)
+    pub mobile_base: String,
+    /// أندرويد: اسم المجلد الفرعي داخله (فارغ = في المجلد العام مباشرة)
+    pub mobile_folder: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -163,6 +167,8 @@ impl Default for Settings {
             parallel_downloads: 3,
             ytdlp_weekly: false,
             ytdlp_checked_at: 0,
+            mobile_base: "Download".into(),
+            mobile_folder: "Khama".into(),
         }
     }
 }
@@ -364,6 +370,22 @@ fn sanitize(s: &mut Settings) {
         pick(&mut p.quality, QUALITIES, &d.quality);
     }
     s.parallel_downloads = s.parallel_downloads.clamp(1, 5);
+    pick(&mut s.mobile_base, MOBILE_BASES, &d.mobile_base);
+    s.mobile_folder = clean_folder_name(&s.mobile_folder);
+}
+
+/// المجلدات العامة التي يقبلها MediaStore دون صلاحيات تخزين جديدة (U-76)
+pub const MOBILE_BASES: &[&str] = &["Download", "Movies", "Music", "DCIM", "Pictures"];
+
+/// اسم مجلد فرعي واحد آمن: بلا فواصل مسار أو رموز ممنوعة، ولا «.» أو «..»، وبطول معقول
+fn clean_folder_name(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|c| if c.is_control() || r#"/\:*?"<>|"#.contains(c) { ' ' } else { c })
+        .collect();
+    let cleaned = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
+    let cleaned = cleaned.trim_matches('.').trim().chars().take(60).collect::<String>();
+    cleaned.trim().to_string()
 }
 
 /// المجلد الفعلي للحفظ: ما اختاره المستخدم، وإلا مجلد التنزيلات
@@ -577,6 +599,21 @@ mod tests {
                 p.quality.as_str()
             ),
             ("video", "mov", "mp3", "720")
+        );
+    }
+
+    #[test]
+    fn mobile_save_folder_defaults_and_is_cleaned() {
+        // ملف 0.3.17 وما قبله لا يعرف الحقلين: يبقى الحفظ في Download/Khama كما كان
+        let s = migrate(serde_json::from_str(r#"{"schemaVersion":1,"language":"ar"}"#).unwrap());
+        assert_eq!((s.mobile_base.as_str(), s.mobile_folder.as_str()), ("Download", "Khama"));
+        let s = migrate(serde_json::from_str(r#"{"mobileBase":"Movies","mobileFolder":"  ../مشاريع/2026:نهائي  "}"#).unwrap());
+        assert_eq!((s.mobile_base.as_str(), s.mobile_folder.as_str()), ("Movies", "مشاريع 2026 نهائي"));
+        let s = migrate(serde_json::from_str(r#"{"mobileBase":"Android","mobileFolder":".."}"#).unwrap());
+        assert_eq!(
+            (s.mobile_base.as_str(), s.mobile_folder.as_str()),
+            ("Download", ""),
+            "مجلد غير مسموح يعود إلى Download"
         );
     }
 

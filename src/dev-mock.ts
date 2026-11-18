@@ -39,6 +39,8 @@ const settings = {
   wantInfo: false,
   projects: [],
   activeProject: null,
+  mobileBase: "Download",
+  mobileFolder: "Khama",
 };
 
 const thumb = (seed: string) => `https://picsum.photos/seed/${seed}/320/180`;

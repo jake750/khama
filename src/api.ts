@@ -1,5 +1,6 @@
 // الجسر بين الواجهة (React) والمحرّك (Rust).
 // كل دالة هنا تستدعي أمرًا معرّفًا في src-tauri/src بالاسم نفسه.
+import type { MobileBase } from "./platform";
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -58,6 +59,10 @@ export interface Settings {
   /** فحص أسبوعي لتحديث yt-dlp بموافقة المستخدم (T-100) */
   ytdlpWeekly: boolean;
   ytdlpCheckedAt: number;
+  /** أندرويد: المجلد العام للحفظ (U-76) */
+  mobileBase: MobileBase;
+  /** أندرويد: المجلد الفرعي داخله، فارغ = في المجلد العام مباشرة */
+  mobileFolder: string;
 }
 
 /** مشروع: مجلد حفظ وإعدادات تنزيل خاصة به */

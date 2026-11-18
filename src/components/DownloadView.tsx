@@ -20,7 +20,7 @@ import { ErrorBox, type ErrorFix } from "./ErrorBox";
 import { Icon } from "./Icon";
 import { Segmented, Toggle } from "./Segmented";
 import { SlideSwitch } from "../motion";
-import { isMobile, MOBILE_SAVE_DIR } from "../platform";
+import { isMobile, mobileSaveDir } from "../platform";
 import { logError } from "../log";
 import { convertMinutes, estimateDownload } from "../estimate";
 import { TrimRange, type PreviewLink, type Range } from "./TrimRange";
@@ -884,7 +884,7 @@ export function DownloadView(props: {
         {isMobile ? (
           <div className="save-to">
             <Icon name="folder" size={16} />
-            <span className="path ltr">{MOBILE_SAVE_DIR}</span>
+            <span className="path ltr">{mobileSaveDir(s)}</span>
           </div>
         ) : (
           <FolderPicker

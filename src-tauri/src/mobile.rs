@@ -89,6 +89,9 @@ pub fn update_ytdlp(app: &AppHandle) -> Result<UpdateOut, AppError> {
 struct PublishArgs<'a> {
     path: &'a str,
     subdir: Option<&'a str>,
+    /// المجلد العام وفرعه من الإعدادات (U-76)
+    base: String,
+    folder: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -96,13 +99,19 @@ pub struct Published {
     pub path: String,
 }
 
-/// ينقل الملف المنتهي إلى Download/Khama العام (يظهر في المعرض ومدير الملفات)
+/// ينقل الملف المنتهي إلى مجلد الحفظ العام المختار في الإعدادات (Download/Khama افتراضيًا)،
+/// فيظهر في المعرض ومدير الملفات
 pub fn publish(app: &AppHandle, file: &Path) -> Result<Published, AppError> {
     publish_in(app, file, None)
 }
 
-/// مثل publish، داخل مجلد فرعي من Download/Khama
+/// مثل publish، داخل مجلد فرعي من مجلد الحفظ
 pub fn publish_in(app: &AppHandle, file: &Path, subdir: Option<&str>) -> Result<Published, AppError> {
+    let (base, folder) = {
+        let s = app.state::<crate::settings::SettingsState>();
+        let s = crate::errors::LockExt::lock_ok(&s.0);
+        (s.mobile_base.clone(), s.mobile_folder.clone())
+    };
     bridge(app)?
         .0
         .run_mobile_plugin(
@@ -110,6 +119,8 @@ pub fn publish_in(app: &AppHandle, file: &Path, subdir: Option<&str>) -> Result<
             PublishArgs {
                 path: &file.to_string_lossy(),
                 subdir,
+                base,
+                folder,
             },
         )
         .map_err(|e| AppError::with_detail("saveFailed", e.to_string()))
@@ -132,7 +143,7 @@ pub async fn publish_any(app: &AppHandle, path: PathBuf) -> Result<PathBuf, AppE
                 last = Some(publish_in(&app, &f, Some(&name))?.path);
             }
             let _ = std::fs::remove_dir_all(&path);
-            // نعيد مسار المجلد نفسه في Download/Khama
+            // نعيد مسار المجلد نفسه في مجلد الحفظ
             Ok(last
                 .map(|p| PathBuf::from(p).parent().map(Path::to_path_buf).unwrap_or_default())
                 .unwrap_or_default())

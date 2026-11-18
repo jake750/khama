@@ -28,7 +28,7 @@ import { Icon, type IconName } from "./Icon";
 import { AnimatedList, SlideSwitch } from "../motion";
 import { Segmented, Toggle } from "./Segmented";
 import { TrimRange } from "./TrimRange";
-import { isMobile, MOBILE_SAVE_DIR } from "../platform";
+import { isMobile, mobileSaveDir } from "../platform";
 
 /**
  * يختار ملفات. على الهاتف يعطينا أندرويد روابط content:// بلا اسم ملف حقيقي،
@@ -843,7 +843,7 @@ export function ConvertView(props: {
         <div className="action-row">
           {isMobile ? (
             <div className="dest faint">
-              <Icon name="folder" size={16} /> <span className="ltr">{MOBILE_SAVE_DIR}</span>
+              <Icon name="folder" size={16} /> <span className="ltr">{mobileSaveDir(s)}</span>
             </div>
           ) : (
             <div className="dest">

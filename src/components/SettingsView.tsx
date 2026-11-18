@@ -20,7 +20,7 @@ import { ErrorBox } from "./ErrorBox";
 import { useConfirm } from "./Dialog";
 import { Icon, type IconName } from "./Icon";
 import { Segmented, Toggle } from "./Segmented";
-import { isMobile, isWindows, MOBILE_SAVE_DIR } from "../platform";
+import { isMobile, isWindows, MOBILE_BASES, mobileSaveDir, type MobileBase } from "../platform";
 import { logError } from "../log";
 import { RATES } from "../downloadPlan";
 import { getVersion } from "@tauri-apps/api/app";
@@ -180,12 +180,14 @@ export function SettingsView(props: {
               ]}
             />
           </div>
-          <div className="setting-row">
-            <div className="min-w-0">
-              <div>{t.saveFolder}</div>
-              <div className="faint ltr break-all">{isMobile ? MOBILE_SAVE_DIR : props.outputDir}</div>
-            </div>
-            {!isMobile && (
+          {isMobile ? (
+            <MobileSaveFolder settings={s} update={update} />
+          ) : (
+            <div className="setting-row">
+              <div className="min-w-0">
+                <div>{t.saveFolder}</div>
+                <div className="faint ltr break-all">{props.outputDir}</div>
+              </div>
               <div className="row-2">
                 <button className="btn" onClick={props.onOpenDir}>
                   <Icon name="folder" size={16} /> {t.open}
@@ -194,8 +196,8 @@ export function SettingsView(props: {
                   {t.choose}
                 </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
           {!isMobile && (
             <div className="setting-row">
               <div className="min-w-0">
@@ -303,6 +305,61 @@ function templateExample(tpl: string, siteFolders: boolean, kindFolders: boolean
 
 const TOKENS = ["{title}", "{uploader}", "{date}", "{today}", "{site}", "{id}", "{res}", "{n}"];
 /** كيلوبايت/ثانية */
+
+/** الهاتف: المجلد العام (Download أو Movies...) واسم المجلد الفرعي (U-76).
+ * الحفظ عبر MediaStore فلا يحتاج صلاحيات تخزين؛ ما لا يقبله المجلد العام (صوت في Movies مثلًا) يذهب إلى Download */
+function MobileSaveFolder(props: { settings: Settings; update: (p: Partial<Settings>) => void }) {
+  const { t } = useI18n();
+  const { settings: s, update } = props;
+  const [name, setName] = useState(s.mobileFolder ?? "Khama");
+  useEffect(() => setName(s.mobileFolder ?? "Khama"), [s.mobileFolder]);
+  const commit = (v: string) => {
+    // مثل clean_folder_name في settings.rs: اسم مجلد واحد بلا رموز ممنوعة ولا «..»
+    const clean = v
+      .replace(/[\\/:*?"<>|]/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/^[.\s]+|[.\s]+$/g, "")
+      .slice(0, 60)
+      .trim();
+    setName(clean);
+    if (clean !== s.mobileFolder) update({ mobileFolder: clean });
+  };
+  return (
+    <div className="setting-row column">
+      <div>
+        <div>{t.saveFolder}</div>
+        <div className="faint">{t.mobileSaveHint}</div>
+      </div>
+      <div className="row-2">
+        <select
+          className="select ltr"
+          value={s.mobileBase ?? "Download"}
+          onChange={(e) => update({ mobileBase: e.target.value as MobileBase })}
+          aria-label={t.mobileBaseLabel}
+        >
+          {MOBILE_BASES.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
+        <span className="faint">/</span>
+        <input
+          className="input ltr"
+          value={name}
+          maxLength={60}
+          spellCheck={false}
+          placeholder={t.mobileFolderEmpty}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={() => commit(name)}
+          onKeyDown={(e) => e.key === "Enter" && commit(name)}
+          aria-label={t.mobileFolderLabel}
+        />
+      </div>
+      <div className="faint ltr break-all">{mobileSaveDir({ ...s, mobileFolder: name.trim() })}</div>
+    </div>
+  );
+}
 
 function DownloadsSection(props: { settings: Settings; update: (p: Partial<Settings>) => void }) {
   const { t } = useI18n();

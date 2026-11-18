@@ -179,7 +179,7 @@ pub(super) async fn deliver_with_extras(
             Ok(())
         })
         .await?;
-        // الهاتف: المجلد كله إلى Download/Khama/<الاسم> stills
+        // الهاتف: المجلد كله إلى مجلد الحفظ/<الاسم> stills
         #[cfg(mobile)]
         if let Err(e) = crate::mobile::publish_any(app, dest).await {
             log::warn!("deliver stills: {e:?}");
@@ -521,7 +521,7 @@ pub(super) async fn blocking(f: impl FnOnce() -> std::io::Result<()> + Send + 's
     Ok(())
 }
 
-/// النقل إلى مجلد المستخدم (وعلى الهاتف: إلى Download/Khama العام)
+/// النقل إلى مجلد المستخدم (وعلى الهاتف: إلى مجلد الحفظ العام)
 #[cfg_attr(mobile, allow(clippy::needless_return))]
 pub(super) async fn deliver(app: &AppHandle, file: &Path, final_dir: &Path) -> Result<PathBuf, AppError> {
     let done = move_into(file, final_dir).await?;

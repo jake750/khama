@@ -59,14 +59,14 @@ export const GUIDE: GuideEntry[] = [
         steps: [
           "Copy the link in your browser or app.",
           "Tap Paste in the link field.",
-          "Wait for the preview, then tap Download. Files go to Download/Khama.",
+          "Wait for the preview, then tap Download. Files go to Download/Khama (change it in Settings).",
         ],
       },
       ar: {
         steps: [
           "انسخ الرابط من المتصفح أو التطبيق.",
           "اضغط «لصق» في حقل الرابط.",
-          "انتظر ظهور المعاينة، ثم اضغط «تنزيل». الملفات تُحفظ في Download/Khama.",
+          "انتظر ظهور المعاينة، ثم اضغط «تنزيل». الملفات تُحفظ في Download/Khama (يمكن تغييره من الإعدادات).",
         ],
       },
     },

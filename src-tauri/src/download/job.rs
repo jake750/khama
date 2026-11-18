@@ -186,7 +186,7 @@ pub(super) async fn run_job(
     {
         req.url = url;
     }
-    // على الهاتف: ننهي الملف داخل التطبيق ثم ننقله إلى Download/Khama العام
+    // على الهاتف: ننهي الملف داخل التطبيق ثم ننقله إلى مجلد الحفظ العام
     #[cfg(mobile)]
     let final_dir = jobs_root(app)?.join("ready");
     #[cfg(desktop)]

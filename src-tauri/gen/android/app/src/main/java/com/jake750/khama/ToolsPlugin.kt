@@ -26,8 +26,12 @@ import kotlin.concurrent.thread
 @InvokeArg
 class PublishArgs {
     lateinit var path: String
-    /** مجلد فرعي داخل Download/Khama (مثل مجلد اللقطات الثابتة) */
+    /** مجلد فرعي داخل مجلد الحفظ (مثل مجلد اللقطات الثابتة) */
     var subdir: String? = null
+    /** المجلد العام من الإعدادات: Download أو Movies أو Music أو DCIM أو Pictures (U-76) */
+    var base: String? = null
+    /** اسم المجلد الفرعي من الإعدادات (فارغ = في المجلد العام مباشرة) */
+    var folder: String? = null
 }
 
 @InvokeArg
@@ -48,7 +52,7 @@ class ImportArgs {
  * - setup: يفكّ Python و yt-dlp و FFmpeg (من مكتبة youtubedl-android) ويعيد مساراتها،
  *   ثم يشغّلها كود Rust نفسه الذي يعمل على الكمبيوتر.
  * - updateYtdlp: يحدّث yt-dlp عند طلب المستخدم فقط.
- * - publish: ينقل الملف المنتهي إلى مجلد Download/Khama العام ليظهر في المعرض ومدير الملفات.
+ * - publish: ينقل الملف المنتهي إلى مجلد الحفظ العام (Download/Khama افتراضيًا) ليظهر في المعرض ومدير الملفات.
  * - importFile: ينسخ ملفًا اختاره المستخدم داخل التطبيق (للمحوّل).
  */
 @TauriPlugin
@@ -117,35 +121,48 @@ class ToolsPlugin(private val activity: Activity) : Plugin(activity) {
                 val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "application/octet-stream"
                 val ret = JSObject()
                 val sub = args.subdir?.replace("/", "_")?.trim()?.takeIf { it.isNotEmpty() }
-                val rel = Environment.DIRECTORY_DOWNLOADS + "/Khama" + (if (sub != null) "/$sub" else "")
+                val folder = args.folder?.replace("/", "_")?.replace("\\", "_")?.trim()?.takeIf { it.isNotEmpty() && it != "." && it != ".." }
+                // المجلد العام يقبل أنواعًا معينة فقط (Movies للفيديو، Music للصوت...)؛ ما لا يقبله يذهب إلى Download
+                var base = targetBase(args.base ?: Environment.DIRECTORY_DOWNLOADS, mime)
+                fun relFor(b: String) = b + (if (folder != null) "/$folder" else "") + (if (sub != null) "/$sub" else "")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     val resolver = activity.contentResolver
                     val values = ContentValues().apply {
-                        put(MediaStore.Downloads.DISPLAY_NAME, src.name)
-                        put(MediaStore.Downloads.MIME_TYPE, mime)
-                        put(MediaStore.Downloads.RELATIVE_PATH, rel)
-                        put(MediaStore.Downloads.IS_PENDING, 1)
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, src.name)
+                        put(MediaStore.MediaColumns.MIME_TYPE, mime)
+                        put(MediaStore.MediaColumns.RELATIVE_PATH, relFor(base))
+                        put(MediaStore.MediaColumns.IS_PENDING, 1)
                     }
-                    val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                        ?: throw IllegalStateException("MediaStore insert failed")
+                    val uri = try {
+                        resolver.insert(collectionFor(base, mime), values)
+                    } catch (e: IllegalArgumentException) {
+                        null
+                    } ?: run {
+                        // احتياط: إن رفض MediaStore المجلد المختار نحفظ في Download بالاسم نفسه
+                        if (base == Environment.DIRECTORY_DOWNLOADS) throw IllegalStateException("MediaStore insert failed")
+                        base = Environment.DIRECTORY_DOWNLOADS
+                        values.put(MediaStore.MediaColumns.RELATIVE_PATH, relFor(base))
+                        resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                            ?: throw IllegalStateException("MediaStore insert failed")
+                    }
                     resolver.openOutputStream(uri).use { out ->
                         src.inputStream().use { it.copyTo(out!!) }
                     }
                     values.clear()
-                    values.put(MediaStore.Downloads.IS_PENDING, 0)
+                    values.put(MediaStore.MediaColumns.IS_PENDING, 0)
                     resolver.update(uri, values, null, null)
                     // الاسم الفعلي (أندرويد يضيف " (1)" إن وُجد ملف بنفس الاسم)
                     var name = src.name
-                    resolver.query(uri, arrayOf(MediaStore.Downloads.DISPLAY_NAME), null, null, null)?.use { c ->
+                    resolver.query(uri, arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)?.use { c ->
                         if (c.moveToFirst()) name = c.getString(0) ?: name
                     }
                     ret.put("uri", uri.toString())
                     // مسار كامل: يمكن للتطبيق قراءة ملفاته من جديد (مثلًا لإرسالها للمحوّل)
                     @Suppress("DEPRECATION")
-                    ret.put("path", File(File(Environment.getExternalStorageDirectory(), rel), name).absolutePath)
+                    ret.put("path", File(File(Environment.getExternalStorageDirectory(), relFor(base)), name).absolutePath)
                 } else {
                     @Suppress("DEPRECATION")
-                    val dir = File(Environment.getExternalStorageDirectory(), rel)
+                    val dir = File(Environment.getExternalStorageDirectory(), relFor(base))
                     dir.mkdirs()
                     var dest = File(dir, src.name)
                     var n = 2
@@ -164,6 +181,27 @@ class ToolsPlugin(private val activity: Activity) : Plugin(activity) {
                 invoke.reject(e.message ?: e.toString())
             }
         }
+    }
+
+    /** المجلد العام الفعلي: المختار إن كان يقبل هذا النوع من الملفات، وإلا Download */
+    private fun targetBase(wanted: String, mime: String): String {
+        val video = mime.startsWith("video/")
+        val image = mime.startsWith("image/")
+        val ok = when (wanted) {
+            Environment.DIRECTORY_MOVIES -> video
+            Environment.DIRECTORY_MUSIC -> mime.startsWith("audio/")
+            Environment.DIRECTORY_DCIM, Environment.DIRECTORY_PICTURES -> video || image
+            else -> false
+        }
+        return if (ok) wanted else Environment.DIRECTORY_DOWNLOADS
+    }
+
+    /** مجموعة MediaStore التي تقبل هذا المجلد العام وهذا النوع (أندرويد 10+) */
+    private fun collectionFor(base: String, mime: String): Uri = when {
+        base == Environment.DIRECTORY_DOWNLOADS -> MediaStore.Downloads.EXTERNAL_CONTENT_URI
+        mime.startsWith("video/") -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        mime.startsWith("audio/") -> MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        else -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
     }
 
     /** ملف اختاره المستخدم (content://...): ننسخه داخل التطبيق باسمه الحقيقي ليقرأه ffmpeg */
