@@ -87,13 +87,13 @@ jobs:
 
   audit:
     runs-on: ubuntu-24.04
-    # audit-check يكتب نتيجته كـ check run، وبدون هذا الإذن يفشل حتى لو لم يجد ثغرة
+    # cargo audit مباشرة لا rustsec/audit-check: ذاك يكتب نتيجته check run عبر API، وكان يفشل
+    # بـ «Not Found» أحيانًا رغم أنه لم يجد ثغرة. هنا يفشل فقط إن وُجدت ثغرة فعلًا.
     permissions:
       contents: read
-      checks: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: src-tauri
+      - name: cargo audit
+        run: |
+          cargo install cargo-audit --locked --quiet
+          cargo audit --file src-tauri/Cargo.lock
