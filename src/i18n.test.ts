@@ -24,8 +24,8 @@ describe("القاموس العربي", () => {
   const ar = dictionaries.ar;
   it("يستخدم الصيغ الصحيحة", () => {
     expect(ar.filesTitle(100)).toBe("100 ملف");
-    expect(ar.historyCount(0)).toBe("لا تنزيلات");
-    expect(ar.historyCount(2)).toBe("تنزيلان");
+    expect(ar.historyCount(0)).toBe("لا ملفات");
+    expect(ar.historyCount(2)).toBe("ملفان");
     expect(ar.downloadN(2)).toBe("تنزيل عنصرين");
     expect(ar.convertBtn(2)).toBe("حوّل الملفين");
     expect(ar.markersFound(15)).toBe("وُجدت 15 نقطة");
