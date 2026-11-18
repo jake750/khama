@@ -998,7 +998,7 @@ export default function App() {
         <Presence show={dragging && tab !== "convert"}>
           <div className="drop-overlay">
             <div>
-              <Icon name="convert" size={24} />
+              <Icon name="filePlus" size={24} />
               <b>{t.dropHere}</b>
               {/* يقول مسبقًا إلى أين تذهب الملفات بدل نقلة مفاجئة (D-56) */}
               <span className="faint">{t.dropHereSub}</span>

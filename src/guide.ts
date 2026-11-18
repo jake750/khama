@@ -666,7 +666,7 @@ export const GUIDE: GuideEntry[] = [
   {
     id: "cookies",
     group: "fix",
-    icon: "file",
+    icon: "shield",
     art: "cookies",
     go: { tab: "settings", section: "cookies" },
     text: {

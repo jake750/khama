@@ -49,6 +49,20 @@ const paths = {
   rotate180: "M5 12a7 7 0 0 1 14 0M19 12l-3-3m3 3 3-3M5 16v4h14v-4",
   flipH: "M12 3v18M9 7 3 17h6V7Zm6 0 6 10h-6V7Z",
   flipV: "M3 12h18M7 9 17 3V9H7Zm0 6 10 6v-6H7Z",
+  // أيقونات مميِّزة لكل معنى (D-70)
+  gauge: "M4 18a9 9 0 1 1 16 0M12 18l4-6M12 18h.01",
+  contrast: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 3v18M12 7a5 5 0 0 1 0 10",
+  interlace: "M4 4h16v16H4zM4 8h16M4 12h16M4 16h16",
+  drop: "M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z",
+  weight: "M8.5 8a3.5 3.5 0 1 1 7 0M6 8h12l2 12H4L6 8Z",
+  musicOff: "M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm11-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM3 3l18 18",
+  block: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM5.6 5.6l12.8 12.8",
+  wave: "M3 12h2m3-5v10m4-13v16m4-12v8m4-4h2",
+  box: "M12 3 3 7.5v9L12 21l9-4.5v-9L12 3ZM3 7.5l9 4.5 9-4.5M12 12v9",
+  filePlus: "M14 3H6v18h12V7l-4-4Zm0 0v4h4M12 11v6m-3-3h6",
+  shield: "M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6l-8-3Z",
+  compass: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm3-12-2 5-5 2 2-5 5-2Z",
+  list: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01",
 } as const;
 
 export type IconName = keyof typeof paths;

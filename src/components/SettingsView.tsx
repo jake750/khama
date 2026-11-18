@@ -91,7 +91,7 @@ export function SettingsView(props: {
     { id: "downloads", label: t.secDownloads, icon: "download", show: true },
     { id: "background", label: t.secBackground, icon: "bell", show: true },
     { id: "projects", label: t.secProjects, icon: "layers", show: true },
-    { id: "cookies", label: t.secCookies, icon: "file", show: true },
+    { id: "cookies", label: t.secCookies, icon: "shield", show: true },
     { id: "watch", label: t.secWatch, icon: "eye", show: !isMobile },
     { id: "tools", label: t.secTools, icon: "chip", show: true },
     { id: "about", label: t.secAbout, icon: "info", show: true },
@@ -238,7 +238,7 @@ export function SettingsView(props: {
             </div>
             <div className="guide-settings-actions">
               <button className="btn" onClick={props.onTour}>
-                <Icon name="eye" size={16} /> {t.tourStart}
+                <Icon name="compass" size={16} /> {t.tourStart}
               </button>
               <button className="btn" onClick={props.onOpenGuide}>
                 <Icon name="help" size={16} /> {t.guideOpen}

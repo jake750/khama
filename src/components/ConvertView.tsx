@@ -1,6 +1,15 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState } from "react";
-import { api, asAppError, type AppError, type ConvertOptions, type ConvertRequest, type MediaInfo, type Settings } from "../api";
+import {
+  api,
+  asAppError,
+  type AppError,
+  type ConvertOptions,
+  type ConvertRequest,
+  type Issue,
+  type MediaInfo,
+  type Settings,
+} from "../api";
 import { formatBytes, formatDuration } from "../format";
 import { useI18n, type Dict } from "../i18n";
 import {
@@ -132,6 +141,19 @@ function Specs({ m }: { m: MediaInfo }) {
 }
 
 /** أيقونة نوع المخرَج على بطاقة الـ Preset (D-21) */
+const ISSUE_ICON: Record<Issue, IconName> = {
+  vfr: "gauge",
+  hdr: "contrast",
+  interlaced: "interlace",
+  tenBit: "drop",
+  heavyCodec: "weight",
+  noAudio: "mute",
+  resolveFreeAudio: "block",
+  editorAudio: "musicOff",
+  editorContainer: "box",
+  pcmInMp4: "wave",
+};
+
 const KIND_ICON: Record<PresetDef["kind"], IconName> = {
   video: "film",
   gif: "film",
@@ -532,7 +554,7 @@ export function ConvertView(props: {
                   <div className="issues">
                     {f.info.issues.map((i) => (
                       <span key={i} className={`issue ${i === "noAudio" ? "" : "warn"}`} title={t.issues[i]}>
-                        <Icon name={i === "noAudio" ? "info" : "alert"} size={16} /> {t.issues[i]}
+                        <Icon name={ISSUE_ICON[i]} size={16} /> {t.issues[i]}
                       </span>
                     ))}
                   </div>

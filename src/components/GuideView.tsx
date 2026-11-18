@@ -24,7 +24,7 @@ export function GuideView(props: { onGo: (tab: GuideTab, section?: string) => vo
           <h2>{t.guideTitle}</h2>
           <p className="muted">{t.guideSub}</p>
           <button className="btn btn-primary" onClick={props.onTour}>
-            <Icon name="eye" size={16} /> {t.tourStart}
+            <Icon name="compass" size={16} /> {t.tourStart}
           </button>
         </div>
         <GuideArt name="guide" className="guide-hero-art" />

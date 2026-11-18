@@ -221,7 +221,7 @@ export function Welcome(props: { onTour: () => void; onLater: () => void }) {
             {t.welcomeLater}
           </button>
           <button className="btn btn-primary" ref={primary} onClick={props.onTour}>
-            <Icon name="eye" size={16} /> {t.tourStart}
+            <Icon name="compass" size={16} /> {t.tourStart}
           </button>
         </div>
       </div>
