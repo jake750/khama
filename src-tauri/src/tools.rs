@@ -354,3 +354,28 @@ pub async fn update_ytdlp(app: AppHandle) -> Result<UpdateResult, AppError> {
         version: after,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ytdlp_always_ignores_user_config_and_gets_our_tools() {
+        let t = Tools {
+            ytdlp: PathBuf::from("yt-dlp"),
+            ytdlp_prefix: vec![],
+            env: vec![],
+            js_runtime: "deno:/x/deno".into(),
+            ffmpeg: PathBuf::new(),
+            ffprobe: PathBuf::new(),
+            ffmpeg_dir: PathBuf::from("/x/ffmpeg"),
+        };
+        let a = ytdlp_base_args(&t);
+        let after = |k: &str| a.iter().position(|x| x == k).and_then(|i| a.get(i + 1)).map(String::as_str);
+        assert_eq!(a[0], "--ignore-config", "ملف إعدادات yt-dlp على الجهاز لا يغيّر سلوكنا");
+        assert!(a.contains(&"--no-playlist".to_string()), "رابط فيديو داخل قائمة = الفيديو وحده");
+        assert_eq!(after("--encoding"), Some("utf-8"));
+        assert_eq!(after("--ffmpeg-location"), Some("/x/ffmpeg"));
+        assert_eq!(after("--js-runtimes"), Some("deno:/x/deno"));
+    }
+}

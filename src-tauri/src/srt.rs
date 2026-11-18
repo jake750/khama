@@ -99,6 +99,16 @@ mod tests {
     const SAMPLE: &str = "1\r\n00:00:01,000 --> 00:00:04,000\r\nHello\r\n\r\n2\r\n00:00:05,500 --> 00:00:08,000 align:start\r\nWorld\r\nline 2\r\n\r\n3\r\n00:01:00,000 --> 00:01:02,000\r\nLater\r\n";
 
     #[test]
+    fn timestamps_round_trip() {
+        assert_eq!(parse_ts("00:01:15,500"), Some(75.5));
+        assert_eq!(parse_ts("1:02:03.25"), Some(3723.25), "نقطة بدل الفاصلة");
+        assert_eq!((parse_ts("01:15"), parse_ts("0:0:1:2"), parse_ts("x:0:0")), (None, None, None));
+        assert_eq!(fmt_ts(75.5), "00:01:15,500");
+        assert_eq!(fmt_ts(-3.0), "00:00:00,000", "لا وقت سالب");
+        assert_eq!(fmt_ts(3723.2496), "01:02:03,250");
+    }
+
+    #[test]
     fn parses_and_writes() {
         let c = parse(SAMPLE);
         assert_eq!(c.len(), 3);

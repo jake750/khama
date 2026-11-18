@@ -332,3 +332,28 @@ fn part_dir_is_removed_once_empty() {
     assert!(out.join("done.mp4").exists());
     let _ = std::fs::remove_dir_all(&out);
 }
+
+// أدوات صغيرة في بناء الأوامر بلا اختبار من قبل (T-15)
+#[test]
+fn small_command_helpers() {
+    assert_eq!(
+        (even(1919.4), even(0.2), even(721.0)),
+        (1920, 2, 722),
+        "الأبعاد زوجية دائمًا وليست صفرًا"
+    );
+    assert_eq!(parse_aspect("16:9").map(|a| (a * 1000.0).round()), Some(1778.0));
+    assert_eq!((parse_aspect("0:9"), parse_aspect("wide")), (None, None));
+    assert_eq!(
+        (fps_expr("29.97"), fps_expr("23.976"), fps_expr("31")),
+        (Some("30000/1001"), Some("24000/1001"), None)
+    );
+    assert_eq!(
+        (sub_ext("a.ASS"), sub_ext("b.vtt"), sub_ext("c.srt"), sub_ext("d")),
+        ("ass", "vtt", "srt", "srt")
+    );
+    assert_eq!(overlay_pos(None), overlay_pos(Some("br")), "الافتراضي أسفل الطرف");
+    assert_eq!(overlay_pos(Some("c")), "x=(W-w)/2:y=(H-h)/2");
+    let args = ["-c:v", "libx264", "-pix_fmt", "yuv420p"].map(String::from);
+    assert_eq!(final_pix(&args).as_deref(), Some("yuv420p"));
+    assert_eq!(final_pix(&args[..2]), None);
+}
