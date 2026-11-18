@@ -1769,3 +1769,10 @@ details.extras .schedule-row {
   border-top: 1px solid var(--border);
   font-size: var(--fs-meta);
 }
+
+/* شارة هيكلية بحجم شارات المعاينة (D-52) */
+.skeleton-tag {
+  width: 64px;
+  height: 20px;
+  border-radius: 999px;
+}

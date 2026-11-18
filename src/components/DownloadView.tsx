@@ -563,6 +563,12 @@ export function DownloadView(props: {
           <div className="thumb skeleton" />
           <div className="grow stack-2">
             <div className="skeleton skeleton-title" />
+            {/* بشكل المعاينة الحقيقية: عنوان ثم شارات (D-52) */}
+            <div className="meta-tags">
+              <span className="skeleton skeleton-tag" />
+              <span className="skeleton skeleton-tag" />
+              <span className="skeleton skeleton-tag" />
+            </div>
             {/* نص صريح وعدّاد بدل هيكل رمادي فقط (U-77)، وإلغاء لمعاينة عالقة (U-78) */}
             <div className="faint probe-wait" role="status">
               {t.probeReading}
