@@ -44,12 +44,12 @@ export function mergeUpdate(j: Job, u: JobUpdate): Job {
 const ACTIVE: JobState[] = ["queued", "starting", "analyzing", "downloading", "processing", "preparing", "separating", "converting"];
 export const isActive = (j: Job) => ACTIVE.includes(j.state);
 
-function statusText(t: Dict, j: Job, lang: string): string {
+function statusText(t: Dict, j: Job, lang: string, queuePos?: [number, number]): string {
   switch (j.state) {
     case "scheduled":
       return t.stScheduled(new Date(j.at ?? 0).toLocaleTimeString(numLocale(lang), { hour: "2-digit", minute: "2-digit" }));
     case "queued":
-      return t.stQueued;
+      return queuePos && queuePos[1] > 1 ? t.stQueuedAt(queuePos[0], queuePos[1]) : t.stQueued;
     case "starting":
       return t.stStarting;
     case "analyzing":
@@ -81,6 +81,8 @@ export function JobCard(props: {
   onRemove: () => void;
   onConvert?: () => void;
   onSplit?: () => void;
+  /** موقعها في الطابور: [الترتيب، عدد المنتظرين] (U-55) */
+  queuePos?: [number, number];
   onCopyMarkers?: () => void;
   /** سحب الملف المكتمل إلى برنامج آخر (الكمبيوتر فقط) */
   onDragOut?: () => void;
@@ -158,7 +160,7 @@ export function JobCard(props: {
           {j.state === "done" && fileName ? fileName : j.title}
         </div>
         <div className="job-meta">
-          <span>{statusText(t, j, lang)}</span>
+          <span>{statusText(t, j, lang, props.queuePos)}</span>
           {active && j.percent != null && !indeterminate && <span className="ltr">{j.percent.toFixed(1)}%</span>}
           {j.state === "downloading" && j.speed != null && <span>{formatSpeed(t, j.speed)}</span>}
           {(j.state === "downloading" || j.state === "converting") && j.eta != null && <span>{formatEta(t, j.eta)}</span>}

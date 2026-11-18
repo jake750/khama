@@ -598,6 +598,11 @@ export default function App() {
     });
   };
   const failed = shown.filter((j) => j.state === "error");
+  // الطابور يأخذ الأقدم أولًا، والأرقام تصاعدية بترتيب البدء (U-55)
+  const queuedIds = shown
+    .filter((j) => j.state === "queued")
+    .map((j) => j.id)
+    .sort((a, b) => a - b);
   const activeShown = shown.filter((j) => isActive(j) || j.state === "scheduled");
 
   const retry = (j: Job) => {
@@ -840,6 +845,7 @@ export default function App() {
                           onRemove={() => setJobs((p) => p.filter((x) => x.id !== j.id))}
                           onConvert={j.type === "download" && j.file ? () => addFiles([j.file!]) : undefined}
                           onSplit={j.markers?.length ? () => split(j) : undefined}
+                          queuePos={j.state === "queued" ? [queuedIds.indexOf(j.id) + 1, queuedIds.length] : undefined}
                           onCopyMarkers={j.markers?.length ? () => copyMarkers(j) : undefined}
                           onDragOut={!isMobile && j.file ? () => dragOut(j.file!) : undefined}
                         />
