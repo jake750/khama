@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dictionaries } from "./i18n";
-import { extractUrls, formatBytes, formatDuration, formatTimecode, isHttpUrl, parseTime } from "./format";
+import { extractUrls, formatBytes, formatDuration, formatTimecode, isHttpUrl, parseTime, youtubeChapters } from "./format";
 
 describe("formatTimecode", () => {
   it("يعرض أجزاء الثانية", () => {
@@ -93,5 +93,11 @@ describe("formatBytes (T-69)", () => {
     expect(formatBytes(t, 1024)).toBe(`1 ${t.bytes[1]}`);
     expect(formatBytes(t, 1536 * 1024)).toBe(`1.5 ${t.bytes[2]}`);
     expect(formatBytes(t, null)).toBe("");
+  });
+});
+
+describe("youtubeChapters (U-60)", () => {
+  it("starts at 0:00 and uses h:mm:ss past an hour", () => {
+    expect(youtubeChapters([65, 3725], (n) => `Part ${n}`)).toBe("0:00 Part 1\n1:05 Part 2\n1:02:05 Part 3");
   });
 });

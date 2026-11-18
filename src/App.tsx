@@ -15,7 +15,7 @@ import { isActive, JobCard, mergeUpdate, type Job } from "./components/JobCard";
 import { SettingsView } from "./components/SettingsView";
 import { Tour, Welcome, type TourStep } from "./components/Tour";
 import { UpdateDialog } from "./components/UpdateDialog";
-import { formatTimecode } from "./format";
+import { formatTimecode, youtubeChapters } from "./format";
 import { dictionaries, I18n, type Dict } from "./i18n";
 import { AnimatedList, Presence, reducedMotion, SlideSwitch, usePresence, useSlidingIndicator } from "./motion";
 import { isMobile } from "./platform";
@@ -672,16 +672,17 @@ export default function App() {
     ).catch(logError("splitHere"));
   };
 
-  const copyText = (text: string) => {
+  const copyText = (text: string, note?: string) => {
     writeText(text)
-      .then(() => toast(t.toastCopied))
+      .then(() => toast(note ?? t.toastCopied))
       .catch(logError("copyText"));
   };
 
   const copyMarkers = (j: Job) => {
     const text = (j.markers ?? []).map(([s, e]) => (s === e ? formatTimecode(s) : `${formatTimecode(s)}\t${formatTimecode(e)}`)).join("\n");
+    // أين يُلصق؟ نقول ذلك بدل «تم النسخ» وحدها (U-60)
     writeText(text)
-      .then(() => toast(t.toastCopied))
+      .then(() => toast(t.timesCopied))
       .catch(logError("copyMarkers"));
   };
 
@@ -900,6 +901,18 @@ export default function App() {
                           onSplit={j.markers?.length ? () => split(j) : undefined}
                           queuePos={j.state === "queued" ? [queuedIds.indexOf(j.id) + 1, queuedIds.length] : undefined}
                           onCopyMarkers={j.markers?.length ? () => copyMarkers(j) : undefined}
+                          onCopyChapters={
+                            j.markers?.length
+                              ? () =>
+                                  copyText(
+                                    youtubeChapters(
+                                      j.markers!.map(([s, e]) => (s === e ? s : e)),
+                                      t.chapterName,
+                                    ),
+                                    t.chaptersCopied,
+                                  )
+                              : undefined
+                          }
                           onDragOut={!isMobile && j.file ? () => dragOut(j.file!) : undefined}
                         />
                       ))}

@@ -105,3 +105,19 @@ export function formatTimecode(sec: number, fps?: number | null): string {
   const frac = tenths % 10;
   return formatDuration(Math.floor(tenths / 10)) + (frac ? `.${frac}` : "");
 }
+
+/**
+ * فصول YouTube من نقاط القطع (U-60): «0:00 الجزء 1» سطرًا لكل فصل، ويبدأ الأول من 0:00 كما يشترط YouTube.
+ * label(n) يعطي اسم الفصل بلغة المستخدم.
+ */
+export function youtubeChapters(starts: number[], label: (n: number) => string): string {
+  const fmt = (sec: number) => {
+    const s = Math.max(0, Math.floor(sec));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const ss = String(s % 60).padStart(2, "0");
+    return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+  };
+  const points = [0, ...starts.filter((s) => s >= 1)].sort((a, b) => a - b);
+  return points.map((s, i) => `${fmt(s)} ${label(i + 1)}`).join("\n");
+}
