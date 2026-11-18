@@ -1746,3 +1746,26 @@ details.extras .schedule-row {
   font-weight: var(--fw-semi);
   overflow: hidden;
 }
+
+/* مشغّل معاينة القص (D-101) */
+.trim-player {
+  margin-top: 16px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.trim-player .trim-video {
+  margin-top: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.trim-player-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-meta);
+}

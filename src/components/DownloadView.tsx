@@ -30,6 +30,7 @@ import { ExtrasPanel } from "./download/ExtrasPanel";
 import { ProjectPicker } from "./download/ProjectPicker";
 import { ScheduleRow, type When } from "./download/ScheduleRow";
 import { StemsRow } from "./download/StemsRow";
+import { PreviewVideo } from "./download/PreviewVideo";
 
 const QUALITIES = ["best", "2160", "1440", "1080", "720", "480"] as const;
 
@@ -744,17 +745,7 @@ export function DownloadView(props: {
             />
             <div className="collapse" data-open={!!activeClips}>
               <div>
-                {activeClips && info.previewUrl && (
-                  <video
-                    ref={video}
-                    className="trim-video"
-                    src={info.previewUrl}
-                    poster={info.thumbnail ?? undefined}
-                    controls
-                    preload="metadata"
-                    aria-label={t.previewLabel}
-                  />
-                )}
+                {activeClips && info.previewUrl && <PreviewVideo video={video} src={info.previewUrl} poster={info.thumbnail} />}
                 {/* الموقع لا يعطي رابط معاينة: نقول ذلك ونشرح كيف تُعرف الأوقات بدل قص أعمى صامت (U-17) */}
                 {activeClips && !info.previewUrl && (
                   <div className="alert info">
