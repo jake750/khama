@@ -309,6 +309,7 @@ export const api = {
   listJobs: () => invoke<Record<string, unknown>[]>("list_jobs"),
   revealFile: (path: string) => invoke<void>("reveal_file", { path }),
   openFile: (path: string) => invoke<void>("open_file", { path }),
+  aiReady: () => invoke<boolean>("ai_ready"),
   openOutputDir: () => invoke<void>("open_output_dir"),
   onJobUpdate: (cb: (u: JobUpdate) => void): Promise<UnlistenFn> => listen<JobUpdate>("job-update", (e) => cb(e.payload)),
   analyzeFile: (path: string) => invoke<MediaInfo>("analyze_file", { path }),

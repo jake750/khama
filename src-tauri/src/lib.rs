@@ -129,6 +129,7 @@ macro_rules! handlers_with {
             download::new_job_id,
             download::reveal_file,
             download::open_file,
+            separate::ai_ready,
             download::open_output_dir,
             download::save_thumbnail,
             download::free_space,

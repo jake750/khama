@@ -1,6 +1,8 @@
 import type { Stems } from "../../downloadPlan";
 import { useI18n } from "../../i18n";
 import { isMobile } from "../../platform";
+import { api } from "../../api";
+import { useConfirm } from "../Dialog";
 import { Segmented } from "../Segmented";
 
 /** إزالة الموسيقى أو الصوت، ولقائمة التشغيل: على كل العناصر أو المختار منها */
@@ -17,14 +19,24 @@ export function StemsRow(props: {
 }) {
   const { t } = useI18n();
   const { stems, scope } = props;
+  const [confirmNode, confirm] = useConfirm();
+  // أول استعمال يُنزّل ~140MB: نسأل قبلها، فلا تكون مفاجأة على بيانات الهاتف (U-29)
+  const choose = async (v: Stems) => {
+    if (v !== "off" && stems === "off") {
+      const ready = await api.aiReady().catch(() => true);
+      if (!ready && !(await confirm(t.aiDownloadTitle, isMobile ? t.aiDownloadBodyMobile : t.aiDownloadBody, t.aiDownloadOk))) return;
+    }
+    props.onStems(v);
+  };
   const label = stems === "music" ? t.stemsMusic : t.stemsVoice;
   return (
     <div className="stems-row">
+      {confirmNode}
       <span className="field-label">{t.stemsLabel}</span>
       <Segmented<Stems>
         label={t.stemsLabel}
         value={stems}
-        onChange={props.onStems}
+        onChange={(v) => void choose(v)}
         options={[
           { value: "off", label: t.stemsOff },
           { value: "voice", label: t.stemsVoice },

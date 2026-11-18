@@ -258,6 +258,19 @@ async fn model_intact(model: &Path) -> bool {
     ok
 }
 
+/// هل النموذج (والمكتبة على الكمبيوتر) موجودان؟ فحص سريع بالوجود والحجم لا بالبصمة،
+/// لتسأل الواجهة قبل تنزيل ~140MB أول مرة (U-29). ensure_assets يبقى الفحص الكامل.
+#[tauri::command]
+pub fn ai_ready(app: AppHandle) -> bool {
+    let Ok(dir) = ai_dir(&app) else { return false };
+    let model_ok = std::fs::metadata(dir.join(MODEL.name)).is_ok_and(|m| m.len() == MODEL.size);
+    #[cfg(not(target_os = "android"))]
+    let lib_ok = RUNTIME.is_some_and(|r| dir.join(r.name).exists());
+    #[cfg(target_os = "android")]
+    let lib_ok = true;
+    model_ok && lib_ok
+}
+
 pub async fn ensure_assets(app: &AppHandle, id: u64, cancel: &mut watch::Receiver<bool>) -> Result<Option<(PathBuf, PathBuf)>, AppError> {
     let _guard = SETUP.lock().await;
     let dir = ai_dir(app)?;

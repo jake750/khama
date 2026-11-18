@@ -167,6 +167,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         thumbnail: null,
         issues: ["vfr", "tenBit", "heavyCodec"],
       };
+    case "ai_ready":
+      return false;
     case "counter_next":
       return 4;
     case "reset_counter":
