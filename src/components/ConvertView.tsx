@@ -323,6 +323,20 @@ export function ConvertView(props: {
     [showPicture && "picture", canTrim && "trim", showBurn && "burn", (showAudio || kind === "copy") && "audio"] as (OptTab | false)[]
   ).filter((x): x is OptTab => !!x);
   const tab: OptTab | undefined = tabs.includes(tabPick) ? tabPick : tabs[0];
+  // ما فُعّل داخل «خيارات إضافية» يظهر على زرها حتى وهي مطوية، فلا يُطبَّق LUT أو سرعة منسيّة بصمت (U-21)
+  const o = opts;
+  const activeOpts = [
+    trimOn && canTrim && t.optTrim,
+    showPicture &&
+      (o.size || o.aspect || o.fps || o.rotate || o.deinterlace || o.denoise || o.tonemap || o.lut || (o.speed && o.speed !== 1)) &&
+      t.optPicture,
+    showBurn && (o.subtitles || o.watermark || o.timecode) && t.optBurn,
+    showAudio && (o.loudness || o.replaceAudio || o.mute) && t.optAudio,
+  ].filter((x): x is string => !!x);
+  const resetOpts = () => {
+    setOpts({ ...defaultOptions(), quality: opts.quality });
+    setTrimOn(false);
+  };
 
   /** نرسل فقط الخيارات المناسبة لنوع الـ Preset (الأقسام المخفية لا تؤثر) */
   const effective = (info?: MediaInfo | null): ConvertOptions => {
@@ -596,9 +610,17 @@ export function ConvertView(props: {
 
         {/* ============ خيارات إضافية: تبويب واحد ظاهر في كل مرة (D-22) ============ */}
         {tabs.length > 0 && (
-          <button className="more-btn" aria-expanded={more} onClick={() => setMore((m) => !m)}>
-            <Icon name="chevron" size={16} /> {t.moreOptions}
-          </button>
+          <div className="more-head">
+            <button className="more-btn" aria-expanded={more} onClick={() => setMore((m) => !m)}>
+              <Icon name="chevron" size={16} /> {t.moreOptions}
+              {activeOpts.length > 0 && <span className="extras-count">{activeOpts.join(" · ")}</span>}
+            </button>
+            {activeOpts.length > 0 && (
+              <button className="btn btn-sm btn-ghost" onClick={resetOpts}>
+                {t.resetOptions}
+              </button>
+            )}
+          </div>
         )}
         <div className="collapse" data-open={more && tabs.length > 0}>
           <div>

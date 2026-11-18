@@ -1479,6 +1479,15 @@ img.file-thumb {
   font-weight: var(--fw-semi);
 }
 
+.more-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.more-head .btn {
+  margin-top: var(--s-4);
+}
+
 .more-btn:hover {
   color: var(--text);
 }
