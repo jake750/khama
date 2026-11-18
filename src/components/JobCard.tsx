@@ -56,7 +56,14 @@ export const isActive = (j: Job) => ACTIVE.includes(j.state);
 function statusText(t: Dict, j: Job, lang: string, queuePos?: [number, number]): string {
   switch (j.state) {
     case "scheduled":
-      return t.stScheduled(new Date(j.at ?? 0).toLocaleTimeString(numLocale(lang), { hour: "2-digit", minute: "2-digit" }));
+      // بعد اليوم يظهر اليوم أيضًا لا الساعة وحدها (U-46)
+      return t.stScheduled(
+        new Date(j.at ?? 0).toLocaleString(numLocale(lang), {
+          ...(new Date(j.at ?? 0).toDateString() === new Date().toDateString() ? {} : { weekday: "short" }),
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      );
     case "queued":
       return queuePos && queuePos[1] > 1 ? t.stQueuedAt(queuePos[0], queuePos[1]) : t.stQueued;
     case "starting":

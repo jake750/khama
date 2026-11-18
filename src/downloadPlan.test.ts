@@ -47,6 +47,8 @@ describe("scheduledAt", () => {
   it("الآن = بلا جدولة", () => expect(scheduledAt("now", "16:00", now)).toBeUndefined());
   it("وقت لاحق اليوم", () => expect(scheduledAt("later", "16:00", now)).toBe(new Date(2026, 10, 15, 16, 0).getTime()));
   it("وقت مضى ← غدًا", () => expect(scheduledAt("later", "09:15", now)).toBe(new Date(2026, 10, 16, 9, 15).getTime()));
+  it("بعد يومين (U-46)", () => expect(scheduledAt("later", "09:15", now, 2)).toBe(new Date(2026, 10, 17, 9, 15).getTime()));
+  it("نهاية الشهر", () => expect(scheduledAt("later", "08:00", new Date(2026, 10, 30, 9), 1)).toBe(new Date(2026, 11, 1, 8).getTime()));
 });
 
 describe("subtitleLangs", () => {

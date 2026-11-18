@@ -107,6 +107,7 @@ export function DownloadView(props: {
     const d = new Date(Date.now() + 60 * 60 * 1000);
     return `${String(d.getHours()).padStart(2, "0")}:00`;
   });
+  const [atDay, setAtDay] = useState(0);
   const [savingThumb, setSavingThumb] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -282,7 +283,7 @@ export function DownloadView(props: {
     if (entries && selected.size === 0) return;
     setStarting(true);
     setStartError(null);
-    const at = scheduledAt(when, atTime);
+    const at = scheduledAt(when, atTime, new Date(), atDay);
     const plan = planDownloads({
       settings: { ...s, quality: effQuality },
       urls: multiLinks ? urls : [clean],
@@ -742,7 +743,7 @@ export function DownloadView(props: {
               selected={selected.size}
             />
           )}
-          <ScheduleRow when={when} onWhen={setWhen} atTime={atTime} onAtTime={setAtTime} />
+          <ScheduleRow when={when} onWhen={setWhen} atTime={atTime} onAtTime={setAtTime} atDay={atDay} onAtDay={setAtDay} />
         </ExtrasPanel>
       </div>
 
