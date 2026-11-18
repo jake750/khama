@@ -449,7 +449,7 @@ export function ConvertView(props: {
           </h2>
           <span className="spacer" />
           <button className="btn btn-sm" onClick={chooseFiles}>
-            <Icon name="plus" size={16} /> {t.chooseFiles}
+            <Icon name="plus" size={16} /> {t.addFiles}
           </button>
           <button className="btn btn-sm btn-ghost" onClick={props.onClearFiles}>
             {t.clearFiles}
