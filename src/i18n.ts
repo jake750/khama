@@ -410,7 +410,7 @@ const en = {
   historyMissing: "File moved or deleted",
   downloadAgain: "Download again",
   copyLink: "Copy link",
-  historyCount: (n: number) => `${n} downloads`,
+  historyCount: (n: number) => (n === 1 ? "1 file" : `${n} files`),
   secGeneral: "General",
   secDownloads: "Downloads",
   secBackground: "Background",
@@ -1005,7 +1005,7 @@ const ar: Dict = {
   downloadAgain: "نزّله مرة أخرى",
   copyLink: "نسخ الرابط",
   historyCount: (n: number) =>
-    arCount(n, { zero: "لا تنزيلات", one: "تنزيل واحد", two: "تنزيلان", few: "# تنزيلات", many: "# تنزيلًا", other: "# تنزيل" }),
+    arCount(n, { zero: "لا ملفات", one: "ملف واحد", two: "ملفان", few: "# ملفات", many: "# ملفًا", other: "# ملف" }),
   secGeneral: "عام",
   secDownloads: "التنزيل",
   secBackground: "الخلفية",
