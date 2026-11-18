@@ -152,6 +152,23 @@ export function DownloadView(props: {
     return () => clearTimeout(timer);
   }, [session, url, reprobe]);
 
+  // ثوانٍ منذ بدء قراءة الرابط (U-77)
+  const [probeSecs, setProbeSecs] = useState(0);
+  useEffect(() => {
+    if (probe.status !== "loading") return;
+    const started = Date.now();
+    const timer = setInterval(() => setProbeSecs(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => {
+      clearInterval(timer);
+      setProbeSecs(0);
+    };
+  }, [probe.status]);
+  const cancelProbe = () => {
+    probeToken.current++;
+    setProbe({ status: "idle" });
+    api.cancelProbe().catch(logError("cancelProbe"));
+  };
+
   // رابط من السجلّ
   useEffect(() => {
     // نتجاهل رابطًا عالجناه من قبل (لا يعود بعد الانتقال بين التبويبات)
@@ -487,8 +504,15 @@ export function DownloadView(props: {
           <div className="thumb skeleton" />
           <div className="grow stack-2">
             <div className="skeleton skeleton-title" />
-            <div className="skeleton skeleton-meta" />
+            {/* نص صريح وعدّاد بدل هيكل رمادي فقط (U-77)، وإلغاء لمعاينة عالقة (U-78) */}
+            <div className="faint probe-wait" role="status">
+              {t.probeReading}
+              {probeSecs >= 3 && <span className="ltr-num"> {t.probeSecs(probeSecs)}</span>}
+            </div>
           </div>
+          <button className="btn btn-sm btn-ghost" onClick={cancelProbe}>
+            {t.cancel}
+          </button>
         </div>
       )}
 

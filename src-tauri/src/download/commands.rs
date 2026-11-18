@@ -431,11 +431,20 @@ pub async fn save_thumbnail(app: AppHandle, settings: State<'_, SettingsState>, 
 
 /// يشغّل yt-dlp للمعاينة (حد 90 ثانية). replace = معاينة شاشة التنزيل: كل معاينة جديدة
 /// توقف السابقة وكل ما شغّلته (T-42)، فكتابة رابط ببطء أو تغييره لا تُراكم عمليات Python.
+fn latest_probe() -> &'static watch::Sender<u64> {
+    static LATEST: std::sync::OnceLock<watch::Sender<u64>> = std::sync::OnceLock::new();
+    LATEST.get_or_init(|| watch::channel(0).0)
+}
+
+/// زر «إلغاء» أثناء قراءة الرابط (U-78): يوقف معاينة شاشة التنزيل الجارية كما تفعل معاينة أحدث
+#[tauri::command]
+pub fn cancel_probe() {
+    latest_probe().send_modify(|g| *g += 1);
+}
+
 pub(super) async fn run_probe(tools: &Tools, args: &[&str], replace: bool) -> Result<(bool, String, String), AppError> {
-    use std::sync::OnceLock;
     use tokio::io::AsyncReadExt;
-    static LATEST: OnceLock<watch::Sender<u64>> = OnceLock::new();
-    let latest = LATEST.get_or_init(|| watch::channel(0).0);
+    let latest = latest_probe();
     let mut mine = 0;
     if replace {
         latest.send_modify(|g| {
