@@ -993,6 +993,8 @@ export default function App() {
             <div>
               <Icon name="convert" size={24} />
               <b>{t.dropHere}</b>
+              {/* يقول مسبقًا إلى أين تذهب الملفات بدل نقلة مفاجئة (D-56) */}
+              <span className="faint">{t.dropHereSub}</span>
             </div>
           </div>
         </Presence>

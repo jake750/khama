@@ -147,8 +147,7 @@ const en = {
   open: "Open",
 
   cookiesTitle: "Cookies",
-  cookiesIntro:
-    "Some videos (age-restricted, or when YouTube asks “are you a bot?”) need you to be signed in. Cookies let Khama use your own session. They never leave your computer.",
+  cookiesIntro: "For age-restricted videos, or when YouTube asks “are you a bot?”. Uses your own session and never leaves your computer.",
   cookiesNone: "Don't use cookies",
   cookiesNoneHint: "Recommended for most public videos.",
   cookiesBrowser: "Read from my browser",
@@ -206,6 +205,7 @@ const en = {
   importing: "Copying…",
   dropSub: "Convert for editing, publishing, or pull out the audio. Files stay on your device.",
   dropHere: "Drop to add",
+  dropHereSub: "Media files open in Convert; a .txt of links goes to Download",
   filesTitle: (n: number) => (n === 1 ? "1 file" : `${n} files`),
   chooseFiles: "Choose files",
   addFiles: "Add files",
@@ -752,8 +752,7 @@ const ar: Dict = {
   open: "فتح",
 
   cookiesTitle: "الكوكيز",
-  cookiesIntro:
-    "بعض الفيديوهات (المقيّدة بالعمر، أو حين يسأل يوتيوب «هل أنت روبوت؟») تحتاج أن تكون مسجّل الدخول. الكوكيز تتيح لخامة استخدام جلستك أنت، ولا تغادر جهازك أبدًا.",
+  cookiesIntro: "للفيديوهات المقيّدة بالعمر، أو حين يسأل يوتيوب «هل أنت روبوت؟». تستعمل جلستك أنت ولا تغادر جهازك.",
   cookiesNone: "بدون كوكيز",
   cookiesNoneHint: "مناسب لأغلب الفيديوهات العامة.",
   cookiesBrowser: "من المتصفح",
@@ -810,6 +809,7 @@ const ar: Dict = {
   importing: "جارٍ النسخ…",
   dropSub: "حوّلها للمونتاج أو للنشر، أو استخرج الصوت. الملفات تبقى على جهازك.",
   dropHere: "أفلت الملفات للإضافة",
+  dropHereSub: "ملفات الوسائط تُفتح في المحوّل، وملف .txt بالروابط يُضاف للتنزيل",
   filesTitle: (n: number) => arCount(n, arFiles),
   chooseFiles: "اختر ملفات",
   addFiles: "أضف ملفات",

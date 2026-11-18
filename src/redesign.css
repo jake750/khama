@@ -1686,3 +1686,17 @@ details.extras .schedule-row {
   left: auto;
   right: 0;
 }
+
+/* طبقة الإفلات: إطار منقّط داخل النافذة لا ستارة معتمة كاملة (D-56) */
+.drop-overlay {
+  inset: 10px;
+  border: 2px dashed color-mix(in srgb, var(--accent) 70%, transparent);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  backdrop-filter: none;
+}
+
+.drop-overlay > div {
+  max-width: 420px;
+  text-align: center;
+}
