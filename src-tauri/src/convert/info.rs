@@ -136,6 +136,10 @@ pub fn parse_probe(path: &Path, size: u64, j: &Value) -> MediaInfo {
     if audio.iter().any(|a| a.codec == "aac") && cfg!(target_os = "linux") {
         issues.push("resolveFreeAudio");
     }
+    // تركيبات لا تقرؤها برامج المونتاج غالبًا (U-89)
+    let format = j["format"]["format_name"].as_str().unwrap_or("");
+    let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+    issues.extend(editor_issues(format, &ext, audio.iter().map(|a| a.codec.as_str())));
 
     MediaInfo {
         path: path.to_string_lossy().into_owned(),
@@ -375,4 +379,23 @@ pub(super) async fn hw_list(app: &AppHandle, tools: &Tools) -> Vec<String> {
 pub async fn hw_encoders(app: AppHandle) -> Result<Vec<String>, AppError> {
     let tools = tools::resolve(&app)?;
     Ok(hw_list(&app, &tools).await)
+}
+
+/// ما تتعثّر به برامج المونتاج (U-89): Premiere لا يقرأ Opus/Vorbis ولا MKV/WebM،
+/// وPCM داخل MP4 غير قياسي فيرفضه Premiere وResolve غالبًا.
+/// format = format_name من ffprobe ("matroska,webm" أو "mov,mp4,m4a,3gp,3g2,mj2")، وext امتداد الملف
+/// (ffprobe يسمّي MOV وMP4 باسم واحد، وPCM سليم في MOV)
+pub(crate) fn editor_issues<'a>(format: &str, ext: &str, audio: impl Iterator<Item = &'a str>) -> Vec<&'static str> {
+    let mut out = Vec::new();
+    let codecs: Vec<&str> = audio.collect();
+    if codecs.iter().any(|c| matches!(*c, "opus" | "vorbis")) {
+        out.push("editorAudio");
+    }
+    if format.contains("matroska") || format.contains("webm") {
+        out.push("editorContainer");
+    }
+    if matches!(ext, "mp4" | "m4v") && codecs.iter().any(|c| c.starts_with("pcm_")) {
+        out.push("pcmInMp4");
+    }
+    out
 }

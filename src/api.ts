@@ -112,7 +112,17 @@ export interface AudioInfo {
   sampleRate: number;
 }
 
-export type Issue = "vfr" | "hdr" | "interlaced" | "tenBit" | "heavyCodec" | "noAudio" | "resolveFreeAudio";
+export type Issue =
+  | "vfr"
+  | "hdr"
+  | "interlaced"
+  | "tenBit"
+  | "heavyCodec"
+  | "noAudio"
+  | "resolveFreeAudio"
+  | "editorAudio"
+  | "editorContainer"
+  | "pcmInMp4";
 
 export interface MediaInfo {
   path: string;

@@ -357,3 +357,15 @@ fn small_command_helpers() {
     assert_eq!(final_pix(&args).as_deref(), Some("yuv420p"));
     assert_eq!(final_pix(&args[..2]), None);
 }
+
+#[test]
+fn editor_issues_flags_what_editors_cant_read() {
+    let mp4 = "mov,mp4,m4a,3gp,3g2,mj2";
+    assert_eq!(
+        editor_issues("matroska,webm", "webm", ["opus"].into_iter()),
+        vec!["editorAudio", "editorContainer"]
+    );
+    assert_eq!(editor_issues(mp4, "mp4", ["pcm_s16le"].into_iter()), vec!["pcmInMp4"]);
+    assert!(editor_issues(mp4, "mov", ["pcm_s24le"].into_iter()).is_empty(), "PCM سليم في MOV");
+    assert!(editor_issues(mp4, "mp4", ["aac"].into_iter()).is_empty());
+}
