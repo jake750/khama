@@ -135,7 +135,7 @@ button:disabled {
   opacity: 0.5;
 }
 
-/* شريط التمرير: مقبض نحيف مستدير باللون الأساسي، بلا أسهم ولا مسار ظاهر */
+/* شريط التمرير: مقبض نحيف محايد (D-50)، بلا أسهم ولا مسار ظاهر */
 
 ::-webkit-scrollbar-track,
 ::-webkit-scrollbar-corner {
@@ -260,7 +260,7 @@ button:disabled {
 }
 
 .container {
-  max-width: 880px;
+  max-width: 960px;
   margin: 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -2091,10 +2091,6 @@ img.file-thumb {
   width: 32px;
   height: 32px;
   border-radius: var(--r-xs);
-}
-
-.container.wide {
-  max-width: 1080px;
 }
 
 .notice-bar {

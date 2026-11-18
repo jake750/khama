@@ -793,7 +793,7 @@ export default function App() {
         </header>
 
         <main className="main">
-          <div className={`container ${tab === "settings" ? "wide" : ""}`}>
+          <div className="container">
             <SlideSwitch id={tab} index={tab === "guide" ? tabs.length : tabs.findIndex((x) => x.id === tab)} fade={!isMobile}>
               <div className="view">
                 {tab === "download" && (

@@ -10,6 +10,12 @@ export const folderName = (p: string) =>
     .split(/[\\/]/)
     .pop() || p;
 
+/** المجلد الأب: «Downloads» وحده لا يفرّق بين مجلدين بالاسم نفسه (D-33) */
+export const parentName = (p: string) => {
+  const parts = p.replace(/[\\/]+$/, "").split(/[\\/]/);
+  return parts.length > 2 ? parts[parts.length - 2] : "";
+};
+
 /** زر مجلد الحفظ: اسم المجلد فقط، وقائمة بآخر المجلدات المستخدمة */
 export function FolderPicker(props: {
   current: string;
@@ -44,6 +50,7 @@ export function FolderPicker(props: {
         <Icon name="folder" size={16} />
         <span className="faint">{t.saveTo}</span>
         <span className="folder-name ltr">
+          {parentName(props.current) && <span className="faint">{parentName(props.current)}/</span>}
           {folderName(props.current)}
           {props.sub && <span className="faint">/{props.sub}</span>}
         </span>
