@@ -4,7 +4,7 @@ import { useI18n } from "../../i18n";
 import { Icon } from "../Icon";
 
 /** معاينة القص بأزرار بأسلوب التطبيق بدل تحكّم المتصفح الأصلي (D-101). التنقّل يتم بمقابض القص نفسها */
-export function PreviewVideo(props: { video: RefObject<HTMLVideoElement | null>; src: string; poster?: string | null }) {
+export function PreviewVideo({ video, src, poster }: { video: RefObject<HTMLVideoElement | null>; src: string; poster?: string | null }) {
   const { t } = useI18n();
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -12,7 +12,7 @@ export function PreviewVideo(props: { video: RefObject<HTMLVideoElement | null>;
   const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    const v = props.video.current;
+    const v = video.current;
     if (!v) return;
     const sync = () => {
       setPlaying(!v.paused);
@@ -23,10 +23,10 @@ export function PreviewVideo(props: { video: RefObject<HTMLVideoElement | null>;
     const events = ["play", "pause", "timeupdate", "loadedmetadata", "volumechange", "seeked"];
     events.forEach((e) => v.addEventListener(e, sync));
     return () => events.forEach((e) => v.removeEventListener(e, sync));
-  }, [props.video, props.src]);
+  }, [video, src]);
 
   const toggle = () => {
-    const v = props.video.current;
+    const v = video.current;
     if (!v) return;
     if (v.paused) void v.play().catch(() => {});
     else v.pause();
@@ -41,10 +41,10 @@ export function PreviewVideo(props: { video: RefObject<HTMLVideoElement | null>;
   return (
     <div className="trim-player">
       <video
-        ref={props.video}
+        ref={video}
         className="trim-video"
-        src={props.src}
-        poster={props.poster ?? undefined}
+        src={src}
+        poster={poster ?? undefined}
         preload="metadata"
         aria-label={t.previewLabel}
         onClick={toggle}
