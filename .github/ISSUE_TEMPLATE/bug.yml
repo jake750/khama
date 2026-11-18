@@ -1,0 +1,47 @@
+name: Something doesn't work · مشكلة
+description: A download, conversion or part of the app fails or behaves wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If a download fails, update yt-dlp first (Settings → Tools) and try again. Most failures are fixed that way.
+        إن فشل تنزيل، حدّث yt-dlp أولًا (الإعدادات ← الأدوات) وأعد المحاولة.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened · ماذا حدث
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Link (for downloads) · الرابط
+      description: The page you tried to download, if it's public.
+  - type: textarea
+    id: error
+    attributes:
+      label: Error and technical details · الخطأ والتفاصيل التقنية
+      description: Copy the message and the "Technical details" under it.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Khama version · نسخة خامة
+      description: Settings → About
+      placeholder: "0.3.15"
+    validations:
+      required: true
+  - type: input
+    id: ytdlp
+    attributes:
+      label: yt-dlp version · نسخة yt-dlp
+      description: Settings → Tools
+  - type: dropdown
+    id: system
+    attributes:
+      label: System · النظام
+      options: [Windows 11, Windows 10, macOS (Apple Silicon), macOS (Intel), Linux, Android]
+    validations:
+      required: true

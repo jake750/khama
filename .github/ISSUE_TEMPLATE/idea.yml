@@ -1,0 +1,15 @@
+name: Idea · فكرة
+description: Something Khama could do better or should add.
+labels: [idea]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do? · ما الذي تحاول فعله؟
+      description: Describe the job, not the button. "I want my clips ready for Premiere without converting twice" helps more than "add a checkbox".
+    validations:
+      required: true
+  - type: textarea
+    id: now
+    attributes:
+      label: How do you do it today? · كيف تفعله الآن؟

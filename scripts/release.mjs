@@ -71,7 +71,8 @@ for (const [file, text] of files) writeFileSync(join(root, file), text);
 console.log(`✓ عُدّلت ${files.length} ملفات`);
 if (noGit) process.exit(0);
 
-sh("git", ["add", "--", ...files.map(([f]) => f)]);
+sh("sh", ["scripts/changelog.sh", next]);
+sh("git", ["add", "--", "CHANGELOG.md", ...files.map(([f]) => f)]);
 sh("git", ["commit", "-q", "-m", `الإصدار ${next}`]);
 sh("git", ["push", "-q", "origin", "HEAD:main"], { stdio: "inherit" });
 console.log(`✓ دُفع ${next} إلى main؛ GitHub يبني كل الأنظمة وينشر الإصدار v${next}`);

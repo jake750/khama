@@ -198,6 +198,7 @@ const en = {
   aboutSource: "Source code",
   aboutLicense: "License (MIT)",
   aboutNotices: "Third-party licenses",
+  aboutReport: "Report a problem",
   aboutBody:
     "Open source under the MIT license. No analytics, no tracking — Khama only talks to the sites you download from (and GitHub, to check for Khama updates at launch and when you update yt-dlp).",
   notice:
@@ -880,6 +881,7 @@ const ar: Dict = {
   aboutSource: "الكود المصدري",
   aboutLicense: "الرخصة (MIT)",
   aboutNotices: "رخص الأطراف الأخرى",
+  aboutReport: "أبلغ عن مشكلة",
   aboutBody:
     "مفتوح المصدر برخصة MIT. لا تحليلات ولا تتبّع؛ خامة تتصل فقط بالمواقع التي تنزّل منها (وبـ GitHub للبحث عن تحديثات خامة عند فتحها، وعند تحديث yt-dlp).",
   notice:

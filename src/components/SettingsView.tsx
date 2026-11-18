@@ -50,6 +50,12 @@ function AboutLinks() {
       <button className="btn btn-sm btn-ghost" onClick={() => openUrl(`${REPO}/blob/main/THIRD_PARTY_NOTICES.md`)}>
         {t.aboutNotices}
       </button>
+      <button
+        className="btn btn-sm btn-ghost"
+        onClick={() => openUrl(`${REPO}/issues/new?template=bug.yml${version ? `&version=${version}` : ""}`)}
+      >
+        {t.aboutReport}
+      </button>
     </div>
   );
 }

@@ -71,6 +71,10 @@ Grab the installer for your system from the [Releases](../../releases) page:
 
 Everything Khama needs (yt-dlp, FFmpeg, Deno) is bundled. There is nothing else to install.
 
+**Minimum systems**: Windows 10 (64-bit) or 11, macOS 10.13 or newer, a 64-bit Linux with WebKitGTK 4.1 (Ubuntu 22.04, Debian 12, Fedora 36 or newer), Android 7 (arm64). Khama draws its window with Microsoft Edge WebView2, which Windows 11 and updated Windows 10 already have. If it's missing, the installer downloads it from Microsoft (needs the internet once).
+
+**Uninstalling**: on Windows, tick "Delete the application data" in the uninstaller to remove settings, history, the updated yt-dlp and the AI model (~140 MB) too. On other systems, delete the folders listed in [docs/DATA.md](docs/DATA.md).
+
 **Linux**: the `.deb` is for Ubuntu, Debian and Mint, the `.rpm` for Fedora and openSUSE. The `.AppImage` runs anywhere without installing: make it executable (`chmod +x`) and open it.
 
 **Android**: open the `.apk` on the phone. Android asks once to allow installs from your browser or file manager ("Install unknown apps"); allow it, then install. The phone version downloads, trims, converts and runs AI clean-up (slower than a computer). Desktop-only: choosing the save folder (files go to `Download/Khama`), dragging files out, the tray, watch folders and the mini window.
@@ -197,6 +201,10 @@ MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-l
 ### التثبيت
 
 نزّل ملف التثبيت المناسب لنظامك من صفحة [الإصدارات](../../releases) (الجدول في القسم الإنجليزي أعلاه). كل الأدوات التي تحتاجها خامة (yt-dlp وFFmpeg وDeno) مضمّنة داخلها، فلا داعي لتثبيت أي شيء آخر.
+
+**الحد الأدنى للأنظمة**: Windows 10 (64 بت) أو 11، وmacOS 10.13 أو أحدث، وLinux 64 بت فيه WebKitGTK 4.1 (Ubuntu 22.04 وDebian 12 وFedora 36 أو أحدث)، وأندرويد 7 (arm64). ترسم خامة نافذتها بـ Microsoft Edge WebView2، وهو موجود في Windows 11 وWindows 10 المحدّث. إن لم يكن موجودًا ينزّله المثبّت من Microsoft (يحتاج الإنترنت مرة واحدة).
+
+**الإزالة**: على Windows، فعّل «حذف بيانات التطبيق» في برنامج الإزالة ليحذف الإعدادات والسجلّ وyt-dlp المحدَّث ونموذج الذكاء الاصطناعي (نحو 140 MB) أيضًا. وعلى الأنظمة الأخرى احذف المجلدات المذكورة في [docs/DATA.md](docs/DATA.md).
 
 **Linux**: ملف `.deb` لـ Ubuntu وDebian وMint، و`.rpm` لـ Fedora وopenSUSE. أما `.AppImage` فيعمل في أي توزيعة بلا تثبيت: اجعله قابلًا للتشغيل (`chmod +x`) ثم افتحه.
 
