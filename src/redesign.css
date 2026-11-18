@@ -1723,3 +1723,26 @@ details.extras .schedule-row {
   background: var(--accent-soft);
   color: var(--text);
 }
+
+/* المقاطع على خط زمني واحد (D-103) */
+.clips-overview {
+  position: relative;
+  margin-bottom: 12px;
+  border-radius: var(--r-xs);
+  background: var(--surface-2);
+}
+
+.clips-overview span {
+  position: absolute;
+  height: 16px;
+  min-width: 14px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-xs);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--fs-cap);
+  font-weight: var(--fw-semi);
+  overflow: hidden;
+}

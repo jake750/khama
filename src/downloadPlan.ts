@@ -39,6 +39,21 @@ export function subtitleLangs(s: Pick<Settings, "wantSubs" | "subLangs">, info: 
 }
 
 /** مقطع جديد بعد آخر مقطع (أو من البداية إن لم يبقَ وقت)، بطول 10% من الفيديو (1 إلى 60 ثانية) */
+/** صف لكل مقطع حتى لا يغطّي مقطعٌ متداخل غيره على الخط الزمني الموحّد (D-103) */
+export function laneClips(clips: Clip[]): { lane: number[]; count: number } {
+  const ends: number[] = [];
+  const lane: number[] = new Array(clips.length).fill(0);
+  [...clips.keys()]
+    .sort((a, b) => clips[a].start - clips[b].start)
+    .forEach((i) => {
+      let l = ends.findIndex((e) => e <= clips[i].start);
+      if (l < 0) l = ends.length;
+      ends[l] = clips[i].end;
+      lane[i] = l;
+    });
+  return { lane, count: Math.max(1, ends.length) };
+}
+
 export function nextClip(duration: number, clips: Clip[], playhead?: number | null): Clip {
   const len = Math.max(Math.min(duration / 10, 60), Math.min(1, duration));
   const lastEnd = clips.length ? Math.max(...clips.map((c) => c.end)) : 0;

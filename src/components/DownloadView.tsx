@@ -14,7 +14,7 @@ import {
 } from "../api";
 import { extractUrls, formatBytes, formatDuration, isHttpUrl } from "../format";
 import { limiter } from "../limit";
-import { nextClip, planDownloads, RATES, scheduledAt, type Stills } from "../downloadPlan";
+import { laneClips, nextClip, planDownloads, RATES, scheduledAt, type Stills } from "../downloadPlan";
 import { useI18n } from "../i18n";
 import { ErrorBox, type ErrorFix } from "./ErrorBox";
 import { Icon } from "./Icon";
@@ -255,6 +255,8 @@ export function DownloadView(props: {
   // العناصر المحدَّدة التي ستُزال منها الموسيقى
   const stemsCount = !entries || !stemsOn ? 0 : stemsScope === "all" ? selected.size : [...picked].filter((i) => selected.has(i)).length;
   const multi = !!activeClips && activeClips.length > 1;
+  // المقاطع المتداخلة في صفوف منفصلة على الخط الزمني الموحّد (D-103)
+  const clipLanes = laneClips(activeClips ?? []);
   // الدمج يحتاج ffmpeg على الكمبيوتر؛ على الهاتف تُحفظ المقاطع ملفات منفصلة
   const willJoin = multi && joinClips;
   const original = !!info?.original;
@@ -758,6 +760,24 @@ export function DownloadView(props: {
                   <div className="alert info">
                     <Icon name="info" size={16} />
                     <span>{t.trimNoPreview}</span>
+                  </div>
+                )}
+                {/* خط زمني واحد يجمع المقاطع: أين يقع كل مقطع من الفيديو وأيها يتداخل (D-103) */}
+                {duration && multi && (
+                  <div className="clips-overview" dir="ltr" aria-hidden="true" style={{ height: `${clipLanes.count * 18 + 4}px` }}>
+                    {activeClips!.map((c, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          left: `${(c.start / duration) * 100}%`,
+                          width: `${((c.end - c.start) / duration) * 100}%`,
+                          top: `${clipLanes.lane[i] * 18 + 2}px`,
+                        }}
+                        title={t.clipN(i + 1)}
+                      >
+                        {i + 1}
+                      </span>
+                    ))}
                   </div>
                 )}
                 {duration &&

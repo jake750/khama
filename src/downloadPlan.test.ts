@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProbeInfo } from "./api";
-import { nextClip, optionsFromMeta, planDownloads, scheduledAt, subtitleLangs, type PlanInput } from "./downloadPlan";
+import { laneClips, nextClip, optionsFromMeta, planDownloads, scheduledAt, subtitleLangs, type PlanInput } from "./downloadPlan";
 
 const settings: PlanInput["settings"] = {
   kind: "video",
@@ -152,5 +152,18 @@ describe("optionsFromMeta (U-40)", () => {
   it("leaves what it can't read", () => {
     expect(optionsFromMeta("video", "ملف Drive")).toEqual({ kind: "video" });
     expect(optionsFromMeta("video", "MP4 · Best")).toEqual({ kind: "video", videoFormat: "mp4" });
+  });
+});
+
+describe("laneClips (D-103)", () => {
+  it("يضع المتداخل في صف جديد ويعيد استعمال الصف الفارغ", () => {
+    const r = laneClips([
+      { start: 0, end: 60 },
+      { start: 30, end: 90 },
+      { start: 70, end: 100 },
+    ]);
+    expect(r.lane).toEqual([0, 1, 0]);
+    expect(r.count).toBe(2);
+    expect(laneClips([]).count).toBe(1);
   });
 });
