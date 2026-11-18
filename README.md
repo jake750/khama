@@ -34,7 +34,7 @@ Paste a link, pick a format, and get a file that drops straight into Premiere, D
 
 ### Converter
 
-A built-in encoder for files already on your computer. Drag files in, pick what you want to *do* (not a codec), and go.
+A built-in encoder for files already on your computer. Drag files in, pick what you want to *do* (not a codec), and go. Sizes, speed and which editor reads each preset: [docs/PRESETS.md](docs/PRESETS.md).
 
 - **For editing**: H.264 for editing (always re-encodes; fixes phone VFR sync), ProRes Proxy/LT/422/HQ/4444, DNxHR LB/SQ/HQ/HQX (best for free DaVinci Resolve), light 540p proxies.
 - **For publishing**: YouTube, Reels/TikTok/Shorts (auto 9:16 crop), small files for WhatsApp, H.265, AV1, WebM, GIF.
@@ -173,7 +173,7 @@ MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-l
 
 ### المحوّل
 
-محوّل مدمج للملفات الموجودة على جهازك: اسحب الملفات، واختر **ماذا تريد أن تفعل** (لا الكودك)، وابدأ.
+محوّل مدمج للملفات الموجودة على جهازك: اسحب الملفات، واختر **ماذا تريد أن تفعل** (لا الكودك)، وابدأ. الأحجام والسرعة وأي برنامج يقرأ كل صيغة: [docs/PRESETS.md](docs/PRESETS.md).
 
 - **للمونتاج**: H.264 للمونتاج (يعيد الترميز دائمًا؛ يصلح تزامن فيديو الجوال)، وProRes بكل درجاته، وDNxHR (الأفضل لـ DaVinci Resolve المجاني)، وبروكسي خفيف.
 - **للنشر**: يوتيوب، ريلز/تيك توك/شورتس (قص 9:16 تلقائي)، حجم صغير لواتساب، H.265، AV1، WebM، GIF.
