@@ -1,5 +1,5 @@
 import type { ProbeInfo, Settings } from "../../api";
-import type { Stills } from "../../downloadPlan";
+import { subtitleLangs, type Stills } from "../../downloadPlan";
 import { useI18n } from "../../i18n";
 import type { ReactNode } from "react";
 import { Icon } from "../Icon";
@@ -58,6 +58,8 @@ export function ExtrasPanel(props: {
               })}
             </div>
           )}
+          {/* قائمة تشغيل أو عدة روابط: لا معاينة للغات، فنقول ما سيُطلب (U-68) */}
+          {s.wantSubs && !video && <div className="faint mt-2">{t.subsLangsBatch(subtitleLangs(s, null).join(", "))}</div>}
         </div>
         <Toggle checked={s.wantThumb} onChange={(wantThumb) => update({ wantThumb })} title={t.thumbToggle} hint={t.thumbHint} />
         <Toggle checked={s.wantInfo} onChange={(wantInfo) => update({ wantInfo })} title={t.infoToggle} hint={t.infoHint} />
