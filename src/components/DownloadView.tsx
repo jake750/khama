@@ -13,6 +13,7 @@ import {
   type VideoFormat,
 } from "../api";
 import { extractUrls, formatBytes, formatDuration, isHttpUrl } from "../format";
+import { limiter } from "../limit";
 import { nextClip, planDownloads, RATES, scheduledAt, type Stills } from "../downloadPlan";
 import { useI18n } from "../i18n";
 import { ErrorBox, type ErrorFix } from "./ErrorBox";
@@ -47,9 +48,21 @@ export interface DownloadSession {
   lastInject: number;
   /** آخر رابط لُصق تلقائيًا من الحافظة: لا نلصقه مرة ثانية بعد أن يمسحه المستخدم */
   lastAutoPasted: string;
+  /** معاينة كل رابط في دفعة عدة روابط (U-65، U-94) */
+  links: Map<string, ProbeInfo | "loading" | "error">;
 }
 
-export const newDownloadSession = (): DownloadSession => ({ draftUrl: "", lastProbe: null, lastInject: 0, lastAutoPasted: "" });
+export const newDownloadSession = (): DownloadSession => ({
+  draftUrl: "",
+  lastProbe: null,
+  lastInject: 0,
+  lastAutoPasted: "",
+  links: new Map(),
+});
+
+/** معاينات الدفعة: اثنتان في كل مرة، فعشرة روابط لا تشغّل عشر عمليات Python معًا */
+const linkTurn = limiter(2);
+const BATCH_PREVIEW = 10;
 
 export interface StartMeta {
   title: string;
@@ -151,6 +164,20 @@ export function DownloadView(props: {
     }, 500);
     return () => clearTimeout(timer);
   }, [session, url, reprobe]);
+
+  // عدة روابط: نقرأ عنوان كل واحد وصورته (أول 10) بدل عرض الروابط نفسها (U-65، U-94)
+  const [, bumpLinks] = useState(0);
+  useEffect(() => {
+    if (!multiLinks) return;
+    for (const u of urls.slice(0, BATCH_PREVIEW)) {
+      if (session.links.has(u)) continue;
+      session.links.set(u, "loading");
+      linkTurn(() => api.probe(u))
+        .then((info) => session.links.set(u, info))
+        .catch(() => session.links.set(u, "error"))
+        .finally(() => bumpLinks((n) => n + 1));
+    }
+  }, [multiLinks, urls, session]);
 
   // ثوانٍ منذ بدء قراءة الرابط (U-77)
   const [probeSecs, setProbeSecs] = useState(0);
@@ -486,20 +513,45 @@ export function DownloadView(props: {
       {multiLinks && (
         <div className="link-list">
           <div className="faint">{t.multiLinks(urls.length)}</div>
-          {urls.map((u) => (
-            <div className="link-item" key={u}>
-              <Icon name="link" size={16} />
-              <span className="ltr">{u}</span>
-              <button
-                className="icon-btn sm"
-                aria-label={t.removeLink}
-                title={t.removeLink}
-                onClick={() => setUrl(urls.filter((x) => x !== u).join(" "))}
-              >
-                <Icon name="x" size={16} />
-              </button>
-            </div>
-          ))}
+          {urls.map((u) => {
+            const li = session.links.get(u);
+            const info = typeof li === "object" ? li : null;
+            return (
+              <div className="link-item" key={u} data-state={info ? "ok" : (li ?? "idle")}>
+                {info?.thumbnail ? (
+                  <img className="link-thumb" src={info.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className={`link-thumb ${li === "loading" ? "skeleton" : ""}`}>
+                    <Icon name={li === "error" ? "alert" : "link"} size={16} />
+                  </span>
+                )}
+                {info ? (
+                  <span className="link-text">
+                    <span className="link-title" dir="auto" title={info.title}>
+                      {info.title}
+                    </span>
+                    <span className="faint link-meta" title={u}>
+                      {[info.site, formatDuration(info.duration), info.entries && t.plItems(info.entries.length)]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="ltr" title={u}>
+                    {u}
+                  </span>
+                )}
+                <button
+                  className="icon-btn sm"
+                  aria-label={t.removeLink}
+                  title={t.removeLink}
+                  onClick={() => setUrl(urls.filter((x) => x !== u).join(" "))}
+                >
+                  <Icon name="x" size={16} />
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 

@@ -3915,3 +3915,31 @@ kbd {
 .project-summary {
   font-size: var(--fs-cap);
 }
+
+/* معاينة كل رابط في الدفعة (U-65، U-94) */
+.link-thumb {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 27px;
+  border-radius: var(--r-xs);
+  background: var(--surface-2);
+  object-fit: cover;
+}
+.link-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+.link-title {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.link-text .link-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
