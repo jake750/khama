@@ -21,12 +21,9 @@ pub struct Settings {
     /// نسخة بنية الملف (M-36). ملف قديم بلا هذا الحقل = 0، وmigrate ترفعه خطوة خطوة إلى SETTINGS_VERSION
     #[serde(default)]
     pub schema_version: u32,
-    /// لا ملف إعدادات بعد: الواجهة تختار لغة النظام في أول تشغيل (M-8). لا يُقرأ من الملف ولا يُكتب فيه
-    #[serde(skip_deserializing, skip_serializing_if = "std::ops::Not::not")]
-    pub first_run: bool,
     /// مجلد الحفظ. فارغ = مجلد التنزيلات الافتراضي للنظام
     pub output_dir: Option<String>,
-    /// لغة الواجهة: "en" (الافتراضية) | "ar"
+    /// لغة الواجهة: "en" (الافتراضية، وأول تشغيل دائمًا بالإنجليزية) | "ar". تُحفظ عند كل تغيير وتبقى بعد إعادة التشغيل
     pub language: String,
     /// "dark" | "light" | "system"
     pub theme: String,
@@ -133,7 +130,6 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             schema_version: SETTINGS_VERSION,
-            first_run: false,
             output_dir: None,
             language: "en".into(),
             theme: "dark".into(),
@@ -305,16 +301,19 @@ pub fn cookies_path(app: &AppHandle) -> Result<PathBuf, AppError> {
 }
 
 pub fn load(app: &AppHandle) -> Settings {
-    match settings_path(app) {
-        Ok(p) => match crate::persist::read_json::<Settings>(&p) {
-            crate::persist::Loaded::Missing => Settings {
-                first_run: true,
-                ..Settings::default()
-            },
-            loaded => migrate(loaded.or_default_logged("settings.json")),
-        },
-        Err(_) => Settings::default(),
-    }
+    settings_path(app).map(|p| load_from(&p)).unwrap_or_default()
+}
+
+/// لا ملف بعد (أول تشغيل) = الافتراضيات، والواجهة بالإنجليزية أيًّا كانت لغة النظام
+fn load_from(path: &std::path::Path) -> Settings {
+    migrate(crate::persist::read_json::<Settings>(path).or_default_logged("settings.json"))
+}
+
+/// ما يكتبه save_settings على القرص
+fn write_to(path: &std::path::Path, mut settings: Settings) -> std::io::Result<()> {
+    sanitize(&mut settings);
+    let json = serde_json::to_string_pretty(&settings).expect("settings serialize");
+    crate::persist::write_atomic(path, json.as_bytes())
 }
 
 /// ترقية إعدادات الإصدارات السابقة
@@ -419,8 +418,7 @@ pub fn save_settings(
     #[cfg(desktop)]
     crate::background::set_clipboard_watch(settings.watch_clipboard);
     queue.set_limit(settings.parallel_downloads.into());
-    let json = serde_json::to_string_pretty(&settings).expect("settings serialize");
-    crate::persist::write_atomic(&settings_path(&app)?, json.as_bytes())?;
+    write_to(&settings_path(&app)?, settings.clone())?;
     *state.0.lock_ok() = settings;
     Ok(())
 }
@@ -605,6 +603,40 @@ mod tests {
             ),
             ("video", "mov", "mp3", "720")
         );
+    }
+
+    #[test]
+    fn first_launch_is_english_and_the_chosen_language_survives_a_restart() {
+        let dir = std::env::temp_dir().join(format!("khama-settings-lang-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings.json");
+        let _ = std::fs::remove_file(&path);
+        // أول تشغيل: لا ملف، فالواجهة بالإنجليزية
+        let first = load_from(&path);
+        assert_eq!(first.language, "en");
+        // المستخدم يختار العربية: يُكتب الملف كما يكتبه save_settings، ثم إعادة تشغيل تقرؤه من جديد
+        write_to(
+            &path,
+            Settings {
+                language: "ar".into(),
+                layout_dir: "ltr".into(),
+                ..first
+            },
+        )
+        .unwrap();
+        let again = load_from(&path);
+        assert_eq!((again.language.as_str(), again.layout_dir.as_str()), ("ar", "ltr"));
+        // والعودة إلى الإنجليزية تبقى كذلك
+        write_to(
+            &path,
+            Settings {
+                language: "en".into(),
+                ..again
+            },
+        )
+        .unwrap();
+        assert_eq!(load_from(&path).language, "en");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

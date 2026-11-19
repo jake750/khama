@@ -215,14 +215,8 @@ export default function App() {
   useEffect(() => {
     api
       .getSettings()
-      .then((s) => {
-        // أول تشغيل: لغة النظام بدل الإنجليزية دائمًا (M-8)
-        if (s.firstRun && navigator.language.toLowerCase().startsWith("ar")) {
-          s = { ...s, language: "ar", firstRun: undefined };
-          api.saveSettings(s).catch(() => {});
-        }
-        setSettings(s);
-      })
+      // أول تشغيل بالإنجليزية دائمًا (الافتراضي في settings.rs)، واللغة التي يختارها المستخدم تُحفظ فورًا وتبقى
+      .then(setSettings)
       .catch((e) => setBootError(asAppError(e)));
     api.defaultOutputDir().then((d) => setDefaultDir(d ?? ""));
   }, []);
