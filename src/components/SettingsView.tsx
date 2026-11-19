@@ -9,6 +9,7 @@ import {
   type AppError,
   type CookiesMode,
   type Language,
+  type LayoutDir,
   type Settings,
   type Theme,
   type ToolsInfo,
@@ -164,6 +165,19 @@ export function SettingsView(props: {
               options={[
                 { value: "en", label: "English" },
                 { value: "ar", label: "العربية" },
+              ]}
+            />
+          </div>
+          <div className="setting-row">
+            <span>{t.layoutDir}</span>
+            <Segmented<LayoutDir>
+              label={t.layoutDir}
+              value={s.layoutDir ?? "rtl"}
+              onChange={(layoutDir) => update({ layoutDir })}
+              options={[
+                { value: "auto", label: t.dirAuto },
+                { value: "rtl", label: t.dirRtl },
+                { value: "ltr", label: t.dirLtr },
               ]}
             />
           </div>

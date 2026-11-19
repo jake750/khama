@@ -24,6 +24,11 @@ language: string,
  */
 theme: string, 
 /**
+ * اتجاه التخطيط: "rtl" (الافتراضي، كما كان منذ 0.3.x) | "ltr" | "auto" (يتبع اللغة).
+ * مستقل عن اللغة: عربي بتخطيط من اليسار، أو إنجليزي معكوس
+ */
+layoutDir: string, 
+/**
  * "video" | "audio"
  */
 kind: string, 

@@ -149,6 +149,10 @@ const en = {
   dark: "Dark",
   light: "Light",
   system: "System",
+  layoutDir: "Layout direction",
+  dirAuto: "Follow language",
+  dirRtl: "Right to left",
+  dirLtr: "Left to right",
   saveFolder: "Save folder",
   mobileSaveHint:
     "A public folder on the phone, plus a folder name inside it. Movies takes videos, Music takes audio, DCIM and Pictures take videos and images; anything else goes to Download.",
@@ -856,6 +860,10 @@ const ar: Dict = {
   dark: "داكن",
   light: "فاتح",
   system: "حسب النظام",
+  layoutDir: "اتجاه الواجهة",
+  dirAuto: "حسب اللغة",
+  dirRtl: "من اليمين لليسار",
+  dirLtr: "من اليسار لليمين",
   saveFolder: "مجلد الحفظ",
   mobileSaveHint:
     "مجلد عام على الهاتف واسم مجلد بداخله. Movies يقبل الفيديو، وMusic الصوت، وDCIM وPictures الفيديو والصور؛ وما عدا ذلك يُحفظ في Download.",

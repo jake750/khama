@@ -30,6 +30,9 @@ pub struct Settings {
     pub language: String,
     /// "dark" | "light" | "system"
     pub theme: String,
+    /// اتجاه التخطيط: "rtl" (الافتراضي، كما كان منذ 0.3.x) | "ltr" | "auto" (يتبع اللغة).
+    /// مستقل عن اللغة: عربي بتخطيط من اليسار، أو إنجليزي معكوس
+    pub layout_dir: String,
     /// "video" | "audio"
     pub kind: String,
     /// "mp4" | "mov" للفيديو — "mp3" | "m4a" | "wav" للصوت
@@ -134,6 +137,7 @@ impl Default for Settings {
             output_dir: None,
             language: "en".into(),
             theme: "dark".into(),
+            layout_dir: "rtl".into(),
             kind: "video".into(),
             video_format: "mp4".into(),
             audio_format: "mp3".into(),
@@ -357,6 +361,7 @@ fn sanitize(s: &mut Settings) {
     let d = Settings::default();
     pick(&mut s.language, &["en", "ar"], &d.language);
     pick(&mut s.theme, &["dark", "light", "system"], &d.theme);
+    pick(&mut s.layout_dir, &["auto", "rtl", "ltr"], &d.layout_dir);
     pick(&mut s.kind, KINDS, &d.kind);
     pick(&mut s.video_format, VIDEO_FORMATS, &d.video_format);
     pick(&mut s.audio_format, AUDIO_FORMATS, &d.audio_format);
@@ -600,6 +605,19 @@ mod tests {
             ),
             ("video", "mov", "mp3", "720")
         );
+    }
+
+    #[test]
+    fn layout_dir_defaults_to_rtl_and_is_cleaned() {
+        // ملف 0.3.18 وما قبله لا يعرف الحقل: يبقى التخطيط من اليمين لليسار كما كان، بأي لغة
+        let s = migrate(serde_json::from_str(r#"{"schemaVersion":1,"language":"en"}"#).unwrap());
+        assert_eq!(s.layout_dir, "rtl");
+        let s = migrate(serde_json::from_str(r#"{"layoutDir":"ltr","language":"ar"}"#).unwrap());
+        assert_eq!((s.layout_dir.as_str(), s.language.as_str()), ("ltr", "ar"));
+        let s = migrate(serde_json::from_str(r#"{"layoutDir":"auto"}"#).unwrap());
+        assert_eq!(s.layout_dir, "auto");
+        let s = migrate(serde_json::from_str(r#"{"layoutDir":"sideways"}"#).unwrap());
+        assert_eq!(s.layout_dir, "rtl", "قيمة غير معروفة تعود إلى الافتراضية");
     }
 
     #[test]

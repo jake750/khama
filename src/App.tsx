@@ -16,7 +16,8 @@ import { SettingsView } from "./components/SettingsView";
 import { Tour, Welcome, type TourStep } from "./components/Tour";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { extractUrls, formatTimecode, youtubeChapters } from "./format";
-import { dictionaries, I18n, type Dict } from "./i18n";
+import { dictionaries, I18n, type Dict, type Lang } from "./i18n";
+import { isMixed, resolveDir } from "./layoutDir";
 import { AnimatedList, Presence, reducedMotion, SlideSwitch, usePresence, useSlidingIndicator } from "./motion";
 import { isMobile } from "./platform";
 import type { Toast, ToastAction } from "./toast";
@@ -183,13 +184,33 @@ export default function App() {
   const tabsRef = useRef<HTMLElement>(null);
   const tabPill = useSlidingIndicator(tabsRef, '.tab[aria-current="page"]', `${tab}|${lang}|${compact}`);
 
-  // تغيير اللغة يغيّر النصوص فقط: أماكن العناصر ثابتة (تخطيط من اليمين لليسار دائمًا)،
-  // والنص الإنجليزي يُرتَّب داخل مكانه من اليسار لليمين (bubbly.css)
+  // تغيير اللغة يغيّر النصوص فقط، واتجاه التخطيط إعداد مستقل (layoutDir): من اليمين لليسار افتراضيًا،
+  // أو من اليسار لليمين، أو حسب اللغة. إن خالف النصُّ التخطيطَ يُرتَّب كل نص داخل مكانه حسب لغته (bubbly.css)
+  const layoutDir = settings?.layoutDir;
+  const loaded = settings != null;
+  // آخر اتجاه طُلب: انتقال سابق لم يكتمل يطبّق الأحدث لا ما طُلب وقتها
+  const wantDir = useRef<{ lang: Lang; layout?: string; dir?: string; loaded?: boolean }>({ lang });
   useEffect(() => {
-    document.documentElement.lang = lang;
-    document.documentElement.dir = "rtl";
+    const root = document.documentElement;
+    const dir = resolveDir(layoutDir, lang);
+    const prev = wantDir.current;
+    wantDir.current = { lang, layout: layoutDir, dir, loaded };
+    const apply = () => {
+      const w = wantDir.current;
+      root.lang = w.lang;
+      root.dir = w.dir!;
+      if (isMixed(w.layout, w.lang)) root.dataset.mixedDir = "";
+      else delete root.dataset.mixedDir;
+    };
     document.title = t.appName;
-  }, [lang, t]);
+    // انقلاب التخطيط بيد المستخدم: تلاشٍ قصير بين الصورتين بدل قفزة، بلا دوران.
+    // أول تطبيق بعد قراءة الإعدادات فوري (لا انتقال عند فتح البرنامج)
+    if (!prev.loaded || prev.dir === dir || reducedMotion() || !document.startViewTransition) return apply();
+    root.dataset.dirSwitch = "";
+    const vt = document.startViewTransition(apply);
+    vt.ready.catch(() => {});
+    vt.finished.catch(() => {}).then(() => delete root.dataset.dirSwitch);
+  }, [lang, layoutDir, loaded, t]);
 
   useEffect(() => {
     api

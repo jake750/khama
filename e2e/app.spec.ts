@@ -82,6 +82,26 @@ test("اللغة والثيم يبقيان بعد إعادة التحميل", as
   await expect(page.getByRole("button", { name: "الثيم الفاتح. انقر للداكن" })).toBeVisible({ timeout: 15_000 });
 });
 
+test("نص عربي بتخطيط من اليسار لليمين يبقى بعد إعادة التحميل", async ({ page }) => {
+  await open(page, { language: "ar" });
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("dir", "rtl");
+  await tab(page, "الإعدادات").click();
+  await page.getByRole("group", { name: "اتجاه الواجهة" }).getByRole("button", { name: "من اليسار لليمين" }).click();
+  await expect(html).toHaveAttribute("dir", "ltr");
+  await expect(html).toHaveAttribute("lang", "ar");
+  await expect(html).toHaveAttribute("data-mixed-dir", "");
+
+  await page.reload();
+  await expect(html).toHaveAttribute("dir", "ltr");
+  await expect(html).toHaveAttribute("lang", "ar");
+  await tab(page, "الإعدادات").click();
+  await expect(page.getByRole("group", { name: "اتجاه الواجهة" }).getByRole("button", { name: "من اليسار لليمين" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});
+
 test("رابط يفشل: رسالة مفهومة وزر إعادة المحاولة", async ({ page }) => {
   await open(page);
   await paste(page, "https://example.com/offline");

@@ -10,12 +10,16 @@ export type VideoFormat = "mp4" | "mov";
 export type AudioFormat = "mp3" | "m4a" | "wav" | "original";
 export type Theme = "dark" | "light" | "system";
 export type Language = "en" | "ar";
+export type { LayoutDir } from "./layoutDir";
+import type { LayoutDir } from "./layoutDir";
 export type CookiesMode = "none" | "browser" | "file";
 
 export interface Settings {
   outputDir: string | null;
   language: Language;
   theme: Theme;
+  /** اتجاه التخطيط، مستقل عن اللغة. auto = يتبع اللغة */
+  layoutDir: LayoutDir;
   kind: Kind;
   videoFormat: VideoFormat;
   audioFormat: AudioFormat;

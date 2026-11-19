@@ -128,9 +128,10 @@ export function Tour<Tab extends string>(props: { steps: TourStep<Tab>[]; onTab:
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
-      // الأسهم تتبع اتجاه القراءة
-      const fwd = "ArrowLeft";
-      const back = "ArrowRight";
+      // الأسهم تتبع اتجاه التخطيط (إعداد مستقل عن اللغة)
+      const rtl = document.documentElement.dir !== "ltr";
+      const fwd = rtl ? "ArrowLeft" : "ArrowRight";
+      const back = rtl ? "ArrowRight" : "ArrowLeft";
       if (e.key === fwd) go(1);
       if (e.key === back) go(-1);
     };

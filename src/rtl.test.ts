@@ -1,5 +1,5 @@
 /// <reference types="node" />
-// اتجاه الصفحة (T-95): الواجهة تنقلب كاملة بين العربية والإنجليزية بخصائص CSS المنطقية
+// اتجاه الصفحة (T-95): الواجهة تنقلب كاملة بين التخطيطين (إعداد layoutDir) بخصائص CSS المنطقية
 // (inline-start/end، inset-inline). أي left/right أو margin-left جديد يبقى في مكانه ولا ينقلب،
 // فيظهر خطأً في إحدى اللغتين فقط. هذا الاختبار يمنعه، إلا القائمة أدناه وكلٌّ بسببه.
 import { readdirSync, readFileSync } from "node:fs";
@@ -10,9 +10,12 @@ const PHYSICAL = /^\s*((?:margin|padding|border)-(?:left|right)|left|right|float
 
 /** المقصود عمدًا: «ملف ← المحدِّد ← الخاصية» وسببه */
 const ALLOWED: Record<string, string> = {
-  'bubbly.css|:root[lang="en"] body,:root[lang="en"] :is(.guide-row,.menu-item,.settings-nav button,.preset,.more-menu-list button)|text-align':
-    "الإنجليزية تُعرض بتخطيط عربي ثابت (اللغة لا تقلب التخطيط)",
-  'bubbly.css|:root[lang="en"] .trim-fields .time-field:last-child|text-align': "حقل نهاية القص يُحاذى مع طرف الشريط الزمني",
+  'bubbly.css|:root[data-mixed-dir][dir="rtl"] body,:root[data-mixed-dir][dir="rtl"] :is(.guide-row,.menu-item,.settings-nav button,.preset,.more-menu-list button)|text-align':
+    "نص يُقرأ عكس التخطيط (plaintext) يُحاذى لبداية التخطيط صراحةً، فـ start يتبع الفقرة لا التخطيط",
+  'bubbly.css|:root[data-mixed-dir][dir="ltr"] body,:root[data-mixed-dir][dir="ltr"] :is(.guide-row,.menu-item,.settings-nav button,.preset,.more-menu-list button)|text-align':
+    "كذلك",
+  'bubbly.css|:root[data-mixed-dir][dir="rtl"] .trim-fields .time-field:last-child|text-align': "حقل نهاية القص يُحاذى مع طرف الصف",
+  'bubbly.css|:root[data-mixed-dir][dir="ltr"] .trim-fields .time-field:last-child|text-align': "كذلك",
   "redesign.css|.motif::before,.motif::after|left": "زخرفة أفقية متكرّرة لا اتجاه لها",
   "styles.css|details.tech pre|text-align": "تفاصيل الخطأ بالإنجليزية والخط الثابت دائمًا",
   "styles.css|.toast|left": "توسيط أفقي (left: 50% مع translateX)",

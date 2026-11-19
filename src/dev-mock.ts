@@ -15,6 +15,7 @@ const settings = {
   outputDir: "C:\\Users\\me\\Videos\\Khama",
   language: "ar",
   theme: "dark",
+  layoutDir: "rtl",
   kind: "video",
   videoFormat: "mp4",
   audioFormat: "mp3",
@@ -87,6 +88,7 @@ const thumb = (seed: string) => {
   const q = new URLSearchParams(location.search);
   if (q.get("lang")) settings.language = q.get("lang") as string;
   if (q.get("theme")) settings.theme = q.get("theme") as string;
+  if (q.get("dir")) settings.layoutDir = q.get("dir") as string;
   settings.seenTour = !q.get("tour");
 }
 const history: HistoryEntry[] = [
