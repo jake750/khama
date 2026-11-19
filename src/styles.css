@@ -3946,3 +3946,82 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ===== خيارات ملف بعينه (U-22) ===== */
+.own-opts {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: 2px var(--s-2);
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--fs-cap);
+  font-weight: var(--fw-semi);
+  line-height: 1.5;
+}
+.scoped {
+  margin-top: var(--s-4);
+  padding: var(--s-3);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+}
+.scoped-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+.icon-btn[aria-pressed="true"] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ===== معاينة قبل/بعد (D-84) ===== */
+.before-after {
+  display: grid;
+  gap: var(--s-2);
+  margin-bottom: var(--s-3);
+}
+.ba-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-3);
+}
+.ba-pane {
+  margin: 0;
+  display: grid;
+  gap: var(--s-1);
+}
+.ba-pane figcaption {
+  color: var(--text-dim);
+  font-size: var(--fs-cap);
+  font-weight: var(--fw-semi);
+}
+.ba-frame {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  padding: var(--s-2);
+  border-radius: var(--r-xs);
+  text-align: center;
+  transition: opacity 0.2s var(--ease-out);
+}
+.ba-frame:not(.skeleton) {
+  background: #000;
+}
+.ba-frame.stale {
+  opacity: 0.55;
+}
+.ba-frame img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+@media (max-width: 480px) {
+  .ba-row {
+    gap: var(--s-2);
+  }
+}

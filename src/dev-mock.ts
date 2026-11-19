@@ -55,6 +55,24 @@ try {
   /* لا تخزين: تبقى الافتراضيات */
 }
 
+/** معاينة وهمية: الناتج يتبع النسبة والتدوير حتى يظهر أثر الخيارات في المتصفح */
+function mockPreview(o: Record<string, unknown>) {
+  const svg = (w: number, h: number, label: string, tint: string) =>
+    "data:image/svg+xml," +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#1e3a5f"/><stop offset="1" stop-color="${tint}"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><text x="50%" y="50%" fill="#fff" font-family="sans-serif" font-size="${Math.round(h / 10)}" text-anchor="middle">${label}</text></svg>`,
+    );
+  let [w, h] = [480, 270];
+  const aspect = typeof o.aspect === "string" ? o.aspect.split(":").map(Number) : null;
+  if (aspect)
+    [w, h] = aspect[0] / aspect[1] > w / h ? [w, Math.round(w / (aspect[0] / aspect[1]))] : [Math.round(h * (aspect[0] / aspect[1])), h];
+  if (o.rotate === "90" || o.rotate === "270") [w, h] = [h, w];
+  const tags = [o.aspect, o.rotate && `rot ${o.rotate}`, o.lut && "LUT", o.watermark && "logo", o.timecode && "TC"]
+    .filter(Boolean)
+    .join(" · ");
+  return { source: svg(480, 270, "source", "#7c3aed"), output: svg(w, h, tags || "output", o.lut ? "#d97706" : "#7c3aed") };
+}
+
 const thumb = (seed: string) => `https://picsum.photos/seed/${seed}/320/180`;
 
 const history: HistoryEntry[] = [
@@ -190,10 +208,12 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return ["C:\\Users\\me\\Videos\\clip-phone.mp4"];
     case "sample_estimate":
       return 41_500_000;
+    case "preview_frame":
+      return mockPreview(args.options as Record<string, unknown>);
     case "analyze_file":
       return {
         path: String(args.path),
-        name: "clip-phone.mp4",
+        name: String(args.path).split("\\").pop(),
         size: 184_000_000,
         duration: 95,
         container: "mp4",

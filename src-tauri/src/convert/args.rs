@@ -676,7 +676,15 @@ fn merge_graph(
 
 /// سلسلة فلاتر الصورة من `src` إلى [vout]: فلاتر الخيارات، ثم لوحة الألوان للـ GIF
 /// أو العلامة المائية وصيغة البكسل التي يحتاجها المشفّر
-fn video_graph(p: &Preset, o: &ConvertOptions, v: &VideoInfo, keep_ts: bool, src: &str, codec: &[String], wm_idx: Option<usize>) -> String {
+pub(super) fn video_graph(
+    p: &Preset,
+    o: &ConvertOptions,
+    v: &VideoInfo,
+    keep_ts: bool,
+    src: &str,
+    codec: &[String],
+    wm_idx: Option<usize>,
+) -> String {
     // بعد الدمج صارت كل المقاطع بمقاس المقطع الأول
     let mut chain = video_filters(p, o, v, keep_ts);
     let (ow, _oh) = output_dims(v.width, v.height, o, default_short(p));

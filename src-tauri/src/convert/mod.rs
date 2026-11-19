@@ -40,6 +40,8 @@ mod detect;
 pub use detect::*;
 mod estimate;
 pub use estimate::*;
+mod preview;
+pub use preview::*;
 mod run;
 pub use run::*;
 #[cfg(test)]

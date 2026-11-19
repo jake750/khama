@@ -545,3 +545,89 @@ fn estimate_windows() {
     assert!(w.iter().all(|(s, e)| *s >= 10.0 && *e <= 70.0 && (e - s - 1.5).abs() < 1e-9));
     assert!((w[1].0 - 39.25).abs() < 1e-9);
 }
+
+// ---- معاينة قبل/بعد (D-84) ----
+
+fn preview(id: &str, o: &ConvertOptions, info: &MediaInfo) -> String {
+    preview_args(&preset(id).unwrap(), o, info, 12.5, Path::new("after.jpg"))
+        .unwrap()
+        .join(" ")
+}
+
+#[test]
+fn preview_uses_same_filters_as_build_plan() {
+    let o = ConvertOptions {
+        aspect: Some("9:16".into()),
+        rotate: Some("hflip".into()),
+        lut: Some("C:/x/look.cube".into()),
+        size: Some(720),
+        ..Default::default()
+    };
+    let info = video(1920, 1080);
+    let a = preview("youtube", &o, &info);
+    let plan = joined(
+        &build_plan(
+            &preset("youtube").unwrap(),
+            &o,
+            std::slice::from_ref(&info),
+            &[],
+            Path::new("o.mp4"),
+            None,
+        )
+        .unwrap(),
+    );
+    for f in ["crop=608:1080", "hflip", "lut3d=file=lut.cube", "scale=720:1280"] {
+        assert!(a.contains(f), "{f} missing in {a}");
+        assert!(plan.contains(f), "{f} missing in plan");
+    }
+    // إطار واحد مصغّر، بلا صوت ولا مشفّر الفيديو
+    assert!(a.contains("-ss 12.500 -i in.mp4"));
+    assert!(a.contains("[vout]scale=480:480:force_original_aspect_ratio=decrease[pv]"));
+    assert!(a.contains("-frames:v 1"));
+    assert!(a.ends_with("after.jpg"));
+    assert!(!a.contains("libx264") && !a.contains("-copyts"));
+}
+
+#[test]
+fn preview_watermark_and_timecode() {
+    let o = ConvertOptions {
+        watermark: Some("logo.png".into()),
+        watermark_pos: Some("tl".into()),
+        timecode: true,
+        speed: Some(2.0),
+        fps: Some("60".into()),
+        ..Default::default()
+    };
+    let a = preview("edit_h264", &o, &video(1920, 1080));
+    assert!(a.contains("-copyts"), "timecode follows source time");
+    assert!(a.contains("-i in.mp4 -i logo.png"));
+    assert!(a.contains("[1:v]scale=") && a.contains("overlay=x=W*0.03:y=H*0.03"));
+    assert!(a.contains("drawtext="));
+    // السرعة والمعدل لا يغيّران إطارًا ثابتًا
+    assert!(!a.contains("setpts=PTS/") && !a.contains("fps="));
+}
+
+#[test]
+fn preview_gif_skips_palette_and_vfr() {
+    let mut info = video(1280, 720);
+    info.video.as_mut().unwrap().vfr = true;
+    let a = preview("gif", &ConvertOptions::default(), &info);
+    assert!(!a.contains("palettegen") && !a.contains("fps="));
+    assert!(a.contains("scale=640:360"), "gif default size: {a}");
+}
+
+#[test]
+fn preview_needs_video() {
+    let mut info = video(1920, 1080);
+    info.video = None;
+    assert!(
+        preview_args(
+            &preset("youtube").unwrap(),
+            &ConvertOptions::default(),
+            &info,
+            0.0,
+            Path::new("a.jpg")
+        )
+        .is_err()
+    );
+}

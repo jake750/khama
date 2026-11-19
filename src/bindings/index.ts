@@ -8,6 +8,7 @@ export type { HistoryEntry } from "./HistoryEntry";
 export type { HistoryStart } from "./HistoryStart";
 export type { JobUpdate } from "./JobUpdate";
 export type { MediaInfo } from "./MediaInfo";
+export type { PreviewFrames } from "./PreviewFrames";
 export type { ProbeInfo } from "./ProbeInfo";
 export type { Project } from "./Project";
 export type { Settings } from "./Settings";

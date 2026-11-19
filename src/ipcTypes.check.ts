@@ -18,6 +18,7 @@ export const checks: true[] = [
   true as Keys<api.MediaInfo, rs.MediaInfo>,
   true as Keys<api.ConvertOptions, rs.ConvertOptions>,
   true as Keys<api.ConvertRequest, rs.ConvertRequest>,
+  true as Keys<api.PreviewFrames, rs.PreviewFrames>,
   true as Keys<api.AppError, rs.AppError>,
   true as Keys<api.ProbeInfo, rs.ProbeInfo>,
   true as Keys<api.PlaylistEntry, rs.Entry>,

@@ -141,6 +141,12 @@ export interface MediaInfo {
   issues: Issue[];
 }
 
+/** صورتا المعاينة قبل/بعد كـ data URL */
+export interface PreviewFrames {
+  source: string | null;
+  output: string | null;
+}
+
 export interface ConvertOptions {
   quality: "high" | "balanced" | "small";
   hw: boolean;
@@ -336,6 +342,9 @@ export const api = {
   /** الحجم المتوقع بتحويل ثلاث شرائح قصيرة (null إن أُلغي بطلب أحدث) */
   sampleEstimate: (path: string, presetId: string, options: ConvertOptions) =>
     invoke<number | null>("sample_estimate", { path, presetId, options }),
+  /** إطار المصدر وإطار الناتج عند `at` ثانية بفلاتر الصورة نفسها (D-84)؛ null إن أُلغي بطلب أحدث */
+  previewFrame: (path: string, presetId: string, options: ConvertOptions, at: number) =>
+    invoke<PreviewFrames | null>("preview_frame", { path, presetId, options, at }),
   hwEncoders: () => invoke<string[]>("hw_encoders"),
   startConvert: (request: ConvertRequest, id?: number) => invoke<number>("start_convert", { request, id }),
   saveThumbnail: (url: string) => invoke<string>("save_thumbnail", { url }),
