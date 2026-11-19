@@ -8,7 +8,7 @@ Paste a link, pick a format, and get a file that drops straight into Premiere, D
 
 [English](#english) · [العربية](#العربية)
 
-<img src="docs/screenshot-en.png" alt="Khama main window" width="760">
+<img src="docs/screenshots/download-ready-en-light.png" alt="Khama main window" width="760">
 
 </div>
 
@@ -147,6 +147,16 @@ Khama is for **public content you have the right to use**. It does not bypass DR
 
 MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-licensed separate programs. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
+### Mini mode
+
+The **Mini** button in the top bar turns Khama into a small always-on-top window (420×640) that sits beside your editor: paste links and drop files without switching apps.
+
+- **Kept**: the link field, the download button, the file and quality summary, the save folder, the Downloads list and the tab icons.
+- **Hidden**: the app name, tab labels, descriptions, extra options, notices, the project picker and the guide button.
+- Mini opens on Download; **Full** brings back the tab you were on.
+
+<img src="docs/screenshots/compact-ready-en-light.png" alt="Khama mini mode" width="280">
+
 ---
 
 <div dir="rtl">
@@ -154,7 +164,7 @@ MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-l
 ## العربية
 
 <div align="center">
-<img src="docs/screenshot-ar.png" alt="واجهة خامة بالعربية" width="760">
+<img src="docs/screenshots/download-ready-ar-dark.png" alt="واجهة خامة بالعربية" width="760">
 </div>
 
 **خامة** أداة تنزيل وسائط على سطح المكتب، مصمّمة لمحرّري الفيديو: الصق رابطًا، واختر الصيغة، فيصلك ملف جاهز للسحب مباشرة إلى Premiere أو DaVinci Resolve أو CapCut.
@@ -197,6 +207,16 @@ MIT, see [LICENSE](LICENSE). The bundled yt-dlp and FFmpeg executables are GPL-l
 - **مشاريع**: لكل مشروع مجلد حفظ وخيارات تنزيل، والتبديل بنقرة. و**قوالب لأسماء الملفات** (`{n}_{site}_{title}`…) ومجلد فرعي لكل موقع.
 - **العمل في الخلفية** من شريط المهام، مع **إشعار** عند انتهاء التنزيل، و**اقتراح الروابط المنسوخة** تلقائيًا (اختياري).
 - **حدّ للسرعة**، و**تنزيل مجدول** («ابدأ الساعة 2:00»)، و**نافذة مصغّرة** تبقى فوق برنامج المونتاج.
+
+### الوضع المصغّر
+
+زر **مصغّر** في الشريط العلوي يحوّل خامة إلى نافذة صغيرة (420×640) تبقى فوق برنامج المونتاج: تلصق الروابط وتسحب الملفات دون التنقّل بين البرامج.
+
+- **يبقى**: حقل الرابط وزر التنزيل وملخص الملف والجودة ومجلد الحفظ وقائمة التنزيلات وأيقونات التبويبات.
+- **يختفي**: اسم التطبيق ونصوص التبويبات والأوصاف والخيارات الإضافية والإشعارات ومنتقي المشروع وزر الدليل.
+- يفتح على التنزيل، و«كامل» يعيدك للتبويب الذي كنت فيه.
+
+<div align="center"><img src="docs/screenshots/compact-ready-ar-dark.png" alt="الوضع المصغّر" width="280"></div>
 
 ### التثبيت
 

@@ -73,8 +73,22 @@ function mockPreview(o: Record<string, unknown>) {
   return { source: svg(480, 270, "source", "#7c3aed"), output: svg(w, h, tags || "output", o.lut ? "#d97706" : "#7c3aed") };
 }
 
-const thumb = (seed: string) => `https://picsum.photos/seed/${seed}/320/180`;
+const thumb = (seed: string) => {
+  const h = [...seed].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7);
+  return (
+    "data:image/svg+xml," +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${h},45%,35%)"/><stop offset="1" stop-color="hsl(${(h + 60) % 360},50%,20%)"/></linearGradient></defs><rect width="320" height="180" fill="url(#g)"/></svg>`,
+    )
+  );
+};
 
+{
+  const q = new URLSearchParams(location.search);
+  if (q.get("lang")) settings.language = q.get("lang") as string;
+  if (q.get("theme")) settings.theme = q.get("theme") as string;
+  settings.seenTour = !q.get("tour");
+}
 const history: HistoryEntry[] = [
   {
     id: 1,
