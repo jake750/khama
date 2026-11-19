@@ -126,4 +126,12 @@ ytdlpWeekly: boolean,
 /**
  * آخر فحص لتحديث yt-dlp (ms منذ 1970)
  */
-ytdlpCheckedAt: bigint, };
+ytdlpCheckedAt: bigint, 
+/**
+ * أندرويد: المجلد العام الذي تُحفظ فيه الملفات (Download وMovies وMusic وDCIM وPictures، U-76)
+ */
+mobileBase: string, 
+/**
+ * أندرويد: اسم المجلد الفرعي داخله (فارغ = في المجلد العام مباشرة)
+ */
+mobileFolder: string, };
