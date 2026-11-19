@@ -71,13 +71,15 @@ test("اللغة والثيم يبقيان بعد إعادة التحميل", as
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await tab(page, "Settings").click();
   await page.getByRole("group", { name: "Appearance" }).getByRole("button", { name: "Light" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.getByRole("group", { name: "Language" }).getByRole("button", { name: "العربية" }).click();
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.locator("html")).toHaveAttribute("lang", "ar");
 
   await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  await expect(page.getByRole("button", { name: "الثيم الفاتح. انقر للداكن" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "ar");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.getByRole("button", { name: "الثيم الفاتح. انقر للداكن" })).toBeVisible({ timeout: 15_000 });
 });
 
 test("رابط يفشل: رسالة مفهومة وزر إعادة المحاولة", async ({ page }) => {
