@@ -33,6 +33,29 @@ jobs:
       - name: npm audit (production)
         run: npm audit --omit=dev --audit-level=high
 
+  # اختبارات الطرف للطرف (T-16): الواجهة في Chromium مع dev-mock.ts، بلا Rust.
+  e2e:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: نسخة Playwright
+        id: pw
+        run: echo "v=$(npx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: pwcache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ steps.pw.outputs.v }}
+      - name: Chromium فقط
+        run: npx playwright install --with-deps chromium
+      - name: Playwright
+        run: npm run e2e
+
   rust:
     runs-on: ubuntu-22.04
     steps:

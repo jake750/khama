@@ -1,11 +1,15 @@
 /* معاينة التصميم في المتصفح فقط (npm run dev خارج Tauri): بيانات تجريبية بدل Rust.
    لا تدخل في نسخة التطبيق لأن main.tsx يستوردها فقط في وضع التطوير. */
+import type { HistoryEntry } from "./api";
+
 type Handler = (e: { event: string; payload: unknown }) => void;
 
 const callbacks = new Map<number, Handler>();
 const listeners = new Map<string, number[]>();
 let nextCb = 1;
 let nextJob = 100;
+
+const SAVED = "khama.mock.settings";
 
 const settings = {
   outputDir: "C:\\Users\\me\\Videos\\Khama",
@@ -43,9 +47,17 @@ const settings = {
   mobileFolder: "Khama",
 };
 
+// يحفظ ما يغيّره المستخدم في المتصفح كما يفعل التطبيق على القرص، فتبقى اللغة والثيم بعد إعادة التحميل.
+// اختبارات الطرف للطرف (e2e/) تزرع هذا المفتاح لبدء كل اختبار بإعدادات معروفة.
+try {
+  Object.assign(settings, JSON.parse(localStorage.getItem(SAVED) ?? "{}"));
+} catch {
+  /* لا تخزين: تبقى الافتراضيات */
+}
+
 const thumb = (seed: string) => `https://picsum.photos/seed/${seed}/320/180`;
 
-const history = [
+const history: HistoryEntry[] = [
   {
     id: 1,
     title: "لقطات جوية لمدينة الرياض وقت الغروب 4K",
@@ -85,6 +97,10 @@ function emit(event: string, payload: unknown) {
   for (const id of listeners.get(event) ?? []) callbacks.get(id)?.({ event, payload });
 }
 
+/** ما سيُكتب في السجلّ عند انتهاء العملية (يكتبه Rust في التطبيق) */
+type Pending = { title: string; meta: string; thumbnail?: string | null; url: string; kind: string };
+const pending = new Map<number, Pending>();
+
 function fakeJob(id: number) {
   let p = 0;
   emit("job-update", { id, state: "analyzing" });
@@ -92,6 +108,21 @@ function fakeJob(id: number) {
     p += 7;
     if (p >= 100) {
       clearInterval(t);
+      const h = pending.get(id);
+      if (h) {
+        const file = "C:\\x\\done.mp4";
+        history.unshift({
+          id,
+          title: h.title,
+          url: h.url,
+          file,
+          kind: h.kind as HistoryEntry["kind"],
+          meta: h.meta,
+          thumbnail: h.thumbnail ?? undefined,
+          date: Date.now(),
+          exists: true,
+        });
+      }
       emit("job-update", { id, state: "done", percent: 100, file: "C:\\x\\done.mp4" });
     } else emit("job-update", { id, state: "downloading", stage: "video", percent: p, speed: 4.2e6, eta: (100 - p) / 7 });
   }, 600);
@@ -103,6 +134,14 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "get_settings":
     case "read_settings_file":
       return structuredClone(settings);
+    case "save_settings":
+      Object.assign(settings, args.settings);
+      try {
+        localStorage.setItem(SAVED, JSON.stringify(settings));
+      } catch {
+        /* لا تخزين */
+      }
+      return null;
     case "default_output_dir":
       return "C:\\Users\\me\\Downloads";
     case "get_history":
@@ -118,6 +157,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "probe": {
       const url = String(args.url);
       if (url.includes("bad")) throw { code: "unavailable", detail: "ERROR: [youtube] xyz: Video unavailable" };
+      if (url.includes("offline")) throw { code: "network", detail: "ERROR: Unable to download webpage: <urlopen error [Errno -3]>" };
       await new Promise((r) => setTimeout(r, 700));
       // قائمة تشغيل كبيرة لتجربة «اعرض المزيد»
       if (url.includes("list="))
@@ -185,6 +225,13 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "start_download":
     case "start_convert": {
       const id = typeof args.id === "number" ? args.id : nextJob++;
+      const req = (args.request ?? {}) as {
+        url?: string;
+        kind?: string;
+        history?: { title: string; meta: string; thumbnail?: string | null };
+      };
+      if (req.history)
+        pending.set(id, { ...req.history, url: req.url ?? "", kind: cmd === "start_convert" ? "convert" : (req.kind ?? "video") });
       setTimeout(() => fakeJob(id), 50);
       return id;
     }

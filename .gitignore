@@ -31,3 +31,7 @@ dist-ssr
 .claude/worktrees/
 samples/
 dist-release/
+
+# Playwright
+test-results/
+playwright-report/
