@@ -13,6 +13,9 @@ const mocked = new Set([...read("./dev-mock.ts").matchAll(/case "([a-z_]+)"/g)].
 
 /** أوامر لا تحتاج بيانات تجريبية: الرد الافتراضي (null) يكفي لمعاينة الواجهة */
 const NULL_IS_FINE = new Set([
+  // تحديث خامة على أندرويد: الواجهة التجريبية لا تعرض نافذة التحديث
+  "download_app_update",
+  "install_app_update",
   "save_settings",
   "export_settings",
   "save_scheduled",

@@ -217,3 +217,88 @@ pub fn cancel_fetch(app: &AppHandle) {
         let _ = b.0.run_mobile_plugin::<serde_json::Value>("cancelFetch", ());
     }
 }
+
+/// ملفات APK تأتي من إصدارات خامة على GitHub فقط
+const RELEASE_DOWNLOADS: &str = "https://github.com/jake750/khama/releases/download/";
+
+fn update_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
+    let dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| AppError::with_detail("updateFailed", e.to_string()))?
+        .join("app-update");
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir)
+}
+
+/// تحديث خامة من داخلها: ينزّل ملف APK الجديد إلى الكاش، ويرسل عدد البايتات في "app-update-progress".
+/// يعيد مسار الملف. ملف نزل كاملًا من قبل يُستعمل مباشرة.
+#[tauri::command]
+pub async fn download_app_update(app: AppHandle, url: String, version: String) -> Result<String, AppError> {
+    use tauri::Emitter;
+    let bad = |d: &str| AppError::with_detail("updateFailed", d.to_string());
+    if !url.starts_with(RELEASE_DOWNLOADS) || url.contains("..") {
+        return Err(bad("url"));
+    }
+    if version.is_empty() || !version.chars().all(|c| c.is_ascii_digit() || c == '.') {
+        return Err(bad("version"));
+    }
+    let dir = update_dir(&app)?;
+    let name = format!("khama-{version}.apk");
+    let dest = dir.join(&name);
+    if dest.is_file() {
+        return Ok(dest.to_string_lossy().into_owned());
+    }
+    // نسخ قديمة أو تنزيل انقطع: لا نتركها تأكل المساحة
+    for e in std::fs::read_dir(&dir)?.flatten() {
+        let _ = std::fs::remove_file(e.path());
+    }
+    let part = dir.join(format!("{name}.part"));
+    let (app2, part2) = (app.clone(), part.clone());
+    let mut task = tauri::async_runtime::spawn_blocking(move || fetch_file(&app2, &url, &part2));
+    let size = || std::fs::metadata(&part).map(|m| m.len()).unwrap_or(0);
+    loop {
+        tokio::select! {
+            r = &mut task => {
+                r.map_err(|e| bad(&e.to_string()))?.map_err(|e| bad(&format!("{e:?}")))?;
+                let _ = app.emit("app-update-progress", size());
+                std::fs::rename(&part, &dest)?;
+                return Ok(dest.to_string_lossy().into_owned());
+            }
+            _ = tokio::time::sleep(std::time::Duration::from_millis(250)) => {
+                let _ = app.emit("app-update-progress", size());
+            }
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct InstallArgs<'a> {
+    path: &'a str,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Installed {
+    needs_permission: bool,
+}
+
+/// يفتح مثبّت أندرويد على الملف الذي نزّله download_app_update.
+/// يعيد true إن فتحنا شاشة «السماح بتثبيت التطبيقات» بدلًا منه (أول مرة فقط).
+#[tauri::command]
+pub async fn install_app_update(app: AppHandle, path: String) -> Result<bool, AppError> {
+    let dir = update_dir(&app)?;
+    let file = PathBuf::from(&path);
+    if file.parent() != Some(dir.as_path()) || file.extension().and_then(|e| e.to_str()) != Some("apk") {
+        return Err(AppError::with_detail("updateFailed", "path"));
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let out: Installed = bridge(&app)?
+            .0
+            .run_mobile_plugin("installApk", InstallArgs { path: &path })
+            .map_err(|e| AppError::with_detail("updateFailed", e.to_string()))?;
+        Ok(out.needs_permission)
+    })
+    .await
+    .map_err(|e| AppError::with_detail("updateFailed", e.to_string()))?
+}

@@ -1,6 +1,7 @@
 package com.jake750.khama
 
 import android.app.Activity
+import android.content.Intent
 import android.content.ContentValues
 import android.media.MediaScannerConnection
 import android.os.Build
@@ -8,6 +9,8 @@ import android.os.Environment
 import android.net.Uri
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import android.provider.Settings
+import androidx.core.content.FileProvider
 import android.webkit.MimeTypeMap
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
@@ -38,6 +41,11 @@ class PublishArgs {
 class FetchArgs {
     lateinit var url: String
     lateinit var dest: String
+}
+
+@InvokeArg
+class InstallArgs {
+    lateinit var path: String
 }
 
 @InvokeArg
@@ -291,5 +299,34 @@ class ToolsPlugin(private val activity: Activity) : Plugin(activity) {
     fun cancelFetch(invoke: Invoke) {
         fetchCancel.set(true)
         invoke.resolve(JSObject())
+    }
+
+    /**
+     * تحديث التطبيق من داخله: يفتح مثبّت أندرويد على ملف APK نزّلناه في مجلد الكاش.
+     * أول مرة يطلب أندرويد السماح لخامة بتثبيت التطبيقات: نفتح تلك الشاشة ونعيد needsPermission،
+     * والواجهة تعيد المحاولة عند الرجوع.
+     */
+    @Command
+    fun installApk(invoke: Invoke) {
+        val args = invoke.parseArgs(InstallArgs::class.java)
+        try {
+            val ret = JSObject()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !activity.packageManager.canRequestPackageInstalls()) {
+                val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + activity.packageName))
+                activity.startActivity(intent)
+                ret.put("needsPermission", true)
+                invoke.resolve(ret)
+                return
+            }
+            val uri = FileProvider.getUriForFile(activity, activity.packageName + ".fileprovider", File(args.path))
+            val intent = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            activity.startActivity(intent)
+            ret.put("needsPermission", false)
+            invoke.resolve(ret)
+        } catch (e: Throwable) {
+            invoke.reject(e.message ?: e.toString())
+        }
     }
 }

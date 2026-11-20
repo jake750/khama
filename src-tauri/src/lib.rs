@@ -168,5 +168,5 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
 
 #[cfg(mobile)]
 fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
-    handlers_with![]
+    handlers_with![mobile::download_app_update, mobile::install_app_update]
 }

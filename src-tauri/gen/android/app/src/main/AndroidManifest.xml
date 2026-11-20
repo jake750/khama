@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- تحديث خامة من داخلها: فتح مثبّت أندرويد على ملف APK الجديد -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- أندرويد 9 وأقدم فقط: الحفظ في مجلد Download العام (الأحدث يستعمل MediaStore بلا صلاحية) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 

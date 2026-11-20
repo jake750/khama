@@ -1,5 +1,6 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -17,10 +18,16 @@ const LATEST_API = "https://api.github.com/repos/jake750/khama/releases/latest";
 const CHECK_DELAY_MS = 2500;
 const EXIT_MS = 220;
 
-type Phase = { step: "ask" } | { step: "downloading"; got: number; total: number | null } | { step: "installing" } | { step: "failed" };
+type Phase =
+  | { step: "ask" }
+  | { step: "downloading"; got: number; total: number | null }
+  | { step: "installing" }
+  /** أندرويد: الملف نزل، ومثبّت النظام مفتوح (أو ينتظر إذن «تثبيت التطبيقات») */
+  | { step: "apk"; path: string; allow: boolean }
+  | { step: "failed" };
 
 /** تحديث متاح: على الكمبيوتر نثبّته بأنفسنا (native)، وعلى الهاتف نفتح رابط ملف APK (url) */
-type Available = { version: string; current: string; notes?: string; native?: Update; url?: string };
+type Available = { version: string; current: string; notes?: string; native?: Update; url?: string; size?: number };
 
 /** "v1.2.10" > "1.2.9"؟ نقارن الأرقام فقط ونتجاهل لاحقة مثل -beta */
 export function isNewer(latest: string, current: string): boolean {
@@ -53,14 +60,21 @@ async function checkMobile(): Promise<Available | null> {
   try {
     const res = await fetch(LATEST_API, { signal: ctrl.signal, headers: { Accept: "application/vnd.github+json" } });
     if (!res.ok) return null;
-    const rel: { tag_name: string; body?: string | null; assets?: { name: string; browser_download_url: string }[] } = await res.json();
+    const rel: { tag_name: string; body?: string | null; assets?: { name: string; browser_download_url: string; size?: number }[] } =
+      await res.json();
     const current = await getVersion();
     // قد يكون هناك APK لكل معمارية: نفضّل الشامل، ثم arm64 (أغلب الهواتف)، ثم أي واحد
     const apks = (rel.assets ?? []).filter((a) => a.name.toLowerCase().endsWith(".apk"));
     const pick = (k: string) => apks.find((a) => a.name.toLowerCase().includes(k));
     const apk = pick("universal") ?? pick("arm64") ?? pick("aarch64") ?? apks[0];
     if (!apk || !isNewer(rel.tag_name, current)) return null;
-    return { version: rel.tag_name.replace(/^v/i, ""), current, notes: rel.body ?? undefined, url: apk.browser_download_url };
+    return {
+      version: rel.tag_name.replace(/^v/i, ""),
+      current,
+      notes: rel.body ?? undefined,
+      url: apk.browser_download_url,
+      size: apk.size,
+    };
   } finally {
     window.clearTimeout(timer);
   }
@@ -79,7 +93,7 @@ export function UpdateDialog(props: {
   request: number;
   /** البحث عند الفتح مسموح (إعداد «البحث عن تحديثات»، F-51) */
   enabled: boolean;
-  /** وُجد تحديث: شارة على «الإعدادات» بدل نافذة عند الإقلاع */
+  /** وُجد تحديث: نافذة عند الفتح، وشارة على «الإعدادات» تبقى إن أُجّل */
   onAvailable: (version: string | null) => void;
 }) {
   const { t } = useI18n();
@@ -90,6 +104,10 @@ export function UpdateDialog(props: {
   const [phase, setPhase] = useState<Phase>({ step: "ask" });
   const [shown, leaving] = usePresence(update, EXIT_MS);
   const started = useRef(false);
+  const busyRef = useRef(props.busy);
+  useEffect(() => {
+    busyRef.current = props.busy;
+  }, [props.busy]);
 
   useEffect(() => {
     // StrictMode يركّب ويفكّ ثم يركّب في التطوير: الإلغاء يمسح المؤقّت الأول،
@@ -101,6 +119,8 @@ export function UpdateDialog(props: {
         .then((u) => {
           found.current = u;
           onAvailable.current(u?.version ?? null);
+          // نخبر المستخدم فور الفتح، إلا إن بدأ تنزيلًا: عندها تبقى الشارة على «الإعدادات»
+          if (u && !busyRef.current) setUpdate(u);
         })
         .catch(() => {}); // بلا اتصال، أو لا يوجد إصدار منشور بعد
     }, CHECK_DELAY_MS);
@@ -115,18 +135,51 @@ export function UpdateDialog(props: {
   }, [props.request]);
 
   const busy = phase.step === "downloading" || phase.step === "installing";
+
+  /** أندرويد: يفتح مثبّت النظام، أو شاشة السماح بالتثبيت أول مرة */
+  const openInstaller = async (path: string) => {
+    try {
+      const allow = await invoke<boolean>("install_app_update", { path });
+      setPhase({ step: "apk", path, allow });
+    } catch (e) {
+      logError("installApk")(e);
+      setPhase({ step: "failed" });
+    }
+  };
+
+  // بعد الرجوع من شاشة السماح بالتثبيت نكمل تلقائيًا
+  useEffect(() => {
+    if (phase.step !== "apk" || !phase.allow) return;
+    const path = phase.path;
+    const onVisible = () => document.visibilityState === "visible" && void openInstaller(path);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [phase]);
+
+  const installMobile = async (u: Available) => {
+    if (!u.url) return;
+    setPhase({ step: "downloading", got: 0, total: u.size ?? null });
+    const stop = await listen<number>("app-update-progress", (e) =>
+      setPhase((p) => (p.step === "downloading" ? { ...p, got: e.payload } : p)),
+    );
+    try {
+      const path = await invoke<string>("download_app_update", { url: u.url, version: u.version });
+      await openInstaller(path);
+    } catch (e) {
+      logError("downloadApk")(e);
+      setPhase({ step: "failed" });
+    } finally {
+      stop();
+    }
+  };
   const close = () => {
     if (!busy) setUpdate(null);
   };
 
   const install = async () => {
     if (!update) return;
-    // الهاتف: المتصفح ينزّل ملف APK، وأندرويد يطلب من المستخدم الموافقة على تثبيته
-    if (!update.native) {
-      if (update.url) openUrl(update.url);
-      setUpdate(null);
-      return;
-    }
+    // الهاتف: ننزّل ملف APK داخل التطبيق، ثم يطلب أندرويد من المستخدم تأكيد تثبيته
+    if (!update.native) return installMobile(update);
     setPhase({ step: "downloading", got: 0, total: null });
     try {
       let got = 0;
@@ -245,6 +298,12 @@ export function UpdateDialog(props: {
           </div>
         )}
 
+        {phase.step === "apk" && (
+          <div className="update-progress" role="status">
+            <span className="faint">{phase.allow ? t.appUpdateApkAllow : t.appUpdateApkConfirm}</span>
+          </div>
+        )}
+
         {phase.step === "failed" && (
           <div className="alert" role="alert">
             <Icon name="alert" size={16} />
@@ -256,7 +315,11 @@ export function UpdateDialog(props: {
           <button className="btn btn-ghost" onClick={close} disabled={busy}>
             {t.appUpdateLater}
           </button>
-          {phase.step === "failed" ? (
+          {phase.step === "apk" ? (
+            <button className="btn btn-primary" ref={primary} onClick={() => void openInstaller(phase.path)}>
+              {t.appUpdateInstall}
+            </button>
+          ) : phase.step === "failed" ? (
             <button className="btn btn-primary" ref={primary} onClick={openPage}>
               {t.appUpdateOpenPage}
             </button>
