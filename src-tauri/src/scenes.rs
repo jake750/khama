@@ -4,10 +4,10 @@
 //!   1. Features per frame: a quantised HSV colour histogram of the whole frame and of a 3×3 grid
 //!      of blocks, plus the mean and standard deviation of the luma.
 //!   2. Frame distance d(t) between consecutive frames:
-//!         d(t) = α · D(H_t, H_{t-1}) + (1 − α) · mean_b D(H_t^b, H_{t-1}^b),   D(p, q) = ½ Σ |p_i − q_i| ∈ [0, 1]
+//!      `d(t) = α · D(H_t, H_{t-1}) + (1 − α) · mean_b D(H_t^b, H_{t-1}^b),   D(p, q) = ½ Σ |p_i − q_i| ∈ [0, 1]`
 //!   3. Hard cuts: d(t) is a local maximum and exceeds an adaptive threshold computed on a sliding window
 //!      around t (the frames t−1..t+1 are excluded so the cut does not raise its own threshold):
-//!         T(t) = max(τ_min, centre + k · spread)
+//!      `T(t) = max(τ_min, centre + k · spread)`
 //!      where (centre, spread) is either (mean, std) or the robust pair (median, 1.4826 · MAD).
 //!      A camera flash (frame t differs from both neighbours, which resemble each other) is rejected.
 //!   4. Gradual transitions (dissolves, fades) with an adaptive twin-comparison: a run of frames whose
@@ -413,13 +413,13 @@ pub fn detect(frames: &[Frame], p: &Params) -> Vec<Boundary> {
         // a fade-out and a fade-in separated only by flat frames are one transition
         let mut merged: Vec<Boundary> = Vec::new();
         for g in grads {
-            if let Some(prev) = merged.last_mut() {
-                if g.start <= prev.end + 1 || (prev.end + 1..g.start).all(|i| flat[i]) {
-                    prev.end = g.end;
-                    prev.time = g.time;
-                    prev.score = prev.score.max(g.score);
-                    continue;
-                }
+            if let Some(prev) = merged.last_mut()
+                && (g.start <= prev.end + 1 || (prev.end + 1..g.start).all(|i| flat[i]))
+            {
+                prev.end = g.end;
+                prev.time = g.time;
+                prev.score = prev.score.max(g.score);
+                continue;
             }
             merged.push(g);
         }
@@ -435,21 +435,21 @@ pub fn detect(frames: &[Frame], p: &Params) -> Vec<Boundary> {
     all.sort_by_key(|b| b.start);
     let mut out: Vec<Boundary> = Vec::new();
     for b in all {
-        if let Some(prev) = out.last_mut() {
-            if b.start <= prev.end + p.min_gap {
-                // a cut inside a gradual run: keep the gradual span; otherwise keep the stronger one
-                if prev.kind == Kind::Gradual || b.kind == Kind::Gradual {
-                    prev.start = prev.start.min(b.start);
-                    prev.end = prev.end.max(b.end);
-                    prev.time = frames[prev.end].time;
-                    prev.start_time = frames[prev.start].time;
-                    prev.kind = Kind::Gradual;
-                    prev.score = prev.score.max(b.score);
-                } else if b.score > prev.score {
-                    *prev = b;
-                }
-                continue;
+        if let Some(prev) = out.last_mut()
+            && b.start <= prev.end + p.min_gap
+        {
+            // a cut inside a gradual run: keep the gradual span; otherwise keep the stronger one
+            if prev.kind == Kind::Gradual || b.kind == Kind::Gradual {
+                prev.start = prev.start.min(b.start);
+                prev.end = prev.end.max(b.end);
+                prev.time = frames[prev.end].time;
+                prev.start_time = frames[prev.start].time;
+                prev.kind = Kind::Gradual;
+                prev.score = prev.score.max(b.score);
+            } else if b.score > prev.score {
+                *prev = b;
             }
+            continue;
         }
         out.push(b);
     }
@@ -539,10 +539,10 @@ pub fn analyze_blocking(
         }
         // the showinfo line may arrive slightly after the frame: fill the time in later
         frames.push(features(&buf, f64::NAN));
-        if frames.len() % 25 == 0 {
-            if let Some(t) = times.lock().unwrap().last() {
-                progress(*t);
-            }
+        if frames.len() % 25 == 0
+            && let Some(t) = times.lock().unwrap().last()
+        {
+            progress(*t);
         }
     }
     if canceled {
