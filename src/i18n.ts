@@ -649,8 +649,9 @@ const en = {
   silenceLevel: "Counts as silence below",
   silenceMin: "Shortest silence",
   silencePad: "Keep at each edge",
+  silenceAuto: "Auto",
   silenceHint:
-    'Raise the level (−30 dB) to catch noisy rooms; lower it (−50 dB) for quiet studios. "Keep at each edge" leaves a little of every pause so words don\'t run into each other.',
+    "Auto measures each file's own background noise, so pauses are found in noisy rooms and quiet studios alike. Pick a level only if it misses pauses (raise it, e.g. −25 dB) or cuts quiet words (lower it). \"Keep at each edge\" leaves a little of every pause so words don't run into each other.",
   secs: (v: number) => `${v} s`,
   copyTimes: "Copy times (table)",
   copyChapters: "Copy as YouTube chapters",
@@ -1384,8 +1385,9 @@ const ar: Dict = {
   silenceLevel: "يُعدّ صمتًا ما هو أهدأ من",
   silenceMin: "أقصر صمت يُحسب",
   silencePad: "اترك من كل طرف",
+  silenceAuto: "تلقائي",
   silenceHint:
-    "ارفع المستوى (−30 dB) لغرفة فيها ضجيج، واخفضه (−50 dB) لاستوديو هادئ. «اترك من كل طرف» يبقي جزءًا صغيرًا من كل وقفة حتى لا يلتصق الكلام ببعضه.",
+    "«تلقائي» يقيس ضجيج الخلفية في كل ملف، فيجد الوقفات في الغرفة المزعجة والاستوديو الهادئ معًا. اختر مستوى بنفسك فقط إن فاتته وقفات (ارفعه، مثل −25 dB) أو قطع كلامًا هادئًا (اخفضه). «اترك من كل طرف» يبقي جزءًا صغيرًا من كل وقفة حتى لا يلتصق الكلام ببعضه.",
   secs: (v) => `${v} ث`,
   copyTimes: "نسخ الأوقات (جدول)",
   copyChapters: "نسخ كفصول YouTube",

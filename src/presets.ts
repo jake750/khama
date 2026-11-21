@@ -428,8 +428,8 @@ export const PRESETS: PresetDef[] = [
     hw: false,
     name: { en: "Find silences", ar: "كشف الصمت" },
     desc: {
-      en: "Finds pauses (−40 dB for 0.6 s by default, both adjustable), lists them under the file in the jobs list, and can cut them out. Handy for talking-head videos.",
-      ar: "يجد فترات السكوت (افتراضيًا أهدأ من −40 dB لمدة 0.6 ث، وتقدر تغيّرهما)، ويكتبها تحت الملف في قائمة المهام، ويحذفها إن أردت. مفيد لفيديوهات الكلام.",
+      en: "Finds pauses of 0.6 s or longer, measured against each file’s own background noise (or a level you pick), lists them under the file in the jobs list, and can cut them out. Handy for talking-head videos.",
+      ar: "يجد فترات السكوت من 0.6 ث فأكثر، مقيسة على ضجيج الخلفية في الملف نفسه (أو مستوى تختاره)، ويكتبها تحت الملف في قائمة المهام، ويحذفها إن أردت. مفيد لفيديوهات الكلام.",
     },
   }),
   P({

@@ -765,12 +765,9 @@ pub(super) async fn run_topics(
     }
 
     // الصمت، لمدة كل موضوع بعد حذفه
-    let dur = o.end.unwrap_or(info.duration.unwrap_or(0.0)) - lo;
-    let args = detect_args("detect_silence", &info.path, o);
-    let Some(log) = run_ffmpeg(c.app, c.id, c.tools, &args, c.work, dur, "analyzing", cancel).await? else {
+    let Some(silences) = detect_silences(c, info, o, cancel).await? else {
         return Ok(None);
     };
-    let silences = parse_markers("detect_silence", &log);
 
     let mut topics = topics_from(&cues, &SegParams::default());
     let end_max = info.duration.unwrap_or(f64::INFINITY).min(hi);

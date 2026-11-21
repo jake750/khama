@@ -12,6 +12,9 @@
 //!       Splits the subtitles into topics and detects the silences, as the "topics" preset does.
 //!       Prints JSON {topics, silences}.
 //!
+//!   khama-bench silence <audio|video> [--opts '<ConvertOptions json>']
+//!       Finds the silences as the "Find silences" preset does. Prints JSON {threshold_db, count, silences}.
+//!
 //! FFmpeg: --ffmpeg <path>, else $KHAMA_FFMPEG, else src-tauri/binaries/ffmpeg/bin.
 
 use std::{path::PathBuf, process::Command, sync::atomic::AtomicBool, time::Instant};
@@ -47,9 +50,11 @@ fn main() {
         Some("scenes") => scenes_cmd(ff, args.split_off(1)),
         Some("separate") => separate_cmd(ff, args.split_off(1)),
         Some("topics") => topics_cmd(ff, args.split_off(1)),
+        Some("silence") => silence_cmd(ff, args.split_off(1)),
         _ => {
             eprintln!("usage: khama-bench scenes <video> [--params json] [--grid file.json] [--dump d.csv]");
             eprintln!("       khama-bench topics <video> <subs> [--opts json]");
+            eprintln!("       khama-bench silence <audio|video> [--opts json]");
             eprintln!("       khama-bench separate <audio> [--voice v.wav] [--music m.wav] [--opts json] [--ai dir]");
             std::process::exit(2);
         }
@@ -153,13 +158,39 @@ fn topics_cmd(ff: PathBuf, mut args: Vec<String>) {
     let cues = clean_cues(parse_subs(&raw));
     let topics = topics_from(&cues, &SegParams::default());
     let seg_ms = t0.elapsed().as_secs_f64() * 1000.0;
-    let out = Command::new(&ff)
-        .args(detect_args("detect_silence", &video, &o))
-        .output()
-        .expect("ffmpeg");
-    let silences = parse_markers("detect_silence", &String::from_utf8_lossy(&out.stderr));
+    let (silences, _) = silences_of(&ff, &video, &o);
     println!(
         "{}",
         json!({ "cues": cues.len(), "segment_ms": seg_ms, "topics": topics, "silences": silences })
+    );
+}
+
+/// الصمت بالكود نفسه الذي يستعمله التطبيق (عتبة تلقائية أو silence_db)
+fn silences_of(ff: &PathBuf, input: &str, o: &khama_lib::topics_bench::ConvertOptions) -> (Vec<[f64; 2]>, Option<f64>) {
+    use khama_lib::topics_bench::silence;
+    let lv = silence::levels_blocking(
+        Command::new(ff),
+        std::path::Path::new(input),
+        o.start,
+        o.end,
+        |_| {},
+        &AtomicBool::new(false),
+    )
+    .expect("ffmpeg")
+    .expect("not canceled");
+    silence::find_silences(&lv, o.silence_db, o.silence_min)
+}
+
+fn silence_cmd(ff: PathBuf, mut args: Vec<String>) {
+    let o: khama_lib::topics_bench::ConvertOptions = take(&mut args, "--opts")
+        .map(|j| serde_json::from_str(&j).expect("opts json"))
+        .unwrap_or_default();
+    let input = args.first().expect("audio or video path").clone();
+    let t0 = Instant::now();
+    let (silences, threshold) = silences_of(&ff, &input, &o);
+    let total: f64 = silences.iter().map(|s| s[1] - s[0]).sum();
+    println!(
+        "{}",
+        json!({ "threshold_db": threshold, "count": silences.len(), "silent_seconds": total, "ms": t0.elapsed().as_millis() as u64, "silences": silences })
     );
 }

@@ -46,6 +46,7 @@ mod run;
 pub use run::*;
 mod topics;
 pub use topics::*;
+pub mod silence;
 #[cfg(test)]
 mod tests;
 #[cfg(desktop)]

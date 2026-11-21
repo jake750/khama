@@ -446,6 +446,12 @@ async fn run_detect(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOption
         return Err(AppError::new("noVideoStream"));
     }
     let dur = o.end.unwrap_or(info.duration.unwrap_or(0.0)) - o.start.unwrap_or(0.0);
+    if p.id == "detect_silence" {
+        let Some(found) = detect_silences(c, info, o, cancel).await? else {
+            return Ok(None);
+        };
+        return Ok(Some((PathBuf::from(&info.path), Some(found.into()))));
+    }
     // المشاهد: خوارزمية خامة (مدرّج ألوان HSV + عتبة متكيّفة + كشف الانتقالات التدريجية)، انظر scenes.rs
     if p.id == "detect_scenes" {
         let t0 = o.start.unwrap_or(0.0);
@@ -483,6 +489,41 @@ async fn run_detect(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOption
         return Ok(None);
     };
     Ok(Some((PathBuf::from(&info.path), Some(parse_markers(p.id, &log).into()))))
+}
+
+/// فترات الصمت بعتبة الملف نفسه (انظر silence.rs)، مع تقدّم «تحليل» على البطاقة
+pub(super) async fn detect_silences(
+    c: &Ctx<'_>,
+    info: &MediaInfo,
+    o: &ConvertOptions,
+    cancel: &mut watch::Receiver<bool>,
+) -> Result<Option<Vec<[f64; 2]>>, AppError> {
+    let t0 = o.start.unwrap_or(0.0);
+    let dur = o.end.unwrap_or(info.duration.unwrap_or(0.0)) - t0;
+    let mut last = std::time::Instant::now() - std::time::Duration::from_secs(1);
+    let levels = silence::levels_file(
+        c.tools,
+        Path::new(&info.path),
+        o.start,
+        o.end,
+        |t| {
+            if dur > 0.0 && last.elapsed() >= std::time::Duration::from_millis(250) {
+                last = std::time::Instant::now();
+                emit(
+                    c.app,
+                    JobUpdate {
+                        id: c.id,
+                        state: "analyzing",
+                        percent: Some(((t - t0) / dur * 100.0).clamp(0.0, 100.0)),
+                        ..Default::default()
+                    },
+                );
+            }
+        },
+        cancel,
+    )
+    .await?;
+    Ok(levels.map(|lv| silence::find_silences(&lv, o.silence_db, o.silence_min).0))
 }
 
 /// إزالة الموسيقى أو الصوت البشري بالنموذج

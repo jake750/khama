@@ -116,4 +116,5 @@ For anything tested by hand that isn't in the lists above, keep one line per che
 | Date | Release | System | Link or file | Steps | Expected | Result | Screenshot |
 |---|---|---|---|---|---|---|---|
 | 2026-11-21 | 0.3.24 | Windows 11 | YouTube 43XWDK6-BbI (8:41, English talk) and rHokT2KpVB0 (Arabic talk, auto-captions) | `khama-bench topics <video> <captions.srt>`; UI with the dev mock: ⋯ → Find topics on a download, then «Clip without silences» | 9 topics close to the 7 tips; 17 topics of 40–180 s for the Arabic talk; the clip request keeps 0.15 s of each silence | As expected. whisper.cpp transcription not run here (first real run is in the released app) | — |
+| 2026-11-21 | 0.3.26 | Windows 11 | 6 voice recordings (WAV, 41–73 s, room noise around −37 dB) and a 9 s tone with digital silence from 6 s | `khama-bench silence <file>`; UI with the dev mock: Tools → Find silences shows «Auto» selected | Before: 0 silences in all 6 at the fixed −40 dB. After: auto level −30.6 to −31.5 dB, 13–23 pauses per file (13–20 s); the tone file gives 6.0–9.0 s at −75 dB. About 0.1 s per file | As expected. Pauses not checked by ear | — |
 | | | | | | | | |

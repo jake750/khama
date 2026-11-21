@@ -833,11 +833,15 @@ export function ConvertView(props: {
                     />
                   </>
                 )}
-                <Pick
+                {/* تلقائي = عتبة تُقاس من ضجيج الملف نفسه؛ -40 الثابتة لم تجد شيئًا في تسجيلات فيها ضجيج غرفة */}
+                <Pick<number | null>
                   label={t.silenceLevel}
-                  value={opts.silenceDb ?? -40}
-                  onChange={(v) => set({ silenceDb: v === -40 ? null : v })}
-                  options={[-30, -35, -40, -45, -50, -60].map((v) => ({ value: v, label: `${v} dB` }))}
+                  value={opts.silenceDb ?? null}
+                  onChange={(v) => set({ silenceDb: v })}
+                  options={[
+                    { value: null, label: t.silenceAuto },
+                    ...[-25, -30, -35, -40, -50, -60].map((v) => ({ value: v, label: `${v} dB` })),
+                  ]}
                 />
                 <Pick
                   label={t.silenceMin}
