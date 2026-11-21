@@ -402,8 +402,8 @@ export const PRESETS: PresetDef[] = [
     hw: false,
     name: { en: "Find scene cuts", ar: "كشف تغيّر المشاهد" },
     desc: {
-      en: "Lists every cut (a picture change above 32%) as marks on the file's card. Copy them, or split the file at those points.",
-      ar: "يعرض كل قطع (تغيّر في الصورة فوق 32%) علامات على بطاقة الملف. انسخها، أو قسّم الملف عندها.",
+      en: "Lists the time of every cut (a picture change above 32%) under the file in the jobs list. Copy them, or split the file there.",
+      ar: "يكتب وقت كل قطع (تغيّر في الصورة فوق 32%) تحت الملف في قائمة المهام. انسخها، أو قسّم الملف عندها.",
     },
   }),
   P({
@@ -415,8 +415,8 @@ export const PRESETS: PresetDef[] = [
     hw: false,
     name: { en: "Find black frames", ar: "كشف الشاشات السوداء" },
     desc: {
-      en: "Finds black gaps of 0.3 s or more (dropped signal, leftover slates) and lists them on the file's card.",
-      ar: "يجد الفراغات السوداء من 0.3 ث فأكثر (انقطاع، أو بقايا في البداية والنهاية) ويعرضها على بطاقة الملف.",
+      en: "Finds black gaps of 0.3 s or more (dropped signal, leftover slates), lists their times under the file in the jobs list, and can cut them out.",
+      ar: "يجد الفراغات السوداء من 0.3 ث فأكثر (انقطاع، أو بقايا في البداية والنهاية)، ويكتب أوقاتها تحت الملف في قائمة المهام، ويحذفها إن أردت.",
     },
   }),
   P({
@@ -428,8 +428,8 @@ export const PRESETS: PresetDef[] = [
     hw: false,
     name: { en: "Find silences", ar: "كشف الصمت" },
     desc: {
-      en: "Finds pauses quieter than −40 dB for 0.6 s or more and lists them on the file's card. Handy for cutting talking-head videos.",
-      ar: "يجد فترات السكوت (أهدأ من −40 dB لمدة 0.6 ث فأكثر) ويعرضها على بطاقة الملف. مفيد لتقطيع فيديوهات الكلام.",
+      en: "Finds pauses (−40 dB for 0.6 s by default, both adjustable), lists them under the file in the jobs list, and can cut them out. Handy for talking-head videos.",
+      ar: "يجد فترات السكوت (افتراضيًا أهدأ من −40 dB لمدة 0.6 ث، وتقدر تغيّرهما)، ويكتبها تحت الملف في قائمة المهام، ويحذفها إن أردت. مفيد لفيديوهات الكلام.",
     },
   }),
 ];

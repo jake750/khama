@@ -112,6 +112,11 @@ export function JobCard(props: {
   onRemove: () => void;
   onConvert?: () => void;
   onSplit?: () => void;
+  /** حذف الصمت أو السواد المكتشف ووصل الباقي */
+  onRemoveFound?: () => void;
+  removeLabel?: string;
+  /** المدة قبل الحذف وبعده (ث) */
+  lengths?: [number, number] | null;
   /** موقعها في الطابور: [الترتيب، عدد المنتظرين] (U-55) */
   queuePos?: [number, number];
   onCopyMarkers?: () => void;
@@ -244,6 +249,14 @@ export function JobCard(props: {
               ))}
               {j.markers.length > 40 && <span className="chip">+{j.markers.length - 40}</span>}
             </div>
+            {props.lengths && (
+              <div className="faint mt-2">{t.lengthAfter(formatTimecode(props.lengths[0]), formatTimecode(props.lengths[1]))}</div>
+            )}
+            {props.onRemoveFound && (
+              <button className="btn btn-sm mt-2" onClick={props.onRemoveFound} title={t.removeHint}>
+                <Icon name="scissors" size={16} /> {props.removeLabel}
+              </button>
+            )}
           </div>
         )}
 

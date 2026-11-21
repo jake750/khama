@@ -98,6 +98,7 @@ export const defaultOptions = (): ConvertOptions => ({
   timecode: false,
   mute: false,
   splitAt: [],
+  cut: [],
 });
 
 const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p;
@@ -193,6 +194,7 @@ const stillOnly = (o: ConvertOptions): ConvertOptions => ({
   mute: false,
   end: null,
   splitAt: [],
+  cut: [],
 });
 
 /**
@@ -474,6 +476,8 @@ export function ConvertView(props: {
       o.end = opts.end ?? info.duration;
     }
     if (kind === "copy") o.mute = opts.mute;
+    if (preset.id === "detect_silence")
+      Object.assign(o, { silenceDb: opts.silenceDb ?? null, silenceMin: opts.silenceMin ?? null, silencePad: opts.silencePad ?? null });
     if (kind === "stems") return o;
     if (showPicture) {
       Object.assign(o, {
@@ -805,6 +809,33 @@ export function ConvertView(props: {
                   />
                 </div>
               )}
+            </div>
+          )}
+
+          {/* كشف الصمت: ما يُعدّ صمتًا، وكم يبقى من طرفيه عند حذفه */}
+          {preset.id === "detect_silence" && (
+            <div className="mt-4">
+              <div className="pick-grid">
+                <Pick
+                  label={t.silenceLevel}
+                  value={opts.silenceDb ?? -40}
+                  onChange={(v) => set({ silenceDb: v === -40 ? null : v })}
+                  options={[-30, -35, -40, -45, -50, -60].map((v) => ({ value: v, label: `${v} dB` }))}
+                />
+                <Pick
+                  label={t.silenceMin}
+                  value={opts.silenceMin ?? 0.6}
+                  onChange={(v) => set({ silenceMin: v === 0.6 ? null : v })}
+                  options={[0.3, 0.4, 0.5, 0.6, 0.8, 1, 1.5, 2, 3].map((v) => ({ value: v, label: t.secs(v) }))}
+                />
+                <Pick
+                  label={t.silencePad}
+                  value={opts.silencePad ?? 0.15}
+                  onChange={(v) => set({ silencePad: v === 0.15 ? null : v })}
+                  options={[0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5].map((v) => ({ value: v, label: t.secs(v) }))}
+                />
+              </div>
+              <div className="faint mt-2">{t.silenceHint}</div>
             </div>
           )}
 

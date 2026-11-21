@@ -171,6 +171,12 @@ export interface ConvertOptions {
   start?: number | null;
   end?: number | null;
   splitAt: number[];
+  /** حذف هذه الفترات [بداية، نهاية] ووصل الباقي */
+  cut: [number, number][];
+  silenceDb?: number | null;
+  silenceMin?: number | null;
+  /** عند حذف الصمت: كم ثانية تبقى من كل طرف */
+  silencePad?: number | null;
   outDir?: string | null;
 }
 

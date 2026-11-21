@@ -38,6 +38,14 @@ pub struct ConvertOptions {
     pub end: Option<f64>,
     /// تقسيم الناتج عند هذه الأوقات (بالثواني)
     pub split_at: Vec<f64>,
+    /// حذف هذه الفترات [بداية، نهاية] (بثواني المصدر) ووصل ما بينها
+    pub cut: Vec<[f64; 2]>,
+    /// كشف الصمت: ما هو أهدأ من هذا المستوى (dB) يُعدّ صمتًا. فارغ = −40
+    pub silence_db: Option<f64>,
+    /// كشف الصمت: أقل مدة (ث) حتى يُعدّ السكوت صمتًا. فارغ = 0.6
+    pub silence_min: Option<f64>,
+    /// عند حذف الصمت: كم ثانية تبقى من كل طرف حتى لا يلتصق الكلام. فارغ = 0.15
+    pub silence_pad: Option<f64>,
     /// مجلد ناتج محدد (مثلًا من مجلد مراقَب). فارغ = حسب الإعدادات
     pub out_dir: Option<String>,
 }
@@ -66,6 +74,10 @@ impl Default for ConvertOptions {
             start: None,
             end: None,
             split_at: Vec::new(),
+            cut: Vec::new(),
+            silence_db: None,
+            silence_min: None,
+            silence_pad: None,
             out_dir: None,
         }
     }

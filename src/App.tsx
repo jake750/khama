@@ -740,6 +740,58 @@ export default function App() {
     ).catch(logError("splitHere"));
   };
 
+  /** الفترات التي ستُحذف: الصمت يُبقي من كل طرف `silencePad` حتى لا يلتصق الكلام */
+  const removalCuts = (j: Job): [number, number][] => {
+    const pad = j.convert?.preset === "detect_silence" ? Math.max(0, j.convert.options.silencePad ?? 0.15) : 0;
+    return (j.markers ?? []).map(([s, e]) => [s + pad, e - pad] as [number, number]).filter(([s, e]) => e - s > 0.01);
+  };
+
+  /** المدة قبل الحذف وبعده (للصمت والسواد) */
+  const removalLengths = (j: Job): [number, number] | null => {
+    if (!j.convert || !["detect_silence", "detect_black"].includes(j.convert.preset)) return null;
+    const dur = files.find((f) => f.path === j.convert!.inputs[0])?.info?.duration;
+    if (!dur) return null;
+    const lo = j.convert.options.start ?? 0;
+    const hi = j.convert.options.end ?? dur;
+    const removed = removalCuts(j).reduce((sum, [s, e]) => sum + Math.max(0, Math.min(e, hi) - Math.max(s, lo)), 0);
+    return [hi - lo, Math.max(0, hi - lo - removed)];
+  };
+
+  /** يحذف الفترات المكتشفة ويصل الباقي، بنفس عائلة المصدر */
+  const removeFound = (j: Job) => {
+    if (!j.convert) return;
+    const cut = removalCuts(j);
+    if (!cut.length) return;
+    const input = j.convert.inputs[0];
+    const info = files.find((f) => f.path === input)?.info;
+    const codec = info?.video?.codec ?? "";
+    const ext = input.split(".").pop()?.toLowerCase() ?? "";
+    const preset = info?.video
+      ? codec === "prores"
+        ? "prores_hq"
+        : codec === "dnxhd"
+          ? "dnxhr_hq"
+          : "edit_h264"
+      : (({ mp3: "mp3", m4a: "aac", aac: "aac", flac: "flac", opus: "opus", ogg: "opus" } as Record<string, string>)[ext] ?? "wav");
+    const label = j.convert.preset === "detect_silence" ? t.removeSilence : t.removeBlack;
+    startConvert(
+      {
+        inputs: [input],
+        preset,
+        options: {
+          ...defaultOptions(),
+          quality: "high",
+          hw: settings.convertHw,
+          start: j.convert.options.start,
+          end: j.convert.options.end,
+          cut,
+        },
+      },
+      baseName(input),
+      `${label} · ${presetById(preset)?.name[lang] ?? preset}`,
+    ).catch(logError("removeFound"));
+  };
+
   const copyText = (text: string, note?: string) => {
     writeText(text)
       .then(() => toast(note ?? t.toastCopied))
@@ -984,6 +1036,13 @@ export default function App() {
                               : undefined
                           }
                           onSplit={j.markers?.length ? () => split(j) : undefined}
+                          onRemoveFound={
+                            j.markers?.length && ["detect_silence", "detect_black"].includes(j.convert?.preset ?? "")
+                              ? () => removeFound(j)
+                              : undefined
+                          }
+                          removeLabel={j.convert?.preset === "detect_silence" ? t.removeSilence : t.removeBlack}
+                          lengths={j.markers?.length ? removalLengths(j) : null}
                           queuePos={j.state === "queued" ? [queuedIds.indexOf(j.id) + 1, queuedIds.length] : undefined}
                           onStartNow={j.type === "download" ? () => api.startNow(j.id).catch(logError("startNow")) : undefined}
                           onCopyMarkers={j.markers?.length ? () => copyMarkers(j) : undefined}

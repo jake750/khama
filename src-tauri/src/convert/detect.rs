@@ -12,11 +12,16 @@ pub fn detect_args(kind: &str, input: &str, o: &ConvertOptions) -> Vec<String> {
     }
     a.extend(["-copyts".into(), "-i".into(), input.to_string()]);
     match kind {
-        "detect_silence" => a.extend(
-            ["-map", "0:a:0", "-af", "silencedetect=n=-40dB:d=0.6"]
-                .iter()
-                .map(|s| s.to_string()),
-        ),
+        "detect_silence" => {
+            let db = o.silence_db.filter(|v| v.is_finite()).unwrap_or(-40.0).clamp(-80.0, -10.0);
+            let d = o.silence_min.filter(|v| v.is_finite()).unwrap_or(0.6).clamp(0.1, 30.0);
+            a.extend([
+                "-map".into(),
+                "0:a:0".into(),
+                "-af".into(),
+                format!("silencedetect=n={db:.0}dB:d={d:.2}"),
+            ]);
+        }
         "detect_black" => a.extend(
             ["-map", "0:v:0", "-vf", "blackdetect=d=0.3:pix_th=0.10"]
                 .iter()

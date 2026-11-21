@@ -390,7 +390,10 @@ pub(super) fn video_filters(p: &Preset, o: &ConvertOptions, v: &VideoInfo, keep_
     if o.timecode {
         f.push(timecode_filter());
     }
-    if keep_ts {
+    // حذف الفترات بعد الترجمة والتايم كود (يتبعان توقيت المصدر)، ثم وصل ما بقي
+    if let Some(e) = cut_expr(o, keep_ts) {
+        f.push(format!("select='{e}',setpts=N/FRAME_RATE/TB"));
+    } else if keep_ts {
         f.push("setpts=PTS-STARTPTS".into());
     }
     if let Some(r) = o.fps.as_deref().and_then(fps_expr) {
@@ -457,6 +460,14 @@ pub fn build_plan(
 ) -> Result<Plan, AppError> {
     let first = infos.first().ok_or_else(|| AppError::new("badInput"))?;
     let merging = infos.len() > 1;
+    // الحذف لملف واحد فقط (أوقاته من ذلك الملف)، ولا يصح مع نسخ بلا ترميز
+    let owned;
+    let o = if !o.cut.is_empty() && (merging || p.kind == PKind::Copy) {
+        owned = ConvertOptions { cut: vec![], ..o.clone() };
+        &owned
+    } else {
+        o
+    };
     let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<String>>();
 
     let needs_video = matches!(p.kind, PKind::Video | PKind::Gif | PKind::Frame | PKind::Sequence);
@@ -471,7 +482,12 @@ pub fn build_plan(
     let end = o.end.filter(|e| *e > start.unwrap_or(0.0));
     let total: f64 = infos.iter().map(|i| i.duration.unwrap_or(0.0)).sum();
     let speed = o.speed.filter(|s| *s > 0.0).unwrap_or(1.0);
-    let span = end.unwrap_or(total) - start.unwrap_or(0.0);
+    let removed: f64 = cut_ranges(o)
+        .iter()
+        .map(|(s, e)| e.min(end.unwrap_or(total)) - s)
+        .filter(|d| *d > 0.0)
+        .sum();
+    let span = end.unwrap_or(total) - start.unwrap_or(0.0) - removed;
     let duration = (span / if p.kind == PKind::Copy { 1.0 } else { speed }).max(0.0);
 
     // الترجمة المحروقة والتايم كود يحتاجان التوقيت الأصلي بعد القص
@@ -596,7 +612,7 @@ pub fn build_plan(
         None
     };
     alabel = asrc.map(|src| {
-        graph.push(audio_graph(o, &src, keep_ts && replace_idx.is_none(), loudnorm));
+        graph.push(audio_graph(o, &src, keep_ts && replace_idx.is_none(), keep_ts, loudnorm));
         "aout".to_string()
     });
 
@@ -635,6 +651,43 @@ pub fn build_plan(
     a.push(output.to_string_lossy().into_owned());
     let duration = if p.kind == PKind::Frame { 0.0 } else { duration };
     Ok(Plan { args: a, duration })
+}
+
+/// الفترات المحذوفة داخل [البداية، النهاية]، مرتبة ومدموجة، بثواني المصدر
+pub(super) fn cut_ranges(o: &ConvertOptions) -> Vec<(f64, f64)> {
+    let lo = o.start.filter(|v| *v > 0.0).unwrap_or(0.0);
+    let hi = o.end.filter(|e| *e > lo).unwrap_or(f64::INFINITY);
+    let mut r: Vec<(f64, f64)> = o
+        .cut
+        .iter()
+        .filter(|[s, e]| s.is_finite() && e.is_finite())
+        .map(|[s, e]| (s.max(lo), e.min(hi)))
+        .filter(|(s, e)| e - s > 0.01)
+        .collect();
+    r.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
+    let mut out: Vec<(f64, f64)> = Vec::new();
+    for (s, e) in r {
+        match out.last_mut() {
+            Some(last) if s <= last.1 => last.1 = last.1.max(e),
+            _ => out.push((s, e)),
+        }
+    }
+    out
+}
+
+/// تعبير select/aselect الذي يُسقط الفترات المحذوفة. `t` بتوقيت المصدر مع -copyts، وإلا من بداية القص
+pub(super) fn cut_expr(o: &ConvertOptions, keep_ts: bool) -> Option<String> {
+    let r = cut_ranges(o);
+    if r.is_empty() {
+        return None;
+    }
+    let off = if keep_ts {
+        0.0
+    } else {
+        o.start.filter(|v| *v > 0.0).unwrap_or(0.0)
+    };
+    let parts: Vec<String> = r.iter().map(|(s, e)| format!("between(t,{:.3},{:.3})", s - off, e - off)).collect();
+    Some(format!("not({})", parts.join("+")))
 }
 
 /// التقسيم عند أوقات محددة (مثلًا عند المشاهد المكتشفة)
@@ -753,9 +806,11 @@ pub(super) fn video_graph(
 }
 
 /// سلسلة فلاتر الصوت من `src` إلى [aout]: تصفير التوقيت بعد القص، والسرعة، وتوحيد الصوت
-fn audio_graph(o: &ConvertOptions, src: &str, reset_ts: bool, loudnorm: Option<&str>) -> String {
+fn audio_graph(o: &ConvertOptions, src: &str, reset_ts: bool, keep_ts: bool, loudnorm: Option<&str>) -> String {
     let mut af: Vec<String> = Vec::new();
-    if reset_ts {
+    if let Some(e) = cut_expr(o, keep_ts) {
+        af.push(format!("aselect='{e}',asetpts=N/SR/TB"));
+    } else if reset_ts {
         af.push("asetpts=PTS-STARTPTS".into());
     }
     if let Some(sp) = o.speed.filter(|s| (*s - 1.0).abs() > 1e-3) {

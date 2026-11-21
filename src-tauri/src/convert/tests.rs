@@ -138,6 +138,35 @@ fn markers() {
 }
 
 #[test]
+fn cut_ranges_merge_and_offset() {
+    let o = ConvertOptions {
+        start: Some(2.0),
+        end: Some(20.0),
+        cut: vec![[5.0, 6.0], [1.0, 3.0], [5.5, 7.0], [19.0, 25.0], [8.0, 8.001]],
+        ..Default::default()
+    };
+    assert_eq!(cut_ranges(&o), vec![(2.0, 3.0), (5.0, 7.0), (19.0, 20.0)]);
+    assert_eq!(
+        cut_expr(&o, false).unwrap(),
+        "not(between(t,0.000,1.000)+between(t,3.000,5.000)+between(t,17.000,18.000))"
+    );
+    assert!(cut_expr(&o, true).unwrap().starts_with("not(between(t,2.000,3.000)"));
+    assert!(cut_expr(&ConvertOptions::default(), false).is_none());
+}
+
+#[test]
+fn detect_silence_params() {
+    let o = ConvertOptions {
+        silence_db: Some(-35.0),
+        silence_min: Some(1.0),
+        ..Default::default()
+    };
+    assert!(detect_args("detect_silence", "in.wav", &o).contains(&"silencedetect=n=-35dB:d=1.00".to_string()));
+    let d = detect_args("detect_silence", "in.wav", &ConvertOptions::default());
+    assert!(d.contains(&"silencedetect=n=-40dB:d=0.60".to_string()));
+}
+
+#[test]
 fn loudnorm_json() {
     let err = "blah\n{\n\t\"input_i\" : \"-20.31\",\n\t\"input_tp\" : \"-3.10\",\n\t\"input_lra\" : \"6.20\",\n\t\"input_thresh\" : \"-30.62\",\n\t\"output_i\" : \"-14.1\",\n\t\"target_offset\" : \"0.12\"\n}\n";
     assert_eq!(

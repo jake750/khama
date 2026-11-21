@@ -46,6 +46,22 @@ loudness: number | null, replaceAudio: string | null, mute: boolean, start: numb
  */
 splitAt: Array<number>, 
 /**
+ * حذف هذه الفترات [بداية، نهاية] (بثواني المصدر) ووصل ما بينها
+ */
+cut: Array<[number, number]>, 
+/**
+ * كشف الصمت: ما هو أهدأ من هذا المستوى (dB) يُعدّ صمتًا. فارغ = −40
+ */
+silenceDb: number | null, 
+/**
+ * كشف الصمت: أقل مدة (ث) حتى يُعدّ السكوت صمتًا. فارغ = 0.6
+ */
+silenceMin: number | null, 
+/**
+ * عند حذف الصمت: كم ثانية تبقى من كل طرف حتى لا يلتصق الكلام. فارغ = 0.15
+ */
+silencePad: number | null, 
+/**
  * مجلد ناتج محدد (مثلًا من مجلد مراقَب). فارغ = حسب الإعدادات
  */
 outDir: string | null, };
