@@ -59,3 +59,19 @@
 [28] Free Software Foundation, "GNU General Public License v3," §5 (aggregates). [Online]. Available: https://www.gnu.org/licenses/gpl-3.0.html
 
 [29] SIL International, "SIL Open Font License 1.1." [Online]. Available: https://openfontlicense.org
+
+[30] H. Zhang, A. Kankanhalli, and S. W. Smoliar, "Automatic partitioning of full-motion video," *Multimedia Systems*, vol. 1, no. 1, pp. 10–28, 1993.
+
+[31] A. Hanjalic, "Shot-boundary detection: unraveled and resolved?," *IEEE Trans. Circuits and Systems for Video Technology*, vol. 12, no. 2, pp. 90–105, 2002.
+
+[32] T. Souček and J. Lokoč, "TransNet V2: An effective deep network architecture for fast shot transition detection," arXiv:2008.04838, 2020.
+
+[33] Z. Li, A. Aaron, I. Katsavounidis, A. Moorthy, and M. Manohara, "Toward a practical perceptual video quality metric," Netflix Technology Blog, 2016. (VMAF)
+
+[34] G. Bjøntegaard, "Calculation of average PSNR differences between RD-curves," ITU-T SG16 VCEG, doc. VCEG-M33, 2001.
+
+[35] F.-R. Stöter, A. Liutkus, and N. Ito, "The 2018 signal separation evaluation campaign," in *Proc. LVA/ICA*, 2018, pp. 293–305.
+
+[36] Xiph.org Foundation, "Xiph.org Video Test Media (derf's collection)." [Online]. Available: https://media.xiph.org/video/derf/
+
+[37] Blender Foundation, "Sintel" (trailer), CC BY 3.0. [Online]. Available: https://durian.blender.org
