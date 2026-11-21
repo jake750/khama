@@ -523,3 +523,14 @@ details.extras > summary > svg:last-child {
   animation-duration: 220ms;
   animation-timing-function: var(--ease-out);
 }
+
+/* قائمة «⋯» انقلبت لأعلى (لا مكان تحتها): تنمو من الزر نحو الأعلى */
+.more-menu-list[data-up] {
+  transform-origin: bottom right;
+}
+[dir="rtl"] .more-menu-list[data-up] {
+  transform-origin: bottom left;
+}
+.more-menu-list {
+  z-index: 60;
+}

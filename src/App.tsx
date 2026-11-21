@@ -11,7 +11,7 @@ import { GuideView } from "./components/GuideView";
 import { HistoryView } from "./components/HistoryView";
 import { Icon, type IconName } from "./components/Icon";
 import { Dialog, useConfirm } from "./components/Dialog";
-import { isActive, JobCard, mergeUpdate, type Job } from "./components/JobCard";
+import { isActive, JobCard, mergeUpdate, overallPercent, type Job } from "./components/JobCard";
 import { SettingsView } from "./components/SettingsView";
 import { Tour, Welcome, type TourStep } from "./components/Tour";
 import { UpdateDialog } from "./components/UpdateDialog";
@@ -871,7 +871,7 @@ export default function App() {
 
   // متوسط تقدّم العمليات الجارية، للخط الرفيع تحت الشريط العلوي
   const running = jobs.filter(isActive);
-  const overall = running.length ? running.reduce((sum, j) => sum + (j.percent ?? 0), 0) / running.length : null;
+  const overall = running.length ? running.reduce((sum, j) => sum + (overallPercent(j) ?? 0), 0) / running.length : null;
 
   return (
     <I18n.Provider value={i18n}>

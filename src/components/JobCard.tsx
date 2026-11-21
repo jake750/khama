@@ -107,6 +107,21 @@ function statusText(t: Dict, j: Job, lang: string, queuePos?: [number, number]):
   }
 }
 
+/** الصورة أكبر من الصوت عادةً بكثير: حصتها من الشريط */
+const VIDEO_SHARE = 85;
+
+/** نسبة التقدّم الكلية للعملية. تنزيل فيديو بصوت منفصل جزءان كل منهما من 0 إلى 100%:
+ * الشريط كان يمتلئ عند نهاية الصورة ثم يعود للصفر، فيبدو أن التنزيل انتهى وهو في منتصفه.
+ * هنا الجزءان شريط واحد متصل. */
+export function overallPercent(j: Pick<Job, "state" | "stage" | "percent" | "request">): number | undefined {
+  const p = j.percent;
+  if (p == null) return undefined;
+  if (j.state !== "downloading" || j.request?.kind === "audio") return p;
+  if (j.stage === "video") return (p * VIDEO_SHARE) / 100;
+  if (j.stage === "audio") return VIDEO_SHARE + (p * (100 - VIDEO_SHARE)) / 100;
+  return p;
+}
+
 /** موضوع كما يُعرض: مدته قبل حذف الصمت وبعده، وهل يصلح ريلًا */
 export interface TopicRow extends Topic {
   before: number;
@@ -182,7 +197,8 @@ export function JobCard(props: {
     extra.push({ label: t.findTopics, icon: "captions", onClick: props.onFindTopics, title: t.findTopicsHint });
   // مرحلة شريط التقدّم: تنزيل، ثم معالجة، ثم ذكاء اصطناعي (D-93)
   const phase = j.state === "separating" ? "ai" : ["processing", "preparing", "converting"].includes(j.state) ? "proc" : "dl";
-  const fill = active && !indeterminate ? (j.percent ?? 0) : 0;
+  const pct = overallPercent(j);
+  const fill = active && !indeterminate ? (pct ?? 0) : 0;
 
   return (
     <div
@@ -233,7 +249,7 @@ export function JobCard(props: {
               {parentDir(j.file)}
             </span>
           )}
-          {active && j.percent != null && !indeterminate && <span className="ltr">{j.percent.toFixed(1)}%</span>}
+          {active && pct != null && !indeterminate && <span className="ltr">{pct.toFixed(1)}%</span>}
           {j.state === "downloading" && j.speed != null && <span>{formatSpeed(t, j.speed)}</span>}
           {(j.state === "downloading" || j.state === "converting" || j.state === "separating") && j.eta != null && (
             <span>{formatEta(t, j.eta)}</span>
@@ -256,9 +272,9 @@ export function JobCard(props: {
             aria-label={j.title}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-valuenow={indeterminate ? undefined : Math.round(j.percent ?? 0)}
+            aria-valuenow={indeterminate ? undefined : Math.round(pct ?? 0)}
           >
-            <div style={{ width: `${j.percent ?? 0}%` }} />
+            <div style={{ width: `${pct ?? 0}%` }} />
           </div>
         )}
 
