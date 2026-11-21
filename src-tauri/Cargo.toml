@@ -45,12 +45,12 @@ serde_json = "1"
 # لتشغيل yt-dlp و ffmpeg كعمليات منفصلة وقراءة مخرجاتها سطرًا بسطر
 tokio = { version = "1", features = ["process", "io-util", "sync", "macros", "time", "fs"] }
 # لفك صفحات سبوتيفاي التي يجلبها yt-dlp (قوائم التشغيل)، ولتحويل الصورة المصغّرة إلى data URL
-base64 = "0.22"
+base64 = "0.23"
 
 # إزالة الموسيقى: ONNX Runtime يُحمَّل وقت التشغيل (يُنزَّل على الكمبيوتر، ومضمّن في تطبيق أندرويد)
-ort = { version = "=2.0.0-rc.10", default-features = false, features = ["load-dynamic"] }
+ort = { version = "=2.0.0-rc.13", default-features = false, features = ["load-dynamic"] }
 rustfft = "6"
-sha2 = "0.10"
+sha2 = "0.11"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 # التحديث التلقائي للتطبيق نفسه، ثم إعادة تشغيله (للكمبيوتر فقط؛ أندرويد يتحدّث من المتجر/الملف)
