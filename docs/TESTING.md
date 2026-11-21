@@ -115,4 +115,5 @@ For anything tested by hand that isn't in the lists above, keep one line per che
 
 | Date | Release | System | Link or file | Steps | Expected | Result | Screenshot |
 |---|---|---|---|---|---|---|---|
+| 2026-11-21 | 0.3.24 | Windows 11 | YouTube 43XWDK6-BbI (8:41, English talk) and rHokT2KpVB0 (Arabic talk, auto-captions) | `khama-bench topics <video> <captions.srt>`; UI with the dev mock: ⋯ → Find topics on a download, then «Clip without silences» | 9 topics close to the 7 tips; 17 topics of 40–180 s for the Arabic talk; the clip request keeps 0.15 s of each silence | As expected. whisper.cpp transcription not run here (first real run is in the released app) | — |
 | | | | | | | | |
