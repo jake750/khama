@@ -13,14 +13,13 @@ pub struct Cue {
 /// "00:01:15,500" ← 75.5
 fn parse_ts(s: &str) -> Option<f64> {
     let s = s.trim().replace(',', ".");
-    let mut parts = s.split(':');
-    let h: f64 = parts.next()?.trim().parse().ok()?;
-    let m: f64 = parts.next()?.trim().parse().ok()?;
-    let sec: f64 = parts.next()?.trim().parse().ok()?;
-    if parts.next().is_some() {
-        return None;
+    // VTT يسمح بـ "01:15.500" بلا ساعات
+    let parts: Vec<f64> = s.split(':').map(|p| p.trim().parse().ok()).collect::<Option<_>>()?;
+    match parts[..] {
+        [h, m, sec] => Some(h * 3600.0 + m * 60.0 + sec),
+        [m, sec] => Some(m * 60.0 + sec),
+        _ => None,
     }
-    Some(h * 3600.0 + m * 60.0 + sec)
 }
 
 /// 75.5 ← "00:01:15,500"
@@ -102,7 +101,8 @@ mod tests {
     fn timestamps_round_trip() {
         assert_eq!(parse_ts("00:01:15,500"), Some(75.5));
         assert_eq!(parse_ts("1:02:03.25"), Some(3723.25), "نقطة بدل الفاصلة");
-        assert_eq!((parse_ts("01:15"), parse_ts("0:0:1:2"), parse_ts("x:0:0")), (None, None, None));
+        assert_eq!(parse_ts("01:15.5"), Some(75.5), "VTT بلا ساعات");
+        assert_eq!((parse_ts("0:0:1:2"), parse_ts("x:0:0"), parse_ts("15")), (None, None, None));
         assert_eq!(fmt_ts(75.5), "00:01:15,500");
         assert_eq!(fmt_ts(-3.0), "00:00:00,000", "لا وقت سالب");
         assert_eq!(fmt_ts(3723.2496), "01:02:03,250");

@@ -231,6 +231,13 @@ pub(super) const PRESETS: &[Preset] = &[
         ext: "",
         suffix: "",
     },
+    // تحليل المواضيع: النص (ترجمة أو تفريغ) ← مواضيع بأوقاتها، مع الصمت لحساب المدة بعد حذفه
+    Preset {
+        id: "topics",
+        kind: PKind::Detect,
+        ext: "",
+        suffix: "",
+    },
 ];
 
 pub fn preset(id: &str) -> Option<Preset> {

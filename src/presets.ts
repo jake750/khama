@@ -432,6 +432,19 @@ export const PRESETS: PresetDef[] = [
       ar: "يجد فترات السكوت (افتراضيًا أهدأ من −40 dB لمدة 0.6 ث، وتقدر تغيّرهما)، ويكتبها تحت الملف في قائمة المهام، ويحذفها إن أردت. مفيد لفيديوهات الكلام.",
     },
   }),
+  P({
+    id: "topics",
+    group: "tools",
+    kind: "detect",
+    ext: "",
+    quality: false,
+    hw: false,
+    name: { en: "Find topics (for Reels)", ar: "استخراج المواضيع (للريلز)" },
+    desc: {
+      en: "Reads the speech (subtitles, or transcribes it), splits it into topics with start and end times, marks the ones that fit a Reel, and shows each one's length before and after removing silences. Export any topic as a clip.",
+      ar: "يقرأ الكلام (من الترجمة، أو يفرّغه)، ويقسّمه إلى مواضيع ببدايتها ونهايتها، ويحدّد ما يصلح منها ريلًا، ويعرض مدة كل موضوع قبل حذف الصمت وبعده. صدّر أي موضوع مقطعًا مستقلًا.",
+    },
+  }),
 ];
 
 // قاعدة الأسماء (F-95): أسماء الصيغ والكودكات تبقى كما هي (ProRes 422 HQ، DNxHR SQ)،
@@ -443,7 +456,7 @@ export const GROUPS: PresetGroup[] = ["edit", "publish", "audio", "tools"];
 /** هل يمكن تطبيق هذا الـ Preset على هذا الملف؟ */
 export function presetFits(p: PresetDef, m?: MediaInfo | null): boolean {
   if (!m) return true;
-  if (p.id === "detect_silence") return m.audio.length > 0;
+  if (p.id === "detect_silence" || p.id === "topics") return m.audio.length > 0;
   if (p.kind === "audio" || p.kind === "stems") return m.audio.length > 0;
   if (p.kind === "copy") return true;
   return !!m.video;

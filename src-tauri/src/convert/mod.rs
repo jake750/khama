@@ -44,6 +44,8 @@ mod preview;
 pub use preview::*;
 mod run;
 pub use run::*;
+mod topics;
+pub use topics::*;
 #[cfg(test)]
 mod tests;
 #[cfg(desktop)]

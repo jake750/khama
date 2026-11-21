@@ -12,6 +12,11 @@ mod persist;
 mod playlist;
 pub mod scenes;
 pub mod separate;
+/// لأداة khama-bench: تحليل المواضيع بالكود نفسه على ملفات تجربة
+pub mod topics_bench {
+    pub use crate::convert::{ConvertOptions, SegParams, Topic, clean_cues, detect_args, parse_markers, topics_from};
+    pub use crate::srt::parse as parse_subs;
+}
 mod settings;
 mod srt;
 mod tools;

@@ -117,7 +117,7 @@ static SETUP: AsyncMutex<()> = AsyncMutex::const_new(());
 /// ONNX Runtime يُحمَّل مرة واحدة في عمر التطبيق
 static ORT_READY: std::sync::OnceLock<Result<(), String>> = std::sync::OnceLock::new();
 
-fn ai_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
+pub(crate) fn ai_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
     Ok(app
         .path()
         .app_local_data_dir()
@@ -125,7 +125,7 @@ fn ai_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
         .join("ai"))
 }
 
-fn sha256_file(path: &Path) -> std::io::Result<String> {
+pub(crate) fn sha256_file(path: &Path) -> std::io::Result<String> {
     let mut f = std::fs::File::open(path)?;
     let mut h = Sha256::new();
     let mut buf = vec![0u8; 1 << 20];
@@ -151,7 +151,7 @@ fn curl() -> PathBuf {
     PathBuf::from("curl")
 }
 
-fn tar() -> PathBuf {
+pub(crate) fn tar() -> PathBuf {
     if cfg!(windows) {
         // tar الخاص بـ Windows (bsdtar) يفك ملفات zip أيضًا
         let sys = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".into());
@@ -161,7 +161,7 @@ fn tar() -> PathBuf {
 }
 
 /// ينزّل ملفًا مع إرسال التقدّم (نقيس حجم الملف الجزئي) وإمكانية الإلغاء
-async fn fetch(
+pub(crate) async fn fetch(
     app: &AppHandle,
     url: &str,
     dest: &Path,

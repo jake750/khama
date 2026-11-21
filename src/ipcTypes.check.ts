@@ -27,4 +27,5 @@ export const checks: true[] = [
   true as Keys<api.JobUpdate, rs.JobUpdate>,
   true as Keys<api.ToolsInfo, rs.ToolsInfo>,
   true as Keys<api.SubLang, rs.SubLang>,
+  true as Keys<api.Topic, rs.Topic>,
 ];

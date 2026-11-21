@@ -8,6 +8,10 @@
 //!       Runs the voice/music separation (one model pass) with the given SepOptions. Prints JSON timings.
 //!       --ai: folder with onnxruntime and UVR-MDX-NET-Voc_FT.onnx (default: the app's own data folder).
 //!
+//!   khama-bench topics <video> <subs.srt|vtt> [--opts '<ConvertOptions json>']
+//!       Splits the subtitles into topics and detects the silences, as the "topics" preset does.
+//!       Prints JSON {topics, silences}.
+//!
 //! FFmpeg: --ffmpeg <path>, else $KHAMA_FFMPEG, else src-tauri/binaries/ffmpeg/bin.
 
 use std::{path::PathBuf, process::Command, sync::atomic::AtomicBool, time::Instant};
@@ -42,8 +46,10 @@ fn main() {
     match args.first().map(String::as_str) {
         Some("scenes") => scenes_cmd(ff, args.split_off(1)),
         Some("separate") => separate_cmd(ff, args.split_off(1)),
+        Some("topics") => topics_cmd(ff, args.split_off(1)),
         _ => {
             eprintln!("usage: khama-bench scenes <video> [--params json] [--grid file.json] [--dump d.csv]");
+            eprintln!("       khama-bench topics <video> <subs> [--opts json]");
             eprintln!("       khama-bench separate <audio> [--voice v.wav] [--music m.wav] [--opts json] [--ai dir]");
             std::process::exit(2);
         }
@@ -132,5 +138,28 @@ fn separate_cmd(ff: PathBuf, mut args: Vec<String>) {
     println!(
         "{}",
         json!({ "ok": ok, "seconds": secs, "audio_seconds": audio, "rtf": secs / audio.max(1e-9), "opts": opts })
+    );
+}
+
+fn topics_cmd(ff: PathBuf, mut args: Vec<String>) {
+    use khama_lib::topics_bench::*;
+    let o: ConvertOptions = take(&mut args, "--opts")
+        .map(|j| serde_json::from_str(&j).expect("opts json"))
+        .unwrap_or_default();
+    let video = args.first().expect("video path").clone();
+    let subs = args.get(1).expect("subtitle path");
+    let raw = String::from_utf8_lossy(&std::fs::read(subs).expect("read subs")).into_owned();
+    let t0 = Instant::now();
+    let cues = clean_cues(parse_subs(&raw));
+    let topics = topics_from(&cues, &SegParams::default());
+    let seg_ms = t0.elapsed().as_secs_f64() * 1000.0;
+    let out = Command::new(&ff)
+        .args(detect_args("detect_silence", &video, &o))
+        .output()
+        .expect("ffmpeg");
+    let silences = parse_markers("detect_silence", &String::from_utf8_lossy(&out.stderr));
+    println!(
+        "{}",
+        json!({ "cues": cues.len(), "segment_ms": seg_ms, "topics": topics, "silences": silences })
     );
 }

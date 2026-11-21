@@ -177,6 +177,11 @@ export interface ConvertOptions {
   silenceMin?: number | null;
   /** عند حذف الصمت: كم ثانية تبقى من كل طرف */
   silencePad?: number | null;
+  /** تحليل المواضيع: رابط الصفحة التي نُزّل منها الملف، لأخذ ترجمتها */
+  sourceUrl?: string | null;
+  /** تحليل المواضيع: المدة المناسبة لريل (ث). فارغ = 15 و90 */
+  reelMin?: number | null;
+  reelMax?: number | null;
   outDir?: string | null;
 }
 
@@ -280,6 +285,16 @@ export interface ScheduledItem {
   thumbnail?: string | null;
 }
 
+/** موضوع من تحليل المواضيع (بثواني الملف) */
+export interface Topic {
+  start: number;
+  end: number;
+  /** أكثر الكلمات تميّزًا */
+  title: string;
+  /** أول الكلام */
+  text: string;
+}
+
 export interface JobUpdate {
   id: number;
   state: JobState;
@@ -290,6 +305,10 @@ export interface JobUpdate {
   file?: string;
   error?: AppError;
   markers?: [number, number][];
+  /** تحليل المواضيع (الصمت المكتشف في markers) */
+  topics?: Topic[];
+  /** من أين جاء النص */
+  transcript?: "subtitles" | "captions" | "speech";
   /** العنوان والصورة من yt-dlp أثناء التنزيل */
   title?: string;
   thumbnail?: string;

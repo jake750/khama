@@ -14,5 +14,6 @@ export type { Project } from "./Project";
 export type { Settings } from "./Settings";
 export type { SubLang } from "./SubLang";
 export type { ToolsInfo } from "./ToolsInfo";
+export type { Topic } from "./Topic";
 export type { VideoInfo } from "./VideoInfo";
 export type { WatchFolder } from "./WatchFolder";

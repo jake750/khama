@@ -26,6 +26,7 @@ import { logError } from "./log";
 import { nextTheme } from "./theme";
 import { limiter } from "./limit";
 import { announceUpdate } from "./whatsNew";
+import { REEL_MAX, REEL_MIN, silenceCuts, topicRows, topicsText } from "./topics";
 import { optionsFromMeta } from "./downloadPlan";
 
 /** تحليل الملفات المضافة للمحوّل: 4 في كل مرة (U-93) */
@@ -522,8 +523,8 @@ export default function App() {
   }, [launch, scheduledLoaded]);
 
   const startConvert = useCallback(
-    async (convert: ConvertRequest, title: string, meta: string, lastError?: AppError) => {
-      await launch({ type: "convert", convert, title, meta, lastError }, (id) => api.startConvert(convert, id));
+    async (convert: ConvertRequest, title: string, meta: string, lastError?: AppError, inDownloads?: boolean) => {
+      await launch({ type: "convert", convert, title, meta, lastError, inDownloads }, (id) => api.startConvert(convert, id));
     },
     [launch],
   );
@@ -676,7 +677,8 @@ export default function App() {
     );
 
   const outputDir = settings.outputDir || defaultDir;
-  const shown = jobs.filter((j) => (tab === "convert" ? j.type === "convert" : j.type === "download"));
+  // تحليل مواضيع بدأ من بطاقة تنزيل يبقى في قائمة التنزيلات
+  const shown = jobs.filter((j) => (tab === "convert" ? j.type === "convert" && !j.inDownloads : j.type === "download" || !!j.inDownloads));
   const finished = shown.filter((j) => !isActive(j) && j.state !== "scheduled");
   const doneFiles = shown.filter((j) => j.state === "done" && j.file).map((j) => j.file!);
 
@@ -710,7 +712,7 @@ export default function App() {
     setJobs((p) => p.filter((x) => x.id !== j.id));
     if (j.type === "download" && j.request)
       startDownload(j.request, { title: j.title, thumbnail: j.thumbnail, lastError: j.error }).catch(logError("retryDownload"));
-    if (j.type === "convert" && j.convert) startConvert(j.convert, j.title, j.meta, j.error).catch(logError("retryConvert"));
+    if (j.type === "convert" && j.convert) startConvert(j.convert, j.title, j.meta, j.error, j.inDownloads).catch(logError("retryConvert"));
   };
 
   /** من نتائج الكشف: نقاط القطع = بداية المشهد، أو منتصف الفراغ الأسود/الصامت */
@@ -757,22 +759,26 @@ export default function App() {
     return [hi - lo, Math.max(0, hi - lo - removed)];
   };
 
+  /** صيغة الناتج عند القص والحذف: بنفس عائلة المصدر (ملف من التنزيلات قد لا يكون في قائمة المحوّل) */
+  const sameFamily = (input: string): string => {
+    const info = files.find((f) => f.path === input)?.info;
+    const codec = info?.video?.codec ?? "";
+    const ext = input.split(".").pop()?.toLowerCase() ?? "";
+    const audio = ({ mp3: "mp3", m4a: "aac", aac: "aac", flac: "flac", opus: "opus", ogg: "opus", wav: "wav" } as Record<string, string>)[
+      ext
+    ];
+    const hasVideo = info ? !!info.video : !audio;
+    if (!hasVideo) return audio ?? "wav";
+    return codec === "prores" ? "prores_hq" : codec === "dnxhd" ? "dnxhr_hq" : "edit_h264";
+  };
+
   /** يحذف الفترات المكتشفة ويصل الباقي، بنفس عائلة المصدر */
   const removeFound = (j: Job) => {
     if (!j.convert) return;
     const cut = removalCuts(j);
     if (!cut.length) return;
     const input = j.convert.inputs[0];
-    const info = files.find((f) => f.path === input)?.info;
-    const codec = info?.video?.codec ?? "";
-    const ext = input.split(".").pop()?.toLowerCase() ?? "";
-    const preset = info?.video
-      ? codec === "prores"
-        ? "prores_hq"
-        : codec === "dnxhd"
-          ? "dnxhr_hq"
-          : "edit_h264"
-      : (({ mp3: "mp3", m4a: "aac", aac: "aac", flac: "flac", opus: "opus", ogg: "opus" } as Record<string, string>)[ext] ?? "wav");
+    const preset = sameFamily(input);
     const label = j.convert.preset === "detect_silence" ? t.removeSilence : t.removeBlack;
     startConvert(
       {
@@ -790,6 +796,56 @@ export default function App() {
       baseName(input),
       `${label} · ${presetById(preset)?.name[lang] ?? preset}`,
     ).catch(logError("removeFound"));
+  };
+
+  /** تحليل المواضيع: مدة الريل المختارة، والصفوف بمدتها بعد حذف الصمت */
+  const reelRange = (j: Job): [number, number] => [j.convert?.options.reelMin ?? REEL_MIN, j.convert?.options.reelMax ?? REEL_MAX];
+  const silencePad = (j: Job) => Math.max(0, j.convert?.options.silencePad ?? 0.15);
+  const rowsOf = (j: Job) => (j.topics ? topicRows(j.topics, j.markers ?? [], silencePad(j), reelRange(j)) : undefined);
+
+  /** يصدّر موضوعًا مقطعًا (tight = بلا صمت) */
+  const topicClip = (j: Job, i: number, tight: boolean) => {
+    const tp = j.topics?.[i];
+    if (!j.convert || !tp) return;
+    const input = j.convert.inputs[0];
+    const preset = sameFamily(input);
+    const label = `${tight ? t.topicClipTight : t.topicClip} ${i + 1}`;
+    startConvert(
+      {
+        inputs: [input],
+        preset,
+        options: {
+          ...defaultOptions(),
+          quality: "high",
+          hw: settings.convertHw,
+          start: tp.start,
+          end: tp.end,
+          cut: tight ? silenceCuts(j.markers ?? [], silencePad(j), tp.start, tp.end) : [],
+        },
+      },
+      `${baseName(input)} · ${tp.title || formatTimecode(tp.start)}`,
+      `${label} · ${presetById(preset)?.name[lang] ?? preset}`,
+      undefined,
+      j.inDownloads,
+    ).catch(logError("topicClip"));
+  };
+
+  /** من بطاقة تنزيل مكتمل: تحليل مواضيعه، مع رابط الصفحة لأخذ ترجمتها (إن نُزّل كاملًا) */
+  const findTopics = (j: Job) => {
+    if (!j.file) return;
+    const r = j.request;
+    const whole = r && !r.clips?.length && r.start == null && r.end == null;
+    startConvert(
+      {
+        inputs: [j.file],
+        preset: "topics",
+        options: { ...defaultOptions(), sourceUrl: whole && /^https?:\/\//.test(r.url) ? r.url : null },
+      },
+      j.title,
+      presetById("topics")?.name[lang] ?? "topics",
+      undefined,
+      true,
+    ).catch(logError("findTopics"));
   };
 
   const copyText = (text: string, note?: string) => {
@@ -1035,19 +1091,19 @@ export default function App() {
                                 }
                               : undefined
                           }
-                          onSplit={j.markers?.length ? () => split(j) : undefined}
+                          onSplit={j.markers?.length && !j.topics ? () => split(j) : undefined}
                           onRemoveFound={
                             j.markers?.length && ["detect_silence", "detect_black"].includes(j.convert?.preset ?? "")
                               ? () => removeFound(j)
                               : undefined
                           }
                           removeLabel={j.convert?.preset === "detect_silence" ? t.removeSilence : t.removeBlack}
-                          lengths={j.markers?.length ? removalLengths(j) : null}
+                          lengths={j.markers?.length && !j.topics ? removalLengths(j) : null}
                           queuePos={j.state === "queued" ? [queuedIds.indexOf(j.id) + 1, queuedIds.length] : undefined}
                           onStartNow={j.type === "download" ? () => api.startNow(j.id).catch(logError("startNow")) : undefined}
-                          onCopyMarkers={j.markers?.length ? () => copyMarkers(j) : undefined}
+                          onCopyMarkers={j.markers?.length && !j.topics ? () => copyMarkers(j) : undefined}
                           onCopyChapters={
-                            j.markers?.length
+                            j.markers?.length && !j.topics
                               ? () =>
                                   copyText(
                                     youtubeChapters(
@@ -1059,6 +1115,11 @@ export default function App() {
                               : undefined
                           }
                           onDragOut={!isMobile && j.file ? () => dragOut(j.file!, j.thumbnail) : undefined}
+                          topicRows={rowsOf(j)}
+                          reelRange={j.topics ? reelRange(j) : undefined}
+                          onCopyTopics={j.topics?.length ? () => copyText(topicsText(rowsOf(j)!, t.topicReel), t.topicsCopied) : undefined}
+                          onTopicClip={j.topics?.length ? (i, tight) => topicClip(j, i, tight) : undefined}
+                          onFindTopics={j.type === "download" && j.file ? () => findTopics(j) : undefined}
                         />
                       ))}
                     </AnimatedList>

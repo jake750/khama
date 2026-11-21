@@ -389,6 +389,12 @@ pub struct JobUpdate {
     /// نتائج الكشف (مشاهد، لقطات سوداء، صمت): [بداية، نهاية]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub markers: Option<Vec<[f64; 2]>>,
+    /// تحليل المواضيع: المواضيع بأوقاتها (والصمت المكتشف في markers)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub topics: Option<Vec<crate::convert::Topic>>,
+    /// من أين جاء النص: "subtitles" (ملف ترجمة) | "captions" (ترجمة الموقع) | "speech" (تفريغ الكلام)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transcript: Option<&'static str>,
     /// عنوان الفيديو وصورته كما طبعهما yt-dlp قبل التنزيل (T-43)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,

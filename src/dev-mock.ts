@@ -162,6 +162,53 @@ function fakeJob(id: number) {
   }, 600);
 }
 
+/** تحليل المواضيع: نتيجة حقيقية من khama-bench على فيديو كلام (مختصرة) */
+function fakeTopics(id: number) {
+  emit("job-update", { id, state: "analyzing", percent: 40 });
+  setTimeout(
+    () =>
+      emit("job-update", {
+        id,
+        state: "done",
+        percent: 100,
+        transcript: "captions",
+        markers: [
+          [60.2, 63.4],
+          [120.5, 121.6],
+          [300.1, 302.9],
+        ],
+        topics: [
+          { start: 0.2, end: 51, title: "passionate · seven · tips", text: "what are seven tips for presenting on camera let's find out…" },
+          {
+            start: 51,
+            end: 89.8,
+            title: "gotta · boring · business",
+            text: "business presentation in front of the camera they're not passionate…",
+          },
+          {
+            start: 89.8,
+            end: 137.8,
+            title: "almost · touching · head",
+            text: "here's what a lot of people do they're presenting like this…",
+          },
+          {
+            start: 137.8,
+            end: 231.9,
+            title: "looking · lens · look",
+            text: "it's not supposed to be in the middle this does not look good…",
+          },
+          {
+            start: 282,
+            end: 319.9,
+            title: "يسيء · بنفسه · الظن",
+            text: "أن العلاقة مع الذات قائمة على التزكية. تقول أن الذات جسد وشيء آخر…",
+          },
+        ],
+      }),
+    800,
+  );
+}
+
 async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<unknown> {
   await new Promise((r) => setTimeout(r, 120));
   switch (cmd) {
@@ -268,7 +315,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       };
       if (req.history)
         pending.set(id, { ...req.history, url: req.url ?? "", kind: cmd === "start_convert" ? "convert" : (req.kind ?? "video") });
-      setTimeout(() => fakeJob(id), 50);
+      if ((args.request as { preset?: string } | undefined)?.preset === "topics") setTimeout(() => fakeTopics(id), 50);
+      else setTimeout(() => fakeJob(id), 50);
       return id;
     }
     case "plugin:event|listen": {

@@ -83,12 +83,7 @@ pub(super) async fn run_ffmpeg(
     }
 }
 
-pub(super) async fn run_convert(
-    app: &AppHandle,
-    id: u64,
-    req: ConvertRequest,
-    cancel: &mut watch::Receiver<bool>,
-) -> Result<Option<(PathBuf, Option<Vec<[f64; 2]>>)>, AppError> {
+pub(super) async fn run_convert(app: &AppHandle, id: u64, req: ConvertRequest, cancel: &mut watch::Receiver<bool>) -> Converted {
     let p = preset(&req.preset).ok_or_else(|| AppError::with_param("unknownPreset", req.preset.clone(), ""))?;
     let o = &req.options;
     if req.inputs.is_empty() {
@@ -339,12 +334,14 @@ pub fn queue_convert(app: &AppHandle, request: ConvertRequest, id: Option<u64>) 
             _ => Ok(None),
         };
         let update = match result {
-            Ok(Some((path, markers))) => JobUpdate {
+            Ok(Some((path, found))) => JobUpdate {
                 id,
                 state: "done",
                 percent: Some(100.0),
-                file: markers.is_none().then(|| path.to_string_lossy().into_owned()),
-                markers,
+                file: found.is_none().then(|| path.to_string_lossy().into_owned()),
+                transcript: found.as_ref().and_then(|f| f.transcript),
+                topics: found.as_ref().and_then(|f| f.topics.clone()),
+                markers: found.map(|f| f.markers),
                 ..Default::default()
             },
             Ok(None) | Err(_) if *rx.borrow() => JobUpdate {
@@ -402,18 +399,46 @@ pub(super) fn convert_history_entry(source: &str, preset: &str, out: &Path, now_
     }
 }
 
-type Converted = Result<Option<(PathBuf, Option<Vec<[f64; 2]>>)>, AppError>;
+type Converted = Result<Option<(PathBuf, Option<Found>)>, AppError>;
+
+/// نتائج الكشف (بدل ملف ناتج)
+pub(super) struct Found {
+    pub markers: Vec<[f64; 2]>,
+    pub topics: Option<Vec<Topic>>,
+    pub transcript: Option<&'static str>,
+}
+
+impl From<Vec<[f64; 2]>> for Found {
+    fn from(markers: Vec<[f64; 2]>) -> Self {
+        Self {
+            markers,
+            topics: None,
+            transcript: None,
+        }
+    }
+}
 
 /// ما تحتاجه مراحل التحويل كلها
-struct Ctx<'a> {
-    app: &'a AppHandle,
-    id: u64,
-    tools: &'a Tools,
-    work: &'a Path,
+pub(super) struct Ctx<'a> {
+    pub app: &'a AppHandle,
+    pub id: u64,
+    pub tools: &'a Tools,
+    pub work: &'a Path,
 }
 
 /// الكشف: لا ملف ناتج، فقط قائمة أوقات
 async fn run_detect(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOptions, cancel: &mut watch::Receiver<bool>) -> Converted {
+    if p.id == "topics" {
+        let Some(r) = run_topics(c, info, o, cancel).await? else {
+            return Ok(None);
+        };
+        let found = Found {
+            markers: r.silences,
+            topics: Some(r.topics),
+            transcript: Some(r.source),
+        };
+        return Ok(Some((PathBuf::from(&info.path), Some(found))));
+    }
     if p.id == "detect_silence" && info.audio.is_empty() {
         return Err(AppError::new("noAudioStream"));
     }
@@ -451,13 +476,13 @@ async fn run_detect(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOption
         )
         .await?;
         let Some(found) = found else { return Ok(None) };
-        return Ok(Some((path, Some(found.iter().map(|b| b.marker()).collect()))));
+        return Ok(Some((path, Some(found.iter().map(|b| b.marker()).collect::<Vec<_>>().into()))));
     }
     let args = detect_args(p.id, &info.path, o);
     let Some(log) = run_ffmpeg(c.app, c.id, c.tools, &args, c.work, dur, "analyzing", cancel).await? else {
         return Ok(None);
     };
-    Ok(Some((PathBuf::from(&info.path), Some(parse_markers(p.id, &log)))))
+    Ok(Some((PathBuf::from(&info.path), Some(parse_markers(p.id, &log).into()))))
 }
 
 /// إزالة الموسيقى أو الصوت البشري بالنموذج

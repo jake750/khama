@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import type { AppError, ConvertRequest, DownloadRequest, JobState, JobUpdate } from "../api";
+import type { AppError, ConvertRequest, DownloadRequest, JobState, JobUpdate, Topic } from "../api";
 import { formatDuration, formatEta, formatSpeed, formatTimecode } from "../format";
 import { errorText, numLocale, useI18n, type Dict } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
@@ -27,6 +27,11 @@ export interface Job {
   /** خطأ المحاولة السابقة عند «أعد» (U-61) */
   lastError?: AppError;
   markers?: [number, number][];
+  /** تحليل المواضيع: المواضيع، ومن أين جاء النص */
+  topics?: Topic[];
+  transcript?: "subtitles" | "captions" | "speech";
+  /** تحويل بدأ من بطاقة تنزيل (تحليل المواضيع): يظهر في قائمة التنزيلات */
+  inDownloads?: boolean;
   /** صورة الفيديو (من المعاينة) */
   thumbnail?: string | null;
   /** تنزيل مجدول: وقت البدء (ms) */
@@ -93,12 +98,20 @@ function statusText(t: Dict, j: Job, lang: string, queuePos?: [number, number]):
     case "converting":
       return j.type === "convert" ? t.stEncoding : t.stConverting;
     case "done":
+      if (j.topics) return t.topicsFound(j.topics.length);
       return j.markers ? (j.markers.length ? t.markersFound(j.markers.length) : t.markersNone) : t.stDone;
     case "canceled":
       return t.stCanceled;
     case "error":
       return t.stError;
   }
+}
+
+/** موضوع كما يُعرض: مدته قبل حذف الصمت وبعده، وهل يصلح ريلًا */
+export interface TopicRow extends Topic {
+  before: number;
+  after: number;
+  reel: boolean;
 }
 
 export function JobCard(props: {
@@ -125,6 +138,14 @@ export function JobCard(props: {
   onStartNow?: () => void;
   /** سحب الملف المكتمل إلى برنامج آخر (الكمبيوتر فقط) */
   onDragOut?: () => void;
+  /** تحليل المواضيع: الصفوف بمدتها بعد حذف الصمت، ومدة الريل [أقصر، أطول] */
+  topicRows?: TopicRow[];
+  reelRange?: [number, number];
+  onCopyTopics?: () => void;
+  /** تصدير موضوع مقطعًا، وtight = بلا صمت */
+  onTopicClip?: (i: number, tight: boolean) => void;
+  /** بطاقة تنزيل مكتمل: حلّل مواضيعه */
+  onFindTopics?: () => void;
 }) {
   const { t, lang } = useI18n();
   const j = props.job;
@@ -157,6 +178,8 @@ export function JobCard(props: {
   if (j.state === "done" && props.onSplit) extra.push({ label: t.splitHere, icon: "scissors", onClick: props.onSplit, title: t.splitHint });
   if (j.state === "done" && props.onCopyMarkers) extra.push({ label: t.copyTimes, icon: "paste", onClick: props.onCopyMarkers });
   if (j.state === "done" && props.onCopyChapters) extra.push({ label: t.copyChapters, icon: "list", onClick: props.onCopyChapters });
+  if (j.state === "done" && props.onFindTopics)
+    extra.push({ label: t.findTopics, icon: "captions", onClick: props.onFindTopics, title: t.findTopicsHint });
   // مرحلة شريط التقدّم: تنزيل، ثم معالجة، ثم ذكاء اصطناعي (D-93)
   const phase = j.state === "separating" ? "ai" : ["processing", "preparing", "converting"].includes(j.state) ? "proc" : "dl";
   const fill = active && !indeterminate ? (j.percent ?? 0) : 0;
@@ -239,7 +262,62 @@ export function JobCard(props: {
           </div>
         )}
 
-        {j.state === "done" && j.markers && j.markers.length > 0 && (
+        {j.state === "done" && props.topicRows && props.topicRows.length > 0 && (
+          <div className="markers topics">
+            <div className="faint">
+              {[
+                j.transcript ? t.topicsFrom[j.transcript] : "",
+                props.reelRange ? t.topicsReels(props.topicRows.filter((r) => r.reel).length) : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </div>
+            <ol className="topic-list">
+              {props.topicRows.map((r, i) => (
+                <li key={i} className={`topic${r.reel ? " is-reel" : ""}`}>
+                  <div className="topic-head">
+                    <span className="chip ltr">
+                      {formatTimecode(r.start)}–{formatTimecode(r.end)}
+                    </span>
+                    {r.reel && props.reelRange && (
+                      <span className="chip chip-reel" title={t.topicReelHint(...props.reelRange)}>
+                        {t.topicReel}
+                      </span>
+                    )}
+                    <span className="faint">{t.topicLength(formatDuration(r.before), formatDuration(r.after))}</span>
+                  </div>
+                  {r.title && (
+                    <div className="topic-title" dir="auto">
+                      {r.title}
+                    </div>
+                  )}
+                  <div className="faint topic-text" dir="auto">
+                    {r.text}
+                  </div>
+                  {props.onTopicClip && (
+                    <div className="marker-actions">
+                      <button className="btn btn-sm" onClick={() => props.onTopicClip!(i, false)} title={t.topicClipHint}>
+                        <Icon name="scissors" size={14} /> {t.topicClip}
+                      </button>
+                      {r.after < r.before - 0.05 && (
+                        <button className="btn btn-sm" onClick={() => props.onTopicClip!(i, true)} title={t.topicClipTightHint}>
+                          <Icon name="wave" size={14} /> {t.topicClipTight}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ol>
+            {props.onCopyTopics && (
+              <button className="btn btn-sm mt-2" onClick={props.onCopyTopics}>
+                <Icon name="copy" size={16} /> {t.copyTopics}
+              </button>
+            )}
+          </div>
+        )}
+
+        {j.state === "done" && !j.topics && j.markers && j.markers.length > 0 && (
           <div className="markers">
             <div className="marker-list ltr">
               {j.markers.slice(0, 40).map(([s, e], i) => (

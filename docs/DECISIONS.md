@@ -63,3 +63,9 @@ Format: **Decision** · Why · Instead of · Revisit when
 
 ### D13. Push to `main`, releases built only by CI
 - **Why**: one maintainer. Every push runs the checks; every release is built from a clean machine with the same steps, not from a laptop's state. See [RELEASING.md](RELEASING.md).
+
+### D14. Topics: subtitles first, whisper.cpp only as a fallback, splitting without a model
+- **Text**: a subtitle file next to the video, then subtitles inside it, then the site's captions (yt-dlp, only for a download of the whole video), and only then transcription with whisper.cpp (`ggml-small-q5_1`, 190 MB, downloaded once and checked by SHA-256 like the AI clean-up model). Subtitles are instant and usually better than a CPU transcription; the small model is the smallest one that handles Arabic acceptably. Prebuilt whisper.cpp exists for Windows and Linux only, so macOS and Android need a subtitle file (error `transcribeUnsupported`).
+- **Splitting**: TextTiling (word overlap between the 30 s before and after each 10 s boundary; a topic starts where it drops deepest, moved to the longest pause nearby). It works offline in milliseconds, in any language, with no second model to download. The title is the topic's most distinctive words, not a sentence: writing real titles needs a language model, which Khama doesn't ship.
+- **Reel fit and lengths** are computed in the interface from the topic times and the detected silences, so changing "keep at each edge" doesn't need a new analysis.
+- **Revisit when**: an offline language model is bundled anyway (then it can write titles and judge which topics stand alone), or whisper.cpp ships macOS/Android builds.

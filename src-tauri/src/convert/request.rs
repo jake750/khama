@@ -46,6 +46,11 @@ pub struct ConvertOptions {
     pub silence_min: Option<f64>,
     /// عند حذف الصمت: كم ثانية تبقى من كل طرف حتى لا يلتصق الكلام. فارغ = 0.15
     pub silence_pad: Option<f64>,
+    /// تحليل المواضيع: رابط الصفحة التي نُزّل منها الملف، لأخذ ترجمتها بدل تفريغ الكلام
+    pub source_url: Option<String>,
+    /// تحليل المواضيع: المدة المناسبة لريل (ث). فارغ = 15 و90 (تستعملها الواجهة فقط)
+    pub reel_min: Option<f64>,
+    pub reel_max: Option<f64>,
     /// مجلد ناتج محدد (مثلًا من مجلد مراقَب). فارغ = حسب الإعدادات
     pub out_dir: Option<String>,
 }
@@ -78,6 +83,9 @@ impl Default for ConvertOptions {
             silence_db: None,
             silence_min: None,
             silence_pad: None,
+            source_url: None,
+            reel_min: None,
+            reel_max: None,
             out_dir: None,
         }
     }

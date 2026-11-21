@@ -476,8 +476,9 @@ export function ConvertView(props: {
       o.end = opts.end ?? info.duration;
     }
     if (kind === "copy") o.mute = opts.mute;
-    if (preset.id === "detect_silence")
+    if (preset.id === "detect_silence" || preset.id === "topics")
       Object.assign(o, { silenceDb: opts.silenceDb ?? null, silenceMin: opts.silenceMin ?? null, silencePad: opts.silencePad ?? null });
+    if (preset.id === "topics") Object.assign(o, { reelMin: opts.reelMin ?? null, reelMax: opts.reelMax ?? null });
     if (kind === "stems") return o;
     if (showPicture) {
       Object.assign(o, {
@@ -813,9 +814,25 @@ export function ConvertView(props: {
           )}
 
           {/* كشف الصمت: ما يُعدّ صمتًا، وكم يبقى من طرفيه عند حذفه */}
-          {preset.id === "detect_silence" && (
+          {(preset.id === "detect_silence" || preset.id === "topics") && (
             <div className="mt-4">
               <div className="pick-grid">
+                {preset.id === "topics" && (
+                  <>
+                    <Pick
+                      label={`${t.reelLength} · ${t.reelMin}`}
+                      value={opts.reelMin ?? 15}
+                      onChange={(v) => set({ reelMin: v === 15 ? null : v })}
+                      options={[5, 10, 15, 20, 30, 45, 60].map((v) => ({ value: v, label: t.secs(v) }))}
+                    />
+                    <Pick
+                      label={`${t.reelLength} · ${t.reelMax}`}
+                      value={opts.reelMax ?? 90}
+                      onChange={(v) => set({ reelMax: v === 90 ? null : v })}
+                      options={[30, 45, 60, 90, 120, 180].map((v) => ({ value: v, label: t.secs(v) }))}
+                    />
+                  </>
+                )}
                 <Pick
                   label={t.silenceLevel}
                   value={opts.silenceDb ?? -40}
@@ -836,6 +853,7 @@ export function ConvertView(props: {
                 />
               </div>
               <div className="faint mt-2">{t.silenceHint}</div>
+              {preset.id === "topics" && <div className="faint mt-2">{t.topicsHint}</div>}
             </div>
           )}
 

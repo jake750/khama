@@ -51,3 +51,4 @@ Size is per minute of 1080p video at the "Balanced" quality (High is about 1.5×
 | Grab a frame (PNG) | One full-resolution frame. |
 | Image sequence (PNG) | Every frame as a PNG in a folder. 10 s at 30 fps is 300 files. |
 | Find scene cuts / black frames / silences | Lists the points as marks on the file's card, to copy or split at. |
+| Find topics (for Reels) | Splits the speech into topics with start and end times, marks the ones that fit a Reel (15–90 s by default, after removing silences), and exports a topic as a clip, with or without its silences. |

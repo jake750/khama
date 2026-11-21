@@ -24,6 +24,9 @@ The interface looks the code up in `t.errors` (`src/i18n.ts`, English and Arabic
 | `aiUnsupported` | AI clean-up isn't available on this system yet. You can still download the file and clean it up on another computer. | — |
 | `aiDownload` | Couldn't download the AI model. Check your internet connection and try again. | — |
 | `aiChecksum` | The downloaded AI model is damaged (checksum mismatch). Try again. | — |
+| `transcribeUnsupported` | This file has no subtitles, and turning speech into text isn't available on this system yet. Put a .srt or .vtt file with the same name next to it and try again. | — |
+| `transcribeFailed` | Couldn't turn the speech into text. Try again; if it keeps failing, add a subtitle file with the same name next to the video. | — |
+| `noSpeech` | No speech was found in this file, so there are no topics to show. | — |
 | `aiLoad` | Couldn't load the AI engine. Restarting the app usually fixes this. | — |
 | `aiRun` | The AI model failed while processing this file. Try again; if it keeps failing, convert the file to WAV first, then run AI clean-up on that. | — |
 | `badInput` | This file couldn't be read. It may be damaged or not a media file. | — |

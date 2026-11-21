@@ -62,6 +62,14 @@ silenceMin: number | null,
  */
 silencePad: number | null, 
 /**
+ * تحليل المواضيع: رابط الصفحة التي نُزّل منها الملف، لأخذ ترجمتها بدل تفريغ الكلام
+ */
+sourceUrl: string | null, 
+/**
+ * تحليل المواضيع: المدة المناسبة لريل (ث). فارغ = 15 و90 (تستعملها الواجهة فقط)
+ */
+reelMin: number | null, reelMax: number | null, 
+/**
  * مجلد ناتج محدد (مثلًا من مجلد مراقَب). فارغ = حسب الإعدادات
  */
 outDir: string | null, };
