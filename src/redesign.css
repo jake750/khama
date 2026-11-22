@@ -596,11 +596,14 @@ button.menu-item:hover {
 /* ---------- السجلّ ---------- */
 .history {
   display: grid;
+  /* عمود بعرض البطاقة لا بعرض المحتوى: مع خط الهاتف الكبير كان رأس السجل والفلاتر يخرجان من الشاشة */
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
 .history-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
@@ -1830,4 +1833,13 @@ details.extras .schedule-row {
   .menu-row .icon-btn {
     opacity: 1;
   }
+}
+
+/* فلاتر السجل تتقلّص مع البطاقة بدل أن تخرج منها (خط الهاتف الكبير) */
+.history .segmented {
+  max-width: 100%;
+}
+.history .segmented button {
+  flex: 1 1 auto;
+  min-width: 0;
 }
