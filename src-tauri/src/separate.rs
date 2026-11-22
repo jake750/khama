@@ -647,20 +647,24 @@ pub fn separate_stems(
     cancel: &AtomicBool,
 ) -> Result<bool, AppError> {
     let ort_ok = ORT_READY.get_or_init(|| {
-        ort::init_from(lib.to_string_lossy().to_string())
-            .with_name("khama")
-            .commit()
-            .map(|_| ())
+        // rc.13: تحميل المكتبة يفشل هنا، وcommit يعيد false فقط إن سبقته إعدادات أخرى (لا يحدث هنا)
+        ort::init_from(lib)
+            .map(|b| {
+                b.with_name("khama").commit();
+            })
             .map_err(|e| e.to_string())
     });
     if let Err(e) = ort_ok {
         return Err(AppError::with_detail("aiLoad", e.clone()));
     }
     let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+    let load_err = |e: &dyn std::fmt::Display| AppError::with_detail("aiLoad", e.to_string());
     let mut session = ort::session::Session::builder()
-        .and_then(|b| b.with_intra_threads(threads))
-        .and_then(|b| b.commit_from_file(model))
-        .map_err(|e| AppError::with_detail("aiLoad", e.to_string()))?;
+        .map_err(|e| load_err(&e))?
+        .with_intra_threads(threads)
+        .map_err(|e| load_err(&e))?
+        .commit_from_file(model)
+        .map_err(|e| load_err(&e))?;
 
     let sp = Spectral::new(VOC_FT);
     let cfg = &sp.cfg;

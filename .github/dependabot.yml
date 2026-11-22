@@ -8,6 +8,12 @@ updates:
     groups:
       npm:
         patterns: ["*"]
+    ignore:
+      # typescript-eslint لا يدعم TypeScript 7 بعد (ERESOLVE في CI)، و@types/node يتبع نسخة Node في CI (22)
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: cargo
     directory: /src-tauri
     schedule:
