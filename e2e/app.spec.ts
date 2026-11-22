@@ -18,6 +18,11 @@ async function open(page: Page, settings: Record<string, unknown> = {}) {
 
 const tab = (page: Page, name: string) => page.getByRole("navigation").getByRole("button", { name, exact: true });
 
+/** dev-mock يحفظ بعد 120ms والحفظات تتتابع: ننتظر وصول القيم إلى localStorage قبل إعادة التحميل وإلا سبقها */
+async function saved(page: Page, expected: Record<string, unknown>) {
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("khama.mock.settings") ?? "{}"))).toMatchObject(expected);
+}
+
 async function paste(page: Page, url: string) {
   await page.getByRole("textbox", { name: "Video link" }).fill(url);
 }
@@ -75,6 +80,7 @@ test("اللغة والثيم يبقيان بعد إعادة التحميل", as
   await page.getByRole("group", { name: "Language" }).getByRole("button", { name: "العربية" }).click();
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.locator("html")).toHaveAttribute("lang", "ar");
+  await saved(page, { theme: "light", language: "ar" });
 
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "ar");
@@ -91,6 +97,7 @@ test("نص عربي بتخطيط من اليسار لليمين يبقى بعد 
   await expect(html).toHaveAttribute("dir", "ltr");
   await expect(html).toHaveAttribute("lang", "ar");
   await expect(html).toHaveAttribute("data-mixed-dir", "");
+  await saved(page, { layoutDir: "ltr" });
 
   await page.reload();
   await expect(html).toHaveAttribute("dir", "ltr");

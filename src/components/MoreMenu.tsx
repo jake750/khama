@@ -21,8 +21,7 @@ export function MoreMenu(props: { label: string; items: MenuItem[] }) {
   const [up, setUp] = useState(false);
   // القائمة في طبقة ثابتة فوق الصفحة: البطاقة (overflow: hidden) كانت تقصّها، وتنقلب لأعلى إن لم يتّسع ما تحتها
   useLayoutEffect(() => {
-    if (!shown) return setPos({ visibility: "hidden" });
-    if (leaving) return;
+    if (!shown || leaving) return;
     const btn = box.current?.getBoundingClientRect();
     const el = list.current;
     if (!btn || !el) return;
@@ -86,7 +85,11 @@ export function MoreMenu(props: { label: string; items: MenuItem[] }) {
         aria-label={props.label}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          // يبدأ مخفيًا في كل فتح حتى يُقاس مكانه (قبل الرسم، في useLayoutEffect)
+          if (!open) setPos({ visibility: "hidden" });
+          setOpen(!open);
+        }}
       >
         <Icon name="dots" size={16} />
       </button>

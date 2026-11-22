@@ -35,7 +35,9 @@ fn frame_db(sum_sq: f64, n: usize) -> f32 {
 /// مستوى كل إطار من عيّنات 16 بت أحادية بتردد 16 kHz
 pub fn levels_from_samples(samples: &[i16]) -> Vec<f32> {
     samples
-        .chunks_exact(FRAME)
+        .as_chunks::<FRAME>()
+        .0
+        .iter()
         .map(|c| frame_db(c.iter().map(|&s| f64::from(s) * f64::from(s)).sum(), FRAME))
         .collect()
 }
@@ -162,8 +164,8 @@ pub fn levels_blocking(
         }
         pending.extend_from_slice(&buf[..n]);
         let whole = pending.len() / (FRAME * 2) * (FRAME * 2);
-        for f in pending[..whole].chunks_exact(FRAME * 2) {
-            let sum: f64 = f.chunks_exact(2).map(|b| f64::from(i16::from_le_bytes([b[0], b[1]])).powi(2)).sum();
+        for f in pending[..whole].as_chunks::<{ FRAME * 2 }>().0 {
+            let sum: f64 = f.as_chunks::<2>().0.iter().map(|b| f64::from(i16::from_le_bytes(*b)).powi(2)).sum();
             db.push(frame_db(sum, FRAME));
         }
         pending.drain(..whole);
