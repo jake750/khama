@@ -90,21 +90,35 @@ fn next_id(list: &[HistoryEntry], now_ms: u64) -> u64 {
 }
 
 /// يضيف عنصرًا للسجلّ. يستدعيه Rust نفسه عند انتهاء التنزيل (T-19)، فلا يضيع العنصر إن فات الواجهةَ الحدث.
+///
+/// الصورة المصغّرة الدائمة تُصنع بعده في الخلفية (RD8): جلبها قد يستغرق حتى 40 ثانية،
+/// وكان «اكتمل» ينتظرها. حتى تجهز يبقى رابط الصورة الأصلي.
 pub async fn add_entry(app: &AppHandle, mut entry: HistoryEntry) -> Result<(), AppError> {
     let state = app.state::<HistoryState>();
-    if let Some(local) = local_thumbnail(app, &entry).await {
-        entry.thumbnail = Some(local);
-    }
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0);
-    with_list(app, &state, |list| {
+    let id = with_list(app, &state, |list| {
         entry.id = next_id(list, now);
-        list.insert(0, entry);
+        let id = entry.id;
+        list.insert(0, entry.clone());
         list.truncate(MAX_ENTRIES);
-        ((), true)
-    })
+        (id, true)
+    })?;
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let Some(local) = local_thumbnail(&app, &entry).await else { return };
+        let state = app.state::<HistoryState>();
+        let _ = with_list(&app, &state, |list| match list.iter_mut().find(|e| e.id == id) {
+            Some(e) => {
+                e.thumbnail = Some(local);
+                ((), true)
+            }
+            None => ((), false),
+        });
+    });
+    Ok(())
 }
 
 /// نسخة صغيرة دائمة من الصورة المصغّرة (T-21): روابط صور إنستغرام وتيك توك موقّعة
