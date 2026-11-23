@@ -66,7 +66,17 @@ pub async fn start_download(
             Err(e) => (Err(e), None),
         };
         let result = match &job_dir {
-            Ok(dir) => run_job(&app2, id, req, settings, dir, &mut rx).await,
+            // في مهمة منفصلة: panic داخلها (خلل غير متوقع) يصير خطأً على البطاقة،
+            // وتُحرَّر الخانة والمجلد تحته، بدل بطاقة عالقة وخانة محجوزة إلى الأبد (RD7)
+            Ok(dir) => {
+                let (app3, dir, mut rx2) = (app2.clone(), dir.clone(), rx.clone());
+                tauri::async_runtime::spawn(async move { run_job(&app3, id, req, settings, &dir, &mut rx2).await })
+                    .await
+                    .unwrap_or_else(|e| {
+                        log::error!("download {id}: task panicked: {e}");
+                        Err(AppError::with_detail("unknown", e.to_string()))
+                    })
+            }
             Err(e) => Err(e.clone()),
         };
         let update = match result {

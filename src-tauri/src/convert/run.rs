@@ -373,7 +373,16 @@ pub fn queue_convert(app: &AppHandle, request: ConvertRequest, id: Option<u64>) 
             None => None,
         };
         let result = match (permit, heavy) {
-            (Some(_), Some(_)) => run_convert(&app2, id, request, &mut rx).await,
+            // panic داخل التحويل يصير خطأً على البطاقة لا بطاقة عالقة (RD7)
+            (Some(_), Some(_)) => {
+                let (app3, mut rx2) = (app2.clone(), rx.clone());
+                tauri::async_runtime::spawn(async move { run_convert(&app3, id, request, &mut rx2).await })
+                    .await
+                    .unwrap_or_else(|e| {
+                        log::error!("convert {id}: task panicked: {e}");
+                        Err(AppError::with_detail("unknown", e.to_string()))
+                    })
+            }
             _ => Ok(None),
         };
         let update = match result {
