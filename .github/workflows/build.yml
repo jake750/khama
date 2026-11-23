@@ -13,10 +13,10 @@ on:
     paths: [src-tauri/tauri.conf.json]
     tags: ["v*"]
 
-# قراءة فقط افتراضيًا؛ الكتابة (إنشاء الإصدار ورفع الملفات) لمهام build وandroid وsbom وحدها،
-# فلا يصل رمز يكتب في المستودع إلى سكربتات npm ci وbuild.rs في مهمة الفحص
+# الكتابة على مستوى الملف: مع «read» هنا و«write» في المهمة رفض GitHub إنشاء إصدار 0.3.30
+# (Resource not accessible by integration) رغم أن رمز المهمة كان Contents: write
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   # release: هل ننشر إصدارًا؟ has_key: هل أُضيف مفتاح توقيع أندرويد؟ (لا تُقرأ secrets في if الخاصة بالـ job)
