@@ -48,6 +48,15 @@ pub(super) fn standard_fps(avg: f64) -> &'static str {
         .unwrap_or("30")
 }
 
+/// السرعة المطلوبة إن كانت غير 1، محصورة في 0.25–4. القائمة في الواجهة لا تعطي غير ذلك، لكن
+/// الأمر يصل عبر IPC: صفر أو سالب كان يعلّق atempo_chain في حلقة لا تنتهي، و NaN يفسد setpts
+pub(super) fn speed_of(o: &ConvertOptions) -> Option<f64> {
+    o.speed
+        .filter(|s| s.is_finite() && *s > 0.0)
+        .map(|s| s.clamp(0.25, 4.0))
+        .filter(|s| (*s - 1.0).abs() > 1e-3)
+}
+
 pub(super) fn atempo_chain(speed: f64) -> Vec<String> {
     let mut v = Vec::new();
     let mut s = speed;
@@ -367,7 +376,9 @@ pub(super) fn video_filters(p: &Preset, o: &ConvertOptions, v: &VideoInfo, keep_
     if let Some(r) = aspect {
         let (w, h) = (v.width as f64, v.height as f64);
         let (cw, ch) = if w / h > r { (h * r, h) } else { (w, w / r) };
-        f.push(format!("crop={}:{}", even(cw.min(w)), even(ch.min(h))));
+        // الأقرب، لكن لا أكبر من المصدر: مصدر بعرض فردي (1079) كان يطلب قصًّا أعرض منه (1080) فيفشل الفلتر
+        let fit = |x: f64, max: f64| even(x).min(((max / 2.0).floor() as u32).max(1) * 2);
+        f.push(format!("crop={}:{}", fit(cw.min(w), w), fit(ch.min(h), h)));
     }
     match o.rotate.as_deref() {
         Some("90") => f.push("transpose=1".into()),
@@ -391,17 +402,28 @@ pub(super) fn video_filters(p: &Preset, o: &ConvertOptions, v: &VideoInfo, keep_
         f.push(timecode_filter());
     }
     // حذف الفترات بعد الترجمة والتايم كود (يتبعان توقيت المصدر)، ثم وصل ما بقي
+    let rate = o
+        .fps
+        .as_deref()
+        .and_then(fps_expr)
+        .or_else(|| v.fps.filter(|_| v.vfr).map(standard_fps));
     if let Some(e) = cut_expr(o, keep_ts) {
+        // N/FRAME_RATE يفترض إطارات متساوية المسافة بالمعدل الاسمي (r_frame_rate، 60 أو 90 في
+        // تسجيلات الهاتف بينما المتوسط ~30): بلا توحيد المعدل قبله يخرج الفيديو أقصر من الصوت
+        // ويفقدان التزامن. نوحّده أولًا (المعدل المطلوب، أو أقرب معدل قياسي للمتوسط)
+        if let Some(r) = rate.or_else(|| v.fps.map(standard_fps)) {
+            f.push(format!("fps={r}"));
+        }
         f.push(format!("select='{e}',setpts=N/FRAME_RATE/TB"));
-    } else if keep_ts {
-        f.push("setpts=PTS-STARTPTS".into());
+    } else {
+        if keep_ts {
+            f.push("setpts=PTS-STARTPTS".into());
+        }
+        if let Some(r) = rate {
+            f.push(format!("fps={r}"));
+        }
     }
-    if let Some(r) = o.fps.as_deref().and_then(fps_expr) {
-        f.push(format!("fps={r}"));
-    } else if let Some(avg) = v.fps.filter(|_| v.vfr) {
-        f.push(format!("fps={}", standard_fps(avg)));
-    }
-    if let Some(sp) = o.speed.filter(|s| (*s - 1.0).abs() > 1e-3) {
+    if let Some(sp) = speed_of(o) {
         f.push(format!("setpts=PTS/{sp:.4}"));
     }
     f
@@ -481,7 +503,7 @@ pub fn build_plan(
     let start = o.start.filter(|v| *v > 0.0);
     let end = o.end.filter(|e| *e > start.unwrap_or(0.0));
     let total: f64 = infos.iter().map(|i| i.duration.unwrap_or(0.0)).sum();
-    let speed = o.speed.filter(|s| *s > 0.0).unwrap_or(1.0);
+    let speed = speed_of(o).unwrap_or(1.0);
     let removed: f64 = cut_ranges(o)
         .iter()
         .map(|(s, e)| e.min(end.unwrap_or(total)) - s)
@@ -813,7 +835,7 @@ fn audio_graph(o: &ConvertOptions, src: &str, reset_ts: bool, keep_ts: bool, lou
     } else if reset_ts {
         af.push("asetpts=PTS-STARTPTS".into());
     }
-    if let Some(sp) = o.speed.filter(|s| (*s - 1.0).abs() > 1e-3) {
+    if let Some(sp) = speed_of(o) {
         af.extend(atempo_chain(sp));
     }
     if let Some(ln) = loudnorm {

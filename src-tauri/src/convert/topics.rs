@@ -412,37 +412,44 @@ pub fn pick_caption(info: &Value) -> Option<(String, bool)> {
 }
 
 async fn site_captions(tools: &Tools, url: &str, work: &Path) -> Option<Vec<Cue>> {
-    let (ok, out, _) = tools::run_ytdlp(tools, &["-J", "--skip-download", "--no-playlist", url])
-        .await
-        .ok()?;
+    // الخيارات المشتركة (مكان ffmpeg، Deno، تجاهل ملف إعدادات yt-dlp) مثل كل استدعاء آخر،
+    // ومهلة لكل خطوة: موقع لا يرد لا يُعلّق التحليل كله
+    let run = |extra: Vec<String>| {
+        let mut a = tools::ytdlp_base_args(tools);
+        a.extend(extra);
+        a.extend(["--".to_string(), url.to_string()]);
+        async move {
+            let args: Vec<&str> = a.iter().map(String::as_str).collect();
+            tokio::time::timeout(Duration::from_secs(90), tools::run_ytdlp(tools, &args))
+                .await
+                .ok()?
+                .ok()
+        }
+    };
+    let (ok, out, _) = run(vec!["-J".into(), "--skip-download".into(), "--playlist-items".into(), "1".into()]).await?;
     if !ok {
         return None;
     }
     let info: Value = serde_json::from_str(out.lines().last()?).ok()?;
     let (key, auto) = pick_caption(&info)?;
     let tmpl = work.join("cap.%(ext)s").to_string_lossy().into_owned();
-    let (ok, _, err) = tools::run_ytdlp(
-        tools,
-        &[
-            "--skip-download",
-            "--no-playlist",
-            if auto { "--write-auto-subs" } else { "--write-subs" },
-            "--sub-langs",
-            &key,
-            "--sub-format",
-            "vtt/srt/best",
-            "--convert-subs",
-            "srt",
-            "-o",
-            &tmpl,
-            url,
-        ],
-    )
-    .await
-    .ok()?;
+    // بلا --convert-subs: نقرأ vtt مباشرة، فلا نحتاج ffmpeg ولا نفشل لأجله
+    let (ok, _, err) = run(vec![
+        "--skip-download".into(),
+        "--playlist-items".into(),
+        "1".into(),
+        if auto { "--write-auto-subs" } else { "--write-subs" }.into(),
+        "--sub-langs".into(),
+        key,
+        "--sub-format".into(),
+        "vtt/srt/best".into(),
+        "-o".into(),
+        tmpl,
+    ])
+    .await?;
     if !ok {
+        // قد يكتب الملف ثم يفشل في خطوة لاحقة: نقبله إن وُجد
         log::warn!("captions: {}", tail(&err, 3));
-        return None;
     }
     let file = std::fs::read_dir(work).ok()?.filter_map(|e| e.ok().map(|e| e.path())).find(|p| {
         p.file_name().is_some_and(|n| n.to_string_lossy().starts_with("cap.")) && p.extension().is_some_and(|e| e == "srt" || e == "vtt")
@@ -547,7 +554,7 @@ async fn ensure_whisper(c: &Ctx<'_>, cancel: &mut watch::Receiver<bool>) -> Resu
         if !separate::fetch(c.app, &url, &tmp, &mut on_bytes, cancel).await? {
             return Ok(None);
         }
-        let hash = separate::sha256_file(&tmp)?;
+        let hash = separate::sha256_async(&tmp).await?;
         if hash != sha {
             let _ = std::fs::remove_file(&tmp);
             return Err(AppError::with_detail("aiChecksum", format!("{url}: {hash}")));

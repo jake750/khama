@@ -125,6 +125,14 @@ pub(crate) fn ai_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
         .join("ai"))
 }
 
+/// sha256_file خارج خيوط tokio: ملف 66–190 MB يأخذ ثانية تقريبًا
+pub(crate) async fn sha256_async(path: &Path) -> std::io::Result<String> {
+    let path = path.to_path_buf();
+    tauri::async_runtime::spawn_blocking(move || sha256_file(&path))
+        .await
+        .map_err(std::io::Error::other)?
+}
+
 pub(crate) fn sha256_file(path: &Path) -> std::io::Result<String> {
     let mut f = std::fs::File::open(path)?;
     let mut h = Sha256::new();
@@ -368,7 +376,7 @@ pub async fn ensure_assets(app: &AppHandle, id: u64, cancel: &mut watch::Receive
                     continue;
                 }
             }
-            let hash = sha256_file(&tmp)?;
+            let hash = sha256_async(&tmp).await?;
             if hash == asset.sha256 {
                 failure = None;
                 break;
@@ -694,6 +702,9 @@ pub fn separate_stems(
     dec.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     no_window(&mut dec);
     let mut dec = dec.spawn()?;
+    // stderr يُقرأ من أوله في خيط: ملف تالف يجعل ffmpeg يكتب خطأً لكل حزمة، فإن امتلأ الأنبوب
+    // توقّف ffmpeg عن الكتابة في stdout ونحن ننتظره، فيعلق الفصل وطابور التحويل كله
+    let dec_err = drain_stderr(&mut dec);
 
     let mut encs: Vec<(bool, std::process::Child)> = Vec::new();
     if let Some(p) = out_voice {
@@ -702,6 +713,7 @@ pub fn separate_stems(
     if let Some(p) = out_music {
         encs.push((true, wav_writer(ffmpeg, p)?));
     }
+    let enc_errs: Vec<_> = encs.iter_mut().map(|(_, c)| drain_stderr(c)).collect();
 
     let result = (|| -> Result<bool, AppError> {
         let mut src = dec.stdout.take().expect("piped");
@@ -827,21 +839,18 @@ pub fn separate_stems(
         Ok(true)
     })();
 
-    let finish = |c: &mut std::process::Child| {
-        let mut err = String::new();
-        if let Some(mut e) = c.stderr.take() {
-            let _ = e.read_to_string(&mut err);
-        }
-        (c.wait().map(|s| s.success()).unwrap_or(false), err)
+    let finish = |c: &mut std::process::Child, err: Option<std::thread::JoinHandle<String>>| {
+        let ok = c.wait().map(|s| s.success()).unwrap_or(false);
+        (ok, err.and_then(|h| h.join().ok()).unwrap_or_default())
     };
     match result {
         Ok(true) => {
-            let (dok, derr) = finish(&mut dec);
+            let (dok, derr) = finish(&mut dec, dec_err);
             if !dok {
                 return Err(AppError::with_detail("noAudioStream", tail(&derr, 6)));
             }
-            for (_, c) in encs.iter_mut() {
-                let (eok, eerr) = finish(c);
+            for ((_, c), e) in encs.iter_mut().zip(enc_errs) {
+                let (eok, eerr) = finish(c, e);
                 if !eok {
                     return Err(AppError::with_detail("encodeFailed", tail(&eerr, 6)));
                 }
@@ -861,6 +870,26 @@ pub fn separate_stems(
             other
         }
     }
+}
+
+/// يقرأ stderr في خيط حتى ينتهي، ويحتفظ بآخر 32 KB فقط
+fn drain_stderr(c: &mut std::process::Child) -> Option<std::thread::JoinHandle<String>> {
+    let mut e = c.stderr.take()?;
+    Some(std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let mut chunk = [0u8; 4096];
+        while let Ok(n) = e.read(&mut chunk) {
+            if n == 0 {
+                break;
+            }
+            buf.extend_from_slice(&chunk[..n]);
+            if buf.len() > 64 * 1024 {
+                let cut = buf.len() - 32 * 1024;
+                buf.drain(..cut);
+            }
+        }
+        String::from_utf8_lossy(&buf).into_owned()
+    }))
 }
 
 /// يفصل الصوت ثم يكتب الناتج النهائي:

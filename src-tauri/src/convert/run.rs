@@ -167,12 +167,15 @@ pub(super) async fn run_convert(app: &AppHandle, id: u64, req: ConvertRequest, c
     ));
     let target = if folder_out {
         std::fs::create_dir_all(&temp)?;
+        // مُخرجا image2 وsegment يقرآن المسار كله كقالب: «%» في الاسم («100% real.mp4») أو في
+        // مجلد الحفظ يُفسَد القالب فيفشل التحويل. نضاعفه ليبقى حرفًا عاديًا
+        let lit = |x: &str| x.replace('%', "%%");
         let pattern = if p.kind == PKind::Sequence {
-            format!("{stem}_%05d.{}", p.ext)
+            format!("{}_%05d.{}", lit(&stem), p.ext)
         } else {
-            format!("{stem}_%03d.{}", p.ext)
+            format!("{}_%03d.{}", lit(&stem), p.ext)
         };
-        temp.join(pattern)
+        PathBuf::from(lit(&temp.to_string_lossy())).join(pattern)
     } else {
         temp.clone()
     };
@@ -190,8 +193,17 @@ pub(super) async fn run_convert(app: &AppHandle, id: u64, req: ConvertRequest, c
     let mut result = run_ffmpeg(app, id, &tools, &plan.args, &work, plan.duration, "converting", cancel).await;
     // مشفّر كرت الشاشة/الهاتف أنهى بلا فيديو (يحدث مع MediaCodec على بعض الأجهزة): نعيد بالمعالج
     let used_hw = plan.args.iter().any(|a| hw.contains(a));
-    if used_hw && !folder_out && p.kind == PKind::Video && matches!(result, Ok(Some(_))) && video_packets(&tools, &temp).await == 0 {
-        log::warn!("hw encoder produced no video, retrying on CPU");
+    // أو فشل المشفّر نفسه: جلسات NVENC محدودة (OBS يسجّل معًا)، دقة فوق حد العتاد، تعريف تغيّر
+    let hw_failed = match &result {
+        Ok(Some(_)) => video_packets(&tools, &temp).await == 0,
+        Err(_) => !*cancel.borrow(),
+        Ok(None) => false,
+    };
+    if used_hw && !folder_out && p.kind == PKind::Video && hw_failed {
+        log::warn!(
+            "hw encoder failed or produced no video, retrying on CPU: {:?}",
+            result.as_ref().err()
+        );
         let _ = std::fs::remove_file(&temp);
         let plan = build_plan(&p, o, &infos, &[], &target, loudnorm.as_deref())?;
         emit(
@@ -223,11 +235,22 @@ pub(super) async fn run_convert(app: &AppHandle, id: u64, req: ConvertRequest, c
             return Err(e);
         }
     }
-    let dest = unique_path(&dir, &final_name);
-    std::fs::rename(&temp, &dest).map_err(|e| {
-        let _ = std::fs::remove_file(&dest);
-        AppError::with_detail("moveFailed", e.to_string())
-    })?;
+    // مجلد الناتج يُحجز مجلدًا فارغًا لا ملفًا: إعادة تسمية مجلد فوق ملف تفشل دائمًا على Unix،
+    // وفي Windows تفشل من ثاني تصدير للملف نفسه
+    let dest = if folder_out {
+        download::unique_dir(&dir, &final_name)
+    } else {
+        unique_path(&dir, &final_name)
+    };
+    if let Err(e) = std::fs::rename(&temp, &dest) {
+        let _ = if folder_out {
+            std::fs::remove_dir(&dest)
+        } else {
+            std::fs::remove_file(&dest)
+        };
+        cleanup();
+        return Err(AppError::with_detail("moveFailed", e.to_string()));
+    }
     Ok(Some((deliver(app, dest).await?, None)))
 }
 
@@ -241,6 +264,26 @@ impl PartDir {
     pub(super) fn new(dir: &Path) -> Result<Self, AppError> {
         let p = dir.join(".khama-parts");
         std::fs::create_dir_all(&p).map_err(|e| AppError::with_detail("outputDirCreate", e.to_string()))?;
+        // بقايا تحويل انقطع (إغلاق، انهيار، انقطاع كهرباء) قد تكون غيغابايتات في مجلد مخفي.
+        // لا تحويل يبقى يومًا بلا كتابة (مؤقّت التعليق T-93)، فما هو أقدم من ذلك يُحذف
+        if let Ok(rd) = std::fs::read_dir(&p) {
+            for e in rd.flatten() {
+                let old = e
+                    .metadata()
+                    .and_then(|m| m.modified())
+                    .ok()
+                    .and_then(|t| t.elapsed().ok())
+                    .is_some_and(|age| age > Duration::from_secs(24 * 3600));
+                if old {
+                    let path = e.path();
+                    let _ = if path.is_dir() {
+                        std::fs::remove_dir_all(&path)
+                    } else {
+                        std::fs::remove_file(&path)
+                    };
+                }
+            }
+        }
         #[cfg(windows)]
         {
             use std::os::windows::ffi::OsStrExt;

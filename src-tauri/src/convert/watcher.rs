@@ -35,7 +35,14 @@ fn list_media(dir: &Path) -> Option<Vec<(PathBuf, u64, u64)>> {
                     .and_then(|x| x.to_str())
                     .is_some_and(|x| MEDIA_EXT.contains(&x.to_lowercase().as_str()));
                 let meta = e.metadata().ok().filter(|m| m.is_file())?;
-                let modified = meta.modified().ok().map(ms_since_epoch).unwrap_or(0);
+                // نسخ Explorer يُبقي تاريخ التعديل الأصلي: ملف نُسخ والتطبيق مغلق يبدو «قديمًا» فلا يُحوَّل.
+                // تاريخ الإنشاء (وقت وصوله للمجلد) يكشفه
+                let modified = [meta.modified().ok(), meta.created().ok()]
+                    .into_iter()
+                    .flatten()
+                    .map(ms_since_epoch)
+                    .max()
+                    .unwrap_or(0);
                 (is_media && !hidden).then_some((path, meta.len(), modified))
             })
             .collect(),
@@ -103,9 +110,12 @@ pub fn spawn_watcher(app: AppHandle) {
                 };
                 let first_scan = known_dirs.insert(dir.clone());
                 let previous_scan = last_scans.insert(w.dir.clone(), scan_started);
-                // ملف حُذف أو نُقل لم يعد في «seen»، فلا تكبر بلا حد
-                seen.retain(|p| p.parent() != Some(dir.as_path()) || entries.iter().any(|(e, _, _)| e == p));
-                pending.retain(|p, _| p.parent() != Some(dir.as_path()) || entries.iter().any(|(e, _, _)| e == p));
+                // ملف حُذف أو نُقل لم يعد في «seen»، فلا تكبر بلا حد. مجموعة مرة واحدة لكل فحص:
+                // البحث في القائمة لكل ملف كان تربيعيًا (مجلد بعشرة آلاف ملف = 10⁸ مقارنة كل 4 ثوانٍ)
+                let present: HashSet<&Path> = entries.iter().map(|(e, _, _)| e.as_path()).collect();
+                seen.retain(|p| p.parent() != Some(dir.as_path()) || present.contains(p.as_path()));
+                pending.retain(|p, _| p.parent() != Some(dir.as_path()) || present.contains(p.as_path()));
+                drop(present);
                 for (path, size, modified) in entries {
                     if seen.contains(&path) {
                         continue;

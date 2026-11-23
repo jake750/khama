@@ -15,11 +15,13 @@ fn parse_ts(s: &str) -> Option<f64> {
     let s = s.trim().replace(',', ".");
     // VTT يسمح بـ "01:15.500" بلا ساعات
     let parts: Vec<f64> = s.split(':').map(|p| p.trim().parse().ok()).collect::<Option<_>>()?;
-    match parts[..] {
-        [h, m, sec] => Some(h * 3600.0 + m * 60.0 + sec),
-        [m, sec] => Some(m * 60.0 + sec),
-        _ => None,
-    }
+    let t = match parts[..] {
+        [h, m, sec] => h * 3600.0 + m * 60.0 + sec,
+        [m, sec] => m * 60.0 + sec,
+        _ => return None,
+    };
+    // f64::parse يقبل "inf" و"NaN" وأرقامًا سالبة: وقت كهذا يفسد القص وتقسيم المواضيع (مصفوفة بحجم لا نهائي)
+    (t.is_finite() && t >= 0.0).then_some(t)
 }
 
 /// 75.5 ← "00:01:15,500"
