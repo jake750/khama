@@ -32,7 +32,7 @@ These are the same commands CI runs before every release (`build.yml`: `npm ci`,
 npm run dev
 ```
 
-Opens the interface in a plain browser at `http://localhost:1430`. `src/main.tsx` loads `src/dev-mock.ts` in development only; it replaces every Tauri command with fake data:
+Opens the interface in a plain browser at `http://localhost:1420`. `src/main.tsx` loads `src/dev-mock.ts` in development only; it replaces every Tauri command with fake data:
 
 - a link preview with formats and subtitles (paste any `https://` link),
 - downloads and conversions that move through every state, one of them failing with an error code,

@@ -7,7 +7,7 @@
 | Every commit (pre-commit hook) | Prettier on staged files, `tsc`, `cargo fmt --check` | `.githooks/pre-commit` |
 | Every push (`check.yml`) | Types, ESLint, Prettier, Vitest (interface logic, RTL rules, translations, dev-mock coverage), end-to-end tests (`npm run e2e`: Playwright + Chromium on the dev server with `dev-mock.ts`, files in `e2e/`), interface size budget, Rust tests and Clippy on Linux, Android compile | GitHub Actions |
 | Every release (`build.yml`) | Rust tests on Windows, macOS ×2 and Linux; bundled FFmpeg checked for its encoders; every installer built from clean; APK signature verified | GitHub Actions |
-| Every Monday (`canary.yml`) | Real downloads from YouTube, Dailymotion, SoundCloud and archive.org with the pinned yt-dlp | GitHub Actions |
+| Every Monday (`canary.yml`) | The pinned yt-dlp still reads popular sites (`--simulate`: formats are chosen, nothing is downloaded; YouTube may fail because it blocks CI runners), the Spotify embed page still parses, and FFmpeg handles an Arabic file name | GitHub Actions |
 
 ```bash
 npx vitest run

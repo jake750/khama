@@ -116,7 +116,7 @@ Run the Rust unit tests:
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-Installers for all three platforms are built automatically by GitHub Actions (`.github/workflows/build.yml`). Run it manually from the **Actions** tab, or push a tag like `v0.2.0` to create a draft release.
+Installers for all three platforms are built automatically by GitHub Actions (`.github/workflows/build.yml`). A release is published by `npm run release` (see [docs/RELEASING.md](docs/RELEASING.md)); never push a tag by hand, because a tag publishes a real release that every installed copy is offered. Running the workflow manually from the **Actions** tab only builds the files as artifacts.
 
 ### How it works
 
@@ -267,7 +267,7 @@ npm run tauri build         # بناء ملف تثبيت لنظامك
 
 <div dir="rtl">
 
-ملفات التثبيت للأنظمة الثلاثة تُبنى تلقائيًا عبر GitHub Actions. شغّل البناء يدويًا من تبويب **Actions**، أو ارفع وسمًا مثل `v0.2.0` ليُنشأ إصدار تجريبي (مسودة).
+ملفات التثبيت للأنظمة الثلاثة تُبنى تلقائيًا عبر GitHub Actions. الإصدار يُنشر بالأمر `npm run release` (التفاصيل في [docs/RELEASING.md](docs/RELEASING.md))، ولا يُرفع وسم يدويًا: الوسم ينشر إصدارًا حقيقيًا يُعرض على كل نسخة مثبّتة. تشغيل البناء يدويًا من تبويب **Actions** يبني الملفات فقط دون نشر.
 
 ### كيف تعمل؟
 
