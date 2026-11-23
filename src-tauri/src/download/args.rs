@@ -16,16 +16,60 @@ pub(super) fn single_item() -> [String; 2] {
     ["--playlist-items".into(), "1".into()]
 }
 
-pub(super) fn cookie_args(app: &AppHandle, s: &Settings) -> Vec<String> {
-    match s.cookies_mode.as_str() {
-        "browser" if !s.cookies_browser.is_empty() => {
-            vec!["--cookies-from-browser".into(), s.cookies_browser.clone()]
+/// خيارات الكوكيز لتشغيل yt-dlp واحد. تبقى حيّة طوال التشغيل: نسخة الملف تُحذف عند إسقاطها.
+pub(super) struct Cookies {
+    args: Vec<String>,
+    copy: Option<PathBuf>,
+}
+
+impl std::ops::Deref for Cookies {
+    type Target = Vec<String>;
+    fn deref(&self) -> &Vec<String> {
+        &self.args
+    }
+}
+
+impl Drop for Cookies {
+    fn drop(&mut self) {
+        if let Some(p) = &self.copy {
+            let _ = std::fs::remove_file(p);
         }
-        "file" => match settings::cookies_path(app) {
-            Ok(p) if p.exists() => vec!["--cookies".into(), p.to_string_lossy().into_owned()],
-            _ => vec![],
+    }
+}
+
+/// yt-dlp يعيد كتابة ملف --cookies عند انتهائه: تنزيلان معًا على الملف نفسه قد يتركانه تالفًا
+/// فتفشل كل التنزيلات بعدها. لكل تشغيل نسخة خاصة، والأصل لا يُلمس (RD2، بموافقة صاحب التطبيق).
+pub(super) fn cookie_args(app: &AppHandle, s: &Settings) -> Cookies {
+    static N: AtomicU64 = AtomicU64::new(0);
+    let none = Cookies { args: vec![], copy: None };
+    match s.cookies_mode.as_str() {
+        "browser" if !s.cookies_browser.is_empty() => Cookies {
+            args: vec!["--cookies-from-browser".into(), s.cookies_browser.clone()],
+            copy: None,
         },
-        _ => vec![],
+        "file" => {
+            let Ok(src) = settings::cookies_path(app) else { return none };
+            let Ok(data) = std::fs::read(&src) else { return none };
+            let Ok(root) = jobs_root(app) else { return none };
+            let _ = std::fs::create_dir_all(&root);
+            let mine = format!("cookies-{}-", std::process::id());
+            // نسخ تركها تشغيل سابق انقطع (إغلاق مفاجئ): فيها جلسات الحساب، فلا تبقى
+            for e in std::fs::read_dir(&root).into_iter().flatten().flatten() {
+                let name = e.file_name().to_string_lossy().into_owned();
+                if name.starts_with("cookies-") && !name.starts_with(&mine) {
+                    let _ = std::fs::remove_file(e.path());
+                }
+            }
+            let copy = root.join(format!("{mine}{}.txt", N.fetch_add(1, Ordering::Relaxed)));
+            if crate::persist::write_atomic_private(&copy, &data).is_err() {
+                return none;
+            }
+            Cookies {
+                args: vec!["--cookies".into(), copy.to_string_lossy().into_owned()],
+                copy: Some(copy),
+            }
+        }
+        _ => none,
     }
 }
 

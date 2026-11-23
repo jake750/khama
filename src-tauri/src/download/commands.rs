@@ -339,7 +339,8 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
         return probe_spotify(&tools, embed).await;
     }
     let mut args = tools::ytdlp_base_args(&tools);
-    args.extend(cookie_args(&app, &s));
+    let cookies = cookie_args(&app, &s);
+    args.extend(cookies.iter().cloned());
     // --flat-playlist: عناصر القائمة دون فتح كل واحد منها (لا يؤثّر على رابط فيديو واحد)
     args.extend(["-J".to_string(), "--flat-playlist".to_string(), "--".to_string(), url]);
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -417,7 +418,8 @@ pub async fn save_thumbnail(app: AppHandle, settings: State<'_, SettingsState>, 
     let _ = tokio::fs::remove_dir_all(&work).await;
     tokio::fs::create_dir_all(&work).await?;
     let mut a = tools::ytdlp_base_args(&tools);
-    a.extend(cookie_args(&app, &s));
+    let cookies = cookie_args(&app, &s);
+    a.extend(cookies.iter().cloned());
     a.extend(single_item());
     a.extend(["--skip-download", "--write-thumbnail", "--convert-thumbnails", "jpg", "-P"].map(String::from));
     a.push(work.to_string_lossy().into_owned());
