@@ -171,6 +171,20 @@ pub(super) fn best_song(found: &[SongHit], title: Option<&str>, duration: Option
     best.map(|(h, _)| h.url.clone())
 }
 
+/// علامة في مجلد المقطع: سُلّم إلى هذا المسار. تبقى مع مجلد العملية بعد خطأ (T-56)
+const DELIVERED: &str = "delivered.txt";
+
+pub(super) fn mark_delivered(clip_dir: &Path, file: &Path) {
+    let _ = std::fs::create_dir_all(clip_dir);
+    let _ = std::fs::write(clip_dir.join(DELIVERED), file.to_string_lossy().as_bytes());
+}
+
+/// المسار الذي سُلّم إليه المقطع في محاولة سابقة، إن كان الملف ما زال هناك
+pub(super) fn delivered_before(clip_dir: &Path) -> Option<PathBuf> {
+    let p = PathBuf::from(std::fs::read_to_string(clip_dir.join(DELIVERED)).ok()?);
+    p.is_file().then_some(p)
+}
+
 pub(super) async fn run_job(
     app: &AppHandle,
     id: u64,
@@ -240,10 +254,15 @@ pub(super) async fn run_job(
     let mut files = Vec::with_capacity(count);
     for (i, sec) in parts.iter().enumerate() {
         let dir = job_dir.join(format!("clip{i}"));
+        // «أعد المحاولة» بعد فشل في منتصف الملفات المنفصلة: ما سُلّم قبله لا يُنزّل ولا يُسلّم مرة ثانية (RD20)
+        if !join && let Some(done) = delivered_before(&dir) {
+            files.push(Err(done));
+            continue;
+        }
         let Some((file, sub)) = fetch(app, id, &tools, &cookies, &req, &opts, Some(*sec), &dir, (i, count), cancel).await? else {
             return Ok(None);
         };
-        files.push((file, dir, sub));
+        files.push(Ok((file, dir, sub)));
     }
 
     if join {
@@ -255,6 +274,7 @@ pub(super) async fn run_job(
                 ..Default::default()
             },
         );
+        let files: Vec<_> = files.into_iter().flatten().collect();
         let inputs: Vec<PathBuf> = files.iter().map(|(f, _, _)| f.clone()).collect();
         let Some(joined) = concat_files(&tools, &req, &inputs, &job_dir.join("joined"), cancel).await? else {
             return Ok(None);
@@ -269,13 +289,20 @@ pub(super) async fn run_job(
     // ملف لكل مقطع: نعيد مسار الأول (الواجهة تفتح مجلده)
     let mut first = None;
     let mut delivered = Vec::with_capacity(count);
-    for (i, (file, dir, sub)) in files.into_iter().enumerate() {
-        let Some(file) = finish(app, id, &tools, &req, file, &dir, cancel).await? else {
-            return Ok(None);
-        };
-        let target = final_dir.join(sub);
-        let Some(done) = deliver_with_extras(app, &tools, &req, &file, &target, &side, &parts[i..=i], &dir, cancel).await? else {
-            return Ok(None);
+    for (i, clip) in files.into_iter().enumerate() {
+        let done = match clip {
+            Err(done) => done,
+            Ok((file, dir, sub)) => {
+                let Some(file) = finish(app, id, &tools, &req, file, &dir, cancel).await? else {
+                    return Ok(None);
+                };
+                let target = final_dir.join(sub);
+                let Some(done) = deliver_with_extras(app, &tools, &req, &file, &target, &side, &parts[i..=i], &dir, cancel).await? else {
+                    return Ok(None);
+                };
+                mark_delivered(&dir, &done);
+                done
+            }
         };
         delivered.push((done.clone(), parts[i]));
         first.get_or_insert(done);

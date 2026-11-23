@@ -500,3 +500,20 @@ fn download_args_single_item_section_and_url_last() {
     assert_eq!(a[a.len() - 2], "--");
     assert_eq!(a.last().unwrap(), &r.url);
 }
+
+/// إعادة المحاولة بعد فشل في منتصف المقاطع المنفصلة: المسلَّم يُعرف ولا يُكرَّر، والمحذوف يُعاد (RD20)
+#[test]
+fn delivered_clip_is_remembered_only_while_file_exists() {
+    let root = std::env::temp_dir().join(format!("khama-delivered-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let clip = root.join("clip0");
+    let out = root.join("out.mp4");
+    assert_eq!(delivered_before(&clip), None);
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(&out, b"x").unwrap();
+    mark_delivered(&clip, &out);
+    assert_eq!(delivered_before(&clip), Some(out.clone()));
+    std::fs::remove_file(&out).unwrap();
+    assert_eq!(delivered_before(&clip), None, "المستخدم حذف الملف: يُنزَّل من جديد");
+    let _ = std::fs::remove_dir_all(&root);
+}
