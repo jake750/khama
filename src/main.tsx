@@ -9,8 +9,10 @@ import "./redesign.css";
 import "./guide.css";
 import "./bubbly.css";
 import App from "./App";
+import { followSystemMotion } from "./motion";
 import { installFocusTrap } from "./focusTrap";
 
+followSystemMotion();
 installFocusTrap();
 
 // في المتصفح فقط (npm run dev): بيانات تجريبية بدل Rust لمعاينة التصميم. لا تدخل في نسخة التطبيق.

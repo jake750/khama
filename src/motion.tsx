@@ -26,9 +26,21 @@ export const D_BOUNCE = 420;
 export const D_SOFT = 360;
 export const D_ANTICIPATE = 260;
 
-// الحركة جزء من تصميم التطبيق، فلا نتبع إعداد «تأثيرات الحركة» في ويندوز (كثيرون يطفئونه لتسريع النظام).
-// من يريد إيقافها يضع data-motion="reduce" على الجذر.
+// «تقليل الحركة» في النظام يُحترم (CS3، بموافقة صاحب التطبيق): يضع data-motion="reduce" على الجذر،
+// وكل الأنماط (bubbly.css) والحركات في الكود تقرأ هذه السمة وحدها.
 export const reducedMotion = () => document.documentElement.dataset.motion === "reduce";
+
+/** يربط data-motion بإعداد النظام الآن وكلما تغيّر */
+export function followSystemMotion() {
+  const q = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+  if (!q) return;
+  const apply = () => {
+    if (q.matches) document.documentElement.dataset.motion = "reduce";
+    else delete document.documentElement.dataset.motion;
+  };
+  apply();
+  q.addEventListener?.("change", apply);
+}
 
 /**
  * مؤشّر منزلق تحت العنصر المختار (تبويبات، أزرار مجزّأة).

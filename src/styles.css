@@ -79,9 +79,9 @@
   --text: #0d1f1d;
   --text-dim: #44605c;
   --text-faint: #566d6a;
-  --accent: #077a70;
+  --accent: #067066; /* 5.2+ على كل خلفيات الوضع الفاتح، كان 4.51 على --surface-2 (CS8) */
   --accent-ink: #f3fbfa;
-  --accent-soft: rgb(10 119 110 / 0.1);
+  --accent-soft: rgb(6 112 102 / 0.1);
   --spark: #8f6100;
   --spark-soft: rgb(222 160 30 / 0.14);
   --danger: #b83530; /* تباين AA على --bg و--surface-2 (CS7) */
