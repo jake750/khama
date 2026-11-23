@@ -211,7 +211,14 @@ pub fn folder_name(name: &str) -> Option<String> {
         .collect();
     let cleaned = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
     let cleaned: String = cleaned.chars().take(100).collect();
-    let cleaned = cleaned.trim_matches(|c: char| c == '.' || c == ' ').to_string();
+    let mut cleaned = cleaned.trim_matches(|c: char| c == '.' || c == ' ').to_string();
+    // أسماء أجهزة محجوزة في Windows (قائمة اسمها «Aux» أو «Con»): لا يُنشأ مجلد بها فيفشل كل عنصر
+    let base = cleaned.split('.').next().unwrap_or("").trim_end().to_ascii_uppercase();
+    let reserved = matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || (base.len() == 4 && (base.starts_with("COM") || base.starts_with("LPT")) && base.as_bytes()[3].is_ascii_digit());
+    if reserved {
+        cleaned.push('_');
+    }
     (!cleaned.is_empty()).then_some(cleaned)
 }
 
@@ -285,5 +292,9 @@ mod tests {
         assert_eq!(page_from_dump(&out).as_deref(), Some("<html>hi</html>"));
         assert_eq!(folder_name("  My: Mix / 2024?. ").as_deref(), Some("My Mix 2024"));
         assert_eq!(folder_name("..."), None);
+        assert_eq!(folder_name("Aux").as_deref(), Some("Aux_"));
+        assert_eq!(folder_name("con.mix").as_deref(), Some("con.mix_"));
+        assert_eq!(folder_name("COM7").as_deref(), Some("COM7_"));
+        assert_eq!(folder_name("Comedy").as_deref(), Some("Comedy"));
     }
 }

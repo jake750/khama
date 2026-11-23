@@ -76,7 +76,9 @@ pub(super) async fn convert_for_editing(
     let output = out_dir.join(input.file_name().unwrap_or_default());
     let mut cmd = tools::command(&tools.ffmpeg);
     cmd.args(["-hide_banner", "-nostdin", "-y", "-i"]).arg(input);
-    cmd.args(["-map", "0:v:0", "-map", "0:a:0?"]);
+    // «?» للفيديو أيضًا: رابط فيديو قد يعود بصوت فقط (SoundCloud، Bandcamp، archive.org) بترميز opus أو flac،
+    // فيُحوَّل صوته إلى AAC بدل أن يفشل ffmpeg بـ «matches no streams»
+    cmd.args(["-map", "0:v:0?", "-map", "0:a:0?"]);
     if check.video_ok {
         cmd.args(["-c:v", "copy"]);
     } else {

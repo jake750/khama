@@ -254,7 +254,14 @@ pub async fn ensure_managed_ytdlp(app: &AppHandle) -> Result<(), AppError> {
         b > m
     };
     if copy {
-        tokio::fs::copy(&bundled, &managed).await?;
+        // نسخ إلى ملف جانبي ثم إعادة تسمية: معاينة تبدأ أثناء النسخ لا تشغّل ملفًا نصف مكتوب
+        let fresh = managed.with_extension("new");
+        tokio::fs::copy(&bundled, &fresh).await?;
+        if let Err(e) = tokio::fs::rename(&fresh, &managed).await {
+            // Windows: yt-dlp يعمل الآن فالملف مقفل. نحاول في التشغيل القادم
+            let _ = tokio::fs::remove_file(&fresh).await;
+            return Err(e.into());
+        }
         forget_resolved();
         #[cfg(unix)]
         {

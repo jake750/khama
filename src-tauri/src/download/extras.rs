@@ -26,9 +26,7 @@ pub(super) async fn fetch_sidecars(
     let mut a = tools::ytdlp_base_args(tools);
     a.extend(cookies.iter().cloned());
     a.extend(["--skip-download", "--no-simulate"].map(String::from));
-    if req.url.starts_with(playlist::MUSIC_SEARCH) {
-        a.extend(["--playlist-items".into(), "1".into()]);
-    }
+    a.extend(single_item());
     if !req.subs.is_empty() {
         a.extend([
             "--write-subs".into(),
@@ -103,7 +101,7 @@ pub(super) fn info_text(info: &Value, sections: &[(f64, f64)], downloaded: &str)
     line(
         "Published",
         s("upload_date")
-            .filter(|d| d.len() == 8)
+            .filter(|d| d.len() == 8 && d.bytes().all(|b| b.is_ascii_digit()))
             .map(|d| format!("{}-{}-{}", &d[..4], &d[4..6], &d[6..])),
     );
     line("Site", s("extractor_key").map(String::from));
@@ -213,6 +211,8 @@ pub(super) async fn grab_stills(
     cmd.args(["-hide_banner", "-nostdin", "-y", "-i"])
         .arg(file)
         .args(["-vf", &filter, "-fps_mode", "vfr", "-q:v", "2"])
+        // سطر تقدّم كل نصف ثانية: بدونه لا يكتب ffmpeg شيئًا في stdout فيقتله مؤقّت التعليق (T-93) بعد 15 دقيقة
+        .args(["-progress", "pipe:1", "-nostats"])
         .arg(dir.join("still_%03d.jpg"));
     match run_streaming(cmd, cancel, |_| {}).await? {
         RunOutcome::Canceled => Ok(None),
@@ -454,6 +454,9 @@ pub(super) async fn finish(
                     ..Default::default()
                 },
             );
+            // التنزيل انتهى: لا نحجز خانته أثناء انتظار دور المعالج المشترك (مثل الفصل، T-40)،
+            // وإلا وقفت طابور التنزيل كله خلف تحويل طويل والشبكة فارغة
+            release_slot(id);
             let Some(_heavy) = heavy_turn(cancel).await else {
                 return Ok(None);
             };
@@ -602,7 +605,8 @@ pub(super) async fn concat_files(
         if req.kind == "video" || output.extension().is_some_and(|e| e == "m4a") {
             cmd.args(["-movflags", "+faststart"]);
         }
-        cmd.arg(&output);
+        // إعادة الترميز قد تطول: أسطر التقدّم تُبقي مؤقّت التعليق راضيًا
+        cmd.args(["-progress", "pipe:1", "-nostats"]).arg(&output);
         match run_streaming(cmd, cancel, |_| {}).await? {
             RunOutcome::Canceled => return Ok(None),
             RunOutcome::Exited { success: true, .. } => return Ok(Some(output)),

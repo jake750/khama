@@ -182,15 +182,19 @@ pub(super) fn format_sizes(j: &Value) -> (Vec<[u64; 2]>, Option<u64>) {
 }
 
 /// المساحة الحرة (بايت) على القرص الذي فيه المجلد، أو أقرب مجلد أب موجود (T-96)
+/// غير متزامن وبمهلة: مجلد على قرص شبكة نائم كان يجمّد النافذة كلها حتى تنتهي مهلة SMB
 #[tauri::command]
-pub fn free_space(path: String) -> Option<u64> {
-    let mut p = std::path::PathBuf::from(path);
-    while !p.exists() {
-        if !p.pop() {
-            return None;
+pub async fn free_space(path: String) -> Option<u64> {
+    let job = tauri::async_runtime::spawn_blocking(move || {
+        let mut p = std::path::PathBuf::from(path);
+        while !p.exists() {
+            if !p.pop() {
+                return None;
+            }
         }
-    }
-    disk_free(&p)
+        disk_free(&p)
+    });
+    tokio::time::timeout(Duration::from_secs(3), job).await.ok()?.ok()?
 }
 
 #[cfg(windows)]
@@ -404,6 +408,7 @@ pub async fn save_thumbnail(app: AppHandle, settings: State<'_, SettingsState>, 
     tokio::fs::create_dir_all(&work).await?;
     let mut a = tools::ytdlp_base_args(&tools);
     a.extend(cookie_args(&app, &s));
+    a.extend(single_item());
     a.extend(["--skip-download", "--write-thumbnail", "--convert-thumbnails", "jpg", "-P"].map(String::from));
     a.push(work.to_string_lossy().into_owned());
     a.extend([
@@ -413,16 +418,26 @@ pub async fn save_thumbnail(app: AppHandle, settings: State<'_, SettingsState>, 
         "--".into(),
         url,
     ]);
+    // مخرج واحد لكل الحالات: مجلد العمل لا يبقى بعد مهلة أو خطأ
+    let done = thumbnail_into(&app, &s, &tools, &a, &work).await;
+    let _ = tokio::fs::remove_dir_all(&work).await;
+    done
+}
+
+async fn thumbnail_into(app: &AppHandle, s: &Settings, tools: &Tools, a: &[String], work: &Path) -> Result<String, AppError> {
     let args: Vec<&str> = a.iter().map(String::as_str).collect();
-    let (ok, _, err) = tokio::time::timeout(Duration::from_secs(90), tools::run_ytdlp(&tools, &args))
+    let (ok, _, err) = tokio::time::timeout(Duration::from_secs(90), tools::run_ytdlp(tools, &args))
         .await
         .map_err(|_| AppError::new("timeout"))??;
-    let jpg = std::fs::read_dir(&work)?
-        .flatten()
-        .map(|e| e.path())
-        .find(|p| p.extension().is_some_and(|e| e == "jpg"));
+    let mut jpg = None;
+    let mut rd = tokio::fs::read_dir(work).await?;
+    while let Some(e) = rd.next_entry().await? {
+        if e.path().extension().is_some_and(|x| x == "jpg") {
+            jpg = Some(e.path());
+            break;
+        }
+    }
     let Some(jpg) = jpg else {
-        let _ = std::fs::remove_dir_all(&work);
         return Err(if ok {
             AppError::new("noThumbnail")
         } else {
@@ -430,13 +445,14 @@ pub async fn save_thumbnail(app: AppHandle, settings: State<'_, SettingsState>, 
         });
     };
     #[cfg(mobile)]
-    let dir = jobs_root(&app)?.join("ready");
+    let dir = {
+        let _ = s;
+        jobs_root(app)?.join("ready")
+    };
     #[cfg(desktop)]
-    let dir = settings::resolve_output_dir(&app, &s)?;
+    let dir = settings::resolve_output_dir(app, s)?;
     tokio::fs::create_dir_all(&dir).await?;
-    let done = deliver(&app, &jpg, &dir).await;
-    let _ = tokio::fs::remove_dir_all(&work).await;
-    Ok(done?.to_string_lossy().into_owned())
+    Ok(deliver(app, &jpg, &dir).await?.to_string_lossy().into_owned())
 }
 
 /// يشغّل yt-dlp للمعاينة (حد 90 ثانية). replace = معاينة شاشة التنزيل: كل معاينة جديدة

@@ -11,6 +11,11 @@ pub(super) fn validate_url(url: &str) -> Result<String, AppError> {
     }
 }
 
+/// عنصر واحد فقط من أي رابط قائمة (التنزيل والملحقات والصورة المصغّرة)
+pub(super) fn single_item() -> [String; 2] {
+    ["--playlist-items".into(), "1".into()]
+}
+
 pub(super) fn cookie_args(app: &AppHandle, s: &Settings) -> Vec<String> {
     match s.cookies_mode.as_str() {
         "browser" if !s.cookies_browser.is_empty() => {
@@ -79,10 +84,9 @@ pub(super) fn download_args(
     if opts.rate_limit_kb > 0 {
         a.extend(["-r".into(), format!("{}K", opts.rate_limit_kb)]);
     }
-    // أغنية من سبوتيفاي: رابط بحث، نأخذ أول نتيجة فقط
-    if req.url.starts_with(playlist::MUSIC_SEARCH) {
-        a.extend(["--playlist-items".into(), "1".into()]);
-    }
+    // ملف واحد لكل مهمة: رابط قائمة أو قناة بدأ قبل وصول المعاينة كان يُنزّل القائمة كلها
+    // ولا يُسلَّم منها إلا آخر ملف. أغنية سبوتيفاي (رابط بحث) تأخذ أول نتيجة بالقاعدة نفسها
+    a.extend(single_item());
     let mut template = format!("{}.%(ext)s", opts.template);
     if let Some((s, e)) = section {
         // * = بالوقت (لا بالفصول). نجبر إطارات مفتاحية عند نقطتي القص حتى يكون القص دقيقًا بالإطار
