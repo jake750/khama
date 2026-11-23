@@ -116,7 +116,9 @@ pub(super) async fn run_convert(app: &AppHandle, id: u64, req: ConvertRequest, c
     };
     copy_in(&o.lut, "lut.cube")?;
     if let Some(sub) = &o.subtitles {
-        copy_in(&o.subtitles, &format!("sub.{}", sub_ext(sub)))?;
+        // نصًّا بـ UTF-8 لا نسخًا: FFmpeg يفترض UTF-8، وملف Windows-1256 كان يُحرق رموزًا مكسورة (RC10)
+        let bytes = std::fs::read(sub).map_err(|e| AppError::with_detail("badInput", format!("{sub}: {e}")))?;
+        std::fs::write(work.join(format!("sub.{}", sub_ext(sub))), crate::srt::decode(&bytes))?;
     }
 
     // ---- الكشف: لا ملف ناتج، فقط قائمة أوقات ----

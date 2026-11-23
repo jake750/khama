@@ -3,6 +3,20 @@
 //! yt-dlp ينزّل ترجمة الفيديو كاملًا حتى لو طلبنا جزءًا منه، فنقصّها نحن
 //! (بلا ffmpeg، فيعمل الشيء نفسه على الهاتف).
 
+/// نص ملف ترجمة أيًّا كان ترميزه (RC10): UTF-8 (مع BOM أو بدونه)، UTF-16 بـ BOM،
+/// وإلا يُخمَّن الترميز القديم (ملفات عربية كثيرة بـ Windows-1256) بدل أحرف مكسورة.
+pub fn decode(bytes: &[u8]) -> String {
+    if let Some((enc, bom)) = encoding_rs::Encoding::for_bom(bytes) {
+        return enc.decode_without_bom_handling(&bytes[bom..]).0.into_owned();
+    }
+    if let Ok(s) = std::str::from_utf8(bytes) {
+        return s.to_owned();
+    }
+    let mut det = chardetng::EncodingDetector::new();
+    det.feed(bytes, true);
+    det.guess(None, true).decode_without_bom_handling(bytes).0.into_owned()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Cue {
     pub start: f64,
@@ -96,6 +110,24 @@ pub fn for_sections(content: &str, sections: &[(f64, f64)]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn decode_handles_legacy_and_bom_encodings() {
+        let text = "1
+00:00:01,000 --> 00:00:02,000
+مرحبا بكم في هذا الفيديو، أهلًا وسهلًا
+";
+        let (cp1256, _, bad) = encoding_rs::WINDOWS_1256.encode(text);
+        assert!(!bad);
+        assert_eq!(decode(&cp1256), text, "Windows-1256");
+        let mut bom = vec![0xEF, 0xBB, 0xBF];
+        bom.extend_from_slice(text.as_bytes());
+        assert_eq!(decode(&bom), text, "UTF-8 BOM");
+        let mut utf16 = vec![0xFF, 0xFE];
+        utf16.extend(text.encode_utf16().flat_map(u16::to_le_bytes));
+        assert_eq!(decode(&utf16), text, "UTF-16LE");
+        assert_eq!(decode(text.as_bytes()), text);
+    }
 
     const SAMPLE: &str = "1\r\n00:00:01,000 --> 00:00:04,000\r\nHello\r\n\r\n2\r\n00:00:05,500 --> 00:00:08,000 align:start\r\nWorld\r\nline 2\r\n\r\n3\r\n00:01:00,000 --> 00:01:02,000\r\nLater\r\n";
 

@@ -51,6 +51,9 @@ base64 = "0.23"
 ort = { version = "=2.0.0-rc.13", default-features = false, features = ["load-dynamic"] }
 rustfft = "6"
 sha2 = "0.11"
+# ترجمات بترميز قديم (Windows-1256 وغيره) تُقرأ صحيحة بدل رموز مكسورة (RC10)
+encoding_rs = "0.8"
+chardetng = "0.1"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 # التحديث التلقائي للتطبيق نفسه، ثم إعادة تشغيله (للكمبيوتر فقط؛ أندرويد يتحدّث من المتجر/الملف)

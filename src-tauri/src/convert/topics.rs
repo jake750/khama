@@ -379,7 +379,7 @@ fn sidecar(input: &Path) -> Option<PathBuf> {
 
 fn read_subs(path: &Path) -> Vec<Cue> {
     std::fs::read(path)
-        .map(|b| clean_cues(srt::parse(&String::from_utf8_lossy(&b))))
+        .map(|b| clean_cues(srt::parse(&srt::decode(&b))))
         .unwrap_or_default()
 }
 
