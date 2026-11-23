@@ -21,23 +21,38 @@ export function suggestedFix(e: AppError): ErrorFix | null {
  * رسالة خطأ مفهومة، وتحتها (مطويّة) التفاصيل التقنية الأصلية.
  * inline = سطر خفيف تحت الحقل بدل صندوق أحمر كبير.
  */
-export function ErrorBox(props: { error: AppError; compact?: boolean; inline?: boolean; onFix?: (fix: ErrorFix) => void }) {
+export function ErrorBox(props: { error: AppError; compact?: boolean; inline?: boolean; onFix?: (fix: ErrorFix) => void | Promise<void> }) {
   const { t } = useI18n();
   const { error } = props;
   const fix = props.onFix ? suggestedFix(error) : null;
   const fixLabel = fix === "cookies" ? t.fixCookies : fix === "ytdlp" ? t.updateYtdlpAction : t.tryAgain;
   const [copied, setCopied] = useState(false);
+  // تحديث yt-dlp يستغرق ثواني: الزر يُظهر الانتظار ولا يُضغط مرتين (UX9)
+  const [busy, setBusy] = useState(false);
+  const runFix = async () => {
+    setBusy(true);
+    try {
+      await props.onFix!(fix!);
+    } finally {
+      setBusy(false);
+    }
+  };
   const copy = () =>
     writeText(`Khama error: ${error.code}\n${error.detail ?? ""}`)
       .then(() => setCopied(true))
       .catch(() => setCopied(false));
   return (
+    // compact = داخل بطاقة في قائمة: عشر بطاقات فاشلة لا تقاطع قارئ الشاشة عشر مرات (UX22)
     <div className={props.inline ? "error-inline" : undefined}>
-      <div className={`alert ${props.inline ? "inline" : ""}`} style={props.compact ? { marginTop: 8 } : undefined} role="alert">
+      <div
+        className={`alert ${props.inline ? "inline" : ""}`}
+        style={props.compact ? { marginTop: 8 } : undefined}
+        role={props.compact ? undefined : "alert"}
+      >
         <Icon name="alert" size={16} />
         <span className="grow">{errorText(t, error)}</span>
         {fix && (
-          <button className="btn btn-sm" onClick={() => props.onFix!(fix)}>
+          <button className="btn btn-sm" onClick={runFix} disabled={busy} aria-busy={busy || undefined}>
             <Icon name={fix === "cookies" ? "settings" : "retry"} size={16} /> {fixLabel}
           </button>
         )}

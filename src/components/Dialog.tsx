@@ -1,27 +1,37 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useI18n } from "../i18n";
 
 /** نافذة حوار بسيطة: خلفية معتمة، Esc والنقر خارجها يغلقانها (إن سُمح)، والتركيز على أول زر أساسي */
 export function Dialog(props: { title: string; children: ReactNode; actions: ReactNode; onClose?: () => void }) {
   const card = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   const onClose = useRef(props.onClose);
   useEffect(() => {
     onClose.current = props.onClose;
   });
   useEffect(() => {
+    // يعود التركيز عند الإغلاق إلى ما فتح النافذة (زر «مسح السجلّ» مثلًا)، لا إلى أول الصفحة
+    const opener = document.activeElement as HTMLElement | null;
     card.current?.querySelector<HTMLButtonElement>("[data-autofocus], .btn-primary")?.focus();
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose.current?.();
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (opener?.isConnected) opener.focus();
+    };
   }, []);
-  return (
+  // في body لا مكان الاستدعاء: شاشة التبويب (will-change: transform) تصير حاويةً لـ position: fixed،
+  // فكانت الخلفية المعتمة لا تغطّي الشريط العلوي، والنافذة تظهر في منتصف قائمة طويلة خارج الشاشة
+  return createPortal(
     <div className="update-backdrop" onClick={(e) => e.target === e.currentTarget && props.onClose?.()}>
-      <div className="update-card" ref={card} role="dialog" aria-modal="true" aria-labelledby="dialog-title">
-        <h2 id="dialog-title">{props.title}</h2>
+      <div className="update-card" ref={card} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <h2 id={titleId}>{props.title}</h2>
         <div className="dialog-body">{props.children}</div>
         <div className="update-actions">{props.actions}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

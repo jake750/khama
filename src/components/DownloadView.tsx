@@ -713,7 +713,7 @@ export function DownloadView(props: {
                 {formatNote && <div className="faint mt-2">{formatNote}</div>}
               </div>
 
-              <div className="collapse slide-x" data-open={s.kind === "video"} aria-hidden={s.kind !== "video" || undefined}>
+              <div className="collapse slide-x" data-open={s.kind === "video"} inert={!(s.kind === "video") || undefined}>
                 <div>
                   <div className="video-only">
                     <div>
@@ -760,7 +760,7 @@ export function DownloadView(props: {
               title={t.trimToggle}
               hint={info.isLive ? `${t.trimLive} ${t.liveNote}` : t.trimHint}
             />
-            <div className="collapse" data-open={!!activeClips}>
+            <div className="collapse" data-open={!!activeClips} inert={!activeClips || undefined}>
               <div>
                 {activeClips && duration && (
                   <ClipEditor

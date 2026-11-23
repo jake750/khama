@@ -125,7 +125,13 @@ export function HistoryView(props: {
       {list && list.length > 0 && (
         <label className="search">
           <Icon name="search" size={16} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.historySearch} spellCheck={false} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            aria-label={t.historySearch}
+            placeholder={t.historySearch}
+            spellCheck={false}
+          />
         </label>
       )}
       {list && list.length > 0 && (

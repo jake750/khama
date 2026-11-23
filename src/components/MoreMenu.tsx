@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent as KeyEvent } from "react";
 import { createPortal } from "react-dom";
 import { Icon, type IconName } from "./Icon";
 import { D_ANTICIPATE, usePresence } from "../motion";
@@ -19,6 +19,30 @@ export function MoreMenu(props: { label: string; items: MenuItem[] }) {
   const list = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<CSSProperties>({ visibility: "hidden" });
   const [up, setUp] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  /** يغلق القائمة ويعيد التركيز إلى زر «⋯» (لوحة المفاتيح وقارئ الشاشة) */
+  const close = (refocus: boolean) => {
+    setOpen(false);
+    if (refocus) trigger.current?.focus();
+  };
+  const items = () => [...(list.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])];
+  /** الأسهم بين العناصر، Home/End للطرفين، Tab يغلق (القائمة في آخر الصفحة فلا معنى للتنقّل فيها بـ Tab) */
+  const onMenuKey = (e: KeyEvent) => {
+    const all = items();
+    const i = all.indexOf(document.activeElement as HTMLButtonElement);
+    const go = (n: number) => {
+      e.preventDefault();
+      all[(n + all.length) % all.length]?.focus();
+    };
+    if (e.key === "ArrowDown") go(i + 1);
+    else if (e.key === "ArrowUp") go(i - 1);
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(all.length - 1);
+    else if (e.key === "Tab") {
+      e.preventDefault();
+      close(true);
+    }
+  };
   // القائمة في طبقة ثابتة فوق الصفحة: البطاقة (overflow: hidden) كانت تقصّها، وتنقلب لأعلى إن لم يتّسع ما تحتها
   useLayoutEffect(() => {
     if (!shown || leaving) return;
@@ -50,6 +74,8 @@ export function MoreMenu(props: { label: string; items: MenuItem[] }) {
       overflowY: "auto",
       ...(flip ? { top: "auto", bottom: window.innerHeight - btn.top + gap } : { top: btn.bottom + gap, bottom: "auto" }),
     });
+    // التركيز على أول عنصر: بدونه لا تصل لوحة المفاتيح إلى القائمة (هي في آخر الصفحة)
+    el.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
   }, [shown, leaving]);
   useEffect(() => {
     if (!open) return;
@@ -64,7 +90,10 @@ export function MoreMenu(props: { label: string; items: MenuItem[] }) {
     window.addEventListener("scroll", scroll, true);
     window.addEventListener("resize", scroll);
     const esc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        trigger.current?.focus();
+      }
     };
     document.addEventListener("pointerdown", away);
     document.addEventListener("keydown", esc);
@@ -79,6 +108,7 @@ export function MoreMenu(props: { label: string; items: MenuItem[] }) {
   return (
     <div className="more-menu" ref={box}>
       <button
+        ref={trigger}
         type="button"
         className="icon-btn sm"
         title={props.label}
@@ -103,6 +133,7 @@ export function MoreMenu(props: { label: string; items: MenuItem[] }) {
             data-up={up || undefined}
             data-leaving={leaving || undefined}
             inert={leaving || undefined}
+            onKeyDown={onMenuKey}
           >
             {props.items.map((it) => (
               <button
@@ -110,8 +141,9 @@ export function MoreMenu(props: { label: string; items: MenuItem[] }) {
                 type="button"
                 title={it.title}
                 role="menuitem"
+                tabIndex={-1}
                 onClick={() => {
-                  setOpen(false);
+                  close(true);
                   it.onClick();
                 }}
               >

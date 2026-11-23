@@ -95,7 +95,7 @@ function Entry(props: {
           <Icon name="chevron" size={16} />
         </span>
       </button>
-      <div className="collapse" id={panel} data-open={props.open}>
+      <div className="collapse" id={panel} data-open={props.open} inert={!props.open || undefined}>
         <div>
           <div className="guide-detail">
             <GuideArt name={e.art} className="guide-detail-art" />

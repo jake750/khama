@@ -57,7 +57,7 @@ export function StemsRow(props: {
           { value: "music", label: t.stemsMusic },
         ]}
       />
-      <div className="collapse" data-open={stems !== "off"}>
+      <div className="collapse" data-open={stems !== "off"} inert={!(stems !== "off") || undefined}>
         <div>
           {props.playlist && (
             <div className="stems-scope">

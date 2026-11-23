@@ -712,7 +712,12 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
         {s.cookiesMode === "browser" && (
           <div>
             <span className="field-label">{t.browser}</span>
-            <select className="select" value={s.cookiesBrowser} onChange={(e) => update({ cookiesBrowser: e.target.value })}>
+            <select
+              className="select"
+              aria-label={t.browser}
+              value={s.cookiesBrowser}
+              onChange={(e) => update({ cookiesBrowser: e.target.value })}
+            >
               {BROWSERS.map((b) => (
                 <option key={b} value={b}>
                   {browserName(b)}
@@ -740,6 +745,7 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
             </div>
             <textarea
               className="textarea"
+              aria-label={t.cookiesFile}
               placeholder={t.cookiesPlaceholder}
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -876,6 +882,7 @@ function WatchSection(props: { settings: Settings; update: (p: Partial<Settings>
           <label className="toggle" title={w.dir}>
             <input
               type="checkbox"
+              aria-label={`${t.watchTitle}: ${w.dir}`}
               checked={w.enabled}
               onChange={(e) => set(list.map((x, k) => (k === i ? { ...x, enabled: e.target.checked } : x)))}
             />
@@ -886,6 +893,7 @@ function WatchSection(props: { settings: Settings; update: (p: Partial<Settings>
           </span>
           <select
             className="select"
+            aria-label={`${t.format}: ${w.dir}`}
             value={w.preset}
             onChange={(e) => set(list.map((x, k) => (k === i ? { ...x, preset: e.target.value } : x)))}
           >
