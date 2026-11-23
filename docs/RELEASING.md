@@ -31,7 +31,7 @@ npm run release
 
 Then `build.yml` takes over, from a clean machine every time:
 
-1. **check**: sees a new version, collects "What's new" from the commit titles since the last tag.
+1. **check**: sees a new version, collects "What's new" from the commit titles since the last tag, then waits for the Check workflow on the same commit to pass. If Check fails there is no release: fix it, then release the next patch.
 2. **build**: Windows, macOS (Apple Silicon and Intel), Linux (AppImage, deb, rpm) and the signed Android APK, each with pinned, checksum-verified yt-dlp, FFmpeg and Deno.
 3. **publish**: the GitHub release (not a draft) with every file, `latest.json` for the updater, an SBOM, and the `vX.Y.Z` tag on the release commit. The job summary lists each installer's size.
 

@@ -13,10 +13,12 @@ on:
     paths: [src-tauri/tauri.conf.json]
     tags: ["v*"]
 
-# الكتابة على مستوى الملف: مع «read» هنا و«write» في المهمة رفض GitHub إنشاء إصدار 0.3.30
-# (Resource not accessible by integration) رغم أن رمز المهمة كان Contents: write
+# قراءة فقط افتراضيًا؛ الكتابة (إنشاء الإصدار ورفع الملفات) لمهام build وandroid وsbom وحدها.
+# (فشل 0.3.30 لم يكن بسببها بل بدفع تعديل على workflows أثناء البناء: docs/RELEASING.md)
 permissions:
-  contents: write
+  contents: read
+  # قراءة نتيجة سير Check لهذا الـcommit قبل النشر
+  actions: read
 
 jobs:
   # release: هل ننشر إصدارًا؟ has_key: هل أُضيف مفتاح توقيع أندرويد؟ (لا تُقرأ secrets في if الخاصة بالـ job)
@@ -52,6 +54,22 @@ jobs:
             echo "إصدار $v"
             echo "build=true" >> "$GITHUB_OUTPUT"; echo "release=true" >> "$GITHUB_OUTPUT"
           fi
+      # لا إصدار قبل نجاح Check على الـcommit نفسه (IN4): كان الإصدار يُنشر ولو فشلت الاختبارات.
+      # الوسم اليدوي وworkflow_dispatch لا ينتظران (Check لا يعمل على الوسوم)
+      - name: Wait for Check on this commit
+        if: steps.version.outputs.release == 'true' && github.ref_type != 'tag'
+        timeout-minutes: 45
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          while :; do
+            r=$(gh run list -R "$GITHUB_REPOSITORY" --workflow check.yml --commit "$GITHUB_SHA" --event push --limit 1 --json status,conclusion --jq '.[0] | "\(.status) \(.conclusion)"')
+            case "$r" in
+              "completed success") echo "Check نجح"; exit 0 ;;
+              completed*) echo "::error::Check لم ينجح على $GITHUB_SHA ($r): لا إصدار. أصلح ثم أعد تشغيل هذا السير"; exit 1 ;;
+            esac
+            sleep 30
+          done
       # «ما الجديد»: عناوين الالتزامات منذ آخر وسم، بلا التزامات الإصدار وقائمة المراجعة
       - id: notes
         run: |
