@@ -34,7 +34,7 @@ jobs:
       - name: Prettier
         run: npx prettier --check .
       - name: Vitest
-        run: npx vitest run --dir src
+        run: npx vitest run
       - name: UI size budget (docs/PERFORMANCE.md)
         run: npx vite build && node scripts/size-budget.mjs
       - name: npm audit (production)
