@@ -56,7 +56,7 @@ pub enum Loaded<T> {
 
 /// يقرأ JSON من `path`. إن كان تالفًا يُنقل جانبًا حتى لا يمحوه الحفظ التالي.
 pub fn read_json<T: DeserializeOwned>(path: &Path) -> Loaded<T> {
-    let text = match fs::read_to_string(path) {
+    let text = match read_retrying(path) {
         Ok(t) => t,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Loaded::Missing,
         Err(_) => return quarantine(path),
@@ -65,6 +65,23 @@ pub fn read_json<T: DeserializeOwned>(path: &Path) -> Loaded<T> {
         Ok(v) => Loaded::Ok(v),
         Err(_) => quarantine(path),
     }
+}
+
+/// قفل مؤقت (مضاد فيروسات أو مزامنة سحابية تفتح الملف على Windows) ليس تلفًا (RD15):
+/// نعيد المحاولة قليلًا قبل أن نعدّه تالفًا وننقله جانبًا. نص غير UTF-8 تالف فورًا.
+fn read_retrying(path: &Path) -> io::Result<String> {
+    let mut last = None;
+    for wait in [0u64, 50, 150, 400] {
+        if wait > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(wait));
+        }
+        match fs::read_to_string(path) {
+            Ok(t) => return Ok(t),
+            Err(e) if matches!(e.kind(), io::ErrorKind::NotFound | io::ErrorKind::InvalidData) => return Err(e),
+            Err(e) => last = Some(e),
+        }
+    }
+    Err(last.unwrap_or_else(|| io::Error::other("read failed")))
 }
 
 impl<T: Default> Loaded<T> {
