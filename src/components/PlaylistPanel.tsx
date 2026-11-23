@@ -1,13 +1,23 @@
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
-import type { PlaylistEntry } from "../api";
+import { api, type PlaylistEntry } from "../api";
+import type { EntryClips } from "../downloadPlan";
 import { formatDuration } from "../format";
 import { useI18n } from "../i18n";
+import { ClipEditor, isTrimmed } from "./ClipEditor";
 import { Icon } from "./Icon";
+
+/** ما نعرفه عن العنصر لمعاينة القص: مدته الحقيقية ونسخة المعاينة */
+interface EntryMedia {
+  duration: number | null;
+  previewUrl?: string | null;
+  thumbnail?: string | null;
+}
 
 const PAGE = 200;
 
 /**
- * عناصر قائمة التشغيل: تختار ما يُنزَّل (الكل افتراضيًا).
+ * عناصر قائمة التشغيل: تختار ما يُنزَّل (الكل افتراضيًا)، ويمكن قص أي عنصر محدَّد
+ * إلى جزء أو عدة مقاطع (زر «قص» بجانبه) بنفس محرّر الفيديو الواحد.
  * pickLabel: عند اختيار "عناصر أحدّدها" لإزالة الموسيقى، يظهر بجانب كل عنصر محدَّد زر بهذا الاسم.
  */
 export function PlaylistPanel(props: {
@@ -17,6 +27,8 @@ export function PlaylistPanel(props: {
   pickLabel: string | null;
   picked: Set<number>;
   onPicked: Dispatch<SetStateAction<Set<number>>>;
+  clips: Map<number, EntryClips>;
+  onClips: (i: number, v: EntryClips | null) => void;
 }) {
   const { t } = useI18n();
   const { entries, selected, picked } = props;
@@ -42,6 +54,37 @@ export function PlaylistPanel(props: {
       }
       return next;
     });
+
+  // العنصر المفتوح للقص، وما جُلب لكل عنصر (المدة الدقيقة ورابط المعاينة)
+  const [open, setOpen] = useState<number | null>(null);
+  const [media, setMedia] = useState<Map<number, EntryMedia | "loading" | "error">>(new Map());
+  const setMediaAt = (i: number, v: EntryMedia | "loading" | "error") => setMedia((m) => new Map(m).set(i, v));
+
+  function openTrim(i: number) {
+    if (open === i) return setOpen(null);
+    setOpen(i);
+    const e = entries[i];
+    if (media.has(i) && media.get(i) !== "error") return;
+    // مدة القائمة تكفي للبدء، والمعاينة تصل حين ينتهي الجلب
+    setMediaAt(i, e.duration ? { duration: e.duration, thumbnail: e.thumbnail } : "loading");
+    api
+      .probe(e.url)
+      .then((info) =>
+        setMediaAt(i, {
+          duration: info.duration ?? e.duration ?? null,
+          previewUrl: info.previewUrl,
+          thumbnail: info.thumbnail ?? e.thumbnail,
+        }),
+      )
+      .catch(() => setMediaAt(i, e.duration ? { duration: e.duration, thumbnail: e.thumbnail } : "error"));
+  }
+
+  /** ملخّص القص على زر العنصر: «0:30–1:10» أو «3 مقاطع» */
+  const trimLabel = (c: EntryClips | undefined) => {
+    if (!c || !isTrimmed(c.duration, c.clips)) return t.plTrim;
+    if (c.clips.length > 1) return t.plTrimClips(c.clips.length);
+    return `${formatDuration(c.clips[0].start)}–${formatDuration(c.clips[0].end)}`;
+  };
 
   const toggle = (set: Set<number>, i: number) => {
     const next = new Set(set);
@@ -76,8 +119,13 @@ export function PlaylistPanel(props: {
         {matches.slice(0, shown).map(({ e, i }) => {
           const on = selected.has(i);
           const sub = [e.uploader, formatDuration(e.duration)].filter(Boolean).join(" · ");
+          const c = props.clips.get(i);
+          const trimmed = !!c && isTrimmed(c.duration, c.clips);
+          const editing = open === i && on;
+          const m = media.get(i);
+          const md = m && m !== "loading" && m !== "error" && m.duration ? { ...m, duration: m.duration } : null;
           return (
-            <li key={i} className="pl-row" data-on={on}>
+            <li key={i} className="pl-row" data-on={on} data-editing={editing || undefined}>
               <label className="pl-main">
                 <input type="checkbox" checked={on} onChange={() => props.onSelected((cur) => toggle(cur, i))} />
                 <span className="pl-idx">{i + 1}</span>
@@ -95,6 +143,12 @@ export function PlaylistPanel(props: {
                   {sub && <span className="pl-sub faint">{sub}</span>}
                 </span>
               </label>
+              {on && (
+                <button className="pl-stem" aria-pressed={trimmed} aria-expanded={editing} onClick={() => openTrim(i)} title={t.trimToggle}>
+                  <Icon name="scissors" size={16} />
+                  <span className="ltr-num">{trimLabel(c)}</span>
+                </button>
+              )}
               {props.pickLabel && on && (
                 <button
                   className="pl-stem"
@@ -105,6 +159,37 @@ export function PlaylistPanel(props: {
                   <Icon name={picked.has(i) ? "check" : "plus"} size={16} />
                   <span>{props.pickLabel}</span>
                 </button>
+              )}
+              {editing && (
+                <div className="pl-clip trim-box">
+                  {m === "loading" && <div className="faint">{t.plTrimLoading}</div>}
+                  {m && m !== "loading" && !md && <div className="faint">{t.plTrimFailed}</div>}
+                  {md && (
+                    <>
+                      <ClipEditor
+                        duration={md.duration}
+                        clips={c?.clips ?? [{ start: 0, end: md.duration }]}
+                        onClips={(clips) => props.onClips(i, clips.length ? { duration: md.duration, clips, join: c?.join ?? true } : null)}
+                        join={c?.join ?? true}
+                        onJoin={(join) =>
+                          props.onClips(i, { duration: md.duration, clips: c?.clips ?? [{ start: 0, end: md.duration }], join })
+                        }
+                        previewUrl={md.previewUrl}
+                        poster={md.thumbnail}
+                      />
+                      <div className="pl-clip-actions">
+                        {trimmed && (
+                          <button className="btn btn-sm btn-ghost" onClick={() => props.onClips(i, null)}>
+                            {t.plTrimReset}
+                          </button>
+                        )}
+                        <button className="btn btn-sm" onClick={() => setOpen(null)}>
+                          {t.plTrimDone}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
             </li>
           );

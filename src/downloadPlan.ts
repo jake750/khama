@@ -84,9 +84,30 @@ export interface PlanInput {
   /** المقاطع المفعّلة لفيديو واحد (null = الملف كاملًا) */
   clips: Clip[] | null;
   joinClips: boolean;
+  /** قائمة تشغيل: مقاطع عنصر قُصّ (رقمه ← مدته ومقاطعه، وهل تُدمج) */
+  entryClips?: Map<number, EntryClips>;
   timeline: boolean;
   /** ملف تايم لاين ممكن على هذه المنصة */
   canTimeline: boolean;
+}
+
+export interface EntryClips {
+  duration: number;
+  clips: Clip[];
+  join: boolean;
+}
+
+/** حقول القص في الطلب: مقطع جزئي = start/end، وعدة مقاطع = clips (تُدمج أو تبقى منفصلة) */
+function clipFields(duration: number | null, clips: Clip[], join: boolean) {
+  const multi = clips.length > 1;
+  const single = clips.length === 1 ? clips[0] : null;
+  const partial = !!single && !!duration && (single.start > 0 || single.end < duration - 0.05);
+  return {
+    start: partial ? single.start : null,
+    end: partial ? single.end : null,
+    clips: multi ? clips.map((c) => [c.start, c.end] as [number, number]) : [],
+    joinClips: multi && join,
+  };
 }
 
 export interface PlannedDownload {
@@ -134,9 +155,11 @@ export function planDownloads(p: PlanInput): PlannedDownload[] {
       .map((i) => {
         const e = entries[i];
         const removeHere = !!stems && (p.stemsScope === "all" || p.picked.has(i));
+        const c = p.entryClips?.get(i);
         return {
           request: {
             ...base(e.url, original),
+            ...(c ? clipFields(c.duration, c.clips, c.join) : {}),
             stems: removeHere ? stems : null,
             subdir: p.info!.title,
             expectDuration: e.duration ?? null,
@@ -148,22 +171,14 @@ export function planDownloads(p: PlanInput): PlannedDownload[] {
       });
   }
 
-  const duration = p.info?.duration ?? null;
-  const clips = p.clips ?? [];
-  const multi = clips.length > 1;
-  const single = clips.length === 1 ? clips[0] : null;
-  const partial = !!single && !!duration && (single.start > 0 || single.end < duration - 0.05);
-  const join = multi && p.joinClips;
+  const cut = clipFields(p.info?.duration ?? null, p.clips ?? [], p.joinClips);
   return [
     {
       request: {
         ...base(url, original),
-        start: partial ? single.start : null,
-        end: partial ? single.end : null,
+        ...cut,
         stems,
-        clips: multi ? clips.map((c) => [c.start, c.end] as [number, number]) : [],
-        joinClips: join,
-        timeline: multi && !join && p.canTimeline && s.kind === "video" && p.timeline,
+        timeline: cut.clips.length > 1 && !cut.joinClips && p.canTimeline && s.kind === "video" && p.timeline,
       },
       title: p.info?.title ?? url,
       thumbnail: p.info?.thumbnail,

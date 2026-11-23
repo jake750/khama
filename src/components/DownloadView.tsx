@@ -14,7 +14,7 @@ import {
 } from "../api";
 import { extractUrls, formatBytes, formatDuration, isHttpUrl } from "../format";
 import { limiter } from "../limit";
-import { laneClips, nextClip, planDownloads, RATES, scheduledAt, type Stills } from "../downloadPlan";
+import { planDownloads, type EntryClips, RATES, scheduledAt, type Stills } from "../downloadPlan";
 import { useI18n } from "../i18n";
 import { ErrorBox, type ErrorFix } from "./ErrorBox";
 import { Icon } from "./Icon";
@@ -23,14 +23,14 @@ import { SlideSwitch } from "../motion";
 import { isMobile, mobileSaveDir } from "../platform";
 import { logError } from "../log";
 import { convertMinutes, estimateDownload } from "../estimate";
-import { TrimRange, type PreviewLink, type Range } from "./TrimRange";
+import type { Range } from "./TrimRange";
+import { ClipEditor } from "./ClipEditor";
 import { PlaylistPanel } from "./PlaylistPanel";
 import { FolderPicker } from "./FolderPicker";
 import { ExtrasPanel } from "./download/ExtrasPanel";
 import { ProjectPicker } from "./download/ProjectPicker";
 import { ScheduleRow, type When } from "./download/ScheduleRow";
 import { StemsRow } from "./download/StemsRow";
-import { PreviewVideo } from "./download/PreviewVideo";
 
 const QUALITIES = ["best", "2160", "1440", "1080", "720", "480"] as const;
 
@@ -116,6 +116,8 @@ export function DownloadView(props: {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [stemsScope, setStemsScope] = useState<"all" | "pick">("all");
   const [picked, setPicked] = useState<Set<number>>(new Set());
+  // مقاطع عناصر القائمة التي قُصّت (رقم العنصر ← مقاطعه)
+  const [entryClips, setEntryClips] = useState<Map<number, EntryClips>>(new Map());
   const [when, setWhen] = useState<When>("now");
   const [atTime, setAtTime] = useState(() => {
     const d = new Date(Date.now() + 60 * 60 * 1000);
@@ -123,7 +125,6 @@ export function DownloadView(props: {
   });
   const [atDay, setAtDay] = useState(0);
   const [savingThumb, setSavingThumb] = useState(false);
-  const video = useRef<HTMLVideoElement>(null);
   const input = useRef<HTMLInputElement>(null);
 
   const urls = useMemo(() => extractUrls(url), [url]);
@@ -146,6 +147,7 @@ export function DownloadView(props: {
       const info = session.lastProbe.info;
       setSelected(new Set(info.entries?.map((_, i) => i) ?? []));
       setPicked(new Set());
+      setEntryClips(new Map());
       setProbe({ status: "ok", info });
       return;
     }
@@ -157,6 +159,7 @@ export function DownloadView(props: {
         if (token === probeToken.current) {
           setSelected(new Set(info.entries?.map((_, i) => i) ?? []));
           setPicked(new Set());
+          setEntryClips(new Map());
           setProbe({ status: "ok", info });
         }
       } catch (e) {
@@ -256,29 +259,10 @@ export function DownloadView(props: {
   // العناصر المحدَّدة التي ستُزال منها الموسيقى
   const stemsCount = !entries || !stemsOn ? 0 : stemsScope === "all" ? selected.size : [...picked].filter((i) => selected.has(i)).length;
   const multi = !!activeClips && activeClips.length > 1;
-  // المقاطع المتداخلة في صفوف منفصلة على الخط الزمني الموحّد (D-103)
-  const clipLanes = laneClips(activeClips ?? []);
   // الدمج يحتاج ffmpeg على الكمبيوتر؛ على الهاتف تُحفظ المقاطع ملفات منفصلة
   const willJoin = multi && joinClips;
   const original = !!info?.original;
   const ready = !!info || multiLinks;
-
-  const preview: PreviewLink | null =
-    info?.previewUrl && trimOn
-      ? {
-          now: () => video.current?.currentTime ?? null,
-          seek: (v) => {
-            if (video.current) video.current.currentTime = v;
-          },
-        }
-      : null;
-
-  const setClip = (i: number, r: Range) => setClips((activeClips ?? []).map((c, j) => (j === i ? r : c)));
-  const removeClip = (i: number) => setClips((activeClips ?? []).filter((_, j) => j !== i));
-  function addClip() {
-    if (!duration || !activeClips) return;
-    setClips([...activeClips, nextClip(duration, activeClips, preview?.now())]);
-  }
 
   async function paste() {
     const found = await clipboardUrl();
@@ -342,6 +326,7 @@ export function DownloadView(props: {
       picked,
       clips: activeClips,
       joinClips,
+      entryClips,
       timeline,
       canTimeline: !isMobile,
     });
@@ -362,6 +347,7 @@ export function DownloadView(props: {
     setTrimOn(false);
     setStems("off");
     setStills("off");
+    setEntryClips(new Map());
     setWhen("now");
   }
 
@@ -637,6 +623,15 @@ export function DownloadView(props: {
           pickLabel={stemsOn && stemsScope === "pick" ? stemsLabel : null}
           picked={picked}
           onPicked={setPicked}
+          clips={entryClips}
+          onClips={(i, v) =>
+            setEntryClips((m) => {
+              const next = new Map(m);
+              if (v) next.set(i, v);
+              else next.delete(i);
+              return next;
+            })
+          }
         />
       )}
       {/* أين تذهب العناصر (F-56) */}
@@ -764,76 +759,16 @@ export function DownloadView(props: {
             />
             <div className="collapse" data-open={!!activeClips}>
               <div>
-                {activeClips && info.previewUrl && <PreviewVideo video={video} src={info.previewUrl} poster={info.thumbnail} />}
-                {/* الموقع لا يعطي رابط معاينة: نقول ذلك ونشرح كيف تُعرف الأوقات بدل قص أعمى صامت (U-17) */}
-                {activeClips && !info.previewUrl && (
-                  <div className="alert info">
-                    <Icon name="info" size={16} />
-                    <span>{t.trimNoPreview}</span>
-                  </div>
-                )}
-                {/* خط زمني واحد يجمع المقاطع: أين يقع كل مقطع من الفيديو وأيها يتداخل (D-103) */}
-                {duration && multi && (
-                  <div className="clips-overview" dir="ltr" aria-hidden="true" style={{ height: `${clipLanes.count * 18 + 4}px` }}>
-                    {activeClips!.map((c, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          left: `${(c.start / duration) * 100}%`,
-                          width: `${((c.end - c.start) / duration) * 100}%`,
-                          top: `${clipLanes.lane[i] * 18 + 2}px`,
-                        }}
-                        title={t.clipN(i + 1)}
-                      >
-                        {i + 1}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {duration &&
-                  (activeClips ?? [{ start: 0, end: duration }]).map((c, i) => (
-                    <div className="clip" key={i}>
-                      {multi && (
-                        <div className="clip-head">
-                          <span className="clip-name">{t.clipN(i + 1)}</span>
-                          <button
-                            className="btn btn-sm btn-ghost"
-                            onClick={() => removeClip(i)}
-                            title={t.removeClip}
-                            aria-label={t.removeClip}
-                          >
-                            <Icon name="trash" size={16} />
-                          </button>
-                        </div>
-                      )}
-                      <TrimRange duration={duration} value={c} onChange={(r) => setClip(i, r)} preview={preview} />
-                    </div>
-                  ))}
-                {duration && (
-                  <div className="clips-footer">
-                    <button className="btn btn-sm" onClick={addClip}>
-                      <Icon name="plus" size={16} /> {t.addClip}
-                    </button>
-                    {multi && (
-                      <div className="clips-output">
-                        <span className="field-label">{t.clipsOutput}</span>
-                        <Segmented<"join" | "separate">
-                          label={t.clipsOutput}
-                          value={joinClips ? "join" : "separate"}
-                          onChange={(v) => setJoinClips(v === "join")}
-                          options={[
-                            { value: "join", label: t.clipsJoin },
-                            { value: "separate", label: t.clipsSeparate },
-                          ]}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-                {multi && (
-                  <div className="faint mt-2">
-                    {willJoin ? t.clipsJoinHint(activeClips!.length) : t.clipsSeparateHint(activeClips!.length)}
-                  </div>
+                {activeClips && duration && (
+                  <ClipEditor
+                    duration={duration}
+                    clips={activeClips}
+                    onClips={setClips}
+                    join={joinClips}
+                    onJoin={setJoinClips}
+                    previewUrl={info.previewUrl}
+                    poster={info.thumbnail}
+                  />
                 )}
                 {multi && !willJoin && !isMobile && s.kind === "video" && (
                   <div className="mt-3">

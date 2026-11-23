@@ -132,6 +132,43 @@ describe("planDownloads", () => {
     expect(plan[0].request.subdir).toBe("قائمتي");
   });
 
+  it("قائمة تشغيل: كل عنصر بمقاطعه (جزء، عدة مقاطع، أو كاملًا)", () => {
+    const entries = [0, 1, 2].map((i) => ({ url: `https://a.com/${i}`, title: `عنصر ${i}`, thumbnail: null, duration: 100 }));
+    const plan = planDownloads(
+      input({
+        info: info({ title: "قائمتي", entries } as Partial<ProbeInfo>),
+        selected: new Set([0, 1, 2]),
+        entryClips: new Map([
+          [0, { duration: 100, clips: [{ start: 10, end: 40 }], join: true }],
+          [
+            1,
+            {
+              duration: 100,
+              clips: [
+                { start: 0, end: 10 },
+                { start: 50, end: 60 },
+              ],
+              join: false,
+            },
+          ],
+        ]),
+      }),
+    );
+    expect(plan[0].request).toMatchObject({ start: 10, end: 40, clips: [], joinClips: false });
+    expect(plan[1].request).toMatchObject({
+      start: null,
+      end: null,
+      clips: [
+        [0, 10],
+        [50, 60],
+      ],
+      joinClips: false,
+    });
+    expect(plan[2].request).toMatchObject({ start: null, end: null, clips: [] });
+    // مطابقة أغنية سبوتيفاي تبقى على مدة الأغنية كاملة لا المقطع
+    expect(plan[0].request.expectDuration).toBe(100);
+  });
+
   it("الملف الأصلي (Drive) بلا تحويل للمونتاج", () => {
     expect(planDownloads(input({ info: info({ original: true }) }))[0].request).toMatchObject({ original: true, editorReady: false });
   });

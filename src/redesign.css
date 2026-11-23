@@ -1843,3 +1843,45 @@ details.extras .schedule-row {
   flex: 1 1 auto;
   min-width: 0;
 }
+
+/* ---------- قص عناصر قائمة التشغيل ---------- */
+.pl-row {
+  flex-wrap: wrap;
+}
+
+/* المحرّر يأخذ سطرًا كاملًا تحت العنصر */
+.pl-clip {
+  flex-basis: 100%;
+  min-width: 0;
+  margin: 0 var(--s-2) var(--s-2);
+  animation: rise-in 0.25s var(--ease-out) backwards;
+}
+
+.pl-row[data-editing] {
+  background: var(--surface-2);
+}
+
+.pl-row[data-editing] .pl-clip {
+  background: var(--surface);
+}
+
+.pl-clip .trim-player {
+  margin-top: 0;
+  margin-bottom: var(--s-3);
+}
+
+.pl-clip .trim-player .trim-video {
+  max-height: 220px;
+}
+
+.pl-clip-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+
+/* أثناء القص: القائمة أطول حتى لا يُحشر المحرّر في 380px */
+.pl-list:has(.pl-row[data-editing]) {
+  max-height: min(680px, 75vh);
+}
