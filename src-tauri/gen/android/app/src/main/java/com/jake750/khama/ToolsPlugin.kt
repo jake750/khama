@@ -153,12 +153,22 @@ class ToolsPlugin(private val activity: Activity) : Plugin(activity) {
                         resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
                             ?: throw IllegalStateException("MediaStore insert failed")
                     }
-                    resolver.openOutputStream(uri).use { out ->
-                        src.inputStream().use { it.copyTo(out!!) }
+                    try {
+                        resolver.openOutputStream(uri).use { out ->
+                            if (out == null) throw IllegalStateException("cannot open $uri")
+                            src.inputStream().use { it.copyTo(out, 1 shl 20) }
+                        }
+                        values.clear()
+                        values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                        resolver.update(uri, values, null, null)
+                    } catch (e: Throwable) {
+                        // امتلأت الذاكرة أو انقطع النسخ: لا نترك ملفًا ناقصًا «قيد الانتظار» يظهر في المعرض فارغًا
+                        try {
+                            resolver.delete(uri, null, null)
+                        } catch (_: Throwable) {
+                        }
+                        throw e
                     }
-                    values.clear()
-                    values.put(MediaStore.MediaColumns.IS_PENDING, 0)
-                    resolver.update(uri, values, null, null)
                     // الاسم الفعلي (أندرويد يضيف " (1)" إن وُجد ملف بنفس الاسم)
                     var name = src.name
                     resolver.query(uri, arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)?.use { c ->
@@ -178,7 +188,12 @@ class ToolsPlugin(private val activity: Activity) : Plugin(activity) {
                         dest = File(dir, "${src.nameWithoutExtension} ($n).${src.extension}")
                         n++
                     }
-                    src.copyTo(dest)
+                    try {
+                        src.copyTo(dest)
+                    } catch (e: Throwable) {
+                        dest.delete()
+                        throw e
+                    }
                     MediaScannerConnection.scanFile(activity, arrayOf(dest.absolutePath), arrayOf(mime), null)
                     ret.put("uri", dest.toURI().toString())
                     ret.put("path", dest.absolutePath)
