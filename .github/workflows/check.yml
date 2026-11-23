@@ -2,13 +2,19 @@
 # الإجراءات مثبّتة على commit محدد (لا وسم يمكن تحريكه)، وDependabot يحدّثها.
 name: Check
 
+# push على main فقط، وطلبات الدمج (فروع Dependabot كانت تُفحص مرتين: push ثم pull_request)
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
 
 permissions:
   contents: read
+
+# دفعة أحدث على الفرع نفسه تلغي فحص السابقة
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   frontend:
@@ -21,7 +27,8 @@ jobs:
           cache: npm
       - run: npm ci
       - name: TypeScript
-        run: npx tsc --noEmit
+        # الواجهة، ثم ملفات الإعداد واختبارات e2e (لم يكن يفحصها شيء)
+        run: npx tsc --noEmit && npx tsc --noEmit -p tsconfig.node.json
       - name: ESLint
         run: npx eslint src --max-warnings 25
       - name: Prettier
@@ -80,12 +87,18 @@ jobs:
       - name: rustfmt
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - name: clippy
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+        # --features bench: أداة القياس (bench/) تُبنى أيضًا، وإلا انكسرت مع تغيّر واجهات المكتبة دون أن يُلاحظ
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --features bench -- -D warnings
       - name: tests
+        # .cargo/config.toml محلي (لا يُرفع)، فبدون هذا تكتب ts-rs في src-tauri/bindings ولا يُفحص شيء
+        env:
+          TS_RS_EXPORT_DIR: ${{ github.workspace }}/src/bindings
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
-      # T-53: cargo test يعيد توليد src/bindings من هياكل Rust؛ أي فرق يعني أنها لم تُحدَّث
+      # T-53: cargo test يعيد توليد src/bindings من هياكل Rust؛ أي فرق (أو ملف جديد) يعني أنها لم تُحدَّث
       - name: Rust types match src/bindings
-        run: git diff --exit-code -- src/bindings
+        run: |
+          git diff --exit-code -- src/bindings
+          test -z "$(git status --porcelain -- src/bindings)"
 
   # كود أندرويد (mobile.rs وما تحت cfg(mobile)) لا يُبنى إلا عند الإصدار، فينحرف دون أن يلاحظ أحد (T-36).
   # clippy فقط (بلا ربط ولا توقيع): دقيقة أو اثنتان، ويكشف كسر البناء على الهاتف في كل دفعة.

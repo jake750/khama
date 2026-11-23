@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import process from "node:process";
@@ -18,6 +19,9 @@ const woff2Only = {
 // https://vite.dev/config/
 export default defineConfig(() => ({
   plugins: [react(), woff2Only],
+
+  // «npx vitest run» من الجذر كان يلتقط e2e/*.spec.ts (Playwright) ونسخ .claude/worktrees
+  test: { include: ["src/**/*.test.ts"] },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
