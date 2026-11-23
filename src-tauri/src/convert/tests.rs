@@ -678,3 +678,13 @@ fn preview_needs_video() {
         .is_err()
     );
 }
+
+#[test]
+fn exact_fps_snaps_only_near_standard_rates() {
+    assert_eq!(exact_fps(29.97003), "30000/1001");
+    assert_eq!(exact_fps(25.0), "25");
+    assert_eq!(exact_fps(59.94006), "60000/1001");
+    // غير القياسي يبقى كما هو
+    assert_eq!(exact_fps(15.0), "15.00000");
+    assert_eq!(exact_fps(29.5), "29.50000");
+}

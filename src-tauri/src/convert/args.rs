@@ -30,6 +30,21 @@ pub(super) fn fps_expr(f: &str) -> Option<&'static str> {
 /// أقرب معدل قياسي لمتوسط معدل ملف VFR. دون هذا يأخذ `-fps_mode cfr` المعدل
 /// الاسمي (r_frame_rate)، وهو في ملفات الهاتف غالبًا 60 أو 90 مع أن المتوسط نحو 30،
 /// فيكرّر الإطارات ويضاعف حجم ProRes وDNxHR.
+/// المعدل كما يكتبه FFmpeg: 29.97 تقريبًا = «30000/1001» بالضبط لا 29.97003 الذي ينحرف
+/// إطارًا كل بضع دقائق في الدمج (RC16). معدل غير قياسي يبقى رقمًا عشريًا.
+pub(super) fn exact_fps(fps: f64) -> String {
+    let std = standard_fps(fps);
+    let value = match std.split_once('/') {
+        Some((n, d)) => n.parse::<f64>().unwrap_or(0.0) / d.parse::<f64>().unwrap_or(1.0),
+        None => std.parse().unwrap_or(0.0),
+    };
+    if (value - fps).abs() < 0.01 {
+        std.to_string()
+    } else {
+        format!("{fps:.5}")
+    }
+}
+
 pub(super) fn standard_fps(avg: f64) -> &'static str {
     const RATES: [(f64, &str); 8] = [
         (24000.0 / 1001.0, "24000/1001"),
@@ -750,7 +765,7 @@ fn merge_graph(
     let first = &infos[0];
     let v0 = first.video.as_ref();
     let (tw, th) = v0.map(|v| (even(v.width as f64), even(v.height as f64))).unwrap_or((1920, 1080));
-    let fps = v0.and_then(|v| v.fps).unwrap_or(30.0);
+    let fps = exact_fps(v0.and_then(|v| v.fps).unwrap_or(30.0));
     let mut pads = String::new();
     for (i, info) in infos.iter().enumerate() {
         if needs_video {
@@ -758,7 +773,7 @@ fn merge_graph(
                 return Err(AppError::with_param("noVideoStream", info.name.clone(), info.path.clone()));
             }
             graph.push(format!(
-                "[{i}:v:0]scale={tw}:{th}:force_original_aspect_ratio=decrease,pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps:.5},format=yuv420p[mv{i}]"
+                "[{i}:v:0]scale={tw}:{th}:force_original_aspect_ratio=decrease,pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps},format=yuv420p[mv{i}]"
             ));
             pads.push_str(&format!("[mv{i}]"));
         }
