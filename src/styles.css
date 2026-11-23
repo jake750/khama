@@ -84,8 +84,8 @@
   --accent-soft: rgb(10 119 110 / 0.1);
   --spark: #8f6100;
   --spark-soft: rgb(222 160 30 / 0.14);
-  --danger: #c93f3a;
-  --danger-soft: rgb(201 63 58 / 0.08);
+  --danger: #b83530; /* تباين AA على --bg و--surface-2 (CS7) */
+  --danger-soft: rgb(184 53 48 / 0.08);
   --ok: #1f8f50;
   --warn: #8a5a10;
   --hero-1: #0f6f66;
@@ -285,12 +285,6 @@ button:disabled {
 
 .faint {
   color: var(--text-faint);
-}
-
-/* ============ حقل الرابط ============ */
-.url-row {
-  display: flex;
-  gap: var(--s-2);
 }
 
 .url-input {
@@ -1029,30 +1023,10 @@ details.tech pre {
   --dir: -1;
 }
 
-@keyframes rise-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.99);
-  }
-}
-
+/* rise-in وtoast-in وtoast-out معرّفة في bubbly.css (الأخيرة تغلب) */
 @keyframes fade-in {
   from {
     opacity: 0;
-  }
-}
-
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 16px) scale(0.96);
-  }
-}
-
-@keyframes toast-out {
-  to {
-    opacity: 0;
-    transform: translate(-50%, 10px) scale(0.97);
   }
 }
 
@@ -2162,11 +2136,6 @@ h1.brand-name {
   border-radius: var(--r-xs);
 }
 
-.notice-bar {
-  margin-top: 0;
-  align-items: center;
-}
-
 /* ---------- حقل الرابط: العنصر الأهم في الشاشة ---------- */
 .url-field {
   display: flex;
@@ -2336,15 +2305,6 @@ h1.brand-name {
   transition: opacity 0.3s var(--ease-out);
 }
 
-.options-wrap.dim {
-  opacity: 0.5;
-}
-
-.options-wrap.dim:hover,
-.options-wrap.dim:focus-within {
-  opacity: 1;
-}
-
 /* ---------- الإضافات ---------- */
 details.extras {
   margin-top: var(--s-4);
@@ -2436,11 +2396,6 @@ details.extras[open] > summary > svg:last-child {
   align-items: center;
   gap: var(--s-3);
   flex-wrap: wrap;
-}
-
-.time-input {
-  max-width: 120px;
-  height: 40px;
 }
 
 .day-select {
@@ -2877,7 +2832,6 @@ button.menu-item:hover {
 .app.compact .tab span,
 .app.compact .card-head p,
 .app.compact .options-wrap,
-.app.compact .notice-bar,
 .app.compact .project-pick,
 .app.compact .jobs-header .btn,
 .app.compact .empty-state .faint {
@@ -3349,10 +3303,6 @@ button.menu-item:hover {
   height: 14px;
   width: 70%;
 }
-.skeleton-meta {
-  height: 12px;
-  width: 40%;
-}
 
 /* =====================================================================
    شاشة التنزيل (القسم 2 من مقترح التصميم)
@@ -3431,13 +3381,6 @@ button.menu-item:hover {
   border-radius: 0 0 var(--r-lg) var(--r-lg);
 }
 
-/* =====================================================================
-   وضوح عناصر التحكم (القسم 3 من مقترح التصميم)
-   ===================================================================== */
-/* الخيارات قبل الرابط: معطّلة بوضوح، بألوانها الحقيقية (D-3) */
-.options-wrap.dim {
-  opacity: 1;
-}
 .options-wrap.locked {
   cursor: not-allowed;
 }
