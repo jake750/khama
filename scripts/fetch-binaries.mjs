@@ -153,11 +153,22 @@ async function github(pathname) {
   return res.json();
 }
 
-/** أحدث بناء تلقائي بوسم ثابت (لا "latest" الذي يتغيّر محتواه) */
+/**
+ * أحدث بناء تلقائي بوسم ثابت (لا "latest" الذي يتغيّر محتواه)، من بناءات آخر الشهر فقط:
+ * المستودعان يحذفان البناءات اليومية بعد أسبوعين تقريبًا ويُبقيان بناء آخر يوم من كل شهر لسنتين،
+ * فوسم يومي في ملف القفل يعطي 404 بعد أيام ويوقف بناء الإصدارات كله
+ */
+function isMonthEnd(tag) {
+  const m = /^autobuild-(\d{4})-(\d{2})-(\d{2})/.exec(tag);
+  if (!m) return false;
+  const [y, mo, d] = m.slice(1).map(Number);
+  return new Date(Date.UTC(y, mo, 0)).getUTCDate() === d;
+}
+
 async function latestAutobuild(repo) {
-  const releases = await github(`${repo}/releases?per_page=10`);
-  const rel = releases.find((r) => r.tag_name.startsWith("autobuild-"));
-  if (!rel) throw new Error(`لا يوجد autobuild في ${repo}`);
+  const releases = await github(`${repo}/releases?per_page=100`);
+  const rel = releases.filter((r) => isMonthEnd(r.tag_name)).sort((a, b) => b.tag_name.localeCompare(a.tag_name))[0];
+  if (!rel) throw new Error(`لا يوجد autobuild لآخر الشهر في ${repo}`);
   return rel;
 }
 

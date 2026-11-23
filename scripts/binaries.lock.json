@@ -4,8 +4,8 @@
     "yt-dlp": "2026.10.26",
     "deno": "v2.9.8",
     "ffmpeg": {
-      "yt-dlp/FFmpeg-Builds": "autobuild-2026-11-14-19-15",
-      "BtbN/FFmpeg-Builds": "autobuild-2026-11-14-12-37"
+      "yt-dlp/FFmpeg-Builds": "autobuild-2026-10-31-18-18",
+      "BtbN/FFmpeg-Builds": "autobuild-2026-10-31-12-59"
     }
   },
   "targets": {
@@ -20,8 +20,8 @@
       },
       "ffmpeg": [
         {
-          "url": "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobuild-2026-11-14-19-15/ffmpeg-N-128911-gbcbc183264-win64-gpl-shared.zip",
-          "sha256": "57250225de1b061885fd1a4f410ae93970e55a562c5cd8a8a4a0318ee49326b5"
+          "url": "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobuild-2026-10-31-18-18/ffmpeg-N-128251-g6d1bfd7609-win64-gpl-shared.zip",
+          "sha256": "de0839788c3f9a649dfb49f6f800a58532c5055ad9af7a75c0aa02043b880591"
         }
       ]
     },
@@ -36,8 +36,8 @@
       },
       "ffmpeg": [
         {
-          "url": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-11-14-12-37/ffmpeg-N-128909-g604ef3784d-linux64-gpl-shared.tar.xz",
-          "sha256": "3d71b9c42b6ba68e8ee64043b63da8b963e28d53c823a5a93a826c2c7562435d"
+          "url": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59/ffmpeg-N-128227-g4811625b5f-linux64-gpl-shared.tar.xz",
+          "sha256": "cf2b9a954ef8f162a94056259a9f20a74a07ba0155778bd14c2f6fbc1641feda"
         }
       ]
     },
@@ -52,8 +52,8 @@
       },
       "ffmpeg": [
         {
-          "url": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-11-14-12-37/ffmpeg-N-128909-g604ef3784d-linuxarm64-gpl-shared.tar.xz",
-          "sha256": "db28616f448f70b7c39ad31013ca487b806c252cde74189be7b716b78e24bb5d"
+          "url": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59/ffmpeg-N-128227-g4811625b5f-linuxarm64-gpl-shared.tar.xz",
+          "sha256": "16049a187215d21af76a462f1d6276091e3d5c9a826d4db75dcd310d24a04919"
         }
       ]
     },
