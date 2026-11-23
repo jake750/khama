@@ -2309,7 +2309,7 @@ dependencies = [
 
 [[package]]
 name = "khama"
-version = "0.3.32"
+version = "0.3.33"
 dependencies = [
  "base64 0.23.1",
  "chardetng",
