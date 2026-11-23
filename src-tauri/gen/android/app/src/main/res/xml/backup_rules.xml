@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- النسخ الاحتياطي في Android 11 وما قبله: الإعدادات والسجل نعم، الكوكيز لا (جلسات حسابات المستخدم).
+     مجلد إعدادات Tauri على أندرويد = جذر مجلد بيانات التطبيق (dataDir)، أي النطاق root -->
+<full-backup-content>
+  <exclude domain="root" path="cookies.txt" />
+  <exclude domain="root" path="cookies.txt.tmp" />
+</full-backup-content>
