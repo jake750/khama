@@ -13,8 +13,10 @@ on:
     paths: [src-tauri/tauri.conf.json]
     tags: ["v*"]
 
+# قراءة فقط افتراضيًا؛ الكتابة (إنشاء الإصدار ورفع الملفات) لمهام build وandroid وsbom وحدها،
+# فلا يصل رمز يكتب في المستودع إلى سكربتات npm ci وbuild.rs في مهمة الفحص
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # release: هل ننشر إصدارًا؟ has_key: هل أُضيف مفتاح توقيع أندرويد؟ (لا تُقرأ secrets في if الخاصة بالـ job)
@@ -26,8 +28,9 @@ jobs:
       has_key: ${{ steps.version.outputs.has_key }}
       notes: ${{ steps.notes.outputs.notes }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           # الوسوم والتاريخ كاملين لكتابة «ما الجديد» من الالتزامات منذ آخر إصدار (F-52)
           fetch-depth: 0
       - id: version
@@ -63,6 +66,8 @@ jobs:
 
   build:
     needs: check
+    permissions:
+      contents: write
     if: needs.check.outputs.build == 'true'
     strategy:
       fail-fast: false
@@ -172,28 +177,32 @@ jobs:
   # (يقرؤها build.gradle.kts من متغيرات KHAMA_*)، وبدونها تُتخطّى هذه المهمة.
   android:
     needs: check
+    permissions:
+      contents: write
     if: needs.check.outputs.build == 'true' && needs.check.outputs.has_key == 'true'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: 21
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: aarch64-linux-android
 
-      - uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: src-tauri -> target
           key: aarch64-linux-android
@@ -223,7 +232,7 @@ jobs:
           "$apksigner" verify --print-certs out/*.apk | head -3
           echo "### Android: $(basename out/*.apk) $(( $(wc -c < out/*.apk) / 1048576 )) MB" >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: khama-android-arm64
           path: out/*.apk
@@ -244,13 +253,17 @@ jobs:
   # والأدوات المضمّنة (yt-dlp وFFmpeg GPL وDeno) بنسخها وبصماتها (M-44)
   sbom:
     needs: [check, build]
+    permissions:
+      contents: write
     if: needs.check.outputs.release == 'true'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
