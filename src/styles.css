@@ -3502,7 +3502,7 @@ button.menu-item:hover {
   flex: none;
   padding: 0 var(--s-2);
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--fs-cap); /* أصغر حجم في السلّم، لا 11px (CS20) */
   font-weight: var(--fw-semi);
   line-height: 20px;
 }
@@ -3876,7 +3876,7 @@ kbd {
 /* تفاصيل الخطأ بخط ثابت العرض (U-74، D-96) */
 .tech pre {
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  font-size: 12px;
+  font-size: var(--fs-cap);
   white-space: pre-wrap;
   word-break: break-word;
 }
