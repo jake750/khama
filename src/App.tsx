@@ -3,11 +3,10 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { isPermissionGranted, sendNotification } from "@tauri-apps/plugin-notification";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, asAppError, type AppError, type ConvertRequest, type DownloadRequest, type JobUpdate, type Settings } from "./api";
 import { ConvertView, defaultOptions, MEDIA_FILTER, type SourceFile } from "./components/ConvertView";
 import { DownloadView, newDownloadSession, type StartMeta } from "./components/DownloadView";
-import { GuideView } from "./components/GuideView";
 import { HistoryView } from "./components/HistoryView";
 import { Icon, type IconName } from "./components/Icon";
 import { Dialog, useConfirm } from "./components/Dialog";
@@ -31,6 +30,8 @@ import { optionsFromMeta } from "./downloadPlan";
 
 /** تحليل الملفات المضافة للمحوّل: 4 في كل مرة (U-93) */
 const analyzeTurn = limiter(4);
+// الدليل (~35KB نصوص) لا يلزم عند الإقلاع: يُحمَّل أول مرة يُفتح تبويبه (FE25)
+const GuideView = lazy(() => import("./components/GuideView").then((m) => ({ default: m.GuideView })));
 
 type Tab = "download" | "convert" | "history" | "settings" | "guide";
 
@@ -361,6 +362,11 @@ export default function App() {
   }, []);
   // الملف نُقل أو حُذف (يحدث كثيرًا: الممنتج ينقل الملفات لمجلد المشروع): رسالة بدل نقرة بلا أثر
   const fileFailed = (e: unknown) => toast(errorText(t, asAppError(e)));
+  // تحميل الدليل مسبقًا بعد الإقلاع بقليل: فتحه لاحقًا فوري بلا فراغ
+  useEffect(() => {
+    const id = window.setTimeout(() => void import("./components/GuideView"), 4000);
+    return () => window.clearTimeout(id);
+  }, []);
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
 
   // «ما الجديد» بعد التحديث، بلغة المستخدم: ننتظر الإعدادات (U-59)
@@ -1038,13 +1044,15 @@ export default function App() {
                   />
                 )}
                 {tab === "guide" && (
-                  <GuideView
-                    onTour={startTour}
-                    onGo={(to, section) => {
-                      if (section) setSettingsSection({ id: section, n: Date.now() });
-                      setTab(to);
-                    }}
-                  />
+                  <Suspense fallback={null}>
+                    <GuideView
+                      onTour={startTour}
+                      onGo={(to, section) => {
+                        if (section) setSettingsSection({ id: section, n: Date.now() });
+                        setTab(to);
+                      }}
+                    />
+                  </Suspense>
                 )}
 
                 {(tab === "download" || tab === "convert") && (
