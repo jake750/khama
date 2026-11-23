@@ -57,7 +57,7 @@ console.log(`${current} → ${next}`);
 if (dryRun) process.exit(0);
 
 if (!noGit) {
-  if (sh("git", ["status", "--porcelain"])) die("في الشجرة تعديلات غير محفوظة: اعمل commit أولًا");
+  if (sh("git", ["status", "--porcelain", "--untracked-files=no"])) die("في الشجرة تعديلات غير محفوظة: اعمل commit أولًا");
   sh("git", ["fetch", "-q", "origin", "main"]);
   try {
     sh("git", ["merge-base", "--is-ancestor", "origin/main", "HEAD"]);

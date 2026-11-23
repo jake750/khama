@@ -35,3 +35,4 @@ dist-release/
 # Playwright
 test-results/
 playwright-report/
+*.tsbuildinfo

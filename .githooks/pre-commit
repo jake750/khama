@@ -1,12 +1,15 @@
 #!/bin/sh
 # فحص سريع قبل كل commit (M-43): التنسيق للملفات المضافة فقط، وأنواع TypeScript إن تغيّر src.
 # يُفعَّل تلقائيًا بـ npm install (سكربت prepare). لتجاوزه مرة: git commit --no-verify
-staged=$(git diff --cached --name-only --diff-filter=ACM)
+# ACMR: الملف المعاد تسميته يُفحص أيضًا
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
 [ -z "$staged" ] && exit 0
 
 web=$(echo "$staged" | grep -E '\.(ts|tsx|css|json|md|mjs)$' || true)
 if [ -n "$web" ]; then
-  echo "$web" | xargs npx --no-install prettier --check --log-level warn || {
+  # بفاصل NUL: اسم ملف فيه مسافة لا ينقسم إلى اسمين
+  git diff --cached --name-only -z --diff-filter=ACMR -- '*.ts' '*.tsx' '*.css' '*.json' '*.md' '*.mjs' \
+    | xargs -0 npx --no-install prettier --check --log-level warn || {
     echo "شغّل: npx prettier --write <الملفات> ثم أضفها من جديد"; exit 1; }
 fi
 if echo "$staged" | grep -qE '^src/.*\.tsx?$'; then
