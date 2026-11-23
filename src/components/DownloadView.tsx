@@ -240,7 +240,8 @@ export function DownloadView(props: {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target?.closest("input, textarea, select, [contenteditable]")) return;
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
+      // e.code: مع لوحة المفاتيح العربية يكون الحرف «ر» لا «v»
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.code === "KeyV") {
         e.preventDefault();
         paste();
       }
@@ -391,8 +392,9 @@ export function DownloadView(props: {
   // الحجم المتوقّع والمساحة الحرة (U-36، U-37، T-96)
   const clipFraction = activeClips && duration ? activeClips.reduce((n, c) => n + (c.end - c.start), 0) / duration : 1;
   const expected = info && !entries && !original ? estimateDownload(info, s.kind, effQuality, clipFraction) : null;
+  const hasEstimate = expected != null;
   useEffect(() => {
-    if (isMobile || expected == null) return;
+    if (isMobile || !hasEstimate) return;
     let alive = true;
     api
       .freeSpace(props.outputDir)
@@ -401,7 +403,8 @@ export function DownloadView(props: {
     return () => {
       alive = false;
     };
-  }, [props.outputDir, expected]);
+    // المساحة لا تتغيّر مع كل خطوة من سحب حدّي القص: نسأل حين يظهر تقدير أو يتغيّر المجلد فقط
+  }, [props.outputDir, hasEstimate]);
   const noRoom = expected != null && free != null && expected > free;
   const startCount = multiLinks ? urls.length : entries ? selected.size : 0;
 

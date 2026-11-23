@@ -200,7 +200,9 @@ export function optionsFromMeta(kind: Settings["kind"], meta: string): Partial<S
   }
   const out: Partial<Settings> = { kind };
   if (fmt === "mp4" || fmt === "mov") out.videoFormat = fmt;
-  if (q === "4k") out.quality = "2160";
+  // «الأفضل» تُكتب في البطاقة بلغة الواجهة وقت التنزيل
+  if (q === "best" || q === "الأفضل") out.quality = "best";
+  else if (q === "4k") out.quality = "2160";
   else if (/^\d{3,4}p$/.test(q)) out.quality = q.slice(0, -1);
   return out;
 }

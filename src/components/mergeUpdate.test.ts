@@ -15,6 +15,13 @@ describe("mergeUpdate (T-43)", () => {
     expect(j.title).toBe("من المعاينة");
     expect(j.thumbnail).toBe("p.jpg");
   });
+  it("مرحلة جديدة بلا نسبة لا ترث نسبة التنزيل (انتظار الفصل لا يعرض 100%)", () => {
+    const dl = mergeUpdate(job("x"), { id: 1, state: "downloading", percent: 100, speed: 5e6 });
+    const wait = mergeUpdate(dl, { id: 1, state: "separating", stage: "wait" });
+    expect(wait.percent).toBeUndefined();
+    expect(wait.speed).toBeUndefined();
+    expect(mergeUpdate(wait, { id: 1, state: "separating", percent: 12 }).percent).toBe(12);
+  });
   it("تحديث التقدّم العادي يبقي العنوان", () => {
     expect(mergeUpdate(job("x"), { id: 1, state: "downloading", percent: 40 })).toMatchObject({ title: "x", percent: 40 });
   });

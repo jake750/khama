@@ -16,7 +16,7 @@ import { SettingsView } from "./components/SettingsView";
 import { Tour, Welcome, type TourStep } from "./components/Tour";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { extractUrls, formatTimecode, youtubeChapters } from "./format";
-import { dictionaries, I18n, type Dict, type Lang } from "./i18n";
+import { dictionaries, errorText, I18n, type Dict, type Lang } from "./i18n";
 import { isMixed, resolveDir } from "./layoutDir";
 import { AnimatedList, Presence, reducedMotion, SlideSwitch, usePresence, useSlidingIndicator } from "./motion";
 import { isMobile } from "./platform";
@@ -283,7 +283,11 @@ export default function App() {
       .takeDeepLink()
       .then((u) => u && toDownload(u))
       .catch(logError("takeDeepLink"));
-    const un2 = api.onDeepLink(toDownload);
+    // وصل الرابط بالحدث: نأخذه من Rust أيضًا، وإلا عاد رابط قديم عند إعادة تحميل الواجهة
+    const un2 = api.onDeepLink((url) => {
+      toDownload(url);
+      api.takeDeepLink().catch(logError("takeDeepLink"));
+    });
     return () => {
       un.then((f) => f());
       un2.then((f) => f());
@@ -345,6 +349,8 @@ export default function App() {
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToastMsg(null), action?.ms ?? 4000);
   }, []);
+  // الملف نُقل أو حُذف (يحدث كثيرًا: الممنتج ينقل الملفات لمجلد المشروع): رسالة بدل نقرة بلا أثر
+  const fileFailed = (e: unknown) => toast(errorText(t, asAppError(e)));
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
 
   // «ما الجديد» بعد التحديث، بلغة المستخدم: ننتظر الإعدادات (U-59)
@@ -604,13 +610,15 @@ export default function App() {
     const order: Tab[] = ["download", "convert", "history", "settings"];
     const onKey = (e: KeyboardEvent) => {
       const typing = (e.target as HTMLElement | null)?.closest("input, textarea, select, [contenteditable]");
-      if ((e.ctrlKey || e.metaKey) && /^[1-4]$/.test(e.key)) {
+      // بالمفتاح الفعلي (e.code) لا بالحرف: مع لوحة المفاتيح العربية يكون «,» حرف «و» و«?» «؟»
+      const digit = /^Digit([1-4])$/.exec(e.code)?.[1];
+      if ((e.ctrlKey || e.metaKey) && digit) {
         e.preventDefault();
-        setTab(order[Number(e.key) - 1]);
-      } else if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+        setTab(order[Number(digit) - 1]);
+      } else if ((e.ctrlKey || e.metaKey) && e.code === "Comma") {
         e.preventDefault();
         setTab("settings");
-      } else if (!typing && e.key === "?") {
+      } else if (!typing && (e.key === "?" || e.key === "؟") && !document.querySelector('[aria-modal="true"]')) {
         setShortcuts((v) => !v);
       }
     };
@@ -720,9 +728,9 @@ export default function App() {
     if (!j.convert || !j.markers?.length) return;
     const input = j.convert.inputs[0];
     // نعيد الترميز حتى يكون القطع دقيقًا بالإطار، لا عند أقرب إطار مفتاحي.
-    // بنفس عائلة المصدر: ProRes يبقى ProRes وDNxHR يبقى DNxHR، لا H.264 بصمت (U-39)
-    const codec = files.find((f) => f.path === input)?.info?.video?.codec ?? "";
-    const preset = codec === "prores" ? "prores_hq" : codec === "dnxhd" ? "dnxhr_hq" : "edit_h264";
+    // بنفس عائلة المصدر: ProRes يبقى ProRes وDNxHR يبقى DNxHR، لا H.264 بصمت (U-39)،
+    // والملف الصوتي يبقى صوتًا (H.264 على ملف بلا فيديو يفشل بـ noVideoStream)
+    const preset = sameFamily(input);
     const splitAt = j.markers.map(([s, e]) => (s === e ? s : (s + e) / 2));
     startConvert(
       {
@@ -1077,8 +1085,8 @@ export default function App() {
                           key={j.id}
                           job={j}
                           onCancel={() => cancel(j)}
-                          onReveal={isMobile ? undefined : () => j.file && api.revealFile(j.file)}
-                          onOpen={isMobile ? undefined : () => j.file && api.openFile(j.file).catch(logError("openFile"))}
+                          onReveal={isMobile ? undefined : () => j.file && api.revealFile(j.file).catch(fileFailed)}
+                          onOpen={isMobile ? undefined : () => j.file && api.openFile(j.file).catch(fileFailed)}
                           onCopyPath={isMobile ? undefined : () => j.file && copyText(j.file)}
                           onRetry={() => retry(j)}
                           onRemove={() => setJobs((p) => p.filter((x) => x.id !== j.id))}

@@ -1,8 +1,9 @@
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { Toast } from "../toast";
 import { useEffect, useMemo, useState } from "react";
-import { api, type HistoryEntry } from "../api";
-import { numLocale, useI18n } from "../i18n";
+import { api, asAppError, type AppError, type HistoryEntry } from "../api";
+import { errorText, numLocale, useI18n } from "../i18n";
+import { ErrorBox } from "./ErrorBox";
 import { isMobile } from "../platform";
 import { useConfirm } from "./Dialog";
 import { Icon } from "./Icon";
@@ -46,14 +47,29 @@ export function HistoryView(props: {
   const [limit, setLimit] = useState(100);
   const [brokenThumbs, setBrokenThumbs] = useState<Set<number>>(() => new Set());
 
-  const load = () =>
-    api
-      .getHistory()
-      .then(setList)
-      .catch(() => setList([]));
+  // خطأ القراءة يُعرض خطأً مع «حاول مرة أخرى»، لا سجلًّا فارغًا
+  const [loadError, setLoadError] = useState<AppError | null>(null);
+  const [reload, setReload] = useState(0);
   useEffect(() => {
-    load();
-  }, [props.version]);
+    // ردّ قديم (تنزيلان انتهيا معًا) لا يكتب فوق أحدث، ولا يعيد عنصرًا حُذف للتو.
+    // تأخير قصير يجمع اكتمالات متتالية (قائمة تشغيل) في قراءة واحدة
+    let alive = true;
+    const timer = window.setTimeout(() => {
+      api
+        .getHistory()
+        .then((l) => {
+          if (!alive) return;
+          setList(l);
+          setLoadError(null);
+        })
+        .catch((e) => alive && setLoadError(asAppError(e)));
+    }, 300);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [props.version, reload]);
+  const fail = (e: unknown) => props.toast(errorText(t, asAppError(e)));
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -76,15 +92,19 @@ export function HistoryView(props: {
   }, [list, q, lang, kind, since, limit]);
   const total = list?.length ?? 0;
 
-  const remove = async (id: number) => {
-    await api.removeHistory(id).catch(logError("removeHistory"));
-    setList((l) => l?.filter((e) => e.id !== id) ?? null);
-  };
+  // القائمة تتغيّر بعد نجاح الحذف فقط: إن فشل لا نوهم المستخدم بأنه حُذف ثم يعود في القراءة التالية
+  const remove = (id: number) =>
+    api
+      .removeHistory(id)
+      .then(() => setList((l) => l?.filter((e) => e.id !== id) ?? null))
+      .catch(fail);
 
   const clear = async () => {
     if (!(await confirm(t.historyClear, t.historyConfirmClear))) return;
-    await api.clearHistory().catch(logError("clearHistory"));
-    setList([]);
+    await api
+      .clearHistory()
+      .then(() => setList([]))
+      .catch(fail);
   };
 
   return (
@@ -134,7 +154,15 @@ export function HistoryView(props: {
         </div>
       )}
 
-      {list && list.length === 0 && (
+      {loadError && (
+        <>
+          <ErrorBox error={loadError} />
+          <button className="btn btn-sm" onClick={() => setReload((n) => n + 1)}>
+            <Icon name="retry" size={16} /> {t.tryAgain}
+          </button>
+        </>
+      )}
+      {list && list.length === 0 && !loadError && (
         <div className="empty-state">
           <div className="empty-art">
             <Icon name="history" size={24} />
@@ -199,13 +227,13 @@ export function HistoryView(props: {
                       className="icon-btn sm"
                       title={t.openFile}
                       aria-label={t.openFile}
-                      onClick={() => api.openFile(e.file).catch(logError("openFile"))}
+                      onClick={() => api.openFile(e.file).catch(fail)}
                     >
                       <Icon name="eye" size={16} />
                     </button>
                   )}
                   {e.exists && !isMobile && (
-                    <button className="btn btn-sm" onClick={() => api.revealFile(e.file).catch(logError("revealFile"))}>
+                    <button className="btn btn-sm" onClick={() => api.revealFile(e.file).catch(fail)}>
                       <Icon name="folder" size={16} /> {t.showInFolder}
                     </button>
                   )}

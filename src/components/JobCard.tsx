@@ -58,6 +58,8 @@ export function mergeUpdate(j: Job, u: JobUpdate): Job {
     ...(u.state === "separating" && !u.stage ? { stage: undefined } : {}),
     // مرحلة جديدة: الوقت الباقي للمرحلة السابقة لا يصلح لها
     ...(u.state !== j.state && u.eta == null ? { eta: undefined } : {}),
+    // ولا نسبتها وسرعتها: «تنتظر دور الفصل» بلا نسبة كانت تعرض 100% من التنزيل وشريطًا ممتلئًا
+    ...(u.state !== j.state && u.percent == null ? { percent: undefined, speed: undefined } : {}),
     title: title && /^https?:\/\//.test(j.title) ? title : j.title,
     source: title && j.request?.url.startsWith(MUSIC_SEARCH) ? title : j.source,
     thumbnail: j.thumbnail ?? thumbnail ?? null,

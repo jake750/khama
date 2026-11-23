@@ -19,6 +19,8 @@ function TimeField(props: { label: string; value: number; fps?: number | null; o
   const [text, setText] = useState(formatTimecode(props.value, props.fps));
   useEffect(() => setText(formatTimecode(props.value, props.fps)), [props.value, props.fps]);
   const commit = () => {
+    // خروج من الحقل بلا تعديل: لا شيء. كان يعيد تطبيق القيمة المقرّبة فينقل المعاينة إلى نهاية المقطع
+    if (text === formatTimecode(props.value, props.fps)) return;
     const v = parseTime(text, props.fps);
     if (v != null) props.onCommit(v);
     // نعيد عرض القيمة الفعلية: إن رُفضت القيمة أو عُدّلت، لا يبقى في الحقل رقم لا يطابق الشريط

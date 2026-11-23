@@ -182,13 +182,14 @@ describe("planDownloads", () => {
 describe("optionsFromMeta (U-40)", () => {
   it("restores kind, format and quality from the history line", () => {
     expect(optionsFromMeta("video", "MP4 · 1080p")).toEqual({ kind: "video", videoFormat: "mp4", quality: "1080" });
+    expect(optionsFromMeta("video", "MOV · Best")).toEqual({ kind: "video", videoFormat: "mov", quality: "best" });
+    expect(optionsFromMeta("video", "MP4 · الأفضل")).toEqual({ kind: "video", videoFormat: "mp4", quality: "best" });
     expect(optionsFromMeta("video", "MOV · 4K")).toEqual({ kind: "video", videoFormat: "mov", quality: "2160" });
     expect(optionsFromMeta("audio", "AAC")).toEqual({ kind: "audio", audioFormat: "m4a" });
     expect(optionsFromMeta("audio", "WAV")).toEqual({ kind: "audio", audioFormat: "wav" });
   });
   it("leaves what it can't read", () => {
     expect(optionsFromMeta("video", "ملف Drive")).toEqual({ kind: "video" });
-    expect(optionsFromMeta("video", "MP4 · Best")).toEqual({ kind: "video", videoFormat: "mp4" });
   });
 });
 

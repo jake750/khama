@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { numLocale, useI18n } from "../../i18n";
 import { scheduledAt } from "../../downloadPlan";
 import { Icon } from "../Icon";
@@ -24,8 +23,9 @@ export function ScheduleRow(props: {
   const { when, atTime } = props;
   const [hh = "00", mm = "00"] = atTime.split(":");
   const loc = numLocale(lang);
-  // لحظة فتح الصف: تكفي لأسماء الأيام والتاريخ المعروض
-  const [now] = useState(() => new Date());
+  // الوقت الآن في كل رسم، كما يحسبه start(): الصف يبقى مفتوحًا ساعات، ولحظة فتحه كانت تعرض
+  // «اليوم 14:00» لموعد سيُضبط فعلًا على الغد
+  const now = new Date();
   const dayName = (d: number) =>
     d === 0 ? t.dayToday : d === 1 ? t.dayTomorrow : new Date(now.getTime() + d * 86_400_000).toLocaleDateString(loc, { weekday: "long" });
   const at = scheduledAt(when, atTime, now, props.atDay);
