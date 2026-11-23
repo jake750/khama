@@ -462,3 +462,41 @@ async fn start_now_wakes_a_queued_job_even_if_pressed_first() {
     forget_jump(9_001);
     start_now(9_001); // بعد النسيان: لا شيء ولا انهيار
 }
+
+/// أمر التنزيل الكامل: عنصر واحد من أي قائمة، المقطع بالوقت، والرابط بعد «--» دائمًا
+#[test]
+fn download_args_single_item_section_and_url_last() {
+    let tools = Tools {
+        ytdlp: PathBuf::from("yt-dlp"),
+        ytdlp_prefix: vec![],
+        env: vec![],
+        js_runtime: String::new(),
+        ffmpeg: PathBuf::new(),
+        ffprobe: PathBuf::new(),
+        ffmpeg_dir: PathBuf::new(),
+    };
+    let opts = JobOptions {
+        template: "%(title)s".into(),
+        rate_limit_kb: 500,
+        max_name: 120,
+    };
+    let mut r = req("video", "mp4", "1080", true);
+    r.url = "-https://example.com/watch?v=x".into();
+    let a = download_args(
+        &tools,
+        vec!["--cookies".into(), "c.txt".into()],
+        &r,
+        &opts,
+        Some((10.0, 20.0)),
+        Path::new("out"),
+        Path::new("work"),
+    );
+    let pos = |s: &str| a.iter().position(|x| x == s).unwrap_or_else(|| panic!("{s} missing"));
+    assert_eq!(a[pos("--playlist-items") + 1], "1");
+    assert_eq!(a[pos("-r") + 1], "500K");
+    assert_eq!(a[pos("--cookies") + 1], "c.txt");
+    assert!(a[pos("--download-sections") + 1].starts_with('*'));
+    assert!(a.contains(&"--force-keyframes-at-cuts".to_string()));
+    assert_eq!(a[a.len() - 2], "--");
+    assert_eq!(a.last().unwrap(), &r.url);
+}
