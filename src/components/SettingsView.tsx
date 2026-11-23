@@ -2,7 +2,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import type { Toast } from "../toast";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { PRESETS } from "../presets";
+import { PRESETS, presetById } from "../presets";
 import {
   api,
   asAppError,
@@ -100,7 +100,13 @@ export function SettingsView(props: {
 
   // نسخة احتياطية من الإعدادات (M-99)
   const exportBackup = async () => {
-    const path = await save({ defaultPath: "khama-settings.json", filters: [{ name: "JSON", extensions: ["json"] }] });
+    let path: string | null;
+    try {
+      path = await save({ defaultPath: "khama-settings.json", filters: [{ name: "JSON", extensions: ["json"] }] });
+    } catch (e) {
+      props.toast(errorText(t, asAppError(e)));
+      return;
+    }
     if (!path) return;
     api
       .exportSettings(path)
@@ -124,8 +130,13 @@ export function SettingsView(props: {
     root.current?.querySelector(`#set-${id}`)?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
   };
 
+  // الطلب نفسه يُنفّذ مرة واحدة: الشاشة تُبنى من جديد عند كل رجوع للإعدادات، فكان كل فتح لاحق
+  // يقفز إلى «الكوكيز» (أو آخر قسم طُلب) بدل أعلى الصفحة
   useEffect(() => {
-    if (props.section) go(props.section.id, false);
+    if (props.section && props.section.n !== handledSection) {
+      handledSection = props.section.n;
+      go(props.section.id, false);
+    }
   }, [props.section]);
 
   // القسم الظاهر الآن يُعلَّم في القائمة الجانبية
@@ -319,6 +330,9 @@ function templateExample(tpl: string, siteFolders: boolean, kindFolders: boolean
 
 const TOKENS = ["{title}", "{uploader}", "{date}", "{today}", "{site}", "{id}", "{res}", "{n}"];
 /** كيلوبايت/ثانية */
+
+/** آخر طلب «افتح قسم كذا» نُفّذ (يبقى بعد إعادة بناء الشاشة) */
+let handledSection = 0;
 
 /** الهاتف: المجلد العام (Download أو Movies...) واسم المجلد الفرعي (U-76).
  * الحفظ عبر MediaStore فلا يحتاج صلاحيات تخزين؛ ما لا يقبله المجلد العام (صوت في Movies مثلًا) يذهب إلى Download */
@@ -663,9 +677,14 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
   }
 
   async function remove() {
-    await api.deleteCookies().catch(logError("deleteCookies"));
-    setHasSaved(false);
-    props.toast(t.toastCookiesDeleted);
+    // «حُذفت» بعد نجاح الحذف فقط: كوكيز تسجيل الدخول على القرص شأن خصوصية
+    try {
+      await api.deleteCookies();
+      setHasSaved(false);
+      props.toast(t.toastCookiesDeleted);
+    } catch (e) {
+      props.toast(errorText(t, asAppError(e)));
+    }
   }
 
   const modes: { value: CookiesMode; title: string; hint: string }[] = [
@@ -843,7 +862,10 @@ function WatchSection(props: { settings: Settings; update: (p: Partial<Settings>
   const add = async () => {
     const dir = await open({ directory: true });
     if (typeof dir === "string" && !list.some((w) => w.dir === dir)) {
-      set([...list, { dir, preset: props.settings.convertPreset || "edit_h264", enabled: true }]);
+      // آخر صيغة في المحوّل قد تكون «كشف» (صمت، مشاهد، مواضيع): لا تُنتج ملفًا ولا تظهر في قائمة المجلد
+      const last = props.settings.convertPreset;
+      const preset = last && presetById(last)?.kind !== "detect" ? last : "edit_h264";
+      set([...list, { dir, preset, enabled: true }]);
     }
   };
   return (

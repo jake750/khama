@@ -426,6 +426,17 @@ pub fn save_settings(
 /// نسخة احتياطية من الإعدادات والمشاريع في ملف يختاره المستخدم (M-99). الكوكيز لا تُصدَّر
 #[tauri::command]
 pub fn export_settings(state: tauri::State<SettingsState>, path: String) -> Result<(), AppError> {
+    // ملف JSON فقط، ولا يُستبدل ملف موجود ليس JSON: أمر IPC يكتب في أي مسار كان يكفي
+    // لكتابة نص فوق ‎~/.bashrc مثلًا لو حُقن كود في الواجهة (نموذج التهديد T-33)
+    let target = Path::new(&path);
+    if !target.extension().is_some_and(|e| e.eq_ignore_ascii_case("json")) {
+        return Err(AppError::with_detail("badInput", "backup must be a .json file"));
+    }
+    if let Ok(old) = fs::read_to_string(target)
+        && serde_json::from_str::<serde_json::Value>(&old).is_err()
+    {
+        return Err(AppError::with_detail("badInput", "refusing to replace a file that is not JSON"));
+    }
     let json = serde_json::to_string_pretty(&*state.0.lock_ok()).expect("settings serialize");
     crate::persist::write_atomic(Path::new(&path), json.as_bytes())?;
     Ok(())
