@@ -69,3 +69,9 @@ Format: **Decision** · Why · Instead of · Revisit when
 - **Splitting**: TextTiling (word overlap between the 30 s before and after each 10 s boundary; a topic starts where it drops deepest, moved to the longest pause nearby). It works offline in milliseconds, in any language, with no second model to download. The title is the topic's most distinctive words, not a sentence: writing real titles needs a language model, which Khama doesn't ship.
 - **Reel fit and lengths** are computed in the interface from the topic times and the detected silences, so changing "keep at each edge" doesn't need a new analysis.
 - **Revisit when**: an offline language model is bundled anyway (then it can write titles and judge which topics stand alone), or whisper.cpp ships macOS/Android builds.
+
+### D15. First run: the welcome comes before the legal notice
+- **Why**: the 2026-11 review suggested showing the notice before the welcome. The owner declined: the current order stays.
+
+### D16. History may open any delivered file, executables included
+- **Why**: the 2026-11 review suggested blocking `open_file` on executables. The owner declined: the app only opens files it downloaded or converted itself and that are in the history (`history::contains_file`), and blocking by extension would also stop legitimate files.
