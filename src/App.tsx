@@ -344,10 +344,18 @@ export default function App() {
 
   // مؤقّت واحد للتنبيه: رسالة جديدة (أو نفس الرسالة مرة ثانية) تبدأ مدتها من جديد
   const toastTimer = useRef<number | undefined>(undefined);
+  const toastMs = useRef(4000);
+  /** المؤشر أو التركيز على التنبيه يوقف عدّه، ومغادرته تعيده بمهلة كاملة (UX12) */
+  const holdToast = () => window.clearTimeout(toastTimer.current);
+  const resumeToast = () => {
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToastMsg(null), toastMs.current);
+  };
   const toast: Toast = useCallback((msg, action) => {
     setToastMsg({ msg, action });
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToastMsg(null), action?.ms ?? 4000);
+    toastMs.current = action?.ms ?? 4000;
   }, []);
   // الملف نُقل أو حُذف (يحدث كثيرًا: الممنتج ينقل الملفات لمجلد المشروع): رسالة بدل نقرة بلا أثر
   const fileFailed = (e: unknown) => toast(errorText(t, asAppError(e)));
@@ -597,14 +605,15 @@ export default function App() {
         type: "convert",
         convert: { inputs: [hit.path], preset: hit.preset, options: defaultOptions() },
         title: baseName(hit.path),
-        meta: p?.name[lang] ?? hit.preset,
+        // اللغة من المرجع: تغييرها لا يعيد الاشتراك فيضيع ملف وصل بين الإلغاء والاشتراك (FE22)
+        meta: p?.name[settingsRef.current?.language ?? "en"] ?? hit.preset,
       });
       toast(tRef.current.toastWatch(baseName(hit.path)));
     });
     return () => {
       un.then((f) => f());
     };
-  }, [addJob, toast, lang]);
+  }, [addJob, toast]);
 
   useEffect(() => {
     const order: Tab[] = ["download", "convert", "history", "settings"];
@@ -1041,7 +1050,9 @@ export default function App() {
                         <button
                           className="btn btn-sm btn-ghost danger-text"
                           onClick={async () =>
-                            (await confirm(t.cancelAll, t.cancelAllConfirm(activeShown.length))) && activeShown.forEach(cancel)
+                            (await confirm(t.cancelAll, t.cancelAllConfirm(activeShown.length))) &&
+                            // القائمة بعد التأكيد لا قبله: ما انتهى أثناء السؤال لا يُلغى (FE23)
+                            jobsRef.current.filter((j) => isActive(j) && activeShown.some((a) => a.id === j.id)).forEach(cancel)
                           }
                         >
                           <Icon name="x" size={16} /> {t.cancelAll}
@@ -1150,7 +1161,14 @@ export default function App() {
         </Presence>
 
         {toastShown && (
-          <div className={`toast ${toastLeaving ? "leaving" : ""}`} role="status">
+          <div
+            className={`toast ${toastLeaving ? "leaving" : ""}`}
+            role="status"
+            onMouseEnter={holdToast}
+            onMouseLeave={resumeToast}
+            onFocus={holdToast}
+            onBlur={resumeToast}
+          >
             <span>{toastShown.msg}</span>
             {toastShown.action && (
               <button

@@ -561,10 +561,21 @@ export function ConvertView(props: {
           meta(),
         );
       } else {
+        // ملف يفشل بدؤه لا يوقف بقية الدفعة: نكمل ونعرض أول خطأ في النهاية (FE6)
+        let first: unknown = null;
         for (const f of ready) {
           if (!presetFits(preset, f.info)) continue;
-          await props.onStart({ inputs: [f.path], preset: preset.id, options: effective(f) }, baseName(f.path), meta(effective(f).quality));
+          try {
+            await props.onStart(
+              { inputs: [f.path], preset: preset.id, options: effective(f) },
+              baseName(f.path),
+              meta(effective(f).quality),
+            );
+          } catch (e) {
+            first ??= e;
+          }
         }
+        if (first) throw first;
       }
     } catch (e) {
       setError(asAppError(e));
@@ -875,7 +886,7 @@ export function ConvertView(props: {
               )}
             </div>
           )}
-          <div className="collapse" data-open={more && tabs.length > 0}>
+          <div className="collapse" data-open={more && tabs.length > 0} inert={!(more && tabs.length > 0) || undefined}>
             <div>
               <div className="more">
                 {tabs.length > 1 && (
@@ -897,7 +908,7 @@ export function ConvertView(props: {
                 {tab === "trim" && (
                   <section>
                     <Toggle checked={trimOn} onChange={setTrimOn} title={t.optTrim} />
-                    <div className="collapse" data-open={trimOn}>
+                    <div className="collapse" data-open={trimOn} inert={!trimOn || undefined}>
                       <div>
                         <TrimRange
                           duration={trimInfo!.duration!}

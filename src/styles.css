@@ -802,6 +802,18 @@ details.tech pre {
   font-size: var(--fs-meta);
   box-shadow: var(--shadow);
   z-index: 10;
+  /* رسالة طويلة لا تتجاوز عرض الشاشة (CS2) */
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  overflow-wrap: anywhere;
+}
+
+/* على الهاتف شريط التبويبات ثابت في الأسفل (z-index 15): التنبيه فوقه لا تحته */
+@media (max-width: 560px) {
+  .toast {
+    bottom: calc(64px + var(--s-3) + env(safe-area-inset-bottom));
+    z-index: 16;
+  }
 }
 
 @media (max-width: 700px) {

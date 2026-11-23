@@ -1,7 +1,7 @@
 import type { ProbeInfo, Settings } from "../../api";
 import { subtitleLangs, type Stills } from "../../downloadPlan";
 import { useI18n } from "../../i18n";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Icon } from "../Icon";
 import { Segmented, Toggle } from "../Segmented";
 
@@ -27,11 +27,12 @@ export function ExtrasPanel(props: {
   const toggleLang = (code: string) =>
     update({ subLangs: s.subLangs.includes(code) ? s.subLangs.filter((c) => c !== code) : [...s.subLangs, code] });
 
+  // مفتوح أول مرة إن كان فيه شيء مفعّل، ثم يبقى كما تركه المستخدم:
+  // كان يُغلق فجأة تحت يده عند إطفاء آخر مفتاح فيه (FE13)
+  const [open, setOpen] = useState(() => s.wantSubs || s.wantThumb || s.wantInfo || stills !== "off" || !!props.more?.some(Boolean));
+
   return (
-    <details
-      className="extras"
-      open={s.wantSubs || s.wantThumb || s.wantInfo || stills !== "off" || props.more?.some(Boolean) || undefined}
-    >
+    <details className="extras" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>
         <Icon name="layers" size={16} /> {t.extrasLabel}
         <span className="extras-count">
