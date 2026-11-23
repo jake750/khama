@@ -151,6 +151,8 @@ export default function App() {
   const tabNowRef = useRef<Tab>("download");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [files, setFiles] = useState<SourceFile[]>([]);
+  const filesRef = useRef<SourceFile[]>([]);
+  const analyzed = useRef(new Map<string, Partial<SourceFile>>());
   const [hw, setHw] = useState<string[] | null>(null);
   const [dragging, setDragging] = useState(false);
   const [toastMsg, setToastMsg] = useState<{ msg: string; action?: ToastAction } | null>(null);
@@ -371,6 +373,7 @@ export default function App() {
   // أحدث القيم للمستمعين والمؤقّتات، تُحدَّث بعد الرسم لا أثناءه
   useLayoutEffect(() => {
     jobsRef.current = jobs;
+    filesRef.current = files;
     settingsRef.current = settings;
     tRef.current = t;
     tabNowRef.current = tab;
@@ -548,15 +551,19 @@ export default function App() {
     const media = paths.filter(isMedia);
     if (!media.length) return;
     setTab("convert");
-    setFiles((prev) => {
-      const fresh = media.filter((p) => !prev.some((f) => f.path === p));
-      for (const p of fresh) {
-        analyzeTurn(() => api.analyzeFile(p))
-          .then((info) => setFiles((cur) => cur.map((f) => (f.path === p ? { ...f, info } : f))))
-          .catch((e) => setFiles((cur) => cur.map((f) => (f.path === p ? { ...f, error: asAppError(e) } : f))));
-      }
-      return [...prev, ...fresh.map((path) => ({ path }))];
-    });
+    // التحليل خارج دالة التحديث (FE16: React قد يستدعيها مرتين)، ونتيجته تُحفظ أيضًا
+    // فـ«تراجع» بعد «مسح» يعيد الملفات محلَّلة لا عالقة على «جارٍ التحليل» (FE4)
+    const fresh = media.filter((p) => !filesRef.current.some((f) => f.path === p));
+    const apply = (p: string, r: Partial<SourceFile>) => {
+      analyzed.current.set(p, r);
+      setFiles((cur) => cur.map((f) => (f.path === p ? { ...f, ...r } : f)));
+    };
+    for (const p of fresh) {
+      analyzeTurn(() => api.analyzeFile(p))
+        .then((info) => apply(p, { info }))
+        .catch((e) => apply(p, { error: asAppError(e) }));
+    }
+    setFiles((prev) => [...prev, ...fresh.filter((p) => !prev.some((f) => f.path === p)).map((path) => ({ path }))]);
   }, []);
 
   /** سحب ملف مكتمل إلى Premiere/DaVinci/CapCut أو إلى أي مجلد */
@@ -993,7 +1000,11 @@ export default function App() {
                     onClearFiles={() => {
                       const prev = files;
                       setFiles(() => []);
-                      toast(t.filesCleared(prev.length), { label: t.undo, ms: 5000, run: () => setFiles(() => prev) });
+                      toast(t.filesCleared(prev.length), {
+                        label: t.undo,
+                        ms: 5000,
+                        run: () => setFiles(() => prev.map((f) => ({ ...f, ...analyzed.current.get(f.path) }))),
+                      });
                     }}
                     onStart={startConvert}
                   />
