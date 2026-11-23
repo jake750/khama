@@ -425,6 +425,8 @@ function DownloadsSection(props: { settings: Settings; update: (p: Partial<Setti
           onKeyDown={(e) => e.key === "Enter" && commit(tpl)}
           aria-label={t.filenameTitle}
         />
+        {/* قالب بلا جزء مميِّز يجعل الملفات تتصادم في الاسم (UX15) */}
+        {!/\{(title|id|n)\}/.test(s.filenameTemplate) && <div className="faint">{t.filenameNoUnique}</div>}
         <div className="chips">
           {TOKENS.map((k) => (
             <button
@@ -612,7 +614,7 @@ function ProjectsSection(props: { settings: Settings; update: (p: Partial<Settin
             className="btn btn-sm btn-ghost"
             onClick={() => {
               update({ projects: s.projects.map((x) => (x.id === p.id ? snapshot(p.id, p.name) : x)) });
-              props.toast(t.toastProject(p.name));
+              props.toast(t.toastProjectUpdated(p.name));
             }}
           >
             {t.updateProject}

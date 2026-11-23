@@ -172,7 +172,7 @@ export const GUIDE: GuideEntry[] = [
         what: "An AI model splits the sound: “Remove music” keeps only the voice, “Remove voice” keeps only the music.",
         when: "A clean voiceover from a noisy video, or background music without the talking. Works on your own files too: Convert → Audio.",
         steps: [
-          "Paste the link, then open “Extras”.",
+          "Paste the link, then open “Extra files”.",
           "Under “AI clean-up”, pick “Remove music” or “Remove voice”.",
           "Download. The model (about 140 MB) is downloaded once; separating takes about as long as the audio.",
         ],
@@ -182,7 +182,7 @@ export const GUIDE: GuideEntry[] = [
         what: "نموذج ذكاء اصطناعي يفصل الصوت: «إزالة الموسيقى» يُبقي الكلام فقط، و«إزالة الصوت البشري» يُبقي الموسيقى فقط.",
         when: "تعليق صوتي نظيف من فيديو مليء بالموسيقى، أو موسيقى خلفية بلا كلام. يعمل على ملفاتك أيضًا: التحويل ← صوت.",
         steps: [
-          "الصق الرابط، ثم افتح «إضافات».",
+          "الصق الرابط، ثم افتح «ملفات مرافقة».",
           "تحت «تنظيف بالذكاء الاصطناعي» اختر «إزالة الموسيقى» أو «إزالة الصوت البشري».",
           "نزّل. النموذج (نحو 140 ميغابايت) يُنزَّل مرة واحدة، والفصل يأخذ تقريبًا مدة الصوت نفسه.",
         ],
@@ -191,14 +191,14 @@ export const GUIDE: GuideEntry[] = [
     mobile: {
       en: {
         steps: [
-          "Paste the link, then open “Extras”.",
+          "Paste the link, then open “Extra files”.",
           "Under “AI clean-up”, pick “Remove music” or “Remove voice”.",
           "Download. The model (about 67 MB) is downloaded once. On a phone it's slow and the phone gets warm.",
         ],
       },
       ar: {
         steps: [
-          "الصق الرابط، ثم افتح «إضافات».",
+          "الصق الرابط، ثم افتح «ملفات مرافقة».",
           "تحت «تنظيف بالذكاء الاصطناعي» اختر «إزالة الموسيقى» أو «إزالة الصوت البشري».",
           "نزّل. النموذج (نحو 67 ميغابايت) يُنزَّل مرة واحدة. على الهاتف يكون بطيئًا ويسخن الجهاز.",
         ],
@@ -217,7 +217,7 @@ export const GUIDE: GuideEntry[] = [
         what: "Saves JPG frames in a folder next to the video: every few seconds, or one per shot. Khama finds the shot changes itself.",
         when: "Moodboards, thumbnails, references, or a quick overview of a long video.",
         steps: [
-          "Paste the link, then open “Extras”.",
+          "Paste the link, then open “Extra files”.",
           "Under “Stills”, pick “Every 5s”, “Every 10s” or “At scene cuts”.",
           "Download. The stills land in their own folder.",
         ],
@@ -227,7 +227,7 @@ export const GUIDE: GuideEntry[] = [
         what: "يحفظ صور JPG في مجلد بجانب الفيديو: كل بضع ثوانٍ، أو لقطة لكل مشهد. خامة تكتشف تغيّر المشاهد بنفسها.",
         when: "لوحات الإلهام، والصور المصغّرة، والمراجع، أو لمحة سريعة عن فيديو طويل.",
         steps: [
-          "الصق الرابط، ثم افتح «إضافات».",
+          "الصق الرابط، ثم افتح «ملفات مرافقة».",
           "تحت «لقطات ثابتة» اختر كل 5 أو 10 ثوانٍ، أو «عند تغيّر المشهد».",
           "نزّل. اللقطات تُحفظ في مجلد خاص بها.",
         ],
@@ -245,13 +245,13 @@ export const GUIDE: GuideEntry[] = [
         title: "Subtitles, thumbnail and source info",
         what: "Extra files saved next to the video: subtitles (SRT), the thumbnail (JPG), and a text file with the link and uploader for credits.",
         when: "Captioning, cover images, or keeping track of where footage came from.",
-        steps: ["Open “Extras”.", "Turn on what you need. For subtitles, pick the languages.", "Download."],
+        steps: ["Open “Extra files”.", "Turn on what you need. For subtitles, pick the languages.", "Download."],
       },
       ar: {
         title: "الترجمة والصورة المصغّرة ومعلومات المصدر",
         what: "ملفات إضافية بجانب الفيديو: الترجمة (SRT)، والصورة المصغّرة (JPG)، وملف نصي فيه الرابط والناشر لذكر المصدر.",
         when: "للترجمة على الفيديو، أو صورة الغلاف، أو لتعرف مصدر كل لقطة.",
-        steps: ["افتح «إضافات».", "فعّل ما تحتاجه. للترجمة اختر اللغات.", "نزّل."],
+        steps: ["افتح «ملفات مرافقة».", "فعّل ما تحتاجه. للترجمة اختر اللغات.", "نزّل."],
       },
     },
   },
@@ -269,7 +269,7 @@ export const GUIDE: GuideEntry[] = [
         when: "You are pulling a batch of footage for one edit.",
         steps: [
           "Paste several links or a playlist (or add clips as separate files).",
-          "In “Extras”, turn on “Timeline file (XML)”.",
+          "In “Extra files”, turn on “Timeline file for your editor (XML)”.",
           "Download, then import the XML in your editor.",
         ],
       },
@@ -279,7 +279,7 @@ export const GUIDE: GuideEntry[] = [
         when: "عندما تجمع مجموعة لقطات لمونتاج واحد.",
         steps: [
           "الصق عدة روابط أو قائمة (أو أضف مقاطع كملفات منفصلة).",
-          "في «إضافات» فعّل «ملف تايم لاين (XML)».",
+          "في «ملفات مرافقة» فعّل «ملف تايم لاين لبرنامج المونتاج (XML)».",
           "نزّل، ثم استورد ملف XML في برنامج المونتاج.",
         ],
       },
@@ -297,7 +297,7 @@ export const GUIDE: GuideEntry[] = [
         what: "Queues a download to start at a time you choose.",
         when: "Big files at night, or when the internet is less busy.",
         steps: [
-          "Open “Extras”.",
+          "Open “Extra files”.",
           "Under “Start”, pick “At a time” and set the time.",
           "Press Download. Khama has to stay open until then.",
         ],
@@ -306,7 +306,11 @@ export const GUIDE: GuideEntry[] = [
         title: "جدولة التنزيل لوقت لاحق",
         what: "يضع التنزيل في الانتظار ليبدأ في الوقت الذي تختاره.",
         when: "الملفات الكبيرة في الليل، أو حين يكون الإنترنت أقل ازدحامًا.",
-        steps: ["افتح «إضافات».", "تحت «البدء» اختر «في وقت محدد» وحدّد الساعة.", "اضغط «تنزيل». يجب أن تبقى خامة مفتوحة حتى ذلك الوقت."],
+        steps: [
+          "افتح «ملفات مرافقة».",
+          "تحت «البدء» اختر «في وقت محدد» وحدّد الساعة.",
+          "اضغط «تنزيل». يجب أن تبقى خامة مفتوحة حتى ذلك الوقت.",
+        ],
       },
     },
   },
