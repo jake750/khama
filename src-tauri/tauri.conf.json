@@ -55,7 +55,7 @@
       "desktop": { "schemes": ["khama"] }
     },
     "updater": {
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU0RDFCNjUyMzA5OEE4QUYKUldTdnFKZ3dVcmJSVkVFNmVteDJPOGRZa2FpdldtbnAxcXJoazdkOTdyWCtvUEh0dm1vTkUxRlgK",
       "endpoints": ["https://github.com/jake750/khama/releases/latest/download/latest.json"],
       "windows": { "installMode": "passive" }
     }
