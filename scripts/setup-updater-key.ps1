@@ -15,7 +15,8 @@ npx tauri signer generate -w $key
 if ($LASTEXITCODE -ne 0) { throw "Key creation failed" }
 
 Write-Host "`n2/3  Uploading the private key to GitHub secrets." -ForegroundColor Cyan
-Get-Content -Raw $key | gh secret set TAURI_SIGNING_PRIVATE_KEY
+# Through cmd, not a PowerShell pipe: Windows PowerShell 5 adds a BOM (0xEF) that makes CI reject the key
+cmd /c "gh secret set TAURI_SIGNING_PRIVATE_KEY < `"$key`""
 if ($LASTEXITCODE -ne 0) { throw "Uploading the key failed" }
 
 Write-Host "`n3/3  Type the SAME password once more, for GitHub." -ForegroundColor Cyan
