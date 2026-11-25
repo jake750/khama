@@ -1,0 +1,20 @@
+{
+  "title": "خامة",
+  "subtitle": "تطبيق مفتوح المصدر لتنزيل الوسائط وتجهيزها للمونتاج، بواجهة عربية وفصل محلي للصوت",
+  "header": "خامة · تقرير مشروع التخرج",
+  "year": "2026–2027",
+  "files": [
+    "00-abstract.md",
+    "01-introduction.md",
+    "02-related-work.md",
+    "03-requirements.md",
+    "04-design.md",
+    "05-implementation.md",
+    "06-evaluation.md",
+    "07-ethics-legal.md",
+    "08-conclusion.md",
+    "glossary.md",
+    "references.md",
+    "appendices.md"
+  ]
+}
