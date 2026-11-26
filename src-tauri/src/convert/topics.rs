@@ -659,76 +659,73 @@ async fn transcribe(
     }
     let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).clamp(2, 8);
     let out_base = c.work.join("speech");
-    let mut cmd = tools::command(&cli);
-    cmd.arg("-m")
-        .arg(&model)
-        .arg("-f")
-        .arg(&wav)
-        // DTW = وقت كل كلمة (يتطلب إيقاف flash attention)، و-ojf يكتبه مع الرموز
-        .args([
-            "-l",
-            "auto",
-            "-t",
-            &threads.to_string(),
-            "-nfa",
-            "-dtw",
-            "small",
-            "-osrt",
-            "-ojf",
-            "-of",
-        ])
-        .arg(&out_base);
-    if let Some(d) = cli.parent() {
-        cmd.current_dir(d);
-        #[cfg(target_os = "linux")]
-        cmd.env("LD_LIBRARY_PATH", d);
-    }
-    let began = Instant::now();
-    let mut last = Instant::now() - Duration::from_secs(1);
-    emit(
-        c.app,
-        JobUpdate {
-            id: c.id,
-            state: "analyzing",
-            percent: Some(0.0),
-            ..Default::default()
-        },
-    );
-    let outcome = run_streaming(cmd, cancel, |line| {
-        if let Some(t) = whisper_line_end(line)
-            && dur > 0.0
-            && last.elapsed() >= Duration::from_millis(250)
-        {
-            last = Instant::now();
-            let pct = (t / dur * 100.0).clamp(0.0, 100.0);
-            emit(
-                c.app,
-                JobUpdate {
-                    id: c.id,
-                    state: "analyzing",
-                    percent: Some(pct),
-                    eta: separate::separation_eta(began.elapsed().as_secs_f64(), pct),
-                    ..Default::default()
-                },
-            );
+    // DTW = وقت كل كلمة (يتطلب إيقاف flash attention)، و-ojf يكتبه مع الرموز. نسخة whisper لا تعرف
+    // هذه الخيارات تفشل بها: نعيد مرة بدونها، فيبقى التفريغ وتُقدَّر أوقات الكلمات من الجمل
+    for dtw in [true, false] {
+        let mut cmd = tools::command(&cli);
+        cmd.arg("-m")
+            .arg(&model)
+            .arg("-f")
+            .arg(&wav)
+            .args(["-l", "auto", "-t", &threads.to_string(), "-osrt", "-of"])
+            .arg(&out_base);
+        if dtw {
+            cmd.args(["-nfa", "-dtw", "small", "-ojf"]);
         }
-    })
-    .await?;
-    match outcome {
-        RunOutcome::Canceled => Ok(None),
-        RunOutcome::Exited { success: true, .. } => {
-            let mut cues = read_subs(&out_base.with_extension("srt"));
-            for q in &mut cues {
-                q.start += start;
-                q.end += start;
+        if let Some(d) = cli.parent() {
+            cmd.current_dir(d);
+            #[cfg(target_os = "linux")]
+            cmd.env("LD_LIBRARY_PATH", d);
+        }
+        let began = Instant::now();
+        let mut last = Instant::now() - Duration::from_secs(1);
+        emit(
+            c.app,
+            JobUpdate {
+                id: c.id,
+                state: "analyzing",
+                percent: Some(0.0),
+                ..Default::default()
+            },
+        );
+        let outcome = run_streaming(cmd, cancel, |line| {
+            if let Some(t) = whisper_line_end(line)
+                && dur > 0.0
+                && last.elapsed() >= Duration::from_millis(250)
+            {
+                last = Instant::now();
+                let pct = (t / dur * 100.0).clamp(0.0, 100.0);
+                emit(
+                    c.app,
+                    JobUpdate {
+                        id: c.id,
+                        state: "analyzing",
+                        percent: Some(pct),
+                        eta: separate::separation_eta(began.elapsed().as_secs_f64(), pct),
+                        ..Default::default()
+                    },
+                );
             }
-            let words = std::fs::read_to_string(out_base.with_extension("json"))
-                .map(|j| words::parse_whisper_json(&j, start))
-                .unwrap_or_default();
-            Ok(Some((cues, words)))
+        })
+        .await?;
+        match outcome {
+            RunOutcome::Canceled => return Ok(None),
+            RunOutcome::Exited { success: true, .. } => {
+                let mut cues = read_subs(&out_base.with_extension("srt"));
+                for q in &mut cues {
+                    q.start += start;
+                    q.end += start;
+                }
+                let words = std::fs::read_to_string(out_base.with_extension("json"))
+                    .map(|j| words::parse_whisper_json(&j, start))
+                    .unwrap_or_default();
+                return Ok(Some((cues, words)));
+            }
+            RunOutcome::Exited { stderr, .. } if dtw => log::warn!("whisper with DTW failed, retrying without: {}", tail(&stderr, 3)),
+            RunOutcome::Exited { stderr, .. } => return Err(AppError::with_detail("transcribeFailed", tail(&stderr, 8))),
         }
-        RunOutcome::Exited { stderr, .. } => Err(AppError::with_detail("transcribeFailed", tail(&stderr, 8))),
     }
+    unreachable!("the second attempt always returns")
 }
 
 // ======================= التشغيل =======================
