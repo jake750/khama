@@ -42,7 +42,7 @@ The React interface only talks to Rust through `src/api.ts`. Every command below
 
 | Event | Payload | When |
 |---|---|---|
-| `job-update` | `JobUpdate` (id, state, progress, speed, ETA, file, error) | Every progress line, state change, finish or failure. Throttled in Rust. |
+| `job-update` | `JobUpdate` (id, state, progress, speed, ETA, file, error; for detections `markers`, `levels`; for topics `topics`, `cues`, `words`, `transcript`) | Every progress line, state change, finish or failure. Throttled in Rust. |
 | `deep-link` | `string` | A `khama://` link opened while the app runs. |
 | `clipboard-url` | `string` | A supported link was copied (when clipboard watching is on). |
 | `watch-file` | `{ id, path, preset }` | A new file appeared in a watch folder. |
@@ -58,3 +58,5 @@ The React interface only talks to Rust through `src/api.ts`. Every command below
 **Shared types.** The structs that cross the boundary (`Settings`, `DownloadRequest`, `JobUpdate`, `MediaInfo`, `ConvertOptions`…) derive `ts_rs::TS` in test builds, and `cargo test` writes them to `src/bindings/` (do not edit those files). `src/api.ts` keeps its own hand-written types because they use exact unions where Rust has `String`, but `src/ipcTypes.check.ts` makes `tsc` fail when a field exists on one side only, and CI fails if `src/bindings/` is out of date. So after changing a struct: `cargo test`, then fix what `tsc` reports.
 
 الهياكل المشتركة تولَّد إلى `src/bindings/` عند `cargo test`، و`tsc` يفشل إن اختلفت أسماء الحقول بينها وبين `api.ts`.
+
+**Clip subtitles.** The interface computes each exported clip's SRT itself (`src/reels.ts`: sections joined, silences removed, lines limited) and sends it as `ConvertOptions.sidecarSrt`; Rust only writes it next to the finished file with the same name.

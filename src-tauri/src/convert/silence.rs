@@ -4,6 +4,7 @@
 //! «الصمت» فيه حول -37 dB. لذلك نقيس مستوى كل 20 ms من الملف، ونأخذ مستوى الضجيج (أهدأ 10%)
 //! ومستوى الكلام (أعلى 10%)، والعتبة بينهما أقرب إلى الضجيج.
 
+use serde::Serialize;
 use std::{
     io::{BufRead, BufReader, Read},
     path::{Path, PathBuf},
@@ -46,19 +47,54 @@ fn percentile(sorted: &[f32], q: f64) -> f32 {
     sorted[((sorted.len() - 1) as f64 * q).round() as usize]
 }
 
-/// العتبة التلقائية: فوق مستوى الضجيج بـ 30% من المسافة إلى الكلام (بين 4 و15 dB).
-/// ملف بلا فرق واضح بين الهادئ والعالي (موسيقى متصلة، ضجيج فقط): لا صمت فيه.
-pub fn auto_threshold(db: &[f32]) -> Option<f64> {
+/// مستوى الضجيج (المئين 10) ومستوى الكلام (المئين 90) بالـ dB، كما تقيسهما العتبة التلقائية
+pub fn floor_and_speech(db: &[f32]) -> Option<(f64, f64)> {
     if db.is_empty() {
         return None;
     }
     let mut s = db.to_vec();
     s.sort_by(f32::total_cmp);
-    let (lo, hi) = (f64::from(percentile(&s, 0.10)), f64::from(percentile(&s, 0.90)));
+    Some((f64::from(percentile(&s, 0.10)), f64::from(percentile(&s, 0.90))))
+}
+
+/// العتبة التلقائية: فوق مستوى الضجيج بـ 30% من المسافة إلى الكلام (بين 4 و15 dB).
+/// ملف بلا فرق واضح بين الهادئ والعالي (موسيقى متصلة، ضجيج فقط): لا صمت فيه.
+pub fn auto_threshold(db: &[f32]) -> Option<f64> {
+    let (lo, hi) = floor_and_speech(db)?;
     if hi - lo < 10.0 {
         return None;
     }
     Some(lo + ((hi - lo) * 0.3).clamp(4.0, 15.0))
+}
+
+/// ما قيس في الملف، لتعرضه الواجهة فيعرف المستخدم أين يضع المستوى اليدوي
+#[derive(Debug, Clone, Copy, Serialize, PartialEq)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
+#[serde(rename_all = "camelCase")]
+pub struct SilenceLevels {
+    /// مستوى الضجيج بين الكلام (dB)
+    pub noise: f64,
+    /// مستوى الكلام (dB)
+    pub speech: f64,
+    /// العتبة المستعملة (dB). فارغ = لا فرق واضح بين الكلام والضجيج فلا صمت
+    pub threshold: Option<f64>,
+    /// true = اختارها المستخدم، false = قيست تلقائيًا
+    pub manual: bool,
+}
+
+/// المستويات المقيسة والعتبة التي ستُستعمل بهذه الخيارات
+pub fn levels_summary(lv: &Levels, db: Option<f64>) -> Option<SilenceLevels> {
+    let (noise, speech) = floor_and_speech(&lv.db)?;
+    let manual = db.filter(|v| v.is_finite());
+    Some(SilenceLevels {
+        noise: (noise * 10.0).round() / 10.0,
+        speech: (speech * 10.0).round() / 10.0,
+        threshold: manual
+            .map(|v| v.clamp(-80.0, -10.0))
+            .or_else(|| auto_threshold(&lv.db))
+            .map(|t| (t * 10.0).round() / 10.0),
+        manual: manual.is_some(),
+    })
 }
 
 /// فترات الصمت: إطارات متتالية تحت العتبة لا تقل مدتها عن `min` ثانية.
@@ -250,6 +286,17 @@ mod tests {
         assert!((runs[0][0] - 2.0).abs() < 1e-6 && (runs[0][1] - 3.0).abs() < 1e-6);
         // صمت آخر الملف يُحسب
         assert!((runs[1][0] - 6.3).abs() < 1e-6 && (runs[1][1] - 7.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn summary_reports_measured_levels() {
+        let lv = noisy(&[(-16.0, 100), (-37.0, 50), (-17.0, 100)]);
+        let auto = levels_summary(&lv, None).unwrap();
+        assert_eq!((auto.noise, auto.speech, auto.manual), (-37.0, -16.0, false));
+        assert_eq!(auto.threshold, find_silences(&lv, None, None).1.map(|t| (t * 10.0).round() / 10.0));
+        let manual = levels_summary(&lv, Some(-30.0)).unwrap();
+        assert_eq!((manual.threshold, manual.manual), (Some(-30.0), true));
+        assert_eq!(levels_summary(&noisy(&[(-20.0, 10)]), None).unwrap().threshold, None);
     }
 
     #[test]

@@ -47,6 +47,8 @@ pub use run::*;
 mod topics;
 pub use topics::*;
 pub mod silence;
+pub mod words;
+pub use silence::SilenceLevels;
 #[cfg(test)]
 mod tests;
 #[cfg(desktop)]

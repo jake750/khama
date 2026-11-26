@@ -355,6 +355,7 @@ pub fn queue_convert(app: &AppHandle, request: ConvertRequest, id: Option<u64>) 
     let app2 = app.clone();
     // للسجلّ: التحويلات (ومنها المجلدات المراقَبة) تُسجَّل كالتنزيلات (U-62، U-75)
     let (source, preset_id) = (request.inputs.first().cloned().unwrap_or_default(), request.preset.clone());
+    let sidecar = request.options.sidecar_srt.clone().filter(|s| !s.trim().is_empty());
     tauri::async_runtime::spawn(async move {
         emit(
             &app2,
@@ -395,6 +396,9 @@ pub fn queue_convert(app: &AppHandle, request: ConvertRequest, id: Option<u64>) 
                 file: found.is_none().then(|| path.to_string_lossy().into_owned()),
                 transcript: found.as_ref().and_then(|f| f.transcript),
                 topics: found.as_ref().and_then(|f| f.topics.clone()),
+                levels: found.as_ref().and_then(|f| f.levels),
+                cues: found.as_ref().and_then(|f| f.cues.clone()),
+                words: found.as_ref().and_then(|f| f.words.clone()),
                 markers: found.map(|f| f.markers),
                 ..Default::default()
             },
@@ -419,6 +423,12 @@ pub fn queue_convert(app: &AppHandle, request: ConvertRequest, id: Option<u64>) 
             let _ = tokio::fs::remove_dir_all(root.join(format!("c{id}"))).await;
         }
         app2.state::<Jobs>().cancels.lock_ok().remove(&id);
+        // ترجمة المقطع بجانبه، بتوقيت يبدأ من صفره (حسبتها الواجهة بعد حذف الصمت)
+        if let (Some(file), Some(srt)) = (update.file.as_deref().filter(|_| update.state == "done"), sidecar.as_deref())
+            && let Err(e) = tokio::fs::write(Path::new(file).with_extension("srt"), srt).await
+        {
+            log::error!("convert {id}: srt: {e}");
+        }
         if let Some(file) = update.file.as_deref().filter(|_| update.state == "done") {
             let entry = convert_history_entry(
                 &source,
@@ -460,6 +470,9 @@ pub(super) struct Found {
     pub markers: Vec<[f64; 2]>,
     pub topics: Option<Vec<Topic>>,
     pub transcript: Option<&'static str>,
+    pub levels: Option<silence::SilenceLevels>,
+    pub cues: Option<Vec<crate::srt::Cue>>,
+    pub words: Option<Vec<super::words::Word>>,
 }
 
 impl From<Vec<[f64; 2]>> for Found {
@@ -468,6 +481,9 @@ impl From<Vec<[f64; 2]>> for Found {
             markers,
             topics: None,
             transcript: None,
+            levels: None,
+            cues: None,
+            words: None,
         }
     }
 }
@@ -490,6 +506,9 @@ async fn run_detect(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOption
             markers: r.silences,
             topics: Some(r.topics),
             transcript: Some(r.source),
+            levels: r.levels,
+            cues: Some(r.cues),
+            words: Some(r.words).filter(|w| !w.is_empty()),
         };
         return Ok(Some((PathBuf::from(&info.path), Some(found))));
     }
@@ -501,10 +520,11 @@ async fn run_detect(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOption
     }
     let dur = o.end.unwrap_or(info.duration.unwrap_or(0.0)) - o.start.unwrap_or(0.0);
     if p.id == "detect_silence" {
-        let Some(found) = detect_silences(c, info, o, cancel).await? else {
+        let Some((found, levels)) = detect_silences(c, info, o, cancel).await? else {
             return Ok(None);
         };
-        return Ok(Some((PathBuf::from(&info.path), Some(found.into()))));
+        let found = Found { levels, ..found.into() };
+        return Ok(Some((PathBuf::from(&info.path), Some(found))));
     }
     // المشاهد: خوارزمية خامة (مدرّج ألوان HSV + عتبة متكيّفة + كشف الانتقالات التدريجية)، انظر scenes.rs
     if p.id == "detect_scenes" {
@@ -551,7 +571,7 @@ pub(super) async fn detect_silences(
     info: &MediaInfo,
     o: &ConvertOptions,
     cancel: &mut watch::Receiver<bool>,
-) -> Result<Option<Vec<[f64; 2]>>, AppError> {
+) -> Result<Option<(Vec<[f64; 2]>, Option<silence::SilenceLevels>)>, AppError> {
     let t0 = o.start.unwrap_or(0.0);
     let dur = o.end.unwrap_or(info.duration.unwrap_or(0.0)) - t0;
     let mut last = std::time::Instant::now() - std::time::Duration::from_secs(1);
@@ -577,7 +597,12 @@ pub(super) async fn detect_silences(
         cancel,
     )
     .await?;
-    Ok(levels.map(|lv| silence::find_silences(&lv, o.silence_db, o.silence_min).0))
+    Ok(levels.map(|lv| {
+        (
+            silence::find_silences(&lv, o.silence_db, o.silence_min).0,
+            silence::levels_summary(&lv, o.silence_db),
+        )
+    }))
 }
 
 /// إزالة الموسيقى أو الصوت البشري بالنموذج

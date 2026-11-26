@@ -392,6 +392,15 @@ pub struct JobUpdate {
     /// تحليل المواضيع: المواضيع بأوقاتها (والصمت المكتشف في markers)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub topics: Option<Vec<crate::convert::Topic>>,
+    /// كشف الصمت: مستوى الكلام والضجيج والعتبة المستعملة
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub levels: Option<crate::convert::SilenceLevels>,
+    /// تحليل المواضيع: النص بأوقاته (لترجمة كل مقطع يُصدَّر)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cues: Option<Vec<crate::srt::Cue>>,
+    /// تحليل المواضيع: وقت كل كلمة (json3 أو whisper مع DTW)، لأسطر ترجمة دقيقة
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub words: Option<Vec<crate::convert::words::Word>>,
     /// من أين جاء النص: "subtitles" (ملف ترجمة) | "captions" (ترجمة الموقع) | "speech" (تفريغ الكلام)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcript: Option<&'static str>,

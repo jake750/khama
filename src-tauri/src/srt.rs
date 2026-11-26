@@ -17,7 +17,8 @@ pub fn decode(bytes: &[u8]) -> String {
     det.guess(None, true).decode_without_bom_handling(bytes).0.into_owned()
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct Cue {
     pub start: f64,
     pub end: f64,

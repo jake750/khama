@@ -1,5 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import type { AppError, ConvertRequest, DownloadRequest, JobState, JobUpdate, Topic } from "../api";
+import type { AppError, ConvertRequest, Cue, DownloadRequest, Word, JobState, JobUpdate, SilenceLevels, Topic } from "../api";
+import type { Range, TopicPlan } from "../reels";
+import { LevelsLine, TopicPanel, type ExportOptions } from "./TopicPanel";
 import { formatDuration, formatEta, formatSpeed, formatTimecode } from "../format";
 import { errorText, numLocale, useI18n, type Dict } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
@@ -30,6 +32,11 @@ export interface Job {
   /** تحليل المواضيع: المواضيع، ومن أين جاء النص */
   topics?: Topic[];
   transcript?: "subtitles" | "captions" | "speech";
+  /** كشف الصمت: ما قيس في الملف */
+  levels?: SilenceLevels;
+  /** تحليل المواضيع: النص بأوقاته، ووقت كل كلمة */
+  cues?: Cue[];
+  words?: Word[];
   /** تحويل بدأ من بطاقة تنزيل (تحليل المواضيع): يظهر في قائمة التنزيلات */
   inDownloads?: boolean;
   /** صورة الفيديو (من المعاينة) */
@@ -159,8 +166,11 @@ export function JobCard(props: {
   topicRows?: TopicRow[];
   reelRange?: [number, number];
   onCopyTopics?: () => void;
-  /** تصدير موضوع مقطعًا، وtight = بلا صمت */
-  onTopicClip?: (i: number, tight: boolean) => void;
+  /** أنواع المواضيع وأجزاؤها المقترحة، وطول الجزء بعد حذف الصمت */
+  topicPlans?: TopicPlan[];
+  partLength?: (r: Range) => number;
+  /** تصدير المواضيع والأجزاء المختارة */
+  onExportTopics?: (sections: Range[], o: ExportOptions) => void;
   /** بطاقة تنزيل مكتمل: حلّل مواضيعه */
   onFindTopics?: () => void;
 }) {
@@ -281,60 +291,24 @@ export function JobCard(props: {
         )}
 
         {j.state === "done" && props.topicRows && props.topicRows.length > 0 && (
-          <div className="markers topics">
-            <div className="faint">
-              {[
-                j.transcript ? t.topicsFrom[j.transcript] : "",
-                props.reelRange ? t.topicsReels(props.topicRows.filter((r) => r.reel).length) : "",
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </div>
-            <ol className="topic-list">
-              {props.topicRows.map((r, i) => (
-                <li key={i} className={`topic${r.reel ? " is-reel" : ""}`}>
-                  <div className="topic-head">
-                    <span className="chip ltr">
-                      {formatTimecode(r.start)}–{formatTimecode(r.end)}
-                    </span>
-                    {r.reel && props.reelRange && (
-                      <span className="chip chip-reel" title={t.topicReelHint(...props.reelRange)}>
-                        {t.topicReel}
-                      </span>
-                    )}
-                    <span className="faint">{t.topicLength(formatDuration(r.before), formatDuration(r.after))}</span>
-                  </div>
-                  {r.title && (
-                    <div className="topic-title" dir="auto">
-                      {r.title}
-                    </div>
-                  )}
-                  <div className="faint topic-text" dir="auto">
-                    {r.text}
-                  </div>
-                  {props.onTopicClip && (
-                    <div className="marker-actions">
-                      <button className="btn btn-sm" onClick={() => props.onTopicClip!(i, false)} title={t.topicClipHint}>
-                        <Icon name="scissors" size={14} /> {t.topicClip}
-                      </button>
-                      {r.after < r.before - 0.05 && (
-                        <button className="btn btn-sm" onClick={() => props.onTopicClip!(i, true)} title={t.topicClipTightHint}>
-                          <Icon name="wave" size={14} /> {t.topicClipTight}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ol>
-            {props.onCopyTopics && (
-              <button className="btn btn-sm mt-2" onClick={props.onCopyTopics}>
-                <Icon name="copy" size={16} /> {t.copyTopics}
-              </button>
-            )}
-          </div>
+          <TopicPanel
+            rows={props.topicRows}
+            plans={props.topicPlans ?? []}
+            summary={[
+              j.transcript ? t.topicsFrom[j.transcript] : "",
+              props.reelRange ? t.topicsReels(props.topicRows.filter((r) => r.reel).length) : "",
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+            levels={j.levels}
+            partLength={props.partLength ?? ((r) => r[1] - r[0])}
+            hasCues={!!j.cues?.length}
+            onExport={props.onExportTopics}
+            onCopyTopics={props.onCopyTopics}
+          />
         )}
 
+        {j.state === "done" && !j.topics && j.levels && <LevelsLine levels={j.levels} />}
         {j.state === "done" && !j.topics && j.markers && j.markers.length > 0 && (
           <div className="markers">
             <div className="marker-list ltr">

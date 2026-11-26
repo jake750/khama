@@ -175,8 +175,14 @@ export interface ConvertOptions {
   cut: [number, number][];
   silenceDb?: number | null;
   silenceMin?: number | null;
-  /** عند حذف الصمت: كم ثانية تبقى من كل طرف */
+  /** عند حذف الصمت: كم ثانية تبقى بعد الكلام (ومن كل طرف إن لم يُحدَّد silencePadBefore) */
   silencePad?: number | null;
+  /** عند حذف الصمت: كم ثانية تبقى قبل الكلام. فارغ = مثل silencePad */
+  silencePadBefore?: number | null;
+  /** تحليل المواضيع: توقيت كل كلمة بـ whisper حتى مع ترجمة جاهزة */
+  alignSpeech?: boolean;
+  /** ترجمة SRT تُكتب بجانب الناتج (توقيتها من صفره) */
+  sidecarSrt?: string | null;
   /** تحليل المواضيع: رابط الصفحة التي نُزّل منها الملف، لأخذ ترجمتها */
   sourceUrl?: string | null;
   /** تحليل المواضيع: المدة المناسبة لريل (ث). فارغ = 15 و90 */
@@ -295,6 +301,30 @@ export interface Topic {
   text: string;
 }
 
+/** ما قيس في الملف عند كشف الصمت (dB) */
+export interface SilenceLevels {
+  noise: number;
+  speech: number;
+  /** فارغ = لا فرق واضح بين الكلام والضجيج */
+  threshold?: number | null;
+  manual: boolean;
+}
+
+/** جملة من الترجمة بأوقاتها (بثواني الملف) */
+export interface Cue {
+  start: number;
+  end: number;
+  text: string;
+}
+
+/** كلمة بوقتها (بثواني الملف) */
+export interface Word {
+  w: string;
+  start: number;
+  end: number;
+  last?: boolean;
+}
+
 export interface JobUpdate {
   id: number;
   state: JobState;
@@ -307,6 +337,12 @@ export interface JobUpdate {
   markers?: [number, number][];
   /** تحليل المواضيع (الصمت المكتشف في markers) */
   topics?: Topic[];
+  /** كشف الصمت: المستويات المقيسة والعتبة */
+  levels?: SilenceLevels;
+  /** تحليل المواضيع: النص بأوقاته */
+  cues?: Cue[];
+  /** تحليل المواضيع: وقت كل كلمة (json3 أو whisper مع DTW) */
+  words?: Word[];
   /** من أين جاء النص */
   transcript?: "subtitles" | "captions" | "speech";
   /** العنوان والصورة من yt-dlp أثناء التنزيل */

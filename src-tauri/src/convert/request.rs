@@ -44,8 +44,15 @@ pub struct ConvertOptions {
     pub silence_db: Option<f64>,
     /// كشف الصمت: أقل مدة (ث) حتى يُعدّ السكوت صمتًا. فارغ = 0.6
     pub silence_min: Option<f64>,
-    /// عند حذف الصمت: كم ثانية تبقى من كل طرف حتى لا يلتصق الكلام. فارغ = 0.15
+    /// عند حذف الصمت: كم ثانية تبقى بعد الكلام (ومن كل طرف إن لم يُحدَّد silence_pad_before). فارغ = 0.15
     pub silence_pad: Option<f64>,
+    /// عند حذف الصمت: كم ثانية تبقى قبل الكلام. فارغ = مثل silence_pad (تستعمله الواجهة فقط)
+    pub silence_pad_before: Option<f64>,
+    /// تحليل المواضيع: «موازنة الترجمة مع الصوت» (توقيت كل كلمة بـ whisper.cpp حتى مع ترجمة جاهزة)
+    #[serde(default)]
+    pub align_speech: bool,
+    /// ترجمة SRT تُكتب بجانب الناتج بالاسم نفسه (توقيتها من صفر الناتج)
+    pub sidecar_srt: Option<String>,
     /// تحليل المواضيع: رابط الصفحة التي نُزّل منها الملف، لأخذ ترجمتها بدل تفريغ الكلام
     pub source_url: Option<String>,
     /// تحليل المواضيع: المدة المناسبة لريل (ث). فارغ = 15 و90 (تستعملها الواجهة فقط)
@@ -83,6 +90,9 @@ impl Default for ConvertOptions {
             silence_db: None,
             silence_min: None,
             silence_pad: None,
+            silence_pad_before: None,
+            align_speech: false,
+            sidecar_srt: None,
             source_url: None,
             reel_min: None,
             reel_max: None,

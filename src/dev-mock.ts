@@ -172,10 +172,19 @@ function fakeTopics(id: number) {
         state: "done",
         percent: 100,
         transcript: "captions",
+        levels: { noise: -63.8, speech: -18.3, threshold: -50.1, manual: false },
         markers: [
           [60.2, 63.4],
           [120.5, 121.6],
+          [180.4, 181.6],
           [300.1, 302.9],
+        ],
+        cues: [
+          { start: 0.2, end: 4, text: "what are seven tips for presenting on camera?" },
+          { start: 4.2, end: 9, text: "let's find out." },
+          { start: 140, end: 179.9, text: "it's not supposed to be in the middle." },
+          { start: 182, end: 230, text: "this does not look good, so move it." },
+          { start: 282, end: 290, text: "أن العلاقة مع الذات قائمة على التزكية." },
         ],
         topics: [
           { start: 0.2, end: 51, title: "passionate · seven · tips", text: "what are seven tips for presenting on camera let's find out…" },

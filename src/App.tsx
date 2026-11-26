@@ -26,6 +26,8 @@ import { nextTheme } from "./theme";
 import { limiter } from "./limit";
 import { announceUpdate } from "./whatsNew";
 import { REEL_MAX, REEL_MIN, silenceCuts, topicRows, topicsText } from "./topics";
+import { exportCues, keptLength, planTopic, toSrt, type Range } from "./reels";
+import type { ExportOptions } from "./components/TopicPanel";
 import { optionsFromMeta } from "./downloadPlan";
 
 /** تحليل الملفات المضافة للمحوّل: 4 في كل مرة (U-93) */
@@ -772,10 +774,13 @@ export default function App() {
     ).catch(logError("splitHere"));
   };
 
-  /** الفترات التي ستُحذف: الصمت يُبقي من كل طرف `silencePad` حتى لا يلتصق الكلام */
+  /** ما يبقى بعد الكلام وقبله عند حذف الصمت */
+  const silencePad = (j: Job) => Math.max(0, j.convert?.options.silencePad ?? 0.15);
+  const silencePadBefore = (j: Job) => Math.max(0, j.convert?.options.silencePadBefore ?? silencePad(j));
+  /** الفترات التي ستُحذف: الصمت يُبقي من طرفيه ما اختير حتى لا يلتصق الكلام */
   const removalCuts = (j: Job): [number, number][] => {
-    const pad = j.convert?.preset === "detect_silence" ? Math.max(0, j.convert.options.silencePad ?? 0.15) : 0;
-    return (j.markers ?? []).map(([s, e]) => [s + pad, e - pad] as [number, number]).filter(([s, e]) => e - s > 0.01);
+    if (j.convert?.preset !== "detect_silence") return (j.markers ?? []).filter(([s, e]) => e - s > 0.01);
+    return silenceCuts(j.markers ?? [], silencePad(j), 0, Infinity, silencePadBefore(j));
   };
 
   /** المدة قبل الحذف وبعده (للصمت والسواد) */
@@ -830,34 +835,55 @@ export default function App() {
 
   /** تحليل المواضيع: مدة الريل المختارة، والصفوف بمدتها بعد حذف الصمت */
   const reelRange = (j: Job): [number, number] => [j.convert?.options.reelMin ?? REEL_MIN, j.convert?.options.reelMax ?? REEL_MAX];
-  const silencePad = (j: Job) => Math.max(0, j.convert?.options.silencePad ?? 0.15);
-  const rowsOf = (j: Job) => (j.topics ? topicRows(j.topics, j.markers ?? [], silencePad(j), reelRange(j)) : undefined);
+  const rowsOf = (j: Job) =>
+    j.topics ? topicRows(j.topics, j.markers ?? [], silencePad(j), reelRange(j), silencePadBefore(j)) : undefined;
+  /** كل فترات الصمت التي تُحذف في الملف (بالهامشين) */
+  const allCuts = (j: Job) => silenceCuts(j.markers ?? [], silencePad(j), 0, Infinity, silencePadBefore(j));
+  const plansOf = (j: Job) => j.topics?.map((tp) => planTopic(tp.start, tp.end, j.cues ?? [], j.markers ?? [], allCuts(j), reelRange(j)));
 
-  /** يصدّر موضوعًا مقطعًا (tight = بلا صمت) */
-  const topicClip = (j: Job, i: number, tight: boolean) => {
-    const tp = j.topics?.[i];
-    if (!j.convert || !tp) return;
+  /**
+   * يصدّر المواضيع والأجزاء المختارة: ملف لكل مقطع، أو فيديو واحد يصلها (ما بينها يُحذف كما يُحذف الصمت).
+   * بجانب كل ناتج ترجمته بتوقيت يبدأ من صفره، ويُعاد حسابه بعد حذف الصمت.
+   */
+  const exportTopics = (j: Job, sections: Range[], o: ExportOptions) => {
+    if (!j.convert || !sections.length) return;
     const input = j.convert.inputs[0];
     const preset = sameFamily(input);
-    const label = `${tight ? t.topicClipTight : t.topicClip} ${i + 1}`;
-    startConvert(
-      {
-        inputs: [input],
-        preset,
-        options: {
-          ...defaultOptions(),
-          quality: "high",
-          hw: settings.convertHw,
-          start: tp.start,
-          end: tp.end,
-          cut: tight ? silenceCuts(j.markers ?? [], silencePad(j), tp.start, tp.end) : [],
+    const silence = o.tight ? allCuts(j) : [];
+    const lines = { maxWords: o.maxWords, maxSecs: o.maxSecs };
+    const srt = (secs: Range[]) =>
+      o.subs && j.cues?.length ? toSrt(exportCues(j.cues, secs, silence, lines, j.words, j.markers ?? [])) : null;
+    const groups: Range[][] = o.join ? [sections] : sections.map((s) => [s]);
+    groups.forEach((secs, n) => {
+      const start = secs[0][0];
+      const end = secs[secs.length - 1][1];
+      // ما بين المقاطع يُحذف، ثم الصمت داخلها
+      const gaps: Range[] = secs
+        .slice(1)
+        .map((s, i) => [secs[i][1], s[0]] as Range)
+        .filter(([a, b]) => b - a > 0.01);
+      const cut = [...gaps, ...silence.map(([a, b]) => [Math.max(a, start), Math.min(b, end)] as Range).filter(([a, b]) => b - a > 0.01)];
+      const label = `${o.tight ? t.topicClipTight : t.topicClip} ${o.join ? "" : n + 1}`.trim();
+      startConvert(
+        {
+          inputs: [input],
+          preset,
+          options: {
+            ...defaultOptions(),
+            quality: "high",
+            hw: settings.convertHw,
+            start,
+            end,
+            cut: cut.sort((a, b) => a[0] - b[0]),
+            sidecarSrt: srt(secs),
+          },
         },
-      },
-      `${baseName(input)} · ${tp.title || formatTimecode(tp.start)}`,
-      `${label} · ${presetById(preset)?.name[lang] ?? preset}`,
-      undefined,
-      j.inDownloads,
-    ).catch(logError("topicClip"));
+        `${baseName(input)} · ${formatTimecode(start)}`,
+        `${label} · ${presetById(preset)?.name[lang] ?? preset}`,
+        undefined,
+        j.inDownloads,
+      ).catch(logError("exportTopics"));
+    });
   };
 
   /** من بطاقة تنزيل مكتمل: تحليل مواضيعه، مع رابط الصفحة لأخذ ترجمتها (إن نُزّل كاملًا) */
@@ -1156,7 +1182,9 @@ export default function App() {
                           topicRows={rowsOf(j)}
                           reelRange={j.topics ? reelRange(j) : undefined}
                           onCopyTopics={j.topics?.length ? () => copyText(topicsText(rowsOf(j)!, t.topicReel), t.topicsCopied) : undefined}
-                          onTopicClip={j.topics?.length ? (i, tight) => topicClip(j, i, tight) : undefined}
+                          topicPlans={j.topics ? plansOf(j) : undefined}
+                          partLength={(r) => keptLength(r[0], r[1], allCuts(j))}
+                          onExportTopics={j.topics?.length ? (secs, o) => exportTopics(j, secs, o) : undefined}
                           onFindTopics={j.type === "download" && j.file ? () => findTopics(j) : undefined}
                         />
                       ))}

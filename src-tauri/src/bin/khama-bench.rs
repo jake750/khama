@@ -8,9 +8,9 @@
 //!       Runs the voice/music separation (one model pass) with the given SepOptions. Prints JSON timings.
 //!       --ai: folder with onnxruntime and UVR-MDX-NET-Voc_FT.onnx (default: the app's own data folder).
 //!
-//!   khama-bench topics <video> <subs.srt|vtt> [--opts '<ConvertOptions json>']
+//!   khama-bench topics <video> <subs.srt|vtt> [--opts '<ConvertOptions json>'] [--words <whisper.json> [--align]]
 //!       Splits the subtitles into topics and detects the silences, as the "topics" preset does.
-//!       Prints JSON {topics, silences}.
+//!       Prints JSON {cues, topics, silences, levels}.
 //!
 //!   khama-bench silence <audio|video> [--opts '<ConvertOptions json>']
 //!       Finds the silences as the "Find silences" preset does. Prints JSON {threshold_db, count, silences}.
@@ -151,6 +151,9 @@ fn topics_cmd(ff: PathBuf, mut args: Vec<String>) {
     let o: ConvertOptions = take(&mut args, "--opts")
         .map(|j| serde_json::from_str(&j).expect("opts json"))
         .unwrap_or_default();
+    // --words <whisper.json>: كلمات whisper مع DTW كما يقرؤها التطبيق؛ --align: محاذاة نص الترجمة عليها
+    let words_json = take(&mut args, "--words");
+    let align = args.iter().position(|a| a == "--align").map(|i| args.remove(i)).is_some();
     let video = args.first().expect("video path").clone();
     let subs = args.get(1).expect("subtitle path");
     let raw = String::from_utf8_lossy(&std::fs::read(subs).expect("read subs")).into_owned();
@@ -158,15 +161,25 @@ fn topics_cmd(ff: PathBuf, mut args: Vec<String>) {
     let cues = clean_cues(parse_subs(&raw));
     let topics = topics_from(&cues, &SegParams::default());
     let seg_ms = t0.elapsed().as_secs_f64() * 1000.0;
-    let (silences, _) = silences_of(&ff, &video, &o);
+    let (silences, _, levels) = silences_of(&ff, &video, &o);
+    let mut words = words_json
+        .map(|p| words::parse_whisper_json(&std::fs::read_to_string(p).expect("read words"), 0.0))
+        .unwrap_or_default();
+    if align {
+        words = words::align(&cues, &words);
+    }
     println!(
         "{}",
-        json!({ "cues": cues.len(), "segment_ms": seg_ms, "topics": topics, "silences": silences })
+        json!({ "cues": cues, "words": words, "segment_ms": seg_ms, "topics": topics, "silences": silences, "levels": levels })
     );
 }
 
 /// الصمت بالكود نفسه الذي يستعمله التطبيق (عتبة تلقائية أو silence_db)
-fn silences_of(ff: &PathBuf, input: &str, o: &khama_lib::topics_bench::ConvertOptions) -> (Vec<[f64; 2]>, Option<f64>) {
+fn silences_of(
+    ff: &PathBuf,
+    input: &str,
+    o: &khama_lib::topics_bench::ConvertOptions,
+) -> (Vec<[f64; 2]>, Option<f64>, Option<khama_lib::topics_bench::silence::SilenceLevels>) {
     use khama_lib::topics_bench::silence;
     let lv = silence::levels_blocking(
         Command::new(ff),
@@ -178,7 +191,8 @@ fn silences_of(ff: &PathBuf, input: &str, o: &khama_lib::topics_bench::ConvertOp
     )
     .expect("ffmpeg")
     .expect("not canceled");
-    silence::find_silences(&lv, o.silence_db, o.silence_min)
+    let (runs, thr) = silence::find_silences(&lv, o.silence_db, o.silence_min);
+    (runs, thr, silence::levels_summary(&lv, o.silence_db))
 }
 
 fn silence_cmd(ff: PathBuf, mut args: Vec<String>) {
@@ -187,10 +201,10 @@ fn silence_cmd(ff: PathBuf, mut args: Vec<String>) {
         .unwrap_or_default();
     let input = args.first().expect("audio or video path").clone();
     let t0 = Instant::now();
-    let (silences, threshold) = silences_of(&ff, &input, &o);
+    let (silences, threshold, levels) = silences_of(&ff, &input, &o);
     let total: f64 = silences.iter().map(|s| s[1] - s[0]).sum();
     println!(
         "{}",
-        json!({ "threshold_db": threshold, "count": silences.len(), "silent_seconds": total, "ms": t0.elapsed().as_millis() as u64, "silences": silences })
+        json!({ "threshold_db": threshold, "levels": levels, "count": silences.len(), "silent_seconds": total, "ms": t0.elapsed().as_millis() as u64, "silences": silences })
     );
 }

@@ -75,3 +75,10 @@ Format: **Decision** · Why · Instead of · Revisit when
 
 ### D16. History may open any delivered file, executables included
 - **Why**: the 2026-11 review suggested blocking `open_file` on executables. The owner declined: the app only opens files it downloaded or converted itself and that are in the history (`history::contains_file`), and blocking by extension would also stop legitimate files.
+
+### D17. Reel subtitles: word times without a new model, line rules in the interface
+- **Word times**: YouTube's automatic captions in json3 (every word has its offset), otherwise whisper.cpp with DTW (`-nfa -dtw small -ojf`, the model Khama already downloads). "Sync the subtitles to the audio" aligns a subtitle file's own text to the words whisper heard (longest common sequence on normalised spelling, unmatched words spread between their neighbours), as the arabic-word-timing tool does. A word's end is cut at a detected silence, because whisper puts it at the next word's start and hides the pause.
+- **Lines**: built in `src/reels.ts`, so changing the words or seconds per line, or the margins kept around silences, needs no new analysis. A line starts on its first word, breaks at a sentence end, a pause or a comma once half full, and when the limit is reached it breaks at the longest pause in its second half; small gaps are closed and lines never overlap or run past the clip.
+- **Instead of**: WhisperX or ctc-forced-aligner (Python, 1+ GB models, the MMS aligner is non-commercial), stable-ts (Python; its silence-snapping idea is used here).
+- **Topic kinds**: "fits", "fits once split" (split points at pauses and sentence ends, chosen so every part is within the Reel length and none starts with a connective such as «لكن» or «لأن»), "doesn't fit". A heuristic, not a language model: see [PLAN-REELS.md](PLAN-REELS.md) for the embeddings step.
+- **Revisit when**: a small offline language model is bundled (then it can judge whether a part stands alone).

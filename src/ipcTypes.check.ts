@@ -28,4 +28,7 @@ export const checks: true[] = [
   true as Keys<api.ToolsInfo, rs.ToolsInfo>,
   true as Keys<api.SubLang, rs.SubLang>,
   true as Keys<api.Topic, rs.Topic>,
+  true as Keys<api.SilenceLevels, rs.SilenceLevels>,
+  true as Keys<api.Cue, rs.Cue>,
+  true as Keys<api.Word, rs.Word>,
 ];

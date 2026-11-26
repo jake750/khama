@@ -15,6 +15,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
 
+use super::words::{self, Word};
 use super::*;
 use crate::srt::{self, Cue};
 
@@ -411,7 +412,7 @@ pub fn pick_caption(info: &Value) -> Option<(String, bool)> {
     manual.first().map(|k| (k.clone(), false))
 }
 
-async fn site_captions(tools: &Tools, url: &str, work: &Path) -> Option<Vec<Cue>> {
+async fn site_captions(tools: &Tools, url: &str, work: &Path) -> Option<(Vec<Cue>, Vec<Word>)> {
     // الخيارات المشتركة (مكان ffmpeg، Deno، تجاهل ملف إعدادات yt-dlp) مثل كل استدعاء آخر،
     // ومهلة لكل خطوة: موقع لا يرد لا يُعلّق التحليل كله
     let run = |extra: Vec<String>| {
@@ -433,7 +434,8 @@ async fn site_captions(tools: &Tools, url: &str, work: &Path) -> Option<Vec<Cue>
     let info: Value = serde_json::from_str(out.lines().last()?).ok()?;
     let (key, auto) = pick_caption(&info)?;
     let tmpl = work.join("cap.%(ext)s").to_string_lossy().into_owned();
-    // بلا --convert-subs: نقرأ vtt مباشرة، فلا نحتاج ffmpeg ولا نفشل لأجله
+    // بلا --convert-subs: نقرأ الملف مباشرة، فلا نحتاج ffmpeg ولا نفشل لأجله.
+    // json3 أولًا: فيه وقت كل كلمة في الترجمة التلقائية
     let (ok, _, err) = run(vec![
         "--skip-download".into(),
         "--playlist-items".into(),
@@ -442,7 +444,7 @@ async fn site_captions(tools: &Tools, url: &str, work: &Path) -> Option<Vec<Cue>
         "--sub-langs".into(),
         key,
         "--sub-format".into(),
-        "vtt/srt/best".into(),
+        "json3/vtt/srt/best".into(),
         "-o".into(),
         tmpl,
     ])
@@ -452,9 +454,14 @@ async fn site_captions(tools: &Tools, url: &str, work: &Path) -> Option<Vec<Cue>
         log::warn!("captions: {}", tail(&err, 3));
     }
     let file = std::fs::read_dir(work).ok()?.filter_map(|e| e.ok().map(|e| e.path())).find(|p| {
-        p.file_name().is_some_and(|n| n.to_string_lossy().starts_with("cap.")) && p.extension().is_some_and(|e| e == "srt" || e == "vtt")
+        p.file_name().is_some_and(|n| n.to_string_lossy().starts_with("cap."))
+            && p.extension().is_some_and(|e| e == "srt" || e == "vtt" || e == "json3")
     })?;
-    Some(read_subs(&file)).filter(|c| !c.is_empty())
+    if file.extension().is_some_and(|e| e == "json3") {
+        let (cues, words) = words::parse_json3(&std::fs::read_to_string(&file).ok()?);
+        return Some((clean_cues(cues), words)).filter(|(c, _)| !c.is_empty());
+    }
+    Some((read_subs(&file), Vec::new())).filter(|(c, _)| !c.is_empty())
 }
 
 // ======================= تفريغ الكلام (whisper.cpp) =======================
@@ -609,7 +616,7 @@ async fn transcribe(
     info: &MediaInfo,
     o: &ConvertOptions,
     cancel: &mut watch::Receiver<bool>,
-) -> Result<Option<Vec<Cue>>, AppError> {
+) -> Result<Option<(Vec<Cue>, Vec<Word>)>, AppError> {
     let Some((cli, model)) = ensure_whisper(c, cancel).await? else {
         return Ok(None);
     };
@@ -657,7 +664,19 @@ async fn transcribe(
         .arg(&model)
         .arg("-f")
         .arg(&wav)
-        .args(["-l", "auto", "-t", &threads.to_string(), "-osrt", "-of"])
+        // DTW = وقت كل كلمة (يتطلب إيقاف flash attention)، و-ojf يكتبه مع الرموز
+        .args([
+            "-l",
+            "auto",
+            "-t",
+            &threads.to_string(),
+            "-nfa",
+            "-dtw",
+            "small",
+            "-osrt",
+            "-ojf",
+            "-of",
+        ])
         .arg(&out_base);
     if let Some(d) = cli.parent() {
         cmd.current_dir(d);
@@ -703,7 +722,10 @@ async fn transcribe(
                 q.start += start;
                 q.end += start;
             }
-            Ok(Some(cues))
+            let words = std::fs::read_to_string(out_base.with_extension("json"))
+                .map(|j| words::parse_whisper_json(&j, start))
+                .unwrap_or_default();
+            Ok(Some((cues, words)))
         }
         RunOutcome::Exited { stderr, .. } => Err(AppError::with_detail("transcribeFailed", tail(&stderr, 8))),
     }
@@ -713,6 +735,9 @@ async fn transcribe(
 
 pub(super) struct TopicsResult {
     pub silences: Vec<[f64; 2]>,
+    pub levels: Option<super::SilenceLevels>,
+    pub cues: Vec<Cue>,
+    pub words: Vec<Word>,
     pub topics: Vec<Topic>,
     pub source: &'static str,
 }
@@ -732,6 +757,7 @@ pub(super) async fn run_topics(
 
     // 1–3: ترجمة جاهزة
     let mut source = "subtitles";
+    let mut words: Vec<Word> = Vec::new();
     let mut cues = sidecar(input).map(|p| read_subs(&p)).unwrap_or_default();
     if cues.is_empty() && info.subtitles > 0 {
         let out = c.work.join("embedded.srt");
@@ -753,17 +779,26 @@ pub(super) async fn run_topics(
                 ..Default::default()
             },
         );
-        if let Some(found) = site_captions(c.tools, url, c.work).await {
+        if let Some((found, w)) = site_captions(c.tools, url, c.work).await {
             cues = found;
+            words = w;
             source = "captions";
         }
     }
     cues.retain(|q| q.end > lo && q.start < hi);
+    words.retain(|w| w.end > lo && w.start < hi);
     // 4: تفريغ الكلام
     if cues.is_empty() {
         source = "speech";
         match transcribe(c, info, o, cancel).await? {
-            Some(found) => cues = found,
+            Some((found, w)) => (cues, words) = (found, w),
+            None => return Ok(None),
+        }
+    } else if o.align_speech && words.is_empty() && WHISPER.is_some() {
+        // «موازنة الترجمة مع الصوت»: نص الترجمة كما هو، بأوقات الكلمات المسموعة
+        match transcribe(c, info, o, cancel).await? {
+            Some((_, heard)) if !heard.is_empty() => words = words::align(&cues, &heard),
+            Some(_) => {}
             None => return Ok(None),
         }
     }
@@ -772,7 +807,7 @@ pub(super) async fn run_topics(
     }
 
     // الصمت، لمدة كل موضوع بعد حذفه
-    let Some(silences) = detect_silences(c, info, o, cancel).await? else {
+    let Some((silences, levels)) = detect_silences(c, info, o, cancel).await? else {
         return Ok(None);
     };
 
@@ -782,7 +817,14 @@ pub(super) async fn run_topics(
         t.start = t.start.max(lo);
         t.end = t.end.min(end_max);
     }
-    Ok(Some(TopicsResult { silences, topics, source }))
+    Ok(Some(TopicsResult {
+        silences,
+        levels,
+        cues,
+        words,
+        topics,
+        source,
+    }))
 }
 
 #[cfg(test)]

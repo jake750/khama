@@ -12,6 +12,7 @@ import {
   type Settings,
 } from "../api";
 import { formatBytes, formatDuration } from "../format";
+import { Pick } from "./Pick";
 import { useI18n, type Dict } from "../i18n";
 import {
   estimateSize,
@@ -348,41 +349,6 @@ function FilePick(props: { label: string; value?: string | null; extensions: str
   );
 }
 
-/** اختيار واحد: حتى 5 خيارات أزرار مجزّأة، وأكثر قائمة منسدلة (D-23) */
-function Pick<T extends string | number | null>(props: {
-  label: string;
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (v: T) => void;
-}) {
-  const idx = props.options.findIndex((o) => o.value === props.value);
-  if (props.options.length <= 5) {
-    return (
-      <div className="pick">
-        <span className="field-label">{props.label}</span>
-        <Segmented<string>
-          label={props.label}
-          value={String(idx)}
-          onChange={(v) => props.onChange(props.options[Number(v)].value)}
-          options={props.options.map((o, i) => ({ value: String(i), label: o.label }))}
-        />
-      </div>
-    );
-  }
-  return (
-    <label className="pick">
-      <span className="field-label">{props.label}</span>
-      <select className="select" value={idx} onChange={(e) => props.onChange(props.options[Number(e.target.value)].value)}>
-        {props.options.map((o, i) => (
-          <option key={String(o.value)} value={i}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 export function ConvertView(props: {
   settings: Settings;
   update: (patch: Partial<Settings>) => void;
@@ -477,8 +443,14 @@ export function ConvertView(props: {
     }
     if (kind === "copy") o.mute = opts.mute;
     if (preset.id === "detect_silence" || preset.id === "topics")
-      Object.assign(o, { silenceDb: opts.silenceDb ?? null, silenceMin: opts.silenceMin ?? null, silencePad: opts.silencePad ?? null });
-    if (preset.id === "topics") Object.assign(o, { reelMin: opts.reelMin ?? null, reelMax: opts.reelMax ?? null });
+      Object.assign(o, {
+        silenceDb: opts.silenceDb ?? null,
+        silenceMin: opts.silenceMin ?? null,
+        silencePad: opts.silencePad ?? null,
+        silencePadBefore: opts.silencePadBefore ?? null,
+      });
+    if (preset.id === "topics")
+      Object.assign(o, { reelMin: opts.reelMin ?? null, reelMax: opts.reelMax ?? null, alignSpeech: !!opts.alignSpeech });
     if (kind === "stems") return o;
     if (showPicture) {
       Object.assign(o, {
@@ -860,6 +832,16 @@ export function ConvertView(props: {
                   onChange={(v) => set({ silenceMin: v === 0.6 ? null : v })}
                   options={[0.3, 0.4, 0.5, 0.6, 0.8, 1, 1.5, 2, 3].map((v) => ({ value: v, label: t.secs(v) }))}
                 />
+                {/* ما يبقى قبل الكلام منفصل عمّا يبقى بعده (كما في auto-editor): النَّفَس قبل الجملة غير ذيلها */}
+                <Pick<number | null>
+                  label={t.silencePadBefore}
+                  value={opts.silencePadBefore ?? null}
+                  onChange={(v) => set({ silencePadBefore: v })}
+                  options={[
+                    { value: null, label: t.sameAsAfter },
+                    ...[0, 0.05, 0.1, 0.2, 0.3, 0.5].map((v) => ({ value: v, label: t.secs(v) })),
+                  ]}
+                />
                 <Pick
                   label={t.silencePad}
                   value={opts.silencePad ?? 0.15}
@@ -869,6 +851,16 @@ export function ConvertView(props: {
               </div>
               <div className="faint mt-2">{t.silenceHint}</div>
               {preset.id === "topics" && <div className="faint mt-2">{t.topicsHint}</div>}
+              {preset.id === "topics" && (
+                <div className="mt-2">
+                  <Toggle
+                    checked={!!opts.alignSpeech}
+                    onChange={(alignSpeech) => set({ alignSpeech })}
+                    title={t.alignSpeech}
+                    hint={t.alignSpeechHint}
+                  />
+                </div>
+              )}
             </div>
           )}
 
