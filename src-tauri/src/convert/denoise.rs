@@ -5,7 +5,7 @@
 //! جُرّب afftdn وanlmdn (بلا نموذج) على تسجيل صوتي حقيقي: لم يخفضا ما بين الكلمات (صدى الغرفة والنَّفَس
 //! ليسا ضجيجًا ثابتًا)، وRNNoise خفضه من −39 إلى −71 dB مع بقاء الكلام. انظر docs/PLAN-REELS.md.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use tokio::sync::watch;
 
@@ -127,6 +127,6 @@ mod tests {
     fn filter_uses_a_plain_model_name() {
         let f = filter("voice.rnnn");
         assert!(f.starts_with("arnndn=m=voice.rnnn,"));
-        assert!(!Path::new("voice.rnnn").is_absolute());
+        assert!(!std::path::Path::new("voice.rnnn").is_absolute());
     }
 }
