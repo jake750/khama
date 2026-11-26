@@ -28,7 +28,12 @@ static CURRENT: std::sync::Mutex<Option<watch::Sender<bool>>> = std::sync::Mutex
 
 /// الحجم المتوقع بالبايت، أو None إن أُلغي أو لا ينطبق (ليست صيغة فيديو)
 #[tauri::command]
-pub async fn sample_estimate(app: AppHandle, path: String, preset_id: String, options: ConvertOptions) -> Result<Option<u64>, AppError> {
+pub async fn sample_estimate(
+    app: AppHandle,
+    path: String,
+    preset_id: String,
+    options: ConvertOptions,
+) -> Result<Option<SampleEstimate>, AppError> {
     let (tx, mut cancel) = watch::channel(false);
     if let Ok(mut cur) = CURRENT.lock()
         && let Some(old) = cur.replace(tx)
@@ -57,6 +62,7 @@ pub async fn sample_estimate(app: AppHandle, path: String, preset_id: String, op
     let (start, end) = (base.start.unwrap_or(0.0), base.end.unwrap_or(duration).min(duration));
     let dir = std::env::temp_dir();
     let (mut bytes, mut secs) = (0u64, 0.0);
+    let began = std::time::Instant::now();
     for (i, (s, e)) in sample_windows(start, end).into_iter().enumerate() {
         let out = dir.join(format!("khama-estimate-{}-{i}.{}", std::process::id(), p.ext));
         let o = ConvertOptions {
@@ -81,5 +87,18 @@ pub async fn sample_estimate(app: AppHandle, path: String, preset_id: String, op
     if secs <= 0.0 || bytes == 0 {
         return Ok(None);
     }
-    Ok(Some((bytes as f64 * full / secs) as u64))
+    // الوقت: كما استغرقت الشرائح، مضروبًا في نسبة المدة كلها إليها (على المعالج، بلا كرت الشاشة)
+    let scale = full / secs;
+    Ok(Some(SampleEstimate {
+        bytes: (bytes as f64 * scale) as u64,
+        seconds: began.elapsed().as_secs_f64() * scale,
+    }))
+}
+
+/// الحجم والوقت المتوقعان من تحويل ثلاث شرائح قصيرة
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
+pub struct SampleEstimate {
+    pub bytes: u64,
+    pub seconds: f64,
 }

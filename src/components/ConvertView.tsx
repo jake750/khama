@@ -420,7 +420,16 @@ export function ConvertView(props: {
   const activeOpts = [
     trimOn && canTrim && t.optTrim,
     showPicture &&
-      (o.size || o.aspect || o.fps || o.rotate || o.deinterlace || o.denoise || o.tonemap || o.lut || (o.speed && o.speed !== 1)) &&
+      (o.size ||
+        o.aspect ||
+        o.fps ||
+        o.rotate ||
+        o.deinterlace ||
+        o.denoise ||
+        o.enhance ||
+        o.tonemap ||
+        o.lut ||
+        (o.speed && o.speed !== 1)) &&
       t.optPicture,
     showBurn && (o.subtitles || o.watermark || o.timecode) && t.optBurn,
     showAudio && (o.loudness || o.replaceAudio || o.mute) && t.optAudio,
@@ -460,6 +469,7 @@ export function ConvertView(props: {
         rotate: opts.rotate,
         deinterlace: opts.deinterlace,
         denoise: opts.denoise,
+        enhance: opts.enhance ?? null,
         tonemap: opts.tonemap,
         lut: opts.lut,
       });
@@ -496,7 +506,7 @@ export function ConvertView(props: {
   const differs = (f: SourceFile) => !!overrides[f.path] && JSON.stringify(effective(f)) !== JSON.stringify(effective(f, shared));
 
   // الصيغ بجودة ثابتة يتبع حجمها تعقيد الصورة: نقيسه بتحويل ثلاث شرائح قصيرة (A-30)
-  const [measured, setMeasured] = useState<{ key: string; bytes: number } | null>(null);
+  const [measured, setMeasured] = useState<{ key: string; bytes: number; seconds: number } | null>(null);
   const sampleKey =
     !isMobile && ready.length === 1 && preset.kind === "video" ? JSON.stringify([ready[0].path, preset.id, effective(ready[0])]) : null;
   useEffect(() => {
@@ -506,7 +516,7 @@ export function ConvertView(props: {
     const timer = setTimeout(() => {
       api
         .sampleEstimate(path, id, o)
-        .then((b) => live && b && setMeasured({ key: sampleKey, bytes: b }))
+        .then((m) => live && m && setMeasured({ key: sampleKey, ...m }))
         .catch(() => {});
     }, 800);
     return () => {
@@ -515,6 +525,8 @@ export function ConvertView(props: {
     };
   }, [sampleKey]);
   const exact = measured && measured.key === sampleKey ? measured.bytes : null;
+  // الوقت المتوقع على المعالج (مقيس من الشرائح نفسها): يظهر حين يتجاوز نصف دقيقة
+  const expectedSecs = measured && measured.key === sampleKey && measured.seconds >= 30 ? measured.seconds : null;
   const shown = exact ?? estimate;
 
   const meta = (q: ConvertOptions["quality"] = shared.opts.quality) =>
@@ -964,6 +976,19 @@ export function ConvertView(props: {
                       <Toggle checked={opts.denoise} onChange={(denoise) => set({ denoise })} title={t.denoise} hint={t.denoiseHint} />
                       <Toggle checked={opts.tonemap} onChange={(tonemap) => set({ tonemap })} title={t.tonemap} hint={t.tonemapHint} />
                     </div>
+                    {/* تحسين بلا نموذج (فلاتر FFmpeg): المعاينة «قبل وبعد» تعرضه، والتقدير المقيس يعرض وقته */}
+                    <Pick<string | null>
+                      label={t.enhance}
+                      value={opts.enhance ?? null}
+                      onChange={(enhance) => set({ enhance })}
+                      options={[
+                        { value: null, label: t.enhanceOff },
+                        { value: "light", label: t.enhanceLight },
+                        { value: "strong", label: t.enhanceStrong },
+                        { value: "sharpen", label: t.enhanceSharpen },
+                      ]}
+                    />
+                    {opts.enhance && <div className="faint mt-2">{t.enhanceHint}</div>}
                     <FilePick label={t.lut} value={opts.lut} extensions={["cube"]} onChange={(lut) => set({ lut })} />
                     {/* ما يفعله كل خيار بالضبط (F-45، F-46) */}
                     {opts.lut && <div className="faint mt-2">{t.lutHint}</div>}
@@ -1057,6 +1082,7 @@ export function ConvertView(props: {
           {shown != null && (
             <span className="estimate ltr-num" title={exact ? t.estimateMeasuredHint : t.estimateHint}>
               {t.estimate(formatBytes(t, shown))}
+              {expectedSecs != null && ` · ${t.estimateTime(formatDuration(expectedSecs))}`}
             </span>
           )}
           {canMerge && (

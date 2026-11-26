@@ -51,6 +51,8 @@ pub struct ConvertOptions {
     /// تحليل المواضيع: «موازنة الترجمة مع الصوت» (توقيت كل كلمة بـ whisper.cpp حتى مع ترجمة جاهزة)
     #[serde(default)]
     pub align_speech: bool,
+    /// تحسين الصورة بلا نموذج: "light" (hqdn3d + توضيح) | "strong" (nlmeans + توضيح) | "sharpen" (توضيح فقط)
+    pub enhance: Option<String>,
     /// ترجمة SRT تُكتب بجانب الناتج بالاسم نفسه (توقيتها من صفر الناتج)
     pub sidecar_srt: Option<String>,
     /// تحليل المواضيع: رابط الصفحة التي نُزّل منها الملف، لأخذ ترجمتها بدل تفريغ الكلام
@@ -92,6 +94,7 @@ impl Default for ConvertOptions {
             silence_pad: None,
             silence_pad_before: None,
             align_speech: false,
+            enhance: None,
             sidecar_srt: None,
             source_url: None,
             reel_min: None,

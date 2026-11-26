@@ -387,6 +387,12 @@ pub(super) fn video_filters(p: &Preset, o: &ConvertOptions, v: &VideoInfo, keep_
     if o.denoise {
         f.push("hqdn3d=2:1.5:3:3".to_string());
     }
+    // تحسين الصورة: إزالة التشويش قبل تغيير المقاس، والتوضيح بعده (بالمقاس الجديد)
+    match o.enhance.as_deref() {
+        Some("light") => f.push("hqdn3d=1.5:1.5:6:6".to_string()),
+        Some("strong") => f.push("nlmeans=s=2.5:p=5:r=7".to_string()),
+        _ => {}
+    }
     let aspect = o.aspect.as_deref().and_then(parse_aspect);
     if let Some(r) = aspect {
         let (w, h) = (v.width as f64, v.height as f64);
@@ -407,6 +413,12 @@ pub(super) fn video_filters(p: &Preset, o: &ConvertOptions, v: &VideoInfo, keep_
     let (cw, ch) = output_dims(v.width, v.height, &ConvertOptions { size: None, ..o.clone() }, None);
     if (ow, oh) != (cw, ch) || ow % 2 == 1 || oh % 2 == 1 || v.width % 2 == 1 || v.height % 2 == 1 {
         f.push(format!("scale={ow}:{oh}:flags=lanczos"));
+    }
+    match o.enhance.as_deref() {
+        Some("light") => f.push("unsharp=5:5:0.5:5:5:0".to_string()),
+        Some("strong") => f.push("unsharp=5:5:0.7:5:5:0".to_string()),
+        Some("sharpen") => f.push("unsharp=5:5:0.9:3:3:0.3".to_string()),
+        _ => {}
     }
     // الترجمة والتايم كود قبل تغيير السرعة: يتبعان توقيت المصدر
     if o.subtitles.is_some() {

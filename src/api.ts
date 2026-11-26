@@ -179,6 +179,8 @@ export interface ConvertOptions {
   silencePad?: number | null;
   /** عند حذف الصمت: كم ثانية تبقى قبل الكلام. فارغ = مثل silencePad */
   silencePadBefore?: number | null;
+  /** تحسين الصورة بلا نموذج: light | strong | sharpen */
+  enhance?: string | null;
   /** تحليل المواضيع: توقيت كل كلمة بـ whisper حتى مع ترجمة جاهزة */
   alignSpeech?: boolean;
   /** ترجمة SRT تُكتب بجانب الناتج (توقيتها من صفره) */
@@ -317,6 +319,12 @@ export interface Cue {
   text: string;
 }
 
+/** الحجم والوقت المتوقعان من تحويل ثلاث شرائح قصيرة */
+export interface SampleEstimate {
+  bytes: number;
+  seconds: number;
+}
+
 /** كلمة بوقتها (بثواني الملف) */
 export interface Word {
   w: string;
@@ -404,7 +412,7 @@ export const api = {
   analyzeFile: (path: string) => invoke<MediaInfo>("analyze_file", { path }),
   /** الحجم المتوقع بتحويل ثلاث شرائح قصيرة (null إن أُلغي بطلب أحدث) */
   sampleEstimate: (path: string, presetId: string, options: ConvertOptions) =>
-    invoke<number | null>("sample_estimate", { path, presetId, options }),
+    invoke<SampleEstimate | null>("sample_estimate", { path, presetId, options }),
   /** إطار المصدر وإطار الناتج عند `at` ثانية بفلاتر الصورة نفسها (D-84)؛ null إن أُلغي بطلب أحدث */
   previewFrame: (path: string, presetId: string, options: ConvertOptions, at: number) =>
     invoke<PreviewFrames | null>("preview_frame", { path, presetId, options, at }),

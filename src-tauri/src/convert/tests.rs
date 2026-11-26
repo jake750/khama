@@ -688,3 +688,26 @@ fn exact_fps_snaps_only_near_standard_rates() {
     assert_eq!(exact_fps(15.0), "15.00000");
     assert_eq!(exact_fps(29.5), "29.50000");
 }
+
+#[test]
+fn enhance_cleans_before_scaling_and_sharpens_after() {
+    let p = preset("edit_h264").unwrap();
+    let o = ConvertOptions {
+        enhance: Some("strong".into()),
+        size: Some(2160),
+        ..Default::default()
+    };
+    let s = joined(&build_plan(&p, &o, &[video(1920, 1080)], &[], Path::new("o.mp4"), None).unwrap());
+    let (dn, sc, sh) = (
+        s.find("nlmeans=").unwrap(),
+        s.find("scale=3840:2160").unwrap(),
+        s.find("unsharp=").unwrap(),
+    );
+    assert!(dn < sc && sc < sh, "{s}");
+    let o = ConvertOptions {
+        enhance: Some("sharpen".into()),
+        ..Default::default()
+    };
+    let s = joined(&build_plan(&p, &o, &[video(1920, 1080)], &[], Path::new("o.mp4"), None).unwrap());
+    assert!(s.contains("unsharp=") && !s.contains("nlmeans") && !s.contains("hqdn3d"), "{s}");
+}

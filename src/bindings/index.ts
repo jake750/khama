@@ -12,6 +12,7 @@ export type { MediaInfo } from "./MediaInfo";
 export type { PreviewFrames } from "./PreviewFrames";
 export type { ProbeInfo } from "./ProbeInfo";
 export type { Project } from "./Project";
+export type { SampleEstimate } from "./SampleEstimate";
 export type { Settings } from "./Settings";
 export type { SilenceLevels } from "./SilenceLevels";
 export type { SubLang } from "./SubLang";

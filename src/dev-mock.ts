@@ -68,7 +68,14 @@ function mockPreview(o: Record<string, unknown>) {
   if (aspect)
     [w, h] = aspect[0] / aspect[1] > w / h ? [w, Math.round(w / (aspect[0] / aspect[1]))] : [Math.round(h * (aspect[0] / aspect[1])), h];
   if (o.rotate === "90" || o.rotate === "270") [w, h] = [h, w];
-  const tags = [o.aspect, o.rotate && `rot ${o.rotate}`, o.lut && "LUT", o.watermark && "logo", o.timecode && "TC"]
+  const tags = [
+    o.aspect,
+    o.rotate && `rot ${o.rotate}`,
+    o.lut && "LUT",
+    o.watermark && "logo",
+    o.timecode && "TC",
+    o.enhance && `enhance ${o.enhance}`,
+  ]
     .filter(Boolean)
     .join(" · ");
   return { source: svg(480, 270, "source", "#7c3aed"), output: svg(w, h, tags || "output", o.lut ? "#d97706" : "#7c3aed") };
@@ -279,7 +286,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "plugin:dialog|open":
       return ["C:\\Users\\me\\Videos\\clip-phone.mp4"];
     case "sample_estimate":
-      return 41_500_000;
+      return { bytes: 41_500_000, seconds: (args.options as { enhance?: string }).enhance === "strong" ? 412 : 95 };
     case "preview_frame":
       return mockPreview(args.options as Record<string, unknown>);
     case "analyze_file":

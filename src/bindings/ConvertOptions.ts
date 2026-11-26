@@ -70,6 +70,10 @@ silencePadBefore: number | null,
  */
 alignSpeech: boolean, 
 /**
+ * تحسين الصورة بلا نموذج: "light" (hqdn3d + توضيح) | "strong" (nlmeans + توضيح) | "sharpen" (توضيح فقط)
+ */
+enhance: string | null, 
+/**
  * ترجمة SRT تُكتب بجانب الناتج بالاسم نفسه (توقيتها من صفر الناتج)
  */
 sidecarSrt: string | null, 
