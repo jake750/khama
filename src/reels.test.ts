@@ -165,6 +165,14 @@ describe("planTopic", () => {
     ]);
   });
 
+  it("splits into as few parts as the Reel length allows", () => {
+    // 100 ث بوقفات كل 20 ث: جزءان يكفيان (حتى 60 ث)، لا خمسة
+    const sil: [number, number][] = [20, 40, 50, 60, 80].map((t) => [t - 0.5, t + 0.5]);
+    const plan = planTopic(0, 100, [], sil, [], [15, 60]);
+    expect(plan.kind).toBe("split");
+    expect(plan.parts.length).toBe(2);
+  });
+
   it("counts the length after removing silence", () => {
     // 80 ث فيها 30 ث صمت محذوف: 50 ث تصلح ريلًا
     expect(planTopic(0, 80, [], [[10, 40]], [[10, 40]], reel).kind).toBe("reel");

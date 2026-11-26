@@ -286,6 +286,9 @@ function firstWord(text: string): string {
     .toLowerCase();
 }
 
+/** ثمن كل جزء إضافي: أكبر من أي فرق في قوة الحدود، فيفوز التقسيم الأقل أجزاءً دائمًا */
+const PART_COST = 100;
+
 /** حدود ممكنة داخل موضوع: الوقفات (منتصفها) ونهايات الجمل، مع قوتها */
 export function splitPoints(start: number, end: number, cues: Cue[], silences: Range[]): { t: number; strength: number }[] {
   const pts: { t: number; strength: number }[] = [];
@@ -317,7 +320,8 @@ export function planTopic(start: number, end: number, cues: Cue[], silences: Ran
     const c = cues.find((q) => q.start >= t - 0.3);
     return !!c && CONNECTIVES.has(firstWord(c.text));
   };
-  // أفضل تقسيم: أقوى الحدود، وعقوبة على كل جزء يبدأ بكلمة وصل، وتفضيل خفيف للأجزاء الأقل
+  // أفضل تقسيم: أقل عدد من الأجزاء أولًا (موضوع يصلح بعد تقسيمه لا يُفتَّت)، ثم أقوى الحدود،
+  // وعقوبة على كل جزء يبدأ بكلمة وصل
   const best: { score: number; prev: number }[] = pts.map(() => ({ score: -Infinity, prev: -1 }));
   best[0].score = 0;
   for (let i = 1; i < pts.length; i++) {
@@ -325,7 +329,7 @@ export function planTopic(start: number, end: number, cues: Cue[], silences: Ran
       if (best[j].score === -Infinity) continue;
       const l = keptLength(pts[j].t, pts[i].t, cuts);
       if (l < reel[0] || l > reel[1]) continue;
-      const score = best[j].score + pts[i].strength - (j > 0 && dangling(pts[j].t) ? 3 : 0) - 0.2;
+      const score = best[j].score + pts[i].strength - (j > 0 && dangling(pts[j].t) ? 3 : 0) - PART_COST;
       if (score > best[i].score) best[i] = { score, prev: j };
     }
   }

@@ -56,7 +56,8 @@ pub fn parse_json3(text: &str) -> (Vec<Cue>, Vec<Word>) {
         for s in segs {
             let raw = s["utf8"].as_str().unwrap_or("");
             let at = t0 + s["tOffsetMs"].as_f64().unwrap_or(0.0) / 1000.0;
-            for (k, part) in raw.split_whitespace().enumerate() {
+            // «>>» علامة تغيّر المتكلم في ترجمة يوتيوب التلقائية، لا كلام
+            for (k, part) in raw.split_whitespace().filter(|p| *p != ">>").enumerate() {
                 // مقطع فيه أكثر من كلمة (الترجمة اليدوية): وقت واحد للمقطع، يوزَّع لاحقًا بين جارتيه
                 line.push(Word {
                     w: part.to_string(),
@@ -296,7 +297,7 @@ mod tests {
         let j = r#"{"events":[
             {"tStartMs":1000,"dDurationMs":3000,"segs":[{"utf8":"السلام"},{"utf8":" عليكم","tOffsetMs":600},{"utf8":" ورحمة","tOffsetMs":1200}]},
             {"tStartMs":3500,"dDurationMs":10,"aAppend":1,"segs":[{"utf8":"\n"}]},
-            {"tStartMs":3600,"dDurationMs":2000,"segs":[{"utf8":"الله"}]}
+            {"tStartMs":3600,"dDurationMs":2000,"segs":[{"utf8":">> الله"}]}
         ]}"#;
         let (cues, words) = parse_json3(j);
         assert_eq!(cues.len(), 2);
