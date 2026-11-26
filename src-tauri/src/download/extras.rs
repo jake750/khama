@@ -508,6 +508,7 @@ pub(super) async fn finish(
             tools,
             &file,
             &out,
+            &separate::VOICE,
             keep,
             None,
             None,

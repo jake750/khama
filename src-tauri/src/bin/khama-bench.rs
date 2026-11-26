@@ -102,9 +102,11 @@ fn scenes_cmd(ff: PathBuf, mut args: Vec<String>) {
 fn separate_cmd(ff: PathBuf, mut args: Vec<String>) {
     use khama_lib::separate::{self, SepOptions};
     use std::sync::atomic::AtomicU64;
+    let model_file = take(&mut args, "--model-file").map(PathBuf::from);
+    let m = separate::sep_model(&take(&mut args, "--model").unwrap_or_default());
     let opts: SepOptions = take(&mut args, "--opts")
         .map(|j| serde_json::from_str(&j).expect("opts json"))
-        .unwrap_or_default();
+        .unwrap_or_else(|| SepOptions::for_model(m));
     let voice = take(&mut args, "--voice").map(PathBuf::from);
     let music = take(&mut args, "--music").map(PathBuf::from);
     let ai = take(&mut args, "--ai").map(PathBuf::from).unwrap_or_else(|| {
@@ -120,13 +122,14 @@ fn separate_cmd(ff: PathBuf, mut args: Vec<String>) {
     } else {
         "libonnxruntime.so"
     });
-    let model = ai.join("UVR-MDX-NET-Voc_FT.onnx");
+    let model = model_file.unwrap_or_else(|| ai.join(m.file_name()));
     let progress = AtomicU64::new(0);
     let cancel = AtomicBool::new(false);
     let t0 = Instant::now();
     let ok = separate::separate_stems(
         &ff,
         &lib,
+        m,
         &model,
         &input,
         None,

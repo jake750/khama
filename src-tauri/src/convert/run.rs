@@ -649,6 +649,8 @@ async fn run_stems(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOptions
     } else {
         "wav"
     };
+    // الصوت الأساسي وحده (KARA_2)، وإلا إزالة الموسيقى (Voc_FT)
+    let model = separate::sep_model(if p.id == "stem_lead" { "lead" } else { "voice" });
     let keep = if p.id == "stem_music" {
         separate::Keep::Music
     } else {
@@ -669,6 +671,7 @@ async fn run_stems(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOptions
         c.tools,
         &first_path,
         &temp,
+        model,
         keep,
         start,
         o.end,

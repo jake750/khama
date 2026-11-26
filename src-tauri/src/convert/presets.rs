@@ -182,6 +182,13 @@ pub(super) const PRESETS: &[Preset] = &[
         ext: "wav",
         suffix: "music only",
     },
+    // الصوت الأساسي وحده: يُسقط الأصوات الخلفية والمرددين مع الموسيقى (KARA_2)
+    Preset {
+        id: "stem_lead",
+        kind: PKind::Stems,
+        ext: "wav",
+        suffix: "lead voice",
+    },
     // إزالة الضجيج من الكلام (RNNoise)، انظر denoise.rs
     Preset {
         id: "denoise_voice",

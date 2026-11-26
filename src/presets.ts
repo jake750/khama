@@ -277,6 +277,19 @@ export const PRESETS: PresetDef[] = [
     desc: { en: "Keeps only the music — an instant instrumental.", ar: "يُبقي الموسيقى فقط، نسخة بلا غناء." },
   }),
   P({
+    id: "stem_lead",
+    group: "audio",
+    kind: "stems",
+    ext: "wav",
+    quality: false,
+    hw: false,
+    name: { en: "Lead voice only (AI)", ar: "الصوت الأساسي وحده (ذكاء اصطناعي)" },
+    desc: {
+      en: "Keeps the main singer or speaker and drops the music, the chorus and backing voices (KARA_2, a 53 MB model downloaded once). Best for nasheeds and songs with a choir.",
+      ar: "يُبقي المنشد أو المتكلم الأساسي ويُسقط الموسيقى والمرددين والأصوات الخلفية (KARA_2، نموذج 53 MB يُنزَّل مرة واحدة). الأنسب للأناشيد والأغاني التي فيها كورال.",
+    },
+  }),
+  P({
     id: "denoise_voice",
     group: "audio",
     kind: "stems",

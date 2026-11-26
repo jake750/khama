@@ -46,21 +46,77 @@ struct Asset {
     name: &'static str,
 }
 
-const MODEL: Asset = Asset {
-    url: "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/UVR-MDX-NET-Voc_FT.onnx",
-    sha256: "534b2070fcc7df514b13ef660dc8cbb328679c2374d04354a5c42bb14ecce111",
-    size: 66_762_490,
-    member: None,
-    name: "UVR-MDX-NET-Voc_FT.onnx",
+/// نموذج فصل من عائلة MDX-Net: ملفه، وإعداداته (من ملف إعدادات UVR الرسمي model_data.json)،
+/// وأيّ الجزأين يتنبأ به
+pub struct SepModel {
+    pub id: &'static str,
+    asset: Asset,
+    /// نسخ احتياطية للملف نفسه (T-39): المصدر الأصلي مستودع طرف ثالث قد يُحذف. كل نسخة تُفحص
+    /// بالبصمة نفسها، فنسخة معدّلة تُرفض كما يُرفض الأصل
+    mirrors: &'static [&'static str],
+    pub cfg: MdxConfig,
+    /// النموذج يتنبأ بالجزء الآخر (الموسيقى مع الأصوات الخلفية): الصوت = الخليط − التنبؤ
+    pub predicts_other: bool,
+}
+
+/// إزالة الموسيقى (الافتراضي): UVR-MDX-NET-Voc_FT
+pub const VOICE: SepModel = SepModel {
+    id: "voice",
+    asset: Asset {
+        url: "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/UVR-MDX-NET-Voc_FT.onnx",
+        sha256: "534b2070fcc7df514b13ef660dc8cbb328679c2374d04354a5c42bb14ecce111",
+        size: 66_762_490,
+        member: None,
+        name: "UVR-MDX-NET-Voc_FT.onnx",
+    },
+    // Hugging Face يعلن البصمة في X-Linked-ETag، وطابقت عند الإضافة 2026-11-17
+    mirrors: &[
+        "https://huggingface.co/Blane187/all_public_uvr_models/resolve/main/UVR-MDX-NET-Voc_FT.onnx",
+        "https://huggingface.co/AI4future/RVC/resolve/main/UVR-MDX-NET-Voc_FT.onnx",
+    ],
+    cfg: VOC_FT,
+    predicts_other: false,
 };
 
-/// نسخ احتياطية للنموذج نفسه (T-39): المصدر الأصلي مستودع طرف ثالث قد يُحذف. كل نسخة تُفحص
-/// بالبصمة نفسها فوق (Hugging Face يعلن البصمة في X-Linked-ETag، وطابقت عند الإضافة 2026-11-17)،
-/// فنسخة معدّلة تُرفض كما يُرفض الأصل.
-const MODEL_MIRRORS: &[&str] = &[
-    "https://huggingface.co/Blane187/all_public_uvr_models/resolve/main/UVR-MDX-NET-Voc_FT.onnx",
-    "https://huggingface.co/AI4future/RVC/resolve/main/UVR-MDX-NET-Voc_FT.onnx",
-];
+/// الصوت الأساسي وحده (يُسقط الأصوات الخلفية والمرددين مع الموسيقى): UVR_MDXNET_KARA_2.
+/// يتنبأ بالمصاحبة (primary_stem = Instrumental)، والصوت الأساسي = الخليط − المصاحبة
+pub const LEAD: SepModel = SepModel {
+    id: "lead",
+    asset: Asset {
+        url: "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/UVR_MDXNET_KARA_2.onnx",
+        sha256: "bf32e15105a09c0f7dddd2b67346146334d6f3ecb399ed7638eba2ab07cbf5f4",
+        size: 52_786_726,
+        member: None,
+        name: "UVR_MDXNET_KARA_2.onnx",
+    },
+    mirrors: &[
+        "https://huggingface.co/Blane187/all_public_uvr_models/resolve/main/UVR_MDXNET_KARA_2.onnx",
+        "https://huggingface.co/AI4future/RVC/resolve/main/UVR_MDXNET_KARA_2.onnx",
+    ],
+    cfg: MdxConfig {
+        n_fft: 5120,
+        hop: 1024,
+        dim_f: 2048,
+        dim_t: 256,
+        compensate: 1.065,
+    },
+    predicts_other: true,
+};
+
+impl SepModel {
+    /// اسم ملفه داخل مجلد ai
+    pub fn file_name(&self) -> &'static str {
+        self.asset.name
+    }
+}
+
+/// النموذج باسمه (والافتراضي إزالة الموسيقى)
+pub fn sep_model(id: &str) -> &'static SepModel {
+    match id {
+        "lead" => &LEAD,
+        _ => &VOICE,
+    }
+}
 
 const ORT_BASE: &str = "https://github.com/microsoft/onnxruntime/releases/download/v1.22.0/";
 
@@ -242,22 +298,22 @@ pub(crate) async fn fetch(
 /// هل ملف النموذج سليم؟ الحجم في كل مرة، والبصمة مرة في كل تشغيل للتطبيق (وكلما تغيّر الملف):
 /// الملف قد يتلف على القرص بعد تنزيله، ونموذج تالف يعطي ضجيجًا أو يُسقط ONNX (T-102).
 /// ~60MB تُحسب في أقل من ثانية على خيط جانبي.
-async fn model_intact(model: &Path) -> bool {
+async fn model_intact(m: &SepModel, model: &Path) -> bool {
     use crate::errors::LockExt;
-    static CHECKED: std::sync::Mutex<Option<(u64, std::time::SystemTime)>> = std::sync::Mutex::new(None);
+    static CHECKED: std::sync::Mutex<Option<(&str, u64, std::time::SystemTime)>> = std::sync::Mutex::new(None);
     let Ok(meta) = std::fs::metadata(model) else {
         return false;
     };
-    if meta.len() != MODEL.size {
+    if meta.len() != m.asset.size {
         return false;
     }
-    let stamp = (meta.len(), meta.modified().unwrap_or(std::time::UNIX_EPOCH));
+    let stamp = (m.id, meta.len(), meta.modified().unwrap_or(std::time::UNIX_EPOCH));
     if *CHECKED.lock_ok() == Some(stamp) {
         return true;
     }
     let path = model.to_path_buf();
     let hash = tauri::async_runtime::spawn_blocking(move || sha256_file(&path)).await;
-    let ok = matches!(hash, Ok(Ok(h)) if h == MODEL.sha256);
+    let ok = matches!(hash, Ok(Ok(h)) if h == m.asset.sha256);
     if ok {
         *CHECKED.lock_ok() = Some(stamp);
     } else {
@@ -274,9 +330,10 @@ pub(crate) fn separation_eta(elapsed: f64, percent: f64) -> Option<f64> {
 /// هل النموذج (والمكتبة على الكمبيوتر) موجودان؟ فحص سريع بالوجود والحجم لا بالبصمة،
 /// لتسأل الواجهة قبل تنزيل ~140MB أول مرة (U-29). ensure_assets يبقى الفحص الكامل.
 #[tauri::command]
-pub fn ai_ready(app: AppHandle) -> bool {
+pub fn ai_ready(app: AppHandle, model: Option<String>) -> bool {
+    let m = sep_model(model.as_deref().unwrap_or("voice"));
     let Ok(dir) = ai_dir(&app) else { return false };
-    let model_ok = std::fs::metadata(dir.join(MODEL.name)).is_ok_and(|m| m.len() == MODEL.size);
+    let model_ok = std::fs::metadata(dir.join(m.asset.name)).is_ok_and(|f| f.len() == m.asset.size);
     #[cfg(not(target_os = "android"))]
     let lib_ok = RUNTIME.is_some_and(|r| dir.join(r.name).exists());
     #[cfg(target_os = "android")]
@@ -284,11 +341,16 @@ pub fn ai_ready(app: AppHandle) -> bool {
     model_ok && lib_ok
 }
 
-pub async fn ensure_assets(app: &AppHandle, id: u64, cancel: &mut watch::Receiver<bool>) -> Result<Option<(PathBuf, PathBuf)>, AppError> {
+pub async fn ensure_assets(
+    app: &AppHandle,
+    m: &SepModel,
+    id: u64,
+    cancel: &mut watch::Receiver<bool>,
+) -> Result<Option<(PathBuf, PathBuf)>, AppError> {
     let _guard = SETUP.lock().await;
     let dir = ai_dir(app)?;
     std::fs::create_dir_all(&dir)?;
-    let model = dir.join(MODEL.name);
+    let model = dir.join(m.asset.name);
 
     // أندرويد: المكتبة مضمّنة في التطبيق
     #[cfg(target_os = "android")]
@@ -320,12 +382,12 @@ pub async fn ensure_assets(app: &AppHandle, id: u64, cancel: &mut watch::Receive
         let need = !(lib.exists() && std::fs::read_to_string(&lib_ok).is_ok_and(|s| s.trim() == runtime.sha256));
         (runtime, lib, lib_ok, need)
     };
-    let need_model = !model_intact(&model).await;
+    let need_model = !model_intact(m, &model).await;
     if !need_lib && !need_model {
         return Ok(Some((lib, model)));
     }
 
-    let total = (if need_lib { runtime.size } else { 0 }) + (if need_model { MODEL.size } else { 0 });
+    let total = (if need_lib { runtime.size } else { 0 }) + (if need_model { m.asset.size } else { 0 });
     let mut done_before = 0u64;
     let mut last = std::time::Instant::now() - Duration::from_secs(1);
     emit(
@@ -338,7 +400,7 @@ pub async fn ensure_assets(app: &AppHandle, id: u64, cancel: &mut watch::Receive
         },
     );
 
-    for (asset, needed) in [(&runtime, need_lib), (&MODEL, need_model)] {
+    for (asset, needed) in [(&runtime, need_lib), (&m.asset, need_model)] {
         if !needed {
             continue;
         }
@@ -347,7 +409,7 @@ pub async fn ensure_assets(app: &AppHandle, id: u64, cancel: &mut watch::Receive
         } else {
             format!("{ORT_BASE}{}", asset.url)
         };
-        let mirrors: &[&str] = if asset.name == MODEL.name { MODEL_MIRRORS } else { &[] };
+        let mirrors: &[&str] = if asset.name == m.asset.name { m.mirrors } else { &[] };
         let tmp = dir.join(format!("{}.download", asset.name));
         let base = done_before;
         let mut on_bytes = |b: u64| {
@@ -424,7 +486,8 @@ pub async fn ensure_assets(app: &AppHandle, id: u64, cancel: &mut watch::Receive
 
 const SR: u32 = 44_100;
 
-/// إعدادات نموذج UVR-MDX-NET-Voc_FT (من ملف إعدادات UVR الرسمي)
+/// إعدادات نموذج MDX-Net (من ملف إعدادات UVR الرسمي)
+#[derive(Clone, Copy, Debug)]
 pub struct MdxConfig {
     pub n_fft: usize,
     pub hop: usize,
@@ -574,10 +637,17 @@ pub struct SepOptions {
 
 impl Default for SepOptions {
     fn default() -> Self {
+        Self::for_model(&VOICE)
+    }
+}
+
+impl SepOptions {
+    /// الإعدادات المعتمدة لنموذج: هامش نصف نافذة، وتعويض المستوى الذي حدده مدرّبه
+    pub fn for_model(m: &SepModel) -> Self {
         Self {
-            margin: VOC_FT.n_fft / 2,
+            margin: m.cfg.n_fft / 2,
             overlap: 0,
-            compensate: VOC_FT.compensate,
+            compensate: m.cfg.compensate,
             derive: "subtract".into(),
         }
     }
@@ -588,6 +658,7 @@ impl Default for SepOptions {
 pub fn separate_blocking(
     ffmpeg: &Path,
     lib: &Path,
+    m: &SepModel,
     model: &Path,
     input: &Path,
     start: Option<f64>,
@@ -604,11 +675,12 @@ pub fn separate_blocking(
     separate_stems(
         ffmpeg,
         lib,
+        m,
         model,
         input,
         start,
         end,
-        &SepOptions::default(),
+        &SepOptions::for_model(m),
         voice,
         music,
         progress,
@@ -644,6 +716,7 @@ fn wav_writer(ffmpeg: &Path, out: &Path) -> std::io::Result<std::process::Child>
 pub fn separate_stems(
     ffmpeg: &Path,
     lib: &Path,
+    m: &SepModel,
     model: &Path,
     input: &Path,
     start: Option<f64>,
@@ -674,7 +747,7 @@ pub fn separate_stems(
         .commit_from_file(model)
         .map_err(|e| load_err(&e))?;
 
-    let sp = Spectral::new(VOC_FT);
+    let sp = Spectral::new(m.cfg);
     let cfg = &sp.cfg;
     let chunk = sp.chunk();
     // margin: context on each side; overlap: cross-faded part of the kept region
@@ -807,8 +880,15 @@ pub fn separate_stems(
                     .collect();
                 sp.istft(&m)
             };
-            let vl = voice_of(0, 1, &sl);
-            let vr = voice_of(2, 3, &sr);
+            let mut vl = voice_of(0, 1, &sl);
+            let mut vr = voice_of(2, 3, &sr);
+            if m.predicts_other {
+                // the model gave the other part: voice = mix - prediction
+                for i in 0..chunk.min(vl.len()) {
+                    vl[i] = left[i] - vl[i];
+                    vr[i] = right[i] - vr[i];
+                }
+            }
 
             // the kept region of this chunk, in output order
             let region: Vec<[f32; 4]> = (margin..margin + kept).map(|i| [vl[i], vr[i], left[i], right[i]]).collect();
@@ -902,6 +982,7 @@ pub async fn process_file(
     tools: &Tools,
     input: &Path,
     output: &Path,
+    m: &'static SepModel,
     keep: Keep,
     start: Option<f64>,
     end: Option<f64>,
@@ -909,7 +990,7 @@ pub async fn process_file(
     work: &Path,
     cancel: &mut watch::Receiver<bool>,
 ) -> Result<bool, AppError> {
-    let Some((lib, model)) = ensure_assets(app, id, cancel).await? else {
+    let Some((lib, model)) = ensure_assets(app, m, id, cancel).await? else {
         return Ok(false);
     };
     emit(
@@ -934,7 +1015,7 @@ pub async fn process_file(
         stop.clone(),
     );
     let mut handle = tauri::async_runtime::spawn_blocking(move || {
-        separate_blocking(&ffmpeg, &lib, &model, &input_p, start, end, keep, &wav_p, &p2, &s2)
+        separate_blocking(&ffmpeg, &lib, m, &model, &input_p, start, end, keep, &wav_p, &p2, &s2)
     });
     let span = end.or(duration).map(|e| e - start.unwrap_or(0.0)).filter(|s| *s > 0.0);
     let total = span.map(|s| s * SR as f64);
@@ -1095,12 +1176,12 @@ mod tests {
         } else {
             "libonnxruntime.so"
         });
-        let model = ai.join(MODEL.name);
+        let model = ai.join(VOICE.asset.name);
         let p = AtomicU64::new(0);
         let c = AtomicBool::new(false);
         for (keep, name) in [(Keep::Voice, "voice.wav"), (Keep::Music, "music.wav")] {
             let t0 = std::time::Instant::now();
-            assert!(separate_blocking(&ffmpeg, &lib, &model, &mix, None, None, keep, &tmp.join(name), &p, &c).unwrap());
+            assert!(separate_blocking(&ffmpeg, &lib, &VOICE, &model, &mix, None, None, keep, &tmp.join(name), &p, &c).unwrap());
             println!("{name}: {:.1}s", t0.elapsed().as_secs_f64());
         }
         // نقارن: الناتج الصوتي يجب أن يشبه الكلام الأصلي أكثر بكثير من الخليط
