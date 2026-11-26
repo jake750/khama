@@ -841,6 +841,9 @@ pub fn gaps_as_silences(cues: &[Cue], words: &[Word], min: f64) -> Vec<[f64; 2]>
         .collect()
 }
 
+/// صيغة الصوت للتحليل: أفضل صوت حتى 70k بلا DRC، وإلا أي صوت بلا DRC، وإلا أي شيء
+pub(crate) const AUDIO_FOR_ANALYSIS: &str = "ba[abr<=70][format_id!*=drc]/ba[format_id!*=drc]/ba/b";
+
 /// تحليل رابط قبل تنزيله: ترجمة الموقع إن وُجدت (بلا تنزيل شيء)، وإلا الصوت وحده ثم تفريغه.
 /// الفيديو لا يُنزَّل.
 pub(super) async fn run_topics_url(
@@ -882,11 +885,13 @@ pub(super) async fn run_topics_url(
             }));
         }
     }
-    // الصوت وحده: أصغر صيغة صوت، في مجلد العمل المؤقت
+    // الصوت وحده في مجلد العمل المؤقت، بأخف صيغة تكفي: whisper يحوّله إلى 16 kHz أحادي، وعلى محاضرة
+    // من يوتيوب أعطى صوت 64k مستويات الصمت نفسها وعدد الوقفات نفسه بنصف حجم أفضل صوت (24 ← 12 MB).
+    // بلا DRC: ضغط المدى يغيّر مستوى ما بين الكلمات الذي تُقاس به العتبة
     let tmpl = c.work.join("audio.%(ext)s").to_string_lossy().into_owned();
     let mut a = tools::ytdlp_base_args(c.tools);
     a.extend(
-        ["-f", "bestaudio/best", "--newline", "--no-part", "-o", &tmpl, "--", url]
+        ["-f", AUDIO_FOR_ANALYSIS, "--newline", "--no-part", "-o", &tmpl, "--", url]
             .iter()
             .map(|s| s.to_string()),
     );
