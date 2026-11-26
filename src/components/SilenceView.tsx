@@ -106,7 +106,6 @@ export function SilenceView(props: {
     const x0 = lv.envStart ?? lo;
     const pts = env.map((db, i) => `${((x0 + i * lv.envStep! - lo) / span) * W},${yOf(db)}`);
     return `M0,${H} L${pts.join(" L")} L${W},${H} Z`;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lv, lo, span]);
   const x = (sec: number) => ((sec - lo) / span) * W;
   const removed = total(props.cuts);
