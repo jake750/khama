@@ -84,16 +84,30 @@ export function estimateWords(cue: Cue): Word[] {
   });
 }
 
+/** أبعد مسافة تُسحب فيها بداية كلمة إلى نهاية الصمت قبلها (ث): للخلف، وللأمام */
+const SNAP_BACK = 0.35;
+const SNAP_FWD = 0.25;
+
 /**
- * نهاية الكلمة من whisper هي بداية التالية، فلا تظهر الوقفات بينهما. الصمت المكتشف يعيدها:
- * كلمة يبدأ داخلها صمت تنتهي عند بدايته.
+ * يصحّح الكلمات بالصمت المكتشف:
+ * - النهاية: نهاية الكلمة من whisper هي بداية التالية، فلا تظهر الوقفات بينهما. كلمة يبدأ داخلها صمت تنتهي عند بدايته.
+ * - البداية: الكلمة بعد وقفة تُعطى متأخرة (قيس على محاضرة: +0.06 ث من يوتيوب و+0.10 من whisper عن بدء الصوت)،
+ *   فتُسحب إلى نهاية الصمت إن كانت قريبة، فيظهر أول سطر بعد الوقفة مع أول صوت. خطأ البداية بعد الوقفات
+ *   نزل بذلك من 0.15–0.16 ث إلى 0.11، وتحركت 38 كلمة من 244 فقط (D17 في DECISIONS.md).
  */
 export function trimToSilences(words: Word[], silences: Range[]): Word[] {
   if (!silences.length) return words;
-  return words.map((w) => {
-    const s = silences.find(([a]) => a > w.start + 0.05 && a < w.end);
-    return s ? { ...w, end: s[0] } : w;
-  });
+  const out: Word[] = [];
+  for (const w of words) {
+    const cut = silences.find(([a]) => a > w.start + 0.05 && a < w.end);
+    let start = w.start;
+    const end = cut ? cut[0] : w.end;
+    const prevEnd = out.length ? out[out.length - 1].end : -Infinity;
+    const resume = silences.find(([, b]) => b - start >= -SNAP_BACK && b - start <= SNAP_FWD);
+    if (resume && resume[1] >= prevEnd && resume[1] < end - 0.05) start = resume[1];
+    out.push(start === w.start && end === w.end ? w : { ...w, start, end });
+  }
+  return out;
 }
 
 /** يضع كلمات المصدر على الخط الزمني للناتج. كلمة تقع كلها في جزء محذوف تسقط */
@@ -123,6 +137,8 @@ export interface LineOptions {
 /** وقفة بين كلمتين تكفي لكسر السطر */
 const PAUSE = 0.35;
 /** فجوة أقصر من هذه بين سطرين تُسدّ (لا ومضة فراغ بين سطرين متتاليين) */
+/** أقصر فراغ مسموح بين سطرين بعد HOLD (ث): أقصر منه يومض */
+const MIN_GAP = 0.12;
 const SMALL_GAP = 0.3;
 /** يبقى السطر بعد آخر كلمة قليلًا ليُقرأ، ما لم يبدأ التالي */
 const HOLD = 0.25;
@@ -139,7 +155,8 @@ export function wordsToLines(words: Word[], opt: LineOptions, total = Infinity):
   let cur: Word[] = [];
   for (let i = 0; i < words.length; i++) {
     const w = words[i];
-    if (cur.length && (cur.length >= maxWords || w.end - cur[0].start > maxSecs)) {
+    // while لا if: ما يبقى بعد الكسر عند وقفة قد يبلغ الحد هو أيضًا مع الكلمة الجديدة
+    while (cur.length && (cur.length >= maxWords || w.end - cur[0].start > maxSecs)) {
       // بلغ الحد: يُكسر عند أطول وقفة في نصفه الثاني إن وُجدت، لا عند الكلمة التي صادفت الحد
       let at = cur.length;
       let gap = 0.12;
@@ -170,13 +187,21 @@ export function wordsToLines(words: Word[], opt: LineOptions, total = Infinity):
       line.unshift(prev.pop()!);
     }
   }
-  const out: Cue[] = lines
-    .filter((l) => l.length)
-    .map((l) => ({ start: l[0].start, end: l[l.length - 1].end + HOLD, text: l.map((w) => w.w).join(" ") }));
+  const kept = lines.filter((l) => l.length);
+  // يبقى السطر بعد آخر كلمة HOLD ثانية، دون أن تتجاوز مدة عرضه الحد (إلا إن كان كلامه نفسه أطول)
+  const out: Cue[] = kept.map((l) => {
+    const spoken = l[l.length - 1].end;
+    return { start: l[0].start, end: Math.max(spoken, Math.min(spoken + HOLD, l[0].start + maxSecs)), text: l.map((w) => w.w).join(" ") };
+  });
   for (let i = 0; i < out.length - 1; i++) {
     const next = out[i + 1];
-    const spoken = lines[i][lines[i].length - 1].end;
-    if (next.start - spoken < SMALL_GAP || out[i].end > next.start) out[i].end = Math.max(spoken, next.start);
+    const spoken = kept[i][kept[i].length - 1].end;
+    // فجوة صغيرة بين سطرين (من الكلام، أو مما يبقى بعد HOLD) تُغلق: ومضة فارغة أقصر من MIN_GAP تزعج العين.
+    // الإغلاق لا يمدّ السطر فوق الحد الذي اختاره المستخدم، ولا يتداخل مع التالي
+    const gap = next.start - out[i].end;
+    if (next.start - spoken < SMALL_GAP || gap < MIN_GAP) {
+      out[i].end = Math.max(spoken, Math.min(next.start, out[i].start + maxSecs));
+    }
   }
   // لا يتجاوز آخر سطر نهاية المقطع
   return out.map((c) => ({ ...c, start: round3(c.start), end: round3(Math.min(total, Math.max(c.end, c.start + 0.05))) }));
@@ -215,7 +240,13 @@ export function exportCues(
     }
     return out;
   }
-  const all = trimToSilences(words?.length ? words : cues.flatMap(estimateWords), silences);
+  // لا تبدأ كلمة قبل أن تنتهي التي قبلها (مصادر الوقت قد تتداخل قليلًا)، فلا يتداخل سطران
+  const all: Word[] = [];
+  for (const w of trimToSilences(words?.length ? words : cues.flatMap(estimateWords), silences)) {
+    const prev = all[all.length - 1];
+    if (prev && w.start < prev.end) all.push({ ...w, start: prev.end, end: Math.max(w.end, prev.end + 0.02) });
+    else all.push(w);
+  }
   const last = tl[tl.length - 1];
   return wordsToLines(mapWords(all, tl), limited ? opt : { maxWords: null }, last.at + last.src[1] - last.src[0]);
 }

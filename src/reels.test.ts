@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { exportCues, keptPieces, planTopic, silenceCuts, timeline, toSrt, wordsToLines, type Cue, type Word } from "./reels";
+import {
+  exportCues,
+  keptPieces,
+  planTopic,
+  silenceCuts,
+  timeline,
+  toSrt,
+  trimToSilences,
+  wordsToLines,
+  type Cue,
+  type Word,
+} from "./reels";
 
 const cue = (start: number, end: number, text: string): Cue => ({ start, end, text });
 
@@ -176,5 +187,28 @@ describe("planTopic", () => {
   it("counts the length after removing silence", () => {
     // 80 ث فيها 30 ث صمت محذوف: 50 ث تصلح ريلًا
     expect(planTopic(0, 80, [], [[10, 40]], [[10, 40]], reel).kind).toBe("reel");
+  });
+});
+
+describe("trimToSilences", () => {
+  const w = (word: string, start: number, end: number) => ({ w: word, start, end, last: false });
+  it("ends a word where a silence starts and pulls the next one back to where speech resumes", () => {
+    const out = trimToSilences([w("a", 0, 1.5), w("b", 1.5, 2)], [[1.0, 1.4]]);
+    expect(out[0].end).toBe(1.0);
+    expect(out[1].start).toBe(1.4);
+  });
+  it("moves a word that starts inside a silence to its end", () => {
+    const out = trimToSilences([w("a", 0, 0.8), w("b", 1.2, 1.8)], [[0.9, 1.35]]);
+    expect(out[1].start).toBe(1.35);
+  });
+  it("leaves words far from a silence alone", () => {
+    const words = [w("a", 0, 0.5), w("b", 0.5, 1), w("c", 3, 3.5)];
+    const out = trimToSilences(words, [[1.0, 2.0]]);
+    expect(out[1]).toBe(words[1]);
+    expect(out[2]).toBe(words[2]);
+  });
+  it("never starts a word before the previous one ends", () => {
+    const out = trimToSilences([w("a", 0, 1.3), w("b", 1.3, 2)], [[1.0, 1.2]]);
+    expect(out[1].start).toBeGreaterThanOrEqual(out[0].end);
   });
 });
