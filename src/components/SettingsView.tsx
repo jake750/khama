@@ -161,6 +161,7 @@ export function SettingsView(props: {
           .map((x) => (
             <button key={x.id} aria-current={current === x.id ? "true" : undefined} onClick={() => go(x.id)}>
               <Icon name={x.icon} size={16} /> <span>{x.label}</span>
+              {x.id === "about" && props.updateVersion && <span className="tab-dot update" title={t.appUpdateTitle} />}
             </button>
           ))}
       </nav>
@@ -250,7 +251,7 @@ export function SettingsView(props: {
 
         <Section id="about" title={t.aboutTitle}>
           {props.updateVersion && props.onInstallUpdate && (
-            <div className="alert info mb-2">
+            <div className="alert info center mb-2">
               <Icon name="download" size={16} />
               <span className="grow">{t.updateAvailable(props.updateVersion)}</span>
               <button className="btn btn-sm btn-primary" onClick={props.onInstallUpdate}>

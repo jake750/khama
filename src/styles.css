@@ -4101,3 +4101,10 @@ kbd {
     gap: var(--s-2);
   }
 }
+/* رسالة بسطر واحد وزر: الأيقونة والنص في وسط الارتفاع مثل الزر */
+.alert.center {
+  align-items: center;
+}
+.alert.center svg {
+  margin-top: 0;
+}

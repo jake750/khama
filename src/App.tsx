@@ -1023,7 +1023,11 @@ export default function App() {
                 className="tab"
                 data-tab={x.id}
                 aria-current={tab === x.id ? "page" : undefined}
-                onClick={() => setTab(x.id)}
+                onClick={() => {
+                  // النقطة على «الإعدادات» تعني تحديثًا: نفتح القسم الذي فيه زر التحديث مباشرة
+                  if (x.id === "settings" && updateVersion) setSettingsSection({ id: "about", n: Date.now() });
+                  setTab(x.id);
+                }}
                 title={x.label}
               >
                 <Icon name={x.icon} size={20} /> <span>{x.label}</span>
