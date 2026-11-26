@@ -75,3 +75,21 @@
 [36] Xiph.org Foundation, "Xiph.org Video Test Media (derf's collection)." [Online]. Available: https://media.xiph.org/video/derf/
 
 [37] Blender Foundation, "Sintel" (trailer), CC BY 3.0. [Online]. Available: https://durian.blender.org
+
+[38] M. A. Hearst, "TextTiling: Segmenting text into multi-paragraph subtopic passages," *Computational Linguistics*, vol. 23, no. 1, pp. 33–64, 1997.
+
+[39] A. Radford, J. W. Kim, T. Xu, G. Brockman, C. McLeavey, and I. Sutskever, "Robust speech recognition via large-scale weak supervision," in *Proc. ICML*, 2023, pp. 28492–28518.
+
+[40] J.-M. Valin, "A hybrid DSP/deep learning approach to real-time full-band speech enhancement," in *Proc. IEEE MMSP*, 2018.
+
+[41] A. Buades, B. Coll, and J.-M. Morel, "A non-local algorithm for image denoising," in *Proc. IEEE CVPR*, 2005, vol. 2, pp. 60–65.
+
+[42] X. Wang, L. Xie, C. Dong, and Y. Shan, "Real-ESRGAN: Training real-world blind super-resolution with pure synthetic data," in *Proc. IEEE/CVF ICCV Workshops*, 2021, pp. 1905–1914.
+
+[43] Silero Team, "Silero VAD: pre-trained enterprise-grade voice activity detector." [Online]. Available: https://github.com/snakers4/silero-vad
+
+[44] L. Wang, N. Yang, X. Huang, L. Yang, R. Majumder, and F. Wei, "Multilingual E5 text embeddings: A technical report," arXiv:2402.05672, 2024.
+
+[45] G. Gerganov, "whisper.cpp: Port of OpenAI's Whisper model in C/C++." [Online]. Available: https://github.com/ggerganov/whisper.cpp
+
+[46] jianfch, "stable-ts: Transcription, forced alignment, and audio indexing with OpenAI's Whisper." [Online]. Available: https://github.com/jianfch/stable-ts
