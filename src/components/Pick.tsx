@@ -1,6 +1,9 @@
 import { Segmented } from "./Segmented";
 import { Select } from "./Select";
 
+/** أطول نص لخيار يبقى زرًّا مجزّأً */
+const LONG = 14;
+
 /** اختيار واحد: حتى 5 خيارات أزرار مجزّأة، وأكثر قائمة منسدلة (D-23) */
 export function Pick<T extends string | number | null>(props: {
   label: string;
@@ -9,7 +12,8 @@ export function Pick<T extends string | number | null>(props: {
   onChange: (v: T) => void;
 }) {
   const idx = props.options.findIndex((o) => o.value === props.value);
-  if (props.options.length <= 5) {
+  // أزرار مجزّأة لخيارات قصيرة فقط: نصوص طويلة (مثل «−14 LUFS · YouTube») تلتفّ في عمود ضيق وتصير كومة
+  if (props.options.length <= 5 && props.options.every((o) => o.label.length <= LONG)) {
     return (
       <div className="pick">
         <span className="field-label">{props.label}</span>

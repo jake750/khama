@@ -4091,9 +4091,16 @@ kbd {
 .ba-frame.stale {
   opacity: 0.55;
 }
+/* الصورة تملأ الإطار وتُحتوى فيه: max-height: 100% لا يُحسب داخل خلية grid بلا ارتفاع صريح،
+   فكانت الصورة العمودية (ريل) تأخذ عرض الإطار ويُقصّ نصفها السفلي */
+.ba-frame {
+  position: relative;
+}
 .ba-frame img {
-  max-width: 100%;
-  max-height: 100%;
+  position: absolute;
+  inset: var(--s-2);
+  width: calc(100% - 2 * var(--s-2));
+  height: calc(100% - 2 * var(--s-2));
   object-fit: contain;
 }
 @media (max-width: 480px) {
