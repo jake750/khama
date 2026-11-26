@@ -27,7 +27,7 @@ Paste a link, pick a format, and get a file that drops straight into Premiere, D
 - **English or Arabic UI** (full RTL), dark or light theme. Errors are explained in plain language, with the raw technical details one click away.
 - **Cookies** (optional): read from your browser, or paste/import a `cookies.txt`. Useful for age-restricted videos or YouTube's "are you a bot?" check.
 - **Download only a part**: pick a start and end, and only that section is downloaded. Cuts are frame-accurate: the few seconds around each cut are re-encoded, which adds a little time.
-- **AI clean-up (remove music or voice)**: keep only the dialogue (or only the music) of a download or any local file. The model (~140 MB) is downloaded once, on first use, and runs fully offline.
+- **AI clean-up (remove music or voice)**: keep only the dialogue (or only the music) of a download or any local file. The model (~140 MB) is downloaded once, on first use, and runs fully offline. **Remove noise from speech** (RNNoise, a 300 KB model) cleans room noise, hum and hiss, about a minute of audio per second.
 - **Update yt-dlp in one click**. Sites change often, and this is the usual fix when downloads start failing.
 - **Private by design**: no analytics, no telemetry. Khama only contacts the sites you download from, plus GitHub (api.github.com) to check for Khama updates once per launch and when you press "Update yt-dlp". That check shows GitHub your IP address; you can turn it off in Settings → Background.
 - **Not supported**: DRM-protected services (Netflix, Disney+, Shahid, paid courses, Spotify's own audio). Spotify links are matched to the same song on YouTube Music instead. Big shared Google Drive files can hit Google's "download quota exceeded" limit.
@@ -180,7 +180,7 @@ The **Mini** button in the top bar turns Khama into a small always-on-top window
 - **واجهة بالإنجليزية أو العربية** (RTL كاملة)، بثيم داكن أو فاتح. رسائل الخطأ مفهومة، والتفاصيل التقنية متاحة بنقرة.
 - **الكوكيز** (اختيارية): من متصفحك مباشرة، أو بلصق ملف `cookies.txt` أو استيراده. تفيد مع الفيديوهات المقيّدة بالعمر، أو حين يسأل يوتيوب «هل أنت روبوت؟».
 - **تنزيل جزء فقط**: حدّد البداية والنهاية، ويُنزَّل هذا الجزء وحده. القص دقيق بالإطار: الثواني القليلة حول كل قطع يُعاد ترميزها، فيأخذ وقتًا أطول قليلًا.
-- **التنظيف بالذكاء الاصطناعي (إزالة الموسيقى أو الصوت البشري)**: أبقِ الحوار وحده (أو الموسيقى وحدها) لأي تنزيل أو ملف على جهازك. النموذج (حوالي 140MB) يُنزَّل مرة واحدة عند أول استخدام، ويعمل بلا إنترنت بعدها.
+- **التنظيف بالذكاء الاصطناعي (إزالة الموسيقى أو الصوت البشري)**: أبقِ الحوار وحده (أو الموسيقى وحدها) لأي تنزيل أو ملف على جهازك. النموذج (حوالي 140MB) يُنزَّل مرة واحدة عند أول استخدام، ويعمل بلا إنترنت بعدها. و**إزالة الضجيج من الكلام** (RNNoise، نموذج 300KB) تزيل ضجيج الغرفة والطنين والهسهسة، بنحو دقيقة صوت في الثانية.
 - **تحديث yt-dlp بنقرة واحدة**: المواقع تتغيّر كثيرًا، وهذا غالبًا هو الحل حين يبدأ التنزيل بالفشل.
 - **الخصوصية**: لا تحليلات ولا تتبّع. تتصل خامة فقط بالمواقع التي تنزّل منها، وبـ GitHub (api.github.com) للبحث عن تحديثات خامة مرة عند كل فتح، وحين تضغط «تحديث yt-dlp». هذا الفحص يُري GitHub عنوان IP الخاص بك، ويمكنك إطفاؤه من الإعدادات ← الخلفية.
 - **غير مدعوم**: الخدمات المحمية بـ DRM (نتفليكس وديزني+ وشاهد والدورات المدفوعة وصوت سبوتيفاي نفسه). روابط سبوتيفاي تُطابَق مع الأغنية نفسها على YouTube Music بدلًا من ذلك. وملفات Google Drive الكبيرة المشتركة قد تصطدم بحدّ Google «تجاوز حصة التنزيل».

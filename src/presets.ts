@@ -277,6 +277,19 @@ export const PRESETS: PresetDef[] = [
     desc: { en: "Keeps only the music — an instant instrumental.", ar: "يُبقي الموسيقى فقط، نسخة بلا غناء." },
   }),
   P({
+    id: "denoise_voice",
+    group: "audio",
+    kind: "stems",
+    ext: "wav",
+    quality: false,
+    hw: false,
+    name: { en: "Remove noise from speech", ar: "إزالة الضجيج من الكلام" },
+    desc: {
+      en: "RNNoise cleans room noise, hum and hiss between and under the words (a 300 KB model, downloaded once). Fast: about a minute of audio per second. Video is copied as is.",
+      ar: "RNNoise يزيل ضجيج الغرفة والطنين والهسهسة بين الكلمات وتحتها (نموذج 300 KB يُنزَّل مرة واحدة). سريع: نحو دقيقة صوت في الثانية. الفيديو يُنسخ كما هو.",
+    },
+  }),
+  P({
     id: "wav",
     group: "audio",
     kind: "audio",

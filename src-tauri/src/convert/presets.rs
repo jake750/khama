@@ -182,6 +182,13 @@ pub(super) const PRESETS: &[Preset] = &[
         ext: "wav",
         suffix: "music only",
     },
+    // إزالة الضجيج من الكلام (RNNoise)، انظر denoise.rs
+    Preset {
+        id: "denoise_voice",
+        kind: PKind::Stems,
+        ext: "wav",
+        suffix: "clean voice",
+    },
     // أدوات
     Preset {
         id: "rewrap_mp4",

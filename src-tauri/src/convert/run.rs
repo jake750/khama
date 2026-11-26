@@ -632,6 +632,9 @@ pub(super) async fn detect_silences(
 
 /// إزالة الموسيقى أو الصوت البشري بالنموذج
 async fn run_stems(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOptions, cancel: &mut watch::Receiver<bool>) -> Converted {
+    if p.id == "denoise_voice" {
+        return super::denoise::run_denoise(c, p, info, o, cancel).await;
+    }
     let first_path = PathBuf::from(&info.path);
     if info.audio.is_empty() {
         return Err(AppError::new("noAudioStream"));

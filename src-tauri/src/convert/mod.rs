@@ -46,6 +46,7 @@ mod run;
 pub use run::*;
 mod topics;
 pub use topics::*;
+mod denoise;
 pub mod silence;
 pub mod words;
 pub use silence::SilenceLevels;
