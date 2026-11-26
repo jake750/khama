@@ -709,5 +709,12 @@ fn enhance_cleans_before_scaling_and_sharpens_after() {
         ..Default::default()
     };
     let s = joined(&build_plan(&p, &o, &[video(1920, 1080)], &[], Path::new("o.mp4"), None).unwrap());
-    assert!(s.contains("unsharp=") && !s.contains("nlmeans") && !s.contains("hqdn3d"), "{s}");
+    assert!(s.contains("unsharp=") && !s.contains("nlmeans") && !s.contains("fftdnoiz"), "{s}");
+    let o = ConvertOptions {
+        enhance: Some("light".into()),
+        size: Some(2160),
+        ..Default::default()
+    };
+    let s = joined(&build_plan(&p, &o, &[video(1920, 1080)], &[], Path::new("o.mp4"), None).unwrap());
+    assert!(s.find("fftdnoiz=").unwrap() < s.find("scale=3840:2160").unwrap(), "{s}");
 }

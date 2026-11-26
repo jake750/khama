@@ -388,9 +388,12 @@ pub(super) fn video_filters(p: &Preset, o: &ConvertOptions, v: &VideoInfo, keep_
         f.push("hqdn3d=2:1.5:3:3".to_string());
     }
     // تحسين الصورة: إزالة التشويش قبل تغيير المقاس، والتوضيح بعده (بالمقاس الجديد)
+    // القيم مقيسة بـ SSIM على مقاطع نظيفة شُوّهت عمدًا (تشويش كاميرا، وضغط شديد): انظر D20 في DECISIONS.md.
+    // fftdnoiz أنظف من hqdn3d بكثير على تشويش الكاميرا بكلفة أقل من الوقت الحقيقي، وnlmeans بقوة 4
+    // أنظف من 2.5 بنفس الوقت، وكلاهما لا يُسيء إلى الفيديو المضغوط الخالي من التشويش
     match o.enhance.as_deref() {
-        Some("light") => f.push("hqdn3d=1.5:1.5:6:6".to_string()),
-        Some("strong") => f.push("nlmeans=s=2.5:p=5:r=7".to_string()),
+        Some("light") => f.push("fftdnoiz=sigma=8".to_string()),
+        Some("strong") => f.push("nlmeans=s=4:p=5:r=7".to_string()),
         _ => {}
     }
     let aspect = o.aspect.as_deref().and_then(parse_aspect);

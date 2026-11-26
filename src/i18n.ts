@@ -316,7 +316,7 @@ const en = {
   enhanceStrong: "Strong (slow)",
   enhanceSharpen: "Sharpen only",
   enhanceHint:
-    "FFmpeg filters, no AI model: noise is cleaned before any resize and sharpening is applied after it, so a larger size gets sharpened at its new size. Compare in the before/after preview. Strong uses nlmeans and can be several times slower.",
+    "FFmpeg filters, no AI model: noise is cleaned before any resize and sharpening is applied after it, so a larger size gets sharpened at its new size. Compare in the before/after preview. Light uses fftdnoiz (faster than real time on most clips); Strong uses nlmeans, cleans the most camera noise and is several times slower.",
   estimateTime: (s: string) => `≈ ${s} on the CPU`,
   tonemap: "HDR → SDR",
   tonemapHint: "Fixes washed-out colors when HDR footage lands on a normal timeline (Hable tone mapping to Rec.709).",
@@ -1113,7 +1113,7 @@ const ar: Dict = {
   enhanceStrong: "قوي (بطيء)",
   enhanceSharpen: "توضيح فقط",
   enhanceHint:
-    "فلاتر FFmpeg بلا نموذج ذكاء اصطناعي: يُنظَّف التشويش قبل تغيير المقاس ويُوضَّح بعده، فالمقاس الأكبر يُوضَّح بحجمه الجديد. قارن في معاينة «قبل وبعد». «قوي» يستعمل nlmeans وقد يكون أبطأ بعدة مرات.",
+    "فلاتر FFmpeg بلا نموذج ذكاء اصطناعي: يُنظَّف التشويش قبل تغيير المقاس ويُوضَّح بعده، فالمقاس الأكبر يُوضَّح بحجمه الجديد. قارن في معاينة «قبل وبعد». «خفيف» يستعمل fftdnoiz (أسرع من الوقت الحقيقي في أغلب المقاطع)، و«قوي» يستعمل nlmeans فيزيل أكثر تشويش الكاميرا وهو أبطأ بعدة مرات.",
   estimateTime: (s) => `≈ ${s} على المعالج`,
   tonemap: "HDR ← SDR",
   tonemapHint: "يصلح الألوان الباهتة حين تضع لقطات HDR على تايملاين عادي (تحويل Hable إلى Rec.709).",
