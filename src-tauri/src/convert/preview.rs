@@ -59,6 +59,25 @@ pub fn preview_args(p: &Preset, o: &ConvertOptions, info: &MediaInfo, at: f64, o
     Ok(a)
 }
 
+/// امتدادات يُسمح بتشغيلها في المعاينة (صوت أو فيديو فقط)
+const PLAYABLE: &[&str] = &[
+    "mp4", "m4v", "mov", "webm", "mkv", "mp3", "m4a", "aac", "wav", "flac", "ogg", "opus",
+];
+
+/// يسمح للواجهة بتشغيل ملف وسائط واحد عبر asset:// (المعاينة في نتيجة كشف الصمت).
+/// النطاق يبدأ فارغًا، ولا يُضاف إليه إلا ملف وسائط موجود يطلبه المستخدم: لا مجلدات ولا ملفات أخرى.
+#[tauri::command]
+pub fn allow_media(app: AppHandle, path: String) -> Result<(), AppError> {
+    let p = std::path::Path::new(&path);
+    let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    if !PLAYABLE.contains(&ext.as_str()) || !p.is_file() {
+        return Err(AppError::with_detail("badInput", "not a playable media file"));
+    }
+    app.asset_protocol_scope()
+        .allow_file(p)
+        .map_err(|e| AppError::with_detail("badInput", e.to_string()))
+}
+
 /// يُلغى الطلب السابق إن طُلب جديد (المستخدم غيّر خيارًا)
 static CURRENT: std::sync::Mutex<Option<watch::Sender<bool>>> = std::sync::Mutex::new(None);
 

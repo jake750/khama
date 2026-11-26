@@ -822,6 +822,23 @@ export default function App() {
     return [hi - lo, Math.max(0, hi - lo - removed)];
   };
 
+  /** للعرض المرئي لنتيجة كشف الصمت أو السواد: ما سيُحذف والمدى المحلَّل */
+  const removalView = (j: Job) => {
+    if (!j.convert || !["detect_silence", "detect_black"].includes(j.convert.preset) || !j.markers) return null;
+    const info = files.find((f) => f.path === j.convert!.inputs[0])?.info;
+    const lo = j.convert.options.start ?? 0;
+    const lastMarker = j.markers.reduce((m, [, e]) => Math.max(m, e), 0);
+    const envEnd = j.levels?.envelope?.length ? (j.levels.envStart ?? 0) + j.levels.envelope.length * (j.levels.envStep ?? 0) : 0;
+    const hi = j.convert.options.end ?? info?.duration ?? Math.max(lastMarker, envEnd);
+    if (!(hi > lo)) return null;
+    return {
+      cuts: removalCuts(j),
+      range: [lo, hi] as [number, number],
+      video: info ? !!info.video : !/\.(mp3|m4a|aac|wav|flac|ogg|opus)$/i.test(j.convert.inputs[0]),
+      black: j.convert.preset === "detect_black",
+    };
+  };
+
   /** صيغة الناتج عند القص والحذف: بنفس عائلة المصدر (ملف من التنزيلات قد لا يكون في قائمة المحوّل) */
   const sameFamily = (input: string): string => {
     const info = files.find((f) => f.path === input)?.info;
@@ -1264,6 +1281,7 @@ export default function App() {
                           }
                           removeLabel={j.convert?.preset === "detect_silence" ? t.removeSilence : t.removeBlack}
                           lengths={j.markers?.length && !j.topics ? removalLengths(j) : null}
+                          removal={removalView(j)}
                           queuePos={j.state === "queued" ? [queuedIds.indexOf(j.id) + 1, queuedIds.length] : undefined}
                           onStartNow={j.type === "download" ? () => api.startNow(j.id).catch(logError("startNow")) : undefined}
                           onCopyMarkers={j.markers?.length && !j.topics ? () => copyMarkers(j) : undefined}

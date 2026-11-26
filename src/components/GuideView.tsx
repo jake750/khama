@@ -113,7 +113,7 @@ function Entry(props: {
               <button className="btn btn-sm" onClick={() => props.onGo(e.go.tab, e.go.section)}>
                 {t.guideShowMe}{" "}
                 <span className="guide-go-arrow" aria-hidden="true">
-                  →
+                  <Icon name="chevron" size={16} />
                 </span>
               </button>
             </div>

@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import type { AppError, ConvertRequest, Cue, DownloadRequest, Word, JobState, JobUpdate, SilenceLevels, Topic } from "../api";
 import type { Range, TopicPlan } from "../reels";
 import { LevelsLine, TopicPanel, type ExportOptions } from "./TopicPanel";
+import { SilenceView } from "./SilenceView";
 import { formatDuration, formatEta, formatSpeed, formatTimecode } from "../format";
 import { errorText, numLocale, useI18n, type Dict } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
@@ -154,6 +155,8 @@ export function JobCard(props: {
   removeLabel?: string;
   /** المدة قبل الحذف وبعده (ث) */
   lengths?: [number, number] | null;
+  /** كشف الصمت أو السواد: ما سيُحذف، والمدى المحلَّل، وهل الملف فيديو (للعرض المرئي والمشغّل) */
+  removal?: { cuts: [number, number][]; range: [number, number]; video: boolean; black: boolean } | null;
   /** موقعها في الطابور: [الترتيب، عدد المنتظرين] (U-55) */
   queuePos?: [number, number];
   onCopyMarkers?: () => void;
@@ -269,9 +272,9 @@ export function JobCard(props: {
           <span className="faint">
             {j.meta}
             {r?.end != null && (
-              <span className="ltr">
-                {" "}
-                · ✂ {formatDuration(r.start ?? 0)}–{formatDuration(r.end)}
+              <span className="meta-trim ltr">
+                <Icon name="scissors" size={14} />
+                {formatDuration(r.start ?? 0)}–{formatDuration(r.end)}
               </span>
             )}
           </span>
@@ -309,8 +312,26 @@ export function JobCard(props: {
           />
         )}
 
-        {j.state === "done" && !j.topics && j.levels && <LevelsLine levels={j.levels} />}
-        {j.state === "done" && !j.topics && j.markers && j.markers.length > 0 && (
+        {j.state === "done" && props.removal && j.markers && (
+          <div className="markers">
+            <SilenceView
+              found={j.markers}
+              cuts={props.removal.cuts}
+              range={props.removal.range}
+              levels={j.levels}
+              path={j.convert?.inputs[0]}
+              video={props.removal.video}
+              black={props.removal.black}
+            />
+            {props.onRemoveFound && j.markers.length > 0 && (
+              <button className="btn btn-sm mt-2" onClick={props.onRemoveFound} title={t.removeHint}>
+                <Icon name="scissors" size={16} /> {props.removeLabel}
+              </button>
+            )}
+          </div>
+        )}
+        {j.state === "done" && !props.removal && !j.topics && j.levels && <LevelsLine levels={j.levels} />}
+        {j.state === "done" && !props.removal && !j.topics && j.markers && j.markers.length > 0 && (
           <div className="markers">
             <div className="marker-list ltr">
               {j.markers.slice(0, 40).map(([s, e], i) => (

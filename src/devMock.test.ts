@@ -17,6 +17,8 @@ const NULL_IS_FINE = new Set([
   "download_app_update",
   "install_app_update",
   "save_settings",
+  // يسمح للمشغّل بقراءة الملف؛ في المعاينة لا ملف حقيقي فيبقى المشغّل مخفيًا
+  "allow_media",
   "export_settings",
   "save_scheduled",
   "save_cookies",

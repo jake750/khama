@@ -29,7 +29,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 # نفس السطر الفرعي لحزمة @tauri-apps/api في package.json (~2.12): الجسر بينهما يجب أن يتطابق (T-82)
-tauri = { version = "2.12", features = ["tray-icon"] }
+tauri = { version = "2.12", features = ["tray-icon", "protocol-asset"] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 # إشعار عند انتهاء التنزيل، وقراءة الحافظة (لصق الرابط ومراقبتها)

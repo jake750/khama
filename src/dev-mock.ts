@@ -169,6 +169,34 @@ function fakeJob(id: number) {
   }, 600);
 }
 
+/** كشف الصمت: وقفات ومستوى صوت مصطنع (كلام بين −22 و−14 dB، وخلفية −64 dB في الوقفات) لـ 40 ث */
+function fakeSilence(id: number) {
+  const markers: [number, number][] = [
+    [3.1, 4.4],
+    [9.8, 10.6],
+    [17.2, 19.9],
+    [26.4, 27.3],
+    [33, 34.8],
+  ];
+  const step = 0.04;
+  const envelope = Array.from({ length: 1000 }, (_, i) => {
+    const t = i * step;
+    return markers.some(([s, e]) => t >= s && t < e) ? -64 + Math.sin(i) * 2 : -18 + Math.sin(i / 3) * 4;
+  });
+  emit("job-update", { id, state: "analyzing", percent: 60 });
+  setTimeout(
+    () =>
+      emit("job-update", {
+        id,
+        state: "done",
+        percent: 100,
+        markers,
+        levels: { noise: -63.8, speech: -18.3, threshold: -50.1, manual: false, envelope, envStart: 0, envStep: step },
+      }),
+    600,
+  );
+}
+
 /** تحليل المواضيع: نتيجة حقيقية من khama-bench على فيديو كلام (مختصرة) */
 function fakeTopics(id: number) {
   emit("job-update", { id, state: "analyzing", percent: 40 });
@@ -331,7 +359,9 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       };
       if (req.history)
         pending.set(id, { ...req.history, url: req.url ?? "", kind: cmd === "start_convert" ? "convert" : (req.kind ?? "video") });
-      if ((args.request as { preset?: string } | undefined)?.preset === "topics") setTimeout(() => fakeTopics(id), 50);
+      const preset = (args.request as { preset?: string } | undefined)?.preset;
+      if (preset === "topics") setTimeout(() => fakeTopics(id), 50);
+      else if (preset === "detect_silence") setTimeout(() => fakeSilence(id), 50);
       else setTimeout(() => fakeJob(id), 50);
       return id;
     }

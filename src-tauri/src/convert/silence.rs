@@ -68,7 +68,7 @@ pub fn auto_threshold(db: &[f32]) -> Option<f64> {
 }
 
 /// ما قيس في الملف، لتعرضه الواجهة فيعرف المستخدم أين يضع المستوى اليدوي
-#[derive(Debug, Clone, Copy, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct SilenceLevels {
@@ -80,11 +80,30 @@ pub struct SilenceLevels {
     pub threshold: Option<f64>,
     /// true = اختارها المستخدم، false = قيست تلقائيًا
     pub manual: bool,
+    /// مستوى الصوت عبر الزمن مصغّرًا لرسمه (أعلى إطار في كل خانة، dB): يرى المستخدم أين الكلام وأين الصمت
+    pub envelope: Vec<f32>,
+    /// وقت أول خانة ومدة كل خانة (ث)
+    pub env_start: f64,
+    pub env_step: f64,
+}
+
+/// أكثر خانات الرسم: تكفي شاشة عريضة، ونحو 8 KB فقط في الحدث
+const ENV_MAX: usize = 1500;
+
+/// المستوى مصغّرًا: أعلى قيمة في كل خانة، فلا تختفي كلمة قصيرة بين إطارين صامتين
+pub fn envelope(db: &[f32]) -> (Vec<f32>, usize) {
+    let per = db.len().div_ceil(ENV_MAX).max(1);
+    let env = db
+        .chunks(per)
+        .map(|c| (c.iter().copied().fold(FLOOR_DB, f32::max) * 10.0).round() / 10.0)
+        .collect();
+    (env, per)
 }
 
 /// المستويات المقيسة والعتبة التي ستُستعمل بهذه الخيارات
 pub fn levels_summary(lv: &Levels, db: Option<f64>) -> Option<SilenceLevels> {
     let (noise, speech) = floor_and_speech(&lv.db)?;
+    let (env, per) = envelope(&lv.db);
     let manual = db.filter(|v| v.is_finite());
     Some(SilenceLevels {
         noise: (noise * 10.0).round() / 10.0,
@@ -94,6 +113,9 @@ pub fn levels_summary(lv: &Levels, db: Option<f64>) -> Option<SilenceLevels> {
             .or_else(|| auto_threshold(&lv.db))
             .map(|t| (t * 10.0).round() / 10.0),
         manual: manual.is_some(),
+        envelope: env,
+        env_start: lv.start,
+        env_step: per as f64 * FRAME_SECS,
     })
 }
 
@@ -286,6 +308,17 @@ mod tests {
         assert!((runs[0][0] - 2.0).abs() < 1e-6 && (runs[0][1] - 3.0).abs() < 1e-6);
         // صمت آخر الملف يُحسب
         assert!((runs[1][0] - 6.3).abs() < 1e-6 && (runs[1][1] - 7.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn envelope_keeps_peaks_and_caps_points() {
+        let mut db = vec![-80.0_f32; 10_000];
+        db[4321] = -12.0;
+        let (env, per) = envelope(&db);
+        assert!(env.len() <= ENV_MAX);
+        assert_eq!(per, 7);
+        assert_eq!(env[4321 / per], -12.0);
+        assert_eq!(envelope(&[-20.0, -30.0]).0, vec![-20.0, -30.0]);
     }
 
     #[test]

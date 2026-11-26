@@ -1,4 +1,5 @@
 import { Segmented } from "./Segmented";
+import { Select } from "./Select";
 
 /** اختيار واحد: حتى 5 خيارات أزرار مجزّأة، وأكثر قائمة منسدلة (D-23) */
 export function Pick<T extends string | number | null>(props: {
@@ -22,15 +23,14 @@ export function Pick<T extends string | number | null>(props: {
     );
   }
   return (
-    <label className="pick">
+    <div className="pick">
       <span className="field-label">{props.label}</span>
-      <select className="select" value={idx} onChange={(e) => props.onChange(props.options[Number(e.target.value)].value)}>
-        {props.options.map((o, i) => (
-          <option key={String(o.value)} value={i}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
+      <Select
+        label={props.label}
+        value={String(idx)}
+        onChange={(v) => props.onChange(props.options[Number(v)].value)}
+        options={props.options.map((o, i) => ({ value: String(i), label: o.label, text: o.label }))}
+      />
+    </div>
   );
 }

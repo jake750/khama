@@ -64,7 +64,8 @@ test("المحوّل: إضافة ملف ثم اختيار إعداد ثم الب
   await tab(page, "Convert").click();
   await page.getByRole("button", { name: "Choose files" }).click();
   await expect(page.getByText("clip-phone.mp4").first()).toBeVisible();
-  const preset = page.getByRole("button", { name: /^H\.264 for editing/ });
+  // البطاقة في قسم «الصيغة» (شارة الوصفة تحمل الاسم نفسه)
+  const preset = page.locator(".cat-pane").getByRole("button", { name: /^H\.264 for editing/ });
   await preset.click();
   await expect(preset).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("main").getByRole("button", { name: "Convert", exact: true }).click();

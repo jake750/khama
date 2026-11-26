@@ -156,6 +156,7 @@ macro_rules! handlers_with {
             convert::analyze_file,
             convert::sample_estimate,
             convert::preview_frame,
+            convert::allow_media,
             convert::hw_encoders,
             convert::start_convert,
             convert::import_files,

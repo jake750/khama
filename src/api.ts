@@ -310,6 +310,10 @@ export interface SilenceLevels {
   /** فارغ = لا فرق واضح بين الكلام والضجيج */
   threshold?: number | null;
   manual: boolean;
+  /** مستوى الصوت عبر الزمن مصغّرًا (dB)، ووقت أول خانة ومدة كل خانة (ث) */
+  envelope?: number[];
+  envStart?: number;
+  envStep?: number;
 }
 
 /** جملة من الترجمة بأوقاتها (بثواني الملف) */
@@ -403,6 +407,8 @@ export const api = {
   listJobs: () => invoke<Record<string, unknown>[]>("list_jobs"),
   revealFile: (path: string) => invoke<void>("reveal_file", { path }),
   openFile: (path: string) => invoke<void>("open_file", { path }),
+  /** يسمح بتشغيل ملف وسائط واحد في الواجهة (asset://) */
+  allowMedia: (path: string) => invoke<void>("allow_media", { path }),
   aiReady: () => invoke<boolean>("ai_ready"),
   cancelProbe: () => invoke<void>("cancel_probe"),
   startNow: (id: number) => invoke<void>("start_now", { id }),

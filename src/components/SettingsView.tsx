@@ -20,6 +20,8 @@ import { errorText, useI18n } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
 import { useConfirm } from "./Dialog";
 import { Icon, type IconName } from "./Icon";
+import { Hint } from "./Hint";
+import { Select } from "./Select";
 import { Segmented, Toggle } from "./Segmented";
 import { isMobile, isWindows, MOBILE_BASES, mobileSaveDir, type MobileBase } from "../platform";
 import { logError } from "../log";
@@ -228,7 +230,7 @@ export function SettingsView(props: {
             <div className="setting-row">
               <div className="min-w-0">
                 <div>{t.backupTitle}</div>
-                <div className="faint">{t.backupHint}</div>
+                <Hint className="hint-plain" text={t.backupHint} />
               </div>
               <div className="row-2">
                 <button className="btn" onClick={exportBackup}>
@@ -296,7 +298,7 @@ function Section(props: { id: string; title: string; intro?: string; children: R
     <section className="card settings-section" id={`set-${props.id}`} data-section={props.id}>
       <div>
         <h2>{props.title}</h2>
-        {props.intro && <p className="faint m-0">{props.intro}</p>}
+        {props.intro && <Hint text={props.intro} />}
       </div>
       <div>{props.children}</div>
     </section>
@@ -357,21 +359,16 @@ function MobileSaveFolder(props: { settings: Settings; update: (p: Partial<Setti
     <div className="setting-row column">
       <div>
         <div>{t.saveFolder}</div>
-        <div className="faint">{t.mobileSaveHint}</div>
+        <Hint className="hint-plain" text={t.mobileSaveHint} />
       </div>
       <div className="row-2">
-        <select
-          className="select ltr"
+        <Select
+          className="ltr"
           value={s.mobileBase ?? "Download"}
-          onChange={(e) => update({ mobileBase: e.target.value as MobileBase })}
-          aria-label={t.mobileBaseLabel}
-        >
-          {MOBILE_BASES.map((b) => (
-            <option key={b} value={b}>
-              {b}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => update({ mobileBase: v as MobileBase })}
+          label={t.mobileBaseLabel}
+          options={MOBILE_BASES.map((b) => ({ value: b, label: b, text: b }))}
+        />
         <span className="faint">/</span>
         <input
           className="input ltr"
@@ -415,7 +412,7 @@ function DownloadsSection(props: { settings: Settings; update: (p: Partial<Setti
       <div className="setting-row column">
         <div>
           <div>{t.filenameTitle}</div>
-          <div className="faint">{t.filenameHint}</div>
+          <Hint className="hint-plain" text={t.filenameHint} />
         </div>
         <input
           className="input wide ltr"
@@ -480,7 +477,7 @@ function DownloadsSection(props: { settings: Settings; update: (p: Partial<Setti
       <div className="setting-row">
         <div>
           <div>{t.rateLimit}</div>
-          <div className="faint">{t.rateLimitHint}</div>
+          <Hint className="hint-plain" text={t.rateLimitHint} />
         </div>
         <Segmented<string>
           label={t.rateLimit}
@@ -492,7 +489,7 @@ function DownloadsSection(props: { settings: Settings; update: (p: Partial<Setti
       <div className="setting-row">
         <div>
           <div>{t.parallelTitle}</div>
-          <div className="faint">{t.parallelHint}</div>
+          <Hint className="hint-plain" text={t.parallelHint} />
         </div>
         <Segmented<string>
           label={t.parallelTitle}
@@ -715,19 +712,16 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
         {s.cookiesMode === "browser" && (
           <div>
             <span className="field-label">{t.browser}</span>
-            <select
-              className="select"
-              aria-label={t.browser}
+            <Select
+              label={t.browser}
               value={s.cookiesBrowser}
-              onChange={(e) => update({ cookiesBrowser: e.target.value })}
-            >
-              {BROWSERS.map((b) => (
-                <option key={b} value={b}>
-                  {browserName(b)}
-                  {b === "firefox" ? ` — ${t.recommended}` : ""}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => update({ cookiesBrowser: v })}
+              options={BROWSERS.map((b) => ({
+                value: b,
+                text: browserName(b),
+                label: b === "firefox" ? `${browserName(b)} — ${t.recommended}` : browserName(b),
+              }))}
+            />
             {/* منذ Chrome 127 «التشفير المرتبط بالتطبيق» يمنع قراءتها على Windows غالبًا (U-19) */}
             {s.cookiesBrowser !== "firefox" && s.cookiesBrowser !== "safari" && (
               <div className={isWindows ? "alert warn mt-2" : "faint mt-2"}>
@@ -736,7 +730,7 @@ function CookiesSection(props: { settings: Settings; update: (p: Partial<Setting
               </div>
             )}
             {/* Safari يحتاج إذنًا من النظام (F-66) */}
-            {s.cookiesBrowser === "safari" && <div className="faint mt-2">{t.safariNote}</div>}
+            {s.cookiesBrowser === "safari" && <Hint className="mt-2" icon="alert" text={t.safariNote} />}
           </div>
         )}
 
@@ -894,18 +888,12 @@ function WatchSection(props: { settings: Settings; update: (p: Partial<Settings>
           <span className="path ltr" title={w.dir}>
             {w.dir}
           </span>
-          <select
-            className="select"
-            aria-label={`${t.format}: ${w.dir}`}
+          <Select
+            label={`${t.format}: ${w.dir}`}
             value={w.preset}
-            onChange={(e) => set(list.map((x, k) => (k === i ? { ...x, preset: e.target.value } : x)))}
-          >
-            {PRESETS.filter((p) => p.kind !== "detect").map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name[lang]}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => set(list.map((x, k) => (k === i ? { ...x, preset: v } : x)))}
+            options={PRESETS.filter((p) => p.kind !== "detect").map((p) => ({ value: p.id, label: p.name[lang], text: p.name[lang] }))}
+          />
           <button className="icon-btn sm" aria-label={t.remove} title={t.remove} onClick={() => set(list.filter((_, k) => k !== i))}>
             <Icon name="x" size={16} />
           </button>

@@ -1,5 +1,6 @@
 import { useRef, type ReactNode } from "react";
 import { useSlidingIndicator } from "../motion";
+import { Hint } from "./Hint";
 
 export interface SegOption<T extends string> {
   value: T;
@@ -40,7 +41,7 @@ export function Toggle(props: { checked: boolean; onChange: (v: boolean) => void
       <span className="switch" />
       <span>
         <span>{props.title}</span>
-        {props.hint && <span className="faint block">{props.hint}</span>}
+        {props.hint && <Hint className="hint-plain" text={props.hint} />}
       </span>
     </label>
   );

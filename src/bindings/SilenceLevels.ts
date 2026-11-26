@@ -19,4 +19,12 @@ threshold: number | null,
 /**
  * true = اختارها المستخدم، false = قيست تلقائيًا
  */
-manual: boolean, };
+manual: boolean, 
+/**
+ * مستوى الصوت عبر الزمن مصغّرًا لرسمه (أعلى إطار في كل خانة، dB): يرى المستخدم أين الكلام وأين الصمت
+ */
+envelope: Array<number>, 
+/**
+ * وقت أول خانة ومدة كل خانة (ث)
+ */
+envStart: number, envStep: number, };

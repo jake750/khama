@@ -16,6 +16,7 @@ import { Pick } from "./Pick";
 import { useI18n, type Dict } from "../i18n";
 import { estimateSize, presetById, presetFits, PRESETS, suggestPreset, suggestReason, type PresetDef, type PresetGroup } from "../presets";
 import { ErrorBox } from "./ErrorBox";
+import { Hint, splitHint } from "./Hint";
 import { Icon, type IconName } from "./Icon";
 import { AnimatedList, SlideSwitch } from "../motion";
 import { Segmented, Toggle } from "./Segmented";
@@ -698,7 +699,8 @@ export function ConvertView(props: {
           <b>{p.name[lang]}</b>
           {tag && <span className={`preset-tag ${tag}`}>{tag === "fast" ? t.tagFast : t.tagHeavy}</span>}
         </span>
-        <span>{p.desc[lang]}</span>
+        {/* أول جملة فقط، والوصف كامل حين تُختار البطاقة: لا تصبح كل بطاقة فقرة */}
+        <span className="preset-desc">{on ? p.desc[lang] : splitHint(p.desc[lang])[0]}</span>
         {p.id === suggestion && (
           <span className="preset-suggested">
             <Icon name="check" size={16} /> {t.suggestedFor}
@@ -936,7 +938,7 @@ export function ConvertView(props: {
                   />
                   <div className="preset-grid">
                     {PRESETS.filter((p) => p.group === fmtGroup && isFormat(p)).map((p) =>
-                      card(p, formatOn && p.id === fmt.id, () => (formatOn && p.id === fmt.id ? setFormatOn(false) : pickFormat(p.id))),
+                      card(p, formatOn && p.id === fmt.id, () => pickFormat(p.id)),
                     )}
                   </div>
                   {!formatOn && <div className="cat-note faint">{convNeeded ? t.noFormatFamily : t.noFormat}</div>}
@@ -1008,7 +1010,7 @@ export function ConvertView(props: {
                         { value: "sharpen", label: t.enhanceSharpen },
                       ]}
                     />
-                    {opts.enhance && <div className="faint mt-2">{t.enhanceHint}</div>}
+                    {opts.enhance && <Hint className="mt-2" icon="contrast" text={t.enhanceHint} />}
                     <div className="toggle-grid">
                       <Toggle checked={opts.denoise} onChange={(denoise) => set({ denoise })} title={t.denoise} hint={t.denoiseHint} />
                       <Toggle
@@ -1021,7 +1023,7 @@ export function ConvertView(props: {
                     </div>
                     <FilePick label={t.lut} value={opts.lut} extensions={["cube"]} onChange={(lut) => set({ lut })} />
                     {/* ما يفعله كل خيار بالضبط (F-45، F-46) */}
-                    {opts.lut && <div className="faint mt-2">{t.lutHint}</div>}
+                    {opts.lut && <Hint className="mt-2" icon="contrast" text={t.lutHint} />}
                   </section>
                 ))}
 
@@ -1031,7 +1033,7 @@ export function ConvertView(props: {
                   <div className="preset-grid mt-0">
                     {PRESETS.filter(isAi).map((p) => card(p, ai.includes(p.id), () => toggleAi(p.id)))}
                   </div>
-                  {oneFile && convNeeded && <div className="faint mt-2">{t.aiOneAtATime}</div>}
+                  {oneFile && convNeeded && <Hint className="mt-2" icon="info" text={t.aiOneAtATime} />}
                   {fmtAudio ? (
                     <>
                       <div className="pick-grid mt-4">
@@ -1054,8 +1056,8 @@ export function ConvertView(props: {
                         />
                       </div>
                       {/* ما يكلّفه كل خيار مكتوبًا تحته (F-40، F-41) */}
-                      {opts.loudness != null && <div className="faint mt-2">{t.loudHint}</div>}
-                      {opts.replaceAudio && <div className="faint mt-2">{t.replaceAudioHint}</div>}
+                      {opts.loudness != null && <Hint className="mt-2" icon="volume" text={t.loudHint} />}
+                      {opts.replaceAudio && <Hint className="mt-2" icon="music" text={t.replaceAudioHint} />}
                       {anyVideo && <Toggle checked={opts.mute} onChange={(mute) => set({ mute })} title={t.mute} />}
                     </>
                   ) : (
@@ -1110,7 +1112,7 @@ export function ConvertView(props: {
                       />
                     </div>
                     <RotatePick value={opts.rotate ?? null} onChange={(rotate) => set({ rotate })} />
-                    {opts.speed != null && opts.speed !== 1 && <div className="faint mt-2">{t.speedHint}</div>}
+                    {opts.speed != null && opts.speed !== 1 && <Hint className="mt-2" icon="gauge" text={t.speedHint} />}
                   </section>
                 ))}
 
@@ -1131,7 +1133,7 @@ export function ConvertView(props: {
                       </div>
                     </>
                   ) : (
-                    ready.length > 1 && <div className="faint mb-2">{t.trimOneFile}</div>
+                    ready.length > 1 && <Hint className="mb-2" icon="scissors" text={t.trimOneFile} />
                   )}
                   {anyVideo && (formatOn ? fmt.kind === "video" : true) ? (
                     <>
@@ -1150,8 +1152,8 @@ export function ConvertView(props: {
                         />
                         {opts.watermark && <PosGrid value={opts.watermarkPos ?? "br"} onChange={(watermarkPos) => set({ watermarkPos })} />}
                       </div>
-                      {opts.subtitles && <div className="faint mt-2">{t.subtitlesHint}</div>}
-                      {opts.watermark && <div className="faint mt-2">{t.watermarkHint}</div>}
+                      {opts.subtitles && <Hint className="mt-2" icon="captions" text={t.subtitlesHint} />}
+                      {opts.watermark && <Hint className="mt-2" icon="image" text={t.watermarkHint} />}
                       <Toggle checked={opts.timecode} onChange={(timecode) => set({ timecode })} title={t.timecode} hint={t.timecodeHint} />
                     </>
                   ) : (
@@ -1218,8 +1220,8 @@ export function ConvertView(props: {
                           options={[0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5].map((v) => ({ value: v, label: t.secs(v) }))}
                         />
                       </div>
-                      <div className="faint mt-2">{t.silenceHint}</div>
-                      {analysis.includes("topics") && <div className="faint mt-2">{t.topicsHint}</div>}
+                      <Hint className="mt-2" icon="wave" text={t.silenceHint} />
+                      {analysis.includes("topics") && <Hint className="mt-2" icon="list" text={t.topicsHint} />}
                       {analysis.includes("topics") && (
                         <div className="mt-2">
                           <Toggle

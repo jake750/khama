@@ -421,7 +421,7 @@ pub fn queue_convert(app: &AppHandle, request: ConvertRequest, id: Option<u64>) 
                 file: found.is_none().then(|| path.to_string_lossy().into_owned()),
                 transcript: found.as_ref().and_then(|f| f.transcript),
                 topics: found.as_ref().and_then(|f| f.topics.clone()),
-                levels: found.as_ref().and_then(|f| f.levels),
+                levels: found.as_ref().and_then(|f| f.levels.clone()),
                 cues: found.as_ref().and_then(|f| f.cues.clone()),
                 words: found.as_ref().and_then(|f| f.words.clone()),
                 markers: found.map(|f| f.markers),
