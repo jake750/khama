@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { SilenceLevels } from "../api";
+import type { Cue, SilenceLevels } from "../api";
 import { formatDuration, formatTimecode } from "../format";
 import { useI18n } from "../i18n";
 import type { Range, TopicPlan } from "../reels";
@@ -54,10 +54,25 @@ export function TopicPanel(props: {
   /** طول الجزء بعد حذف الصمت */
   partLength: (r: Range) => number;
   hasCues: boolean;
+  /** النص كله بأوقاته: يُعرض منه كلام الموضوع كاملًا عند الطلب */
+  cues?: Cue[];
   onExport?: (sections: Range[], o: ExportOptions) => void;
   onCopyTopics?: () => void;
 }) {
   const { t } = useI18n();
+  // المواضيع التي فُتح نصها كاملًا
+  const [open, setOpen] = useState<Set<number>>(new Set());
+  const toggleOpen = (i: number) =>
+    setOpen((cur) => {
+      const next = new Set(cur);
+      if (!next.delete(i)) next.add(i);
+      return next;
+    });
+  const fullText = (r: { start: number; end: number }) =>
+    (props.cues ?? [])
+      .filter((c) => c.start >= r.start - 0.05 && c.start < r.end)
+      .map((c) => c.text)
+      .join(" ");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [o, setO] = useState<ExportOptions>({ join: false, tight: true, subs: true, maxWords: 7, maxSecs: 3.5 });
   const sections = selectedSections(props.rows, props.plans, picked);
@@ -131,8 +146,21 @@ export function TopicPanel(props: {
                 </div>
               )}
               <div className="faint topic-text" dir="auto">
-                {r.text}
+                {open.has(i) ? fullText(r) : r.text}
               </div>
+              {/* الملخص أول 160 حرفًا فقط: النص كاملًا من الترجمة نفسها، ليعرف ما في الموضوع قبل تصديره */}
+              {(props.cues?.length ?? 0) > 0 && r.text.endsWith("…") && (
+                <div className="topic-more">
+                  <button className="btn btn-sm btn-ghost" aria-expanded={open.has(i)} onClick={() => toggleOpen(i)}>
+                    <Icon name="captions" size={16} /> {open.has(i) ? t.topicTextLess : t.topicTextAll}
+                  </button>
+                  {open.has(i) && (
+                    <button className="btn btn-sm btn-ghost" onClick={() => navigator.clipboard?.writeText(fullText(r)).catch(() => {})}>
+                      <Icon name="copy" size={16} /> {t.topicTextCopy}
+                    </button>
+                  )}
+                </div>
+              )}
               {plan.kind === "no" && plan.reason && <div className="faint topic-why">{t.topicNo[plan.reason]}</div>}
               {plan.parts.length > 0 && (
                 <ul className="topic-parts">

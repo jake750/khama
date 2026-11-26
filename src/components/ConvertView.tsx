@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   api,
   asAppError,
@@ -14,17 +14,7 @@ import {
 import { formatBytes, formatDuration } from "../format";
 import { Pick } from "./Pick";
 import { useI18n, type Dict } from "../i18n";
-import {
-  estimateSize,
-  GROUPS,
-  presetById,
-  presetFits,
-  PRESETS,
-  suggestPreset,
-  suggestReason,
-  type PresetDef,
-  type PresetGroup,
-} from "../presets";
+import { estimateSize, presetById, presetFits, PRESETS, suggestPreset, suggestReason, type PresetDef, type PresetGroup } from "../presets";
 import { ErrorBox } from "./ErrorBox";
 import { Icon, type IconName } from "./Icon";
 import { AnimatedList, SlideSwitch } from "../motion";
@@ -174,8 +164,6 @@ function speedTag(p: PresetDef): "fast" | "heavy" | null {
   if (p.kind === "stems") return "heavy";
   return null;
 }
-
-type OptTab = "trim" | "picture" | "burn" | "audio";
 
 /** خيارات نطاق واحد: المشتركة لكل الملفات أو ملف بعينه (U-22) */
 interface Scoped {
@@ -349,6 +337,40 @@ function FilePick(props: { label: string; value?: string | null; extensions: str
   );
 }
 
+/** أقسام مساحة العمل: الملف يُضاف مرة، والأدوات من كل قسم تُجمع في «وصفة» واحدة */
+type Cat = "format" | "enhance" | "audio" | "frame" | "text" | "analysis";
+const CATS: { id: Cat; icon: IconName }[] = [
+  { id: "format", icon: "convert" },
+  { id: "enhance", icon: "contrast" },
+  { id: "audio", icon: "wave" },
+  { id: "frame", icon: "gauge" },
+  { id: "text", icon: "captions" },
+  { id: "analysis", icon: "search" },
+];
+/** مجموعات الصيغ داخل قسم «الصيغة» (أدوات النسخ بلا ترميز تُعدّ صيغة) */
+type FmtGroup = "edit" | "publish" | "audio" | "tools";
+const isFormat = (p: PresetDef) => ["video", "gif", "audio", "copy"].includes(p.kind);
+const isAi = (p: PresetDef) => p.kind === "stems";
+const isAnalysis = (p: PresetDef) => ["detect", "frame", "sequence"].includes(p.kind);
+
+/** صيغة من عائلة المصدر حين تُطلب أدوات دون صيغة: ProRes يبقى ProRes، والصوت يبقى صوتًا */
+function familyPreset(f: SourceFile): string {
+  const v = f.info?.video;
+  if (!v) {
+    const ext = f.path.split(".").pop()?.toLowerCase() ?? "";
+    return ({ mp3: "mp3", m4a: "aac", aac: "aac", flac: "flac", opus: "opus", ogg: "opus" } as Record<string, string>)[ext] ?? "wav";
+  }
+  return v.codec === "prores" ? "prores_hq" : v.codec === "dnxhd" ? "dnxhr_hq" : "edit_h264";
+}
+
+/** عملية واحدة سيبدؤها «ابدأ»، و`then` خطوة تعمل على ناتجها (ملف واحد) */
+interface Step {
+  req: ConvertRequest;
+  title: string;
+  meta: string;
+  then?: { preset: string; options: ConvertOptions; meta: string };
+}
+
 export function ConvertView(props: {
   settings: Settings;
   update: (patch: Partial<Settings>) => void;
@@ -360,6 +382,13 @@ export function ConvertView(props: {
   /** «امسح القائمة» مع «تراجع» (U-98) */
   onClearFiles: () => void;
   onStart: (req: ConvertRequest, title: string, meta: string) => Promise<void>;
+  /** خطوتان على ملف واحد: الثانية تبدأ على ناتج الأولى حين تكتمل */
+  onChain: (
+    first: ConvertRequest,
+    title: string,
+    meta: string,
+    next: (file: string) => { req: ConvertRequest; meta: string },
+  ) => Promise<void>;
 }) {
   const { t, lang } = useI18n();
   const { settings: s, update, files } = props;
@@ -367,12 +396,17 @@ export function ConvertView(props: {
   // خيارات خاصة بملف واحد تتقدّم على المشتركة (U-22)
   const [overrides, setOverrides] = useState<Record<string, Scoped>>({});
   const [editPath, setEditPath] = useState<string | null>(null);
-  const [more, setMore] = useState(false);
-  const [tabPick, setTab] = useState<OptTab>("picture");
   const [error, setError] = useState<AppError | null>(null);
   const [busy, setBusy] = useState(false);
-  const preset = presetById(s.convertPreset) ?? PRESETS[0];
-  const [group, setGroup] = useState<PresetGroup>(preset.group);
+  // الصيغة المحفوظة قد تكون أداة (من نسخة سابقة): تنتقل لقسمها
+  const saved = presetById(s.convertPreset) ?? PRESETS[0];
+  const fmt = isFormat(saved) ? saved : PRESETS[0];
+  const [formatOn, setFormatOn] = useState(isFormat(saved));
+  const [ai, setAi] = useState<string[]>(isAi(saved) ? [saved.id] : []);
+  const [analysis, setAnalysis] = useState<string[]>(isAnalysis(saved) ? [saved.id] : []);
+  const [oneFile, setOneFile] = useState(true);
+  const [cat, setCat] = useState<Cat>(isAi(saved) ? "audio" : isAnalysis(saved) ? "analysis" : "format");
+  const [fmtGroup, setFmtGroup] = useState<FmtGroup>(fmt.group);
 
   const ready = files.filter((f) => f.info);
   const editFile = (editPath && ready.find((f) => f.path === editPath)) || null;
@@ -392,16 +426,12 @@ export function ConvertView(props: {
     });
   }, [files]);
   const audioOnly = ready.filter((f) => !f.info!.video).length;
+  const anyVideo = ready.some((f) => f.info!.video);
   const loading = files.some((f) => !f.info && !f.error);
   const single = ready.length === 1 ? ready[0].info! : null;
   const fits = (p: PresetDef) => ready.every((f) => presetFits(p, f.info));
   const suggestion = single ? suggestPreset(single.issues) : null;
   const reason = single ? suggestReason(single.issues) : null;
-
-  const kind = preset.kind;
-  const showPicture = ["video", "gif", "frame", "sequence"].includes(kind);
-  const showAudio = kind === "video" || kind === "audio";
-  const showBurn = kind === "video";
   const trimInfo = editFile ? editFile.info! : single;
   const canTrim = !!trimInfo?.duration;
   const move = (i: number, by: -1 | 1) =>
@@ -410,58 +440,75 @@ export function ConvertView(props: {
       [next[i], next[i + by]] = [next[i + by], next[i]];
       return next;
     });
-  const canMerge = ready.length > 1 && ["video", "audio", "gif"].includes(kind);
-  const tabs = (
-    [showPicture && "picture", canTrim && "trim", showBurn && "burn", (showAudio || kind === "copy") && "audio"] as (OptTab | false)[]
-  ).filter((x): x is OptTab => !!x);
-  const tab: OptTab | undefined = tabs.includes(tabPick) ? tabPick : tabs[0];
-  // ما فُعّل داخل «خيارات إضافية» يظهر على زرها حتى وهي مطوية، فلا يُطبَّق LUT أو سرعة منسيّة بصمت (U-21)
+
+  // ما فُعّل في كل قسم (للعدّاد على القائمة الجانبية وشارات الوصفة)
   const o = opts;
-  const activeOpts = [
-    trimOn && canTrim && t.optTrim,
-    showPicture &&
-      (o.size ||
-        o.aspect ||
-        o.fps ||
-        o.rotate ||
-        o.deinterlace ||
-        o.denoise ||
-        o.enhance ||
-        o.tonemap ||
-        o.lut ||
-        (o.speed && o.speed !== 1)) &&
-      t.optPicture,
-    showBurn && (o.subtitles || o.watermark || o.timecode) && t.optBurn,
-    showAudio && (o.loudness || o.replaceAudio || o.mute) && t.optAudio,
+  const fmtPicture = ["video", "gif"].includes(fmt.kind) || !formatOn;
+  const fmtAudio = fmt.kind === "video" || fmt.kind === "audio" || !formatOn;
+  const enhanceOn = [
+    o.enhance && `${t.enhance}: ${enhanceName(t, o.enhance)}`,
+    o.denoise && t.denoise,
+    o.deinterlace && t.deinterlace,
+    o.tonemap && t.tonemap,
+    o.lut && t.lut,
   ].filter((x): x is string => !!x);
-  const resetOpts = () => setScope(() => ({ opts: { ...defaultOptions(), quality: opts.quality }, trimOn: false }));
+  const frameOn = [
+    o.size && (o.size === 2160 ? "4K" : `${o.size}p`),
+    o.aspect,
+    o.fps && `${o.fps} fps`,
+    o.speed && o.speed !== 1 && `${o.speed}×`,
+    o.rotate && t.rotate,
+  ].filter((x): x is string => !!x);
+  const textOn = [trimOn && canTrim && t.optTrim, o.subtitles && t.subtitles, o.watermark && t.watermark, o.timecode && t.timecode].filter(
+    (x): x is string => !!x,
+  );
+  const audioOptsOn = [o.loudness != null && t.loudness, o.replaceAudio && t.replaceAudio, o.mute && t.mute].filter(
+    (x): x is string => !!x,
+  );
+  // أدوات تحتاج تمريرة تحويل حتى لو لم تُختر صيغة (القص وحده لا، إن كانت معه أداة أخرى تقص)
+  const pictureMods = fmtPicture && enhanceOn.length + frameOn.length + (textOn.length - (trimOn && canTrim ? 1 : 0)) > 0;
+  const convNeeded =
+    formatOn || pictureMods || (fmtAudio && audioOptsOn.length > 0) || (trimOn && canTrim && ai.length === 0 && analysis.length === 0);
+  const conv = (f: SourceFile | null): PresetDef => (formatOn ? fmt : presetById(familyPreset(f ?? ready[0]))!);
+  const counts: Record<Cat, number> = {
+    format: formatOn ? 1 : 0,
+    enhance: fmtPicture ? enhanceOn.length : 0,
+    audio: ai.length + (fmtAudio ? audioOptsOn.length : 0),
+    frame: fmtPicture ? frameOn.length : 0,
+    text: textOn.length,
+    analysis: analysis.length,
+  };
+  // «ملف واحد / ملف لكل أداة» لا يهم إلا حين تجتمع أداة ذكاء اصطناعي مع تحويل، أو أكثر من أداة ذكاء
+  const askMode = ai.length > 0 && (convNeeded || ai.length > 1);
+  const chain = oneFile && ai.length === 1 && convNeeded;
 
   /**
-   * نرسل فقط الخيارات المناسبة لنوع الـ Preset (الأقسام المخفية لا تؤثر).
-   * `f` = ملف بعينه (خياراته الخاصة إن وُجدت)، أو null للدمج (المشتركة).
+   * الخيارات التي تخص صيغة بعينها (الأقسام التي لا تنطبق لا تؤثر).
+   * `f` = ملف بعينه (خياراته الخاصة إن وُجدت)، أو null للدمج (المشتركة). `trim` = هل يُقص في هذه الخطوة.
    */
-  const effective = (f: SourceFile | null, sc: Scoped = (f && overrides[f.path]) || shared): ConvertOptions => {
+  const effective = (p: PresetDef, f: SourceFile | null, trim = true, sc: Scoped = (f && overrides[f.path]) || shared): ConvertOptions => {
     const opts = sc.opts;
     const info = f?.info;
-    const o: ConvertOptions = { ...defaultOptions(), quality: opts.quality, hw: preset.hw && s.convertHw };
+    const kind = p.kind;
+    const o: ConvertOptions = { ...defaultOptions(), quality: opts.quality, hw: p.hw && s.convertHw };
     // القص المشترك لا يصح إلا لملف واحد؛ الخاص يصح لملفه
     const own = sc !== shared || (info != null && info === single);
-    if (sc.trimOn && own && info?.duration) {
+    if (trim && sc.trimOn && own && info?.duration) {
       o.start = opts.start ?? 0;
       o.end = opts.end ?? info.duration;
     }
     if (kind === "copy") o.mute = opts.mute;
-    if (preset.id === "detect_silence" || preset.id === "topics")
+    if (p.id === "detect_silence" || p.id === "topics")
       Object.assign(o, {
         silenceDb: opts.silenceDb ?? null,
         silenceMin: opts.silenceMin ?? null,
         silencePad: opts.silencePad ?? null,
         silencePadBefore: opts.silencePadBefore ?? null,
       });
-    if (preset.id === "topics")
+    if (p.id === "topics")
       Object.assign(o, { reelMin: opts.reelMin ?? null, reelMax: opts.reelMax ?? null, alignSpeech: !!opts.alignSpeech });
-    if (kind === "stems") return o;
-    if (showPicture) {
+    if (kind === "stems" || kind === "detect") return o;
+    if (["video", "gif", "frame", "sequence"].includes(kind)) {
       Object.assign(o, {
         size: opts.size,
         aspect: opts.aspect,
@@ -475,7 +522,7 @@ export function ConvertView(props: {
       });
       if (kind !== "frame") o.speed = opts.speed;
     }
-    if (showAudio) {
+    if (kind === "video" || kind === "audio") {
       Object.assign(o, {
         loudness: opts.loudness,
         replaceAudio: opts.replaceAudio,
@@ -483,32 +530,40 @@ export function ConvertView(props: {
         speed: opts.speed,
       });
     }
-    if (showBurn) {
+    if (kind === "video") {
       Object.assign(o, { subtitles: opts.subtitles, watermark: opts.watermark, watermarkPos: opts.watermarkPos, timecode: opts.timecode });
     }
     return o;
   };
+  const resetOpts = () => setScope(() => ({ opts: { ...defaultOptions(), quality: opts.quality }, trimOn: false }));
 
+  // التقدير والمعاينة لتمريرة التحويل
+  const convPreset = ready.length ? conv(ready[0]) : fmt;
   const estimate = useMemo(() => {
+    if (!convNeeded) return null;
     let sum = 0;
     for (const f of ready) {
-      const e = estimateSize(preset, f.info!, effective(f));
+      const e = estimateSize(conv(f), f.info!, effective(conv(f), f));
       if (e == null) return null;
       sum += e;
     }
     return sum || null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, preset, shared, overrides, s.convertHw]);
+  }, [ready, fmt, formatOn, convNeeded, shared, overrides, s.convertHw]);
   // المعاينة لملف واحد: الذي تُعدَّل خياراته، أو أول فيديو في القائمة
-  const previewFile = showPicture ? (editFile ?? ready.find((f) => f.info!.video)) : undefined;
-  const previewAt = previewFile ? (effective(previewFile).start ?? (previewFile.info!.duration ?? 0) / 3) : 0;
+  const previewFile = fmtPicture ? (editFile ?? ready.find((f) => f.info!.video)) : undefined;
+  const previewPreset = previewFile ? conv(previewFile) : convPreset;
+  const previewAt = previewFile ? (effective(previewPreset, previewFile).start ?? (previewFile.info!.duration ?? 0) / 3) : 0;
   /** ملف خياراته الخاصة تختلف فعلًا عن المشتركة (العلامة على صفّه) */
-  const differs = (f: SourceFile) => !!overrides[f.path] && JSON.stringify(effective(f)) !== JSON.stringify(effective(f, shared));
+  const differs = (f: SourceFile) =>
+    !!overrides[f.path] && JSON.stringify(effective(conv(f), f)) !== JSON.stringify(effective(conv(f), f, true, shared));
 
   // الصيغ بجودة ثابتة يتبع حجمها تعقيد الصورة: نقيسه بتحويل ثلاث شرائح قصيرة (A-30)
   const [measured, setMeasured] = useState<{ key: string; bytes: number; seconds: number } | null>(null);
   const sampleKey =
-    !isMobile && ready.length === 1 && preset.kind === "video" ? JSON.stringify([ready[0].path, preset.id, effective(ready[0])]) : null;
+    !isMobile && convNeeded && ready.length === 1 && convPreset.kind === "video"
+      ? JSON.stringify([ready[0].path, convPreset.id, effective(convPreset, ready[0])])
+      : null;
   useEffect(() => {
     if (!sampleKey) return;
     const [path, id, o] = JSON.parse(sampleKey) as [string, string, ConvertOptions];
@@ -529,10 +584,46 @@ export function ConvertView(props: {
   const expectedSecs = measured && measured.key === sampleKey && measured.seconds >= 30 ? measured.seconds : null;
   const shown = exact ?? estimate;
 
-  const meta = (q: ConvertOptions["quality"] = shared.opts.quality) =>
-    [preset.name[lang], preset.quality ? { high: t.qualityHigh, balanced: t.qualityBalanced, small: t.qualitySmall }[q] : null]
+  const meta = (p: PresetDef, q: ConvertOptions["quality"] = shared.opts.quality) =>
+    [p.name[lang], p.quality ? { high: t.qualityHigh, balanced: t.qualityBalanced, small: t.qualitySmall }[q] : null]
       .filter(Boolean)
       .join(" · ");
+
+  /** كل ما سيبدأ لملف واحد: أداة الذكاء (وبعدها التحويل إن كان «ملفًا واحدًا»)، والتحويل، والتحليل */
+  const stepsFor = (f: SourceFile): Step[] => {
+    const out: Step[] = [];
+    const name = baseName(f.path);
+    const aiFit = ai.map((id) => presetById(id)!).filter((p) => presetFits(p, f.info));
+    const c = conv(f);
+    const convFits = convNeeded && presetFits(c, f.info);
+    if (chain && aiFit.length === 1 && convFits) {
+      // القص في الخطوة الأولى، فالثانية تعمل على الجزء المقصوص وحده
+      const first = aiFit[0];
+      out.push({
+        req: { inputs: [f.path], preset: first.id, options: effective(first, f) },
+        title: name,
+        meta: `${meta(first)} → ${meta(c, effective(c, f).quality)}`,
+        then: { preset: c.id, options: effective(c, f, false), meta: `${meta(first)} → ${meta(c, effective(c, f).quality)}` },
+      });
+    } else {
+      for (const p of aiFit) out.push({ req: { inputs: [f.path], preset: p.id, options: effective(p, f) }, title: name, meta: meta(p) });
+      if (convFits)
+        out.push({
+          req: { inputs: [f.path], preset: c.id, options: effective(c, f) },
+          title: name,
+          meta: meta(c, effective(c, f).quality),
+        });
+    }
+    for (const id of analysis) {
+      const p = presetById(id)!;
+      if (presetFits(p, f.info))
+        out.push({ req: { inputs: [f.path], preset: p.id, options: effective(p, f) }, title: name, meta: meta(p) });
+    }
+    return out;
+  };
+  const stepCount = ready.reduce((n, f) => n + stepsFor(f).reduce((m, st) => m + (st.then ? 2 : 1), 0), 0);
+  const canMerge =
+    ready.length > 1 && convNeeded && ai.length === 0 && analysis.length === 0 && ["video", "audio", "gif"].includes(convPreset.kind);
 
   async function start(merge: boolean) {
     setError(null);
@@ -540,25 +631,27 @@ export function ConvertView(props: {
     try {
       if (merge) {
         await props.onStart(
-          { inputs: ready.map((f) => f.path), preset: preset.id, options: effective(null) },
+          { inputs: ready.map((f) => f.path), preset: convPreset.id, options: effective(convPreset, null) },
           `${baseName(ready[0].path)} + ${ready.length - 1}`,
-          meta(),
+          meta(convPreset),
         );
       } else {
         // ملف يفشل بدؤه لا يوقف بقية الدفعة: نكمل ونعرض أول خطأ في النهاية (FE6)
         let first: unknown = null;
-        for (const f of ready) {
-          if (!presetFits(preset, f.info)) continue;
-          try {
-            await props.onStart(
-              { inputs: [f.path], preset: preset.id, options: effective(f) },
-              baseName(f.path),
-              meta(effective(f).quality),
-            );
-          } catch (e) {
-            first ??= e;
+        for (const f of ready)
+          for (const st of stepsFor(f)) {
+            try {
+              const next = st.then;
+              if (next)
+                await props.onChain(st.req, st.title, st.meta, (file) => ({
+                  req: { inputs: [file], preset: next.preset, options: next.options },
+                  meta: next.meta,
+                }));
+              else await props.onStart(st.req, st.title, st.meta);
+            } catch (e) {
+              first ??= e;
+            }
           }
-        }
         if (first) throw first;
       }
     } catch (e) {
@@ -586,6 +679,40 @@ export function ConvertView(props: {
   const hwNames = (props.hw ?? []).map((e) => e.split("_").pop()!.toUpperCase());
   const hwLabel = [...new Set(hwNames)].join(" / ");
 
+  const toggleAi = (id: string) =>
+    setAi((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : oneFile && convNeeded ? [id] : [...cur, id]));
+  const toggleAnalysis = (id: string) => setAnalysis((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  const pickFormat = (id: string) => {
+    update({ convertPreset: id });
+    setFormatOn(true);
+  };
+
+  /** بطاقة صيغة أو أداة (نفس الشكل في كل الأقسام) */
+  const card = (p: PresetDef, on: boolean, onClick: () => void) => {
+    const ok = fits(p);
+    const tag = speedTag(p);
+    return (
+      <button key={p.id} className={`preset ${p.id === suggestion ? "suggested" : ""}`} aria-pressed={on} disabled={!ok} onClick={onClick}>
+        <span className="preset-head">
+          <Icon name={KIND_ICON[p.kind]} size={18} />
+          <b>{p.name[lang]}</b>
+          {tag && <span className={`preset-tag ${tag}`}>{tag === "fast" ? t.tagFast : t.tagHeavy}</span>}
+        </span>
+        <span>{p.desc[lang]}</span>
+        {p.id === suggestion && (
+          <span className="preset-suggested">
+            <Icon name="check" size={16} /> {t.suggestedFor}
+            {reason && ` · ${t.suggestWhy[reason.issue]}`}
+          </span>
+        )}
+        {/* سبب التعطيل مكتوب لا في title، فيظهر على الهاتف أيضًا (D-86) */}
+        {!ok && <span className="preset-why">{t.notFit}</span>}
+      </button>
+    );
+  };
+  /** قسم لا ينطبق على الصيغة المختارة: جملة تقول لماذا بدل خيارات بلا أثر */
+  const notHere = (why: string) => <div className="cat-note faint">{why}</div>;
+
   // ============ بلا ملفات: منطقة الإفلات ============
   if (files.length === 0) {
     return (
@@ -602,6 +729,54 @@ export function ConvertView(props: {
       </div>
     );
   }
+
+  const catLabel = (c: Cat) => t.cat[c];
+  const recipe: { cat: Cat; label: string; clear: () => void }[] = [
+    ...ai.map((id) => ({
+      cat: "audio" as Cat,
+      label: presetById(id)!.name[lang],
+      clear: () => setAi((cur) => cur.filter((x) => x !== id)),
+    })),
+    ...(fmtPicture && enhanceOn.length
+      ? [
+          {
+            cat: "enhance" as Cat,
+            label: enhanceOn.join("، "),
+            clear: () => set({ enhance: null, denoise: false, deinterlace: false, tonemap: false, lut: null }),
+          },
+        ]
+      : []),
+    ...(fmtPicture && frameOn.length
+      ? [
+          {
+            cat: "frame" as Cat,
+            label: frameOn.join("، "),
+            clear: () => set({ size: null, aspect: null, fps: null, speed: null, rotate: null }),
+          },
+        ]
+      : []),
+    ...(textOn.length
+      ? [
+          {
+            cat: "text" as Cat,
+            label: textOn.join("، "),
+            clear: () => {
+              set({ subtitles: null, watermark: null, timecode: false });
+              setTrimOn(false);
+            },
+          },
+        ]
+      : []),
+    ...(fmtAudio && audioOptsOn.length
+      ? [{ cat: "audio" as Cat, label: audioOptsOn.join("، "), clear: () => set({ loudness: null, replaceAudio: null, mute: false }) }]
+      : []),
+    ...(formatOn ? [{ cat: "format" as Cat, label: fmt.name[lang], clear: () => setFormatOn(false) }] : []),
+    ...analysis.map((id) => ({
+      cat: "analysis" as Cat,
+      label: presetById(id)!.name[lang],
+      clear: () => setAnalysis((cur) => cur.filter((x) => x !== id)),
+    })),
+  ];
 
   return (
     <>
@@ -681,10 +856,7 @@ export function ConvertView(props: {
                   title={t.editFileOpts}
                   aria-label={t.editFileOpts}
                   aria-pressed={editFile?.path === f.path}
-                  onClick={() => {
-                    setEditPath(editFile?.path === f.path ? null : f.path);
-                    setMore(true);
-                  }}
+                  onClick={() => setEditPath(editFile?.path === f.path ? null : f.path)}
                 >
                   <Icon name="settings" size={16} />
                 </button>
@@ -702,58 +874,24 @@ export function ConvertView(props: {
         </AnimatedList>
       </div>
 
-      {/* ============ ماذا تريد؟ ============ */}
-      <div className="card">
-        <Segmented<PresetGroup>
-          label={t.format}
-          value={group}
-          onChange={setGroup}
-          options={GROUPS.map((g) => ({
-            value: g,
-            label:
-              suggestion && g !== group && presetById(suggestion)?.group === g ? (
-                <>
-                  {groupName(t, g)} <span className="suggest-dot" title={t.suggested} />
-                </>
-              ) : (
-                groupName(t, g)
-              ),
-          }))}
-        />
-        <SlideSwitch id={group} index={GROUPS.indexOf(group)} distance={40}>
-          <div className="preset-grid">
-            {PRESETS.filter((p) => p.group === group).map((p) => {
-              const ok = fits(p);
-              const tag = speedTag(p);
-              return (
-                <button
-                  key={p.id}
-                  className={`preset ${p.id === suggestion ? "suggested" : ""}`}
-                  aria-pressed={p.id === preset.id}
-                  disabled={!ok}
-                  onClick={() => update({ convertPreset: p.id })}
-                >
-                  <span className="preset-head">
-                    <Icon name={KIND_ICON[p.kind]} size={18} />
-                    <b>{p.name[lang]}</b>
-                    {tag && <span className={`preset-tag ${tag}`}>{tag === "fast" ? t.tagFast : t.tagHeavy}</span>}
-                  </span>
-                  <span>{p.desc[lang]}</span>
-                  {p.id === suggestion && (
-                    <span className="preset-suggested">
-                      <Icon name="check" size={16} /> {t.suggestedFor}
-                      {reason && ` · ${t.suggestWhy[reason.issue]}`}
-                    </span>
-                  )}
-                  {/* سبب التعطيل مكتوب لا في title، فيظهر على الهاتف أيضًا (D-86) */}
-                  {!ok && <span className="preset-why">{t.notFit}</span>}
-                </button>
-              );
-            })}
-          </div>
-        </SlideSwitch>
+      {/* ============ مساحة العمل: الأقسام على الجانب، وأدوات القسم المختار في الوسط ============ */}
+      <div className="card workspace">
+        <nav className="cat-nav" aria-label={t.toolsHeading}>
+          {CATS.map((c) => (
+            <button key={c.id} aria-current={cat === c.id ? "true" : undefined} onClick={() => setCat(c.id)}>
+              <Icon name={c.icon} size={16} />
+              <span className="cat-name">{catLabel(c.id)}</span>
+              {counts[c.id] > 0 && <span className="cat-count ltr-num">{counts[c.id]}</span>}
+              {suggestion &&
+                cat !== c.id &&
+                c.id === (isFormat(presetById(suggestion)!) ? "format" : isAi(presetById(suggestion)!) ? "audio" : "analysis") && (
+                  <span className="suggest-dot" title={t.suggested} />
+                )}
+            </button>
+          ))}
+        </nav>
 
-        <div className={editFile ? "scoped" : undefined}>
+        <div className={`cat-body ${editFile ? "scoped" : ""}`}>
           {editFile && (
             <div className="scoped-head">
               <div>
@@ -777,158 +915,168 @@ export function ConvertView(props: {
               </button>
             </div>
           )}
-          {(preset.quality || preset.hw) && (
-            <div className="options mt-4">
-              {preset.quality && (
-                <div>
-                  <span className="field-label">{t.quality}</span>
-                  <Segmented<ConvertOptions["quality"]>
-                    label={t.quality}
-                    value={opts.quality}
-                    onChange={(quality) => set({ quality })}
-                    // الرقم خلف كل مستوى للمحترف: معدل البت التقريبي عند 1080p أو للصوت (F-13)
-                    options={(["high", "balanced", "small"] as const).map((q) => ({
-                      value: q,
-                      label: { high: t.qualityHigh, balanced: t.qualityBalanced, small: t.qualitySmall }[q],
-                      title: qualityRate(preset, q),
-                    }))}
-                  />
-                </div>
-              )}
-              {preset.hw && (
-                <div>
-                  <Toggle
-                    checked={s.convertHw && (props.hw?.length ?? 0) > 0}
-                    onChange={(convertHw) => update({ convertHw })}
-                    title={isMobile ? t.hwToggleMobile : t.hwToggle}
-                    hint={props.hw == null ? t.analyzingFile : props.hw.length ? t.hwHint(hwLabel) : isMobile ? t.hwNoneMobile : t.hwNone}
-                  />
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* كشف الصمت: ما يُعدّ صمتًا، وكم يبقى من طرفيه عند حذفه */}
-          {(preset.id === "detect_silence" || preset.id === "topics") && (
-            <div className="mt-4">
-              <div className="pick-grid">
-                {preset.id === "topics" && (
-                  <>
-                    <Pick
-                      label={`${t.reelLength} · ${t.reelMin}`}
-                      value={opts.reelMin ?? 15}
-                      onChange={(v) => set({ reelMin: v === 15 ? null : v })}
-                      options={[5, 10, 15, 20, 30, 45, 60].map((v) => ({ value: v, label: t.secs(v) }))}
-                    />
-                    <Pick
-                      label={`${t.reelLength} · ${t.reelMax}`}
-                      value={opts.reelMax ?? 90}
-                      onChange={(v) => set({ reelMax: v === 90 ? null : v })}
-                      options={[30, 45, 60, 90, 120, 180].map((v) => ({ value: v, label: t.secs(v) }))}
-                    />
-                  </>
-                )}
-                {/* تلقائي = عتبة تُقاس من ضجيج الملف نفسه؛ -40 الثابتة لم تجد شيئًا في تسجيلات فيها ضجيج غرفة */}
-                <Pick<number | null>
-                  label={t.silenceLevel}
-                  value={opts.silenceDb ?? null}
-                  onChange={(v) => set({ silenceDb: v })}
-                  options={[
-                    { value: null, label: t.silenceAuto },
-                    ...[-25, -30, -35, -40, -50, -60].map((v) => ({ value: v, label: `${v} dB` })),
-                  ]}
-                />
-                <Pick
-                  label={t.silenceMin}
-                  value={opts.silenceMin ?? 0.6}
-                  onChange={(v) => set({ silenceMin: v === 0.6 ? null : v })}
-                  options={[0.3, 0.4, 0.5, 0.6, 0.8, 1, 1.5, 2, 3].map((v) => ({ value: v, label: t.secs(v) }))}
-                />
-                {/* ما يبقى قبل الكلام منفصل عمّا يبقى بعده (كما في auto-editor): النَّفَس قبل الجملة غير ذيلها */}
-                <Pick<number | null>
-                  label={t.silencePadBefore}
-                  value={opts.silencePadBefore ?? null}
-                  onChange={(v) => set({ silencePadBefore: v })}
-                  options={[
-                    { value: null, label: t.sameAsAfter },
-                    ...[0, 0.05, 0.1, 0.2, 0.3, 0.5].map((v) => ({ value: v, label: t.secs(v) })),
-                  ]}
-                />
-                <Pick
-                  label={t.silencePad}
-                  value={opts.silencePad ?? 0.15}
-                  onChange={(v) => set({ silencePad: v === 0.15 ? null : v })}
-                  options={[0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5].map((v) => ({ value: v, label: t.secs(v) }))}
-                />
+          <SlideSwitch id={cat} index={CATS.findIndex((c) => c.id === cat)} distance={24} fade>
+            <div className="cat-pane">
+              <div className="cat-head">
+                <h3>{catLabel(cat)}</h3>
+                <span className="faint">{t.catHint[cat]}</span>
               </div>
-              <div className="faint mt-2">{t.silenceHint}</div>
-              {preset.id === "topics" && <div className="faint mt-2">{t.topicsHint}</div>}
-              {preset.id === "topics" && (
-                <div className="mt-2">
-                  <Toggle
-                    checked={!!opts.alignSpeech}
-                    onChange={(alignSpeech) => set({ alignSpeech })}
-                    title={t.alignSpeech}
-                    hint={t.alignSpeechHint}
-                  />
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* ============ خيارات إضافية: تبويب واحد ظاهر في كل مرة (D-22) ============ */}
-          {tabs.length > 0 && (
-            <div className="more-head">
-              <button className="more-btn" aria-expanded={more} onClick={() => setMore((m) => !m)}>
-                <Icon name="chevron" size={16} /> {t.moreOptions}
-                {activeOpts.length > 0 && <span className="extras-count">{activeOpts.join(" · ")}</span>}
-              </button>
-              {activeOpts.length > 0 && (
-                <button className="btn btn-sm btn-ghost" onClick={resetOpts}>
-                  {t.resetOptions}
-                </button>
-              )}
-            </div>
-          )}
-          <div className="collapse" data-open={more && tabs.length > 0} inert={!(more && tabs.length > 0) || undefined}>
-            <div>
-              <div className="more">
-                {tabs.length > 1 && (
-                  <Segmented<OptTab>
-                    label={t.moreOptions}
-                    value={tab!}
-                    onChange={setTab}
-                    options={tabs.map((v) => ({
-                      value: v,
-                      label: { trim: t.optTrim, picture: t.optPicture, burn: t.optBurn, audio: t.optAudio }[v],
+              {cat === "format" && (
+                <>
+                  <Segmented<FmtGroup>
+                    label={t.format}
+                    value={fmtGroup}
+                    onChange={setFmtGroup}
+                    options={(["edit", "publish", "audio", "tools"] as FmtGroup[]).map((g) => ({
+                      value: g,
+                      label: g === "tools" ? t.groupCopy : groupName(t, g),
                     }))}
                   />
-                )}
+                  <div className="preset-grid">
+                    {PRESETS.filter((p) => p.group === fmtGroup && isFormat(p)).map((p) =>
+                      card(p, formatOn && p.id === fmt.id, () => (formatOn && p.id === fmt.id ? setFormatOn(false) : pickFormat(p.id))),
+                    )}
+                  </div>
+                  {!formatOn && <div className="cat-note faint">{convNeeded ? t.noFormatFamily : t.noFormat}</div>}
+                  {formatOn && (fmt.quality || fmt.hw) && (
+                    <div className="options mt-4">
+                      {fmt.quality && (
+                        <div>
+                          <span className="field-label">{t.quality}</span>
+                          <Segmented<ConvertOptions["quality"]>
+                            label={t.quality}
+                            value={opts.quality}
+                            onChange={(quality) => set({ quality })}
+                            // الرقم خلف كل مستوى للمحترف: معدل البت التقريبي عند 1080p أو للصوت (F-13)
+                            options={(["high", "balanced", "small"] as const).map((q) => ({
+                              value: q,
+                              label: { high: t.qualityHigh, balanced: t.qualityBalanced, small: t.qualitySmall }[q],
+                              title: qualityRate(fmt, q),
+                            }))}
+                          />
+                        </div>
+                      )}
+                      {fmt.hw && (
+                        <div>
+                          <Toggle
+                            checked={s.convertHw && (props.hw?.length ?? 0) > 0}
+                            onChange={(convertHw) => update({ convertHw })}
+                            title={isMobile ? t.hwToggleMobile : t.hwToggle}
+                            hint={
+                              props.hw == null
+                                ? t.analyzingFile
+                                : props.hw.length
+                                  ? t.hwHint(hwLabel)
+                                  : isMobile
+                                    ? t.hwNoneMobile
+                                    : t.hwNone
+                            }
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
 
-                {previewFile && tab && tab !== "audio" && (
-                  <BeforeAfter path={previewFile.path} presetId={preset.id} options={effective(previewFile)} at={previewAt} />
-                )}
-
-                {tab === "trim" && (
+              {cat === "enhance" &&
+                (!anyVideo || !fmtPicture ? (
+                  notHere(anyVideo ? t.needVideoFormat : t.needVideoFile)
+                ) : (
                   <section>
-                    <Toggle checked={trimOn} onChange={setTrimOn} title={t.optTrim} />
-                    <div className="collapse" data-open={trimOn} inert={!trimOn || undefined}>
-                      <div>
-                        <TrimRange
-                          duration={trimInfo!.duration!}
-                          fps={trimInfo!.video?.fps}
-                          value={{ start: opts.start ?? 0, end: opts.end ?? trimInfo!.duration! }}
-                          onChange={(r) => set({ start: r.start, end: r.end })}
+                    {previewFile && (
+                      <BeforeAfter
+                        path={previewFile.path}
+                        presetId={previewPreset.id}
+                        options={effective(previewPreset, previewFile)}
+                        at={previewAt}
+                      />
+                    )}
+                    {audioOnly > 0 && <div className="faint mb-2">{t.pictureSkipsAudio(audioOnly)}</div>}
+                    {/* تحسين بلا نموذج (فلاتر FFmpeg): المعاينة «قبل وبعد» تعرضه، والتقدير المقيس يعرض وقته */}
+                    <span className="field-label">{t.enhance}</span>
+                    <Segmented<string>
+                      label={t.enhance}
+                      value={opts.enhance ?? "off"}
+                      onChange={(v) => set({ enhance: v === "off" ? null : v })}
+                      options={[
+                        { value: "off", label: t.enhanceOff },
+                        { value: "light", label: t.enhanceLight },
+                        { value: "strong", label: t.enhanceStrong },
+                        { value: "sharpen", label: t.enhanceSharpen },
+                      ]}
+                    />
+                    {opts.enhance && <div className="faint mt-2">{t.enhanceHint}</div>}
+                    <div className="toggle-grid">
+                      <Toggle checked={opts.denoise} onChange={(denoise) => set({ denoise })} title={t.denoise} hint={t.denoiseHint} />
+                      <Toggle
+                        checked={opts.deinterlace}
+                        onChange={(deinterlace) => set({ deinterlace })}
+                        title={t.deinterlace}
+                        hint={t.deinterlaceHint}
+                      />
+                      <Toggle checked={opts.tonemap} onChange={(tonemap) => set({ tonemap })} title={t.tonemap} hint={t.tonemapHint} />
+                    </div>
+                    <FilePick label={t.lut} value={opts.lut} extensions={["cube"]} onChange={(lut) => set({ lut })} />
+                    {/* ما يفعله كل خيار بالضبط (F-45، F-46) */}
+                    {opts.lut && <div className="faint mt-2">{t.lutHint}</div>}
+                  </section>
+                ))}
+
+              {cat === "audio" && (
+                <section>
+                  <span className="field-label">{t.aiAudio}</span>
+                  <div className="preset-grid mt-0">
+                    {PRESETS.filter(isAi).map((p) => card(p, ai.includes(p.id), () => toggleAi(p.id)))}
+                  </div>
+                  {oneFile && convNeeded && <div className="faint mt-2">{t.aiOneAtATime}</div>}
+                  {fmtAudio ? (
+                    <>
+                      <div className="pick-grid mt-4">
+                        <Pick
+                          label={t.loudness}
+                          value={opts.loudness ?? null}
+                          onChange={(loudness) => set({ loudness })}
+                          options={[
+                            { value: null, label: t.loudOff },
+                            { value: -14, label: t.loudSocial },
+                            { value: -16, label: t.loudPodcast },
+                            { value: -23, label: t.loudBroadcast },
+                          ]}
+                        />
+                        <FilePick
+                          label={t.replaceAudio}
+                          value={opts.replaceAudio}
+                          extensions={MEDIA_FILTER.extensions}
+                          onChange={(replaceAudio) => set({ replaceAudio })}
                         />
                       </div>
-                    </div>
-                  </section>
-                )}
+                      {/* ما يكلّفه كل خيار مكتوبًا تحته (F-40، F-41) */}
+                      {opts.loudness != null && <div className="faint mt-2">{t.loudHint}</div>}
+                      {opts.replaceAudio && <div className="faint mt-2">{t.replaceAudioHint}</div>}
+                      {anyVideo && <Toggle checked={opts.mute} onChange={(mute) => set({ mute })} title={t.mute} />}
+                    </>
+                  ) : (
+                    fmt.kind === "copy" && <Toggle checked={opts.mute} onChange={(mute) => set({ mute })} title={t.mute} />
+                  )}
+                </section>
+              )}
 
-                {tab === "picture" && (
+              {cat === "frame" &&
+                (!anyVideo || !fmtPicture ? (
+                  notHere(anyVideo ? t.needVideoFormat : t.needVideoFile)
+                ) : (
                   <section>
-                    {/* ملفات صوت فقط بين الفيديوهات: خيارات الصورة لا تمسّها (U-92) */}
-                    {audioOnly > 0 && audioOnly < ready.length && <div className="faint mb-2">{t.pictureSkipsAudio(audioOnly)}</div>}
+                    {previewFile && (
+                      <BeforeAfter
+                        path={previewFile.path}
+                        presetId={previewPreset.id}
+                        options={effective(previewPreset, previewFile)}
+                        at={previewAt}
+                      />
+                    )}
                     <div className="pick-grid">
                       <Pick
                         label={t.size}
@@ -945,121 +1093,204 @@ export function ConvertView(props: {
                         onChange={(aspect) => set({ aspect })}
                         options={[null, "16:9", "9:16", "1:1", "4:5", "21:9"].map((v) => ({ value: v, label: v ?? t.original }))}
                       />
-                      {kind !== "frame" && (
-                        <Pick
-                          label={t.fps}
-                          value={opts.fps ?? null}
-                          onChange={(fps) => set({ fps })}
-                          options={[null, "23.976", "24", "25", "29.97", "30", "50", "59.94", "60"].map((v) => ({
-                            value: v,
-                            label: v ?? t.original,
-                          }))}
-                        />
-                      )}
-                      {kind !== "frame" && (
-                        <Pick
-                          label={t.speed}
-                          value={opts.speed ?? 1}
-                          onChange={(speed) => set({ speed: speed === 1 ? null : speed })}
-                          options={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4].map((v) => ({ value: v, label: `${v}×` }))}
-                        />
-                      )}
+                      <Pick
+                        label={t.fps}
+                        value={opts.fps ?? null}
+                        onChange={(fps) => set({ fps })}
+                        options={[null, "23.976", "24", "25", "29.97", "30", "50", "59.94", "60"].map((v) => ({
+                          value: v,
+                          label: v ?? t.original,
+                        }))}
+                      />
+                      <Pick
+                        label={t.speed}
+                        value={opts.speed ?? 1}
+                        onChange={(speed) => set({ speed: speed === 1 ? null : speed })}
+                        options={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4].map((v) => ({ value: v, label: `${v}×` }))}
+                      />
                     </div>
                     <RotatePick value={opts.rotate ?? null} onChange={(rotate) => set({ rotate })} />
-                    <div className="toggle-grid">
-                      <Toggle
-                        checked={opts.deinterlace}
-                        onChange={(deinterlace) => set({ deinterlace })}
-                        title={t.deinterlace}
-                        hint={t.deinterlaceHint}
-                      />
-                      <Toggle checked={opts.denoise} onChange={(denoise) => set({ denoise })} title={t.denoise} hint={t.denoiseHint} />
-                      <Toggle checked={opts.tonemap} onChange={(tonemap) => set({ tonemap })} title={t.tonemap} hint={t.tonemapHint} />
-                    </div>
-                    {/* تحسين بلا نموذج (فلاتر FFmpeg): المعاينة «قبل وبعد» تعرضه، والتقدير المقيس يعرض وقته */}
-                    <Pick<string | null>
-                      label={t.enhance}
-                      value={opts.enhance ?? null}
-                      onChange={(enhance) => set({ enhance })}
-                      options={[
-                        { value: null, label: t.enhanceOff },
-                        { value: "light", label: t.enhanceLight },
-                        { value: "strong", label: t.enhanceStrong },
-                        { value: "sharpen", label: t.enhanceSharpen },
-                      ]}
-                    />
-                    {opts.enhance && <div className="faint mt-2">{t.enhanceHint}</div>}
-                    <FilePick label={t.lut} value={opts.lut} extensions={["cube"]} onChange={(lut) => set({ lut })} />
-                    {/* ما يفعله كل خيار بالضبط (F-45، F-46) */}
-                    {opts.lut && <div className="faint mt-2">{t.lutHint}</div>}
                     {opts.speed != null && opts.speed !== 1 && <div className="faint mt-2">{t.speedHint}</div>}
                   </section>
-                )}
+                ))}
 
-                {tab === "burn" && (
-                  <section>
-                    <div className="pick-grid">
-                      <FilePick
-                        label={t.subtitles}
-                        value={opts.subtitles}
-                        extensions={["srt", "ass", "ssa", "vtt"]}
-                        onChange={(subtitles) => set({ subtitles })}
-                      />
-                      <FilePick
-                        label={t.watermark}
-                        value={opts.watermark}
-                        extensions={["png", "jpg", "jpeg", "webp"]}
-                        onChange={(watermark) => set({ watermark })}
-                      />
-                      {opts.watermark && <PosGrid value={opts.watermarkPos ?? "br"} onChange={(watermarkPos) => set({ watermarkPos })} />}
+              {cat === "text" && (
+                <section>
+                  {canTrim ? (
+                    <>
+                      <Toggle checked={trimOn} onChange={setTrimOn} title={t.optTrim} hint={t.trimToolsHint} />
+                      <div className="collapse" data-open={trimOn} inert={!trimOn || undefined}>
+                        <div>
+                          <TrimRange
+                            duration={trimInfo!.duration!}
+                            fps={trimInfo!.video?.fps}
+                            value={{ start: opts.start ?? 0, end: opts.end ?? trimInfo!.duration! }}
+                            onChange={(r) => set({ start: r.start, end: r.end })}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    ready.length > 1 && <div className="faint mb-2">{t.trimOneFile}</div>
+                  )}
+                  {anyVideo && (formatOn ? fmt.kind === "video" : true) ? (
+                    <>
+                      <div className="pick-grid mt-4">
+                        <FilePick
+                          label={t.subtitles}
+                          value={opts.subtitles}
+                          extensions={["srt", "ass", "ssa", "vtt"]}
+                          onChange={(subtitles) => set({ subtitles })}
+                        />
+                        <FilePick
+                          label={t.watermark}
+                          value={opts.watermark}
+                          extensions={["png", "jpg", "jpeg", "webp"]}
+                          onChange={(watermark) => set({ watermark })}
+                        />
+                        {opts.watermark && <PosGrid value={opts.watermarkPos ?? "br"} onChange={(watermarkPos) => set({ watermarkPos })} />}
+                      </div>
+                      {opts.subtitles && <div className="faint mt-2">{t.subtitlesHint}</div>}
+                      {opts.watermark && <div className="faint mt-2">{t.watermarkHint}</div>}
+                      <Toggle checked={opts.timecode} onChange={(timecode) => set({ timecode })} title={t.timecode} hint={t.timecodeHint} />
+                    </>
+                  ) : (
+                    notHere(anyVideo ? t.needVideoFormat : t.needVideoFile)
+                  )}
+                </section>
+              )}
+
+              {cat === "analysis" && (
+                <section>
+                  <div className="preset-grid mt-0">
+                    {PRESETS.filter(isAnalysis).map((p) => card(p, analysis.includes(p.id), () => toggleAnalysis(p.id)))}
+                  </div>
+                  {/* كشف الصمت: ما يُعدّ صمتًا، وكم يبقى من طرفيه عند حذفه */}
+                  {(analysis.includes("detect_silence") || analysis.includes("topics")) && (
+                    <div className="mt-4">
+                      <div className="pick-grid">
+                        {analysis.includes("topics") && (
+                          <>
+                            <Pick
+                              label={`${t.reelLength} · ${t.reelMin}`}
+                              value={opts.reelMin ?? 15}
+                              onChange={(v) => set({ reelMin: v === 15 ? null : v })}
+                              options={[5, 10, 15, 20, 30, 45, 60].map((v) => ({ value: v, label: t.secs(v) }))}
+                            />
+                            <Pick
+                              label={`${t.reelLength} · ${t.reelMax}`}
+                              value={opts.reelMax ?? 90}
+                              onChange={(v) => set({ reelMax: v === 90 ? null : v })}
+                              options={[30, 45, 60, 90, 120, 180].map((v) => ({ value: v, label: t.secs(v) }))}
+                            />
+                          </>
+                        )}
+                        {/* تلقائي = عتبة تُقاس من ضجيج الملف نفسه؛ -40 الثابتة لم تجد شيئًا في تسجيلات فيها ضجيج غرفة */}
+                        <Pick<number | null>
+                          label={t.silenceLevel}
+                          value={opts.silenceDb ?? null}
+                          onChange={(v) => set({ silenceDb: v })}
+                          options={[
+                            { value: null, label: t.silenceAuto },
+                            ...[-25, -30, -35, -40, -50, -60].map((v) => ({ value: v, label: `${v} dB` })),
+                          ]}
+                        />
+                        <Pick
+                          label={t.silenceMin}
+                          value={opts.silenceMin ?? 0.6}
+                          onChange={(v) => set({ silenceMin: v === 0.6 ? null : v })}
+                          options={[0.3, 0.4, 0.5, 0.6, 0.8, 1, 1.5, 2, 3].map((v) => ({ value: v, label: t.secs(v) }))}
+                        />
+                        {/* ما يبقى قبل الكلام منفصل عمّا يبقى بعده (كما في auto-editor): النَّفَس قبل الجملة غير ذيلها */}
+                        <Pick<number | null>
+                          label={t.silencePadBefore}
+                          value={opts.silencePadBefore ?? null}
+                          onChange={(v) => set({ silencePadBefore: v })}
+                          options={[
+                            { value: null, label: t.sameAsAfter },
+                            ...[0, 0.05, 0.1, 0.2, 0.3, 0.5].map((v) => ({ value: v, label: t.secs(v) })),
+                          ]}
+                        />
+                        <Pick
+                          label={t.silencePad}
+                          value={opts.silencePad ?? 0.15}
+                          onChange={(v) => set({ silencePad: v === 0.15 ? null : v })}
+                          options={[0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5].map((v) => ({ value: v, label: t.secs(v) }))}
+                        />
+                      </div>
+                      <div className="faint mt-2">{t.silenceHint}</div>
+                      {analysis.includes("topics") && <div className="faint mt-2">{t.topicsHint}</div>}
+                      {analysis.includes("topics") && (
+                        <div className="mt-2">
+                          <Toggle
+                            checked={!!opts.alignSpeech}
+                            onChange={(alignSpeech) => set({ alignSpeech })}
+                            title={t.alignSpeech}
+                            hint={t.alignSpeechHint}
+                          />
+                        </div>
+                      )}
                     </div>
-                    {opts.subtitles && <div className="faint mt-2">{t.subtitlesHint}</div>}
-                    {opts.watermark && <div className="faint mt-2">{t.watermarkHint}</div>}
-                    <Toggle checked={opts.timecode} onChange={(timecode) => set({ timecode })} title={t.timecode} hint={t.timecodeHint} />
-                  </section>
-                )}
-
-                {tab === "audio" && showAudio && (
-                  <section>
-                    <div className="pick-grid">
-                      <Pick
-                        label={t.loudness}
-                        value={opts.loudness ?? null}
-                        onChange={(loudness) => set({ loudness })}
-                        options={[
-                          { value: null, label: t.loudOff },
-                          { value: -14, label: t.loudSocial },
-                          { value: -16, label: t.loudPodcast },
-                          { value: -23, label: t.loudBroadcast },
-                        ]}
-                      />
-                      <FilePick
-                        label={t.replaceAudio}
-                        value={opts.replaceAudio}
-                        extensions={MEDIA_FILTER.extensions}
-                        onChange={(replaceAudio) => set({ replaceAudio })}
-                      />
-                    </div>
-                    {/* ما يكلّفه كل خيار مكتوبًا تحته (F-40، F-41) */}
-                    {opts.loudness != null && <div className="faint mt-2">{t.loudHint}</div>}
-                    {opts.replaceAudio && <div className="faint mt-2">{t.replaceAudioHint}</div>}
-                    {kind === "video" && <Toggle checked={opts.mute} onChange={(mute) => set({ mute })} title={t.mute} />}
-                  </section>
-                )}
-
-                {tab === "audio" && kind === "copy" && (
-                  <section>
-                    <Toggle checked={opts.mute} onChange={(mute) => set({ mute })} title={t.mute} />
-                  </section>
-                )}
-              </div>
+                  )}
+                </section>
+              )}
             </div>
-          </div>
+          </SlideSwitch>
+        </div>
+      </div>
+
+      {/* ============ الوصفة: كل ما اختير من كل الأقسام، ثم البدء ============ */}
+      <div className="card recipe-card">
+        <div className="recipe" aria-label={t.recipe}>
+          <span className="field-label m-0">{t.recipe}</span>
+          {recipe.length === 0 ? (
+            <span className="faint">{t.recipeEmpty}</span>
+          ) : (
+            recipe.map((r, i) => (
+              <span key={`${r.cat}-${r.label}`} className="recipe-chip" style={{ "--i": i } as CSSProperties}>
+                <button className="recipe-go" onClick={() => setCat(r.cat)} title={catLabel(r.cat)}>
+                  {r.label}
+                </button>
+                <button className="recipe-x" aria-label={`${t.unpick}: ${r.label}`} title={t.unpick} onClick={r.clear}>
+                  <Icon name="x" size={14} />
+                </button>
+              </span>
+            ))
+          )}
+          {recipe.length > 0 && (
+            <button
+              className="btn btn-sm btn-ghost recipe-reset"
+              onClick={() => {
+                resetOpts();
+                setAi([]);
+                setAnalysis([]);
+              }}
+            >
+              {t.resetOptions}
+            </button>
+          )}
         </div>
 
         {error && <ErrorBox error={error} />}
 
         <div className="action-row">
+          {askMode && (
+            <div className="dest">
+              <Segmented<"one" | "each">
+                label={t.outputMode}
+                value={oneFile ? "one" : "each"}
+                onChange={(v) => {
+                  setOneFile(v === "one");
+                  // ملف واحد: أداة ذكاء واحدة فقط قبل التحويل (لا يُجمع صوتان متعارضان)
+                  if (v === "one" && convNeeded) setAi((cur) => cur.slice(0, 1));
+                }}
+                options={[
+                  { value: "one", label: t.modeOne, title: t.modeOneHint },
+                  { value: "each", label: t.modeEach, title: t.modeEachHint },
+                ]}
+              />
+            </div>
+          )}
           {isMobile ? (
             <div className="dest faint">
               <Icon name="folder" size={16} /> <span className="ltr">{mobileSaveDir(s)}</span>
@@ -1079,10 +1310,15 @@ export function ConvertView(props: {
             </div>
           )}
           <span className="spacer" />
-          {shown != null && (
+          {(shown != null || stepCount > 1) && (
             <span className="estimate ltr-num" title={exact ? t.estimateMeasuredHint : t.estimateHint}>
-              {t.estimate(formatBytes(t, shown))}
-              {expectedSecs != null && ` · ${t.estimateTime(formatDuration(expectedSecs))}`}
+              {[
+                stepCount > 1 && t.steps(stepCount),
+                shown != null && t.estimate(formatBytes(t, shown)),
+                expectedSecs != null && t.estimateTime(formatDuration(expectedSecs)),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </span>
           )}
           {canMerge && (
@@ -1095,15 +1331,15 @@ export function ConvertView(props: {
               {t.mergeBtn}
             </button>
           )}
-          <button
-            className="btn btn-primary btn-lg"
-            disabled={busy || loading || ready.length === 0 || !ready.some((f) => presetFits(preset, f.info))}
-            onClick={() => start(false)}
-          >
+          <button className="btn btn-primary btn-lg" disabled={busy || loading || stepCount === 0} onClick={() => start(false)}>
             <Icon name="convert" /> {t.convertBtn(ready.length)}
           </button>
         </div>
       </div>
     </>
   );
+}
+
+function enhanceName(t: Dict, v: string) {
+  return ({ light: t.enhanceLight, strong: t.enhanceStrong, sharpen: t.enhanceSharpen } as Record<string, string>)[v] ?? v;
 }

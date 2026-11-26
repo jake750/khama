@@ -303,6 +303,7 @@ export function JobCard(props: {
             levels={j.levels}
             partLength={props.partLength ?? ((r) => r[1] - r[0])}
             hasCues={!!j.cues?.length}
+            cues={j.cues}
             onExport={props.onExportTopics}
             onCopyTopics={props.onCopyTopics}
           />

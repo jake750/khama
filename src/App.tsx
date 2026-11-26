@@ -564,6 +564,24 @@ export default function App() {
     [launch],
   );
 
+  /** خطوتان على ملف واحد (أداة ذكاء ثم تحويل): الثانية تبدأ على ناتج الأولى حين تكتمل */
+  const chainConvert = useCallback(
+    async (first: ConvertRequest, title: string, meta: string, next: (file: string) => { req: ConvertRequest; meta: string }) => {
+      await launch({ type: "convert", convert: first, title, meta }, (id) => {
+        // يُسجَّل قبل البدء، فلا يسبقه حدث «اكتمل» من عملية قصيرة
+        afterDownload.current.set(id, (file) => {
+          const n = next(file);
+          startConvert(n.req, title, n.meta).catch(logError("chainConvert"));
+        });
+        return api.startConvert(first, id).catch((e) => {
+          afterDownload.current.delete(id);
+          throw e;
+        });
+      });
+    },
+    [launch, startConvert],
+  );
+
   /** يضيف ملفات للمحوّل ويقرأ معلوماتها */
   const addFiles = useCallback((paths: string[]) => {
     const media = paths.filter(isMedia);
@@ -1121,6 +1139,7 @@ export default function App() {
                       });
                     }}
                     onStart={startConvert}
+                    onChain={chainConvert}
                   />
                 )}
                 {tab === "history" && (
