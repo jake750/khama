@@ -16,7 +16,7 @@ pub mod separate;
 pub mod topics_bench {
     pub use crate::convert::silence;
     pub use crate::convert::words;
-    pub use crate::convert::{ConvertOptions, SegParams, Topic, clean_cues, detect_args, parse_markers, topics_from};
+    pub use crate::convert::{ConvertOptions, SegParams, Topic, clean_cues, detect_args, gaps_as_silences, parse_markers, topics_from};
     pub use crate::srt::parse as parse_subs;
 }
 mod settings;

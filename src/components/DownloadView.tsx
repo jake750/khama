@@ -79,7 +79,7 @@ export function DownloadView(props: {
   onChooseDir: () => void;
   onPickDir: (dir: string) => void;
   /** at = وقت البدء (ms) للتنزيل المجدول */
-  onStart: (req: DownloadRequest, meta: StartMeta, at?: number) => Promise<void>;
+  onStart: (req: DownloadRequest, meta: StartMeta, at?: number) => Promise<unknown>;
   /** رابط نسخه المستخدم وخامة تراقب الحافظة */
   clipUrl: string | null;
   onClipDone: () => void;
@@ -88,6 +88,8 @@ export function DownloadView(props: {
   onOpenSettings: (section: string) => void;
   toast: Toast;
   session: DownloadSession;
+  /** تحليل المواضيع قبل التنزيل (ترجمة الموقع أو الصوت وحده). range = المقطع المحدد إن وُجد */
+  onAnalyze?: (url: string, title: string, thumbnail?: string | null, range?: [number, number] | null) => void;
 }) {
   const { t } = useI18n();
   const { settings: s, update, session } = props;
@@ -845,6 +847,23 @@ export function DownloadView(props: {
           <span className="estimate ltr-num" title={t.estimateHint}>
             {t.estimate(formatBytes(t, expected))}
           </span>
+        )}
+        {/* رابط فيديو واحد: تحليل مواضيعه قبل تنزيله، بلا تنزيل الفيديو */}
+        {props.onAnalyze && info && duration && (
+          <button
+            className="btn btn-lg"
+            onClick={() =>
+              props.onAnalyze!(
+                urls[0] ?? url.trim(),
+                info.title,
+                info.thumbnail,
+                activeClips?.length === 1 ? [activeClips[0].start, activeClips[0].end] : null,
+              )
+            }
+            title={t.analyzeVideoHint}
+          >
+            <Icon name="captions" /> {t.analyzeVideo}
+          </button>
         )}
         <button className="btn btn-primary btn-lg download-btn" disabled={!canStart} onClick={start}>
           <Icon name={when === "later" ? "clock" : "download"} />

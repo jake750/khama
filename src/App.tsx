@@ -263,11 +263,20 @@ export default function App() {
     }
   }, []);
 
+  /** ما يُفعل بملف تنزيل حين يكتمل (رقم التنزيل ← الدالة) */
+  const afterDownload = useRef(new Map<number, (file: string) => void>());
+
   // نستمع لأحداث التقدّم القادمة من Rust
   useEffect(() => {
     const unlisten = api.onJobUpdate((u) => {
       const job = jobsRef.current.find((j) => j.id === u.id);
       if (job && (u.state === "done" || u.state === "error") && job.state !== u.state) onFinished(job, u);
+      // تصدير من تحليل رابط: ينتظر تنزيل المدى المطلوب، ثم يقص الملف المنزَّل
+      const then = afterDownload.current.get(u.id);
+      if (then && ["done", "error", "canceled"].includes(u.state)) {
+        afterDownload.current.delete(u.id);
+        if (u.state === "done" && u.file) then(u.file);
+      }
       // البطاقة تُضاف قبل أن يبدأ Rust (newJobId)، فلا تحديث يسبقها (T-18)
       setJobs((prev) => prev.map((j) => (j.id === u.id ? mergeUpdate(j, u) : j)));
     });
@@ -426,6 +435,7 @@ export default function App() {
         setJobs((prev) => prev.filter((j) => j.id !== id));
         throw e;
       }
+      return id;
     },
     [addJob],
   );
@@ -447,7 +457,7 @@ export default function App() {
         setJobs((prev) => [{ id: localId, state: "scheduled", at, ...base } as Job, ...prev]);
         return;
       }
-      await launch(base, (id) => api.startDownload(withHistory(request, base), id));
+      return await launch(base, (id) => api.startDownload(withHistory(request, base), id));
     },
     [launch],
   );
@@ -848,6 +858,56 @@ export default function App() {
   const exportTopics = (j: Job, sections: Range[], o: ExportOptions) => {
     if (!j.convert || !sections.length) return;
     const input = j.convert.inputs[0];
+    if (/^https?:\/\//.test(input)) {
+      exportFromUrl(j, input, sections, o);
+      return;
+    }
+    exportFromFile(j, input, sections, o);
+  };
+
+  /**
+   * تحليل رابط لم يُنزَّل: يُنزَّل المدى المطلوب فقط (مدى كل مقطع، أو من أول المقاطع إلى آخرها لفيديو واحد)،
+   * ثم يُقص الملف المنزَّل كما يُقص ملف محلي، بأوقات تبدأ من بداية ما نُزّل.
+   */
+  const exportFromUrl = (j: Job, url: string, sections: Range[], o: ExportOptions) => {
+    const spans: Range[][] = o.join ? [sections] : sections.map((s) => [s]);
+    for (const secs of spans) {
+      const from = secs[0][0];
+      const to = secs[secs.length - 1][1];
+      const shift = (r: Range): Range => [r[0] - from, r[1] - from];
+      const moved: Job = {
+        ...j,
+        markers: j.markers?.map(shift),
+        cues: j.cues?.map((c) => ({ ...c, start: c.start - from, end: c.end - from })),
+        words: j.words?.map((w) => ({ ...w, start: w.start - from, end: w.end - from })),
+      };
+      const request: DownloadRequest = {
+        url,
+        kind: "video",
+        videoFormat: settings.videoFormat,
+        audioFormat: settings.audioFormat,
+        quality: settings.quality,
+        editorReady: false,
+        start: from,
+        end: to,
+        stems: null,
+        clips: [],
+        joinClips: false,
+        subs: [],
+        thumbnail: false,
+        infoFile: false,
+        stills: null,
+        original: false,
+      };
+      startDownload(request, { title: `${j.title} · ${formatTimecode(from)}`, thumbnail: j.thumbnail })
+        .then((id) => {
+          if (id != null) afterDownload.current.set(id, (file) => exportFromFile(moved, file, secs.map(shift), o));
+        })
+        .catch(logError("exportFromUrl"));
+    }
+  };
+
+  const exportFromFile = (j: Job, input: string, sections: Range[], o: ExportOptions) => {
     const preset = sameFamily(input);
     const silence = o.tight ? allCuts(j) : [];
     const lines = { maxWords: o.maxWords, maxSecs: o.maxSecs };
@@ -884,6 +944,23 @@ export default function App() {
         j.inDownloads,
       ).catch(logError("exportTopics"));
     });
+  };
+
+  /** من حقل الرابط: تحليل المواضيع قبل التنزيل (Rust يأخذ ترجمة الموقع أو الصوت وحده) */
+  const analyzeUrl = (url: string, title: string, thumbnail?: string | null, range?: [number, number] | null) => {
+    startConvert(
+      {
+        inputs: [url],
+        preset: "topics",
+        options: { ...defaultOptions(), sourceUrl: url, start: range?.[0] ?? null, end: range?.[1] ?? null },
+      },
+      title,
+      presetById("topics")?.name[lang] ?? "topics",
+      undefined,
+      true,
+    )
+      .then(() => thumbnail && setJobs((prev) => prev.map((j) => (j.convert?.inputs[0] === url && !j.thumbnail ? { ...j, thumbnail } : j))))
+      .catch(logError("analyzeUrl"));
   };
 
   /** من بطاقة تنزيل مكتمل: تحليل مواضيعه، مع رابط الصفحة لأخذ ترجمتها (إن نُزّل كاملًا) */
@@ -1004,6 +1081,7 @@ export default function App() {
                 {tab === "download" && (
                   <DownloadView
                     session={downloadSession}
+                    onAnalyze={isMobile ? undefined : analyzeUrl}
                     settings={settings}
                     update={update}
                     outputDir={outputDir}

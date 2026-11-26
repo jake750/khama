@@ -99,6 +99,31 @@ pub(super) async fn run_convert(app: &AppHandle, id: u64, req: ConvertRequest, c
             ..Default::default()
         },
     );
+    // تحليل رابط قبل تنزيله: لا ملف محلي يُفحص (ترجمة الموقع أو الصوت وحده)
+    if p.id == "topics"
+        && let Some(url) = req.inputs.first().filter(|u| u.starts_with("http://") || u.starts_with("https://"))
+    {
+        let work = download::jobs_root(app)?.join(format!("c{id}"));
+        std::fs::create_dir_all(&work)?;
+        let c = Ctx {
+            app,
+            id,
+            tools: &tools,
+            work: &work,
+        };
+        let Some(r) = run_topics_url(&c, url, o, cancel).await? else {
+            return Ok(None);
+        };
+        let found = Found {
+            markers: r.silences,
+            topics: Some(r.topics),
+            transcript: Some(r.source),
+            levels: r.levels,
+            cues: Some(r.cues),
+            words: Some(r.words).filter(|w| !w.is_empty()),
+        };
+        return Ok(Some((PathBuf::from(url), Some(found))));
+    }
     let mut infos = Vec::new();
     for i in &req.inputs {
         infos.push(probe_file(&tools, Path::new(i)).await?);

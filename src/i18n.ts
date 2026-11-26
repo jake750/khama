@@ -658,6 +658,9 @@ const en = {
   silenceMin: "Shortest silence",
   silencePad: "Keep after speech",
   silencePadBefore: "Keep before speech",
+  analyzeVideo: "Analyze the video",
+  analyzeVideoHint:
+    "Finds the topics and the ones that fit a Reel before downloading: uses the site's captions if it has them, otherwise downloads the audio only and transcribes it. The video itself isn't downloaded; exporting a clip downloads only its part.",
   alignSpeech: "Sync the subtitles to the audio",
   alignSpeechHint:
     "Times every word from the audio with whisper.cpp, even when a subtitle file or the site's captions exist, so each line appears when its words are spoken. Slower: it transcribes the whole file.",
@@ -1429,6 +1432,9 @@ const ar: Dict = {
   silenceMin: "أقصر صمت يُحسب",
   silencePad: "اترك بعد الكلام",
   silencePadBefore: "اترك قبل الكلام",
+  analyzeVideo: "حلّل الفيديو",
+  analyzeVideoHint:
+    "يستخرج المواضيع وما يصلح منها ريلًا قبل التنزيل: من ترجمة الموقع إن وُجدت، وإلا ينزّل الصوت وحده ويفرّغه. لا يُنزَّل الفيديو نفسه، وتصدير مقطع ينزّل جزءه فقط.",
   alignSpeech: "موازنة الترجمة مع الصوت",
   alignSpeechHint:
     "يقيس وقت كل كلمة من الصوت بـ whisper.cpp حتى مع ملف ترجمة أو ترجمة الموقع، فيظهر كل سطر حين تُنطق كلماته. أبطأ لأنه يفرّغ الملف كله.",

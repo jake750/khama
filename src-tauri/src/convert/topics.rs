@@ -824,6 +824,118 @@ pub(super) async fn run_topics(
     }))
 }
 
+/// وقفات من أوقات الكلمات (ترجمة الموقع بلا صوت منزَّل): فجوة بين كلمتين أو جملتين لا تقل عن `min`
+pub fn gaps_as_silences(cues: &[Cue], words: &[Word], min: f64) -> Vec<[f64; 2]> {
+    let spans: Vec<(f64, f64)> = if words.is_empty() {
+        cues.iter().map(|c| (c.start, c.end)).collect()
+    } else {
+        // نهاية الكلمة هنا بداية التالية، فالفجوة تظهر فقط حين تنتهي جملتها قبل التالية
+        words.iter().map(|w| (w.start, w.end)).collect()
+    };
+    spans
+        .windows(2)
+        .filter_map(|p| {
+            let (a, b) = (p[0].1, p[1].0);
+            (b - a >= min).then_some([a, b])
+        })
+        .collect()
+}
+
+/// تحليل رابط قبل تنزيله: ترجمة الموقع إن وُجدت (بلا تنزيل شيء)، وإلا الصوت وحده ثم تفريغه.
+/// الفيديو لا يُنزَّل.
+pub(super) async fn run_topics_url(
+    c: &Ctx<'_>,
+    url: &str,
+    o: &ConvertOptions,
+    cancel: &mut watch::Receiver<bool>,
+) -> Result<Option<TopicsResult>, AppError> {
+    let lo = o.start.filter(|v| *v > 0.0).unwrap_or(0.0);
+    let hi = o.end.filter(|e| *e > lo).unwrap_or(f64::INFINITY);
+    emit(
+        c.app,
+        JobUpdate {
+            id: c.id,
+            state: "analyzing",
+            ..Default::default()
+        },
+    );
+    if !o.align_speech
+        && let Some((mut cues, mut words)) = site_captions(c.tools, url, c.work).await
+    {
+        cues.retain(|q| q.end > lo && q.start < hi);
+        words.retain(|w| w.end > lo && w.start < hi);
+        if !cues.is_empty() {
+            let silences = gaps_as_silences(&cues, &words, o.silence_min.unwrap_or(0.6).clamp(0.1, 30.0));
+            let mut topics = topics_from(&cues, &SegParams::default());
+            let end_max = cues.last().map_or(hi, |q| q.end).min(hi);
+            for t in &mut topics {
+                t.start = t.start.max(lo);
+                t.end = t.end.min(end_max);
+            }
+            return Ok(Some(TopicsResult {
+                silences,
+                levels: None,
+                cues,
+                words,
+                topics,
+                source: "captions",
+            }));
+        }
+    }
+    // الصوت وحده: أصغر صيغة صوت، في مجلد العمل المؤقت
+    let tmpl = c.work.join("audio.%(ext)s").to_string_lossy().into_owned();
+    let mut a = tools::ytdlp_base_args(c.tools);
+    a.extend(
+        ["-f", "bestaudio/best", "--newline", "--no-part", "-o", &tmpl, "--", url]
+            .iter()
+            .map(|s| s.to_string()),
+    );
+    let mut cmd = tools::ytdlp_command(c.tools);
+    cmd.args(&a);
+    let mut last = Instant::now() - Duration::from_secs(1);
+    let outcome = run_streaming(cmd, cancel, |line| {
+        // [download]  42.3% of ...
+        if let Some(p) = line
+            .strip_prefix("[download]")
+            .and_then(|r| r.trim_start().split('%').next())
+            .and_then(|v| v.trim().parse::<f64>().ok())
+            && last.elapsed() >= Duration::from_millis(250)
+        {
+            last = Instant::now();
+            emit(
+                c.app,
+                JobUpdate {
+                    id: c.id,
+                    state: "downloading",
+                    stage: Some("audio"),
+                    percent: Some(p),
+                    ..Default::default()
+                },
+            );
+        }
+    })
+    .await?;
+    match outcome {
+        RunOutcome::Canceled => return Ok(None),
+        RunOutcome::Exited {
+            success: false, stderr, ..
+        } => {
+            return Err(crate::errors::friendly_ytdlp_error(&stderr));
+        }
+        RunOutcome::Exited { .. } => {}
+    }
+    let audio = std::fs::read_dir(c.work)?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .find(|p| p.file_stem().is_some_and(|n| n == "audio"))
+        .ok_or_else(|| AppError::new("noAudioStream"))?;
+    let info = probe_file(c.tools, &audio).await?;
+    let local = ConvertOptions {
+        source_url: None,
+        ..o.clone()
+    };
+    run_topics(c, &info, &local, cancel).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -924,6 +1036,20 @@ mod tests {
         for t in topics_from(&cues, &SegParams::default()) {
             println!("{:7.1}–{:7.1} ({:5.1}s) {} | {}", t.start, t.end, t.end - t.start, t.title, t.text);
         }
+    }
+
+    #[test]
+    fn caption_gaps_become_pauses() {
+        let w = |s: f64, e: f64| Word {
+            w: "x".into(),
+            start: s,
+            end: e,
+            last: false,
+        };
+        let words = vec![w(0.0, 1.0), w(1.0, 2.0), w(3.0, 3.5), w(3.6, 4.0)];
+        assert_eq!(gaps_as_silences(&[], &words, 0.6), vec![[2.0, 3.0]]);
+        let cues = vec![cue(0.0, 2.0, "a"), cue(2.2, 4.0, "b"), cue(5.0, 6.0, "c")];
+        assert_eq!(gaps_as_silences(&cues, &[], 0.6), vec![[4.0, 5.0]]);
     }
 
     #[test]

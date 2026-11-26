@@ -158,13 +158,24 @@ fn topics_cmd(ff: PathBuf, mut args: Vec<String>) {
     let subs = args.get(1).expect("subtitle path");
     let raw = String::from_utf8_lossy(&std::fs::read(subs).expect("read subs")).into_owned();
     let t0 = Instant::now();
-    let cues = clean_cues(parse_subs(&raw));
+    // json3 (ترجمة يوتيوب): الجمل ووقت كل كلمة كما يقرؤها التطبيق
+    let (cues, json_words) = if subs.ends_with(".json3") {
+        let (c, w) = words::parse_json3(&raw);
+        (clean_cues(c), w)
+    } else {
+        (clean_cues(parse_subs(&raw)), Vec::new())
+    };
     let topics = topics_from(&cues, &SegParams::default());
     let seg_ms = t0.elapsed().as_secs_f64() * 1000.0;
-    let (silences, _, levels) = silences_of(&ff, &video, &o);
     let mut words = words_json
         .map(|p| words::parse_whisper_json(&std::fs::read_to_string(p).expect("read words"), 0.0))
-        .unwrap_or_default();
+        .unwrap_or(json_words);
+    // الفيديو "-" = لا ملف (تحليل رابط بترجمته): الوقفات من الفجوات بين الكلمات
+    let (silences, _, levels) = if video == "-" {
+        (gaps_as_silences(&cues, &words, o.silence_min.unwrap_or(0.6)), None, None)
+    } else {
+        silences_of(&ff, &video, &o)
+    };
     if align {
         words = words::align(&cues, &words);
     }
