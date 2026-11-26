@@ -8,8 +8,15 @@ import { D_ANTICIPATE, usePresence } from "../motion";
  * تنبت من زرّها وتنعكس لأعلى إن لم يتّسع ما تحته، وتُغلق بالنقر خارجها أو Escape أو بالتمرير.
  * لوحة المفاتيح: الأسهم وHome/End للتنقّل، Enter/Space للاختيار، وحرف للقفز إلى أول خيار يبدأ به.
  */
-/** قبل القياس: ثابتة في أعلى الشاشة ومخفية، فلا تطيل الصفحة ولا تحرّكها */
-const HIDDEN: CSSProperties = { visibility: "hidden", position: "fixed", top: 0, left: 0 };
+/**
+ * قبل القياس: ثابتة في أعلى الشاشة ومخفية، فلا تطيل الصفحة ولا تحرّكها.
+ * inset كلها صريحة: ‎.more-menu-list‎ تضع top و inset-inline-end، فكانت القائمة تمتدّ بعرض النافذة
+ * عند القياس، وتُدفع تحت الشاشة حين تنقلب لأعلى (top يغلب bottom).
+ */
+const HIDDEN: CSSProperties = { visibility: "hidden", position: "fixed", inset: "0 auto auto 0", width: "max-content" };
+/** أقصى عرض وارتفاع للقائمة: لا تتجاوز زرّها إلا بقدر ما يحتاجه نص خيار، وتتمرّر بعد ذلك */
+const MAX_W = 320;
+const MAX_H = 300;
 
 export function Select(props: {
   value: string;
@@ -66,11 +73,12 @@ export function Select(props: {
     const margin = 8;
     const nav = document.querySelector<HTMLElement>("nav.tabs")?.getBoundingClientRect();
     const floor = nav && nav.top > window.innerHeight / 2 ? nav.top : window.innerHeight;
-    const h = el.scrollHeight;
+    const h = Math.min(el.scrollHeight, MAX_H);
     const below = floor - btn.bottom - gap - margin;
     const above = btn.top - gap - margin;
     const flip = h > below && above > below;
-    const w = Math.min(Math.max(btn.width, el.offsetWidth), window.innerWidth - 2 * margin);
+    const room = Math.max(0, flip ? above : below);
+    const w = Math.min(Math.max(btn.width, Math.min(el.offsetWidth, MAX_W)), window.innerWidth - 2 * margin);
     const rtl = document.documentElement.dir === "rtl";
     let left = rtl ? btn.right - w : btn.left;
     left = Math.max(margin, Math.min(left, window.innerWidth - margin - w));
@@ -78,10 +86,12 @@ export function Select(props: {
     setPos({
       position: "fixed",
       left,
+      right: "auto",
       width: w,
-      maxHeight: Math.max(140, Math.min(320, flip ? above : below)),
+      maxHeight: Math.min(MAX_H, room),
       overflowY: "auto",
-      ...(flip ? { bottom: window.innerHeight - btn.top + gap } : { top: btn.bottom + gap }),
+      transformOrigin: flip ? "bottom center" : "top center",
+      ...(flip ? { top: "auto", bottom: window.innerHeight - btn.top + gap } : { top: btn.bottom + gap, bottom: "auto" }),
     });
   }, [shown, leaving]);
 
