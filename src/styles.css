@@ -579,6 +579,9 @@ details.tech pre {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* على الهاتف لا يتسع السطر للعنوان وأزرار القائمة: تلتف بدل أن تخرج من الحافة */
+  flex-wrap: wrap;
+  row-gap: var(--s-1);
 }
 
 .jobs-header h3 {

@@ -187,6 +187,21 @@ const stillOnly = (o: ConvertOptions): ConvertOptions => ({
   cut: [],
 });
 
+/** نافذة عريضة (1280 فأكثر): المعاينة في عمود الوسط بدل داخل لوح القسم. القيمة نفسها في CSS */
+const WIDE = "(min-width: 1280px)";
+function useWide() {
+  const [wide, setWide] = useState(() => window.matchMedia?.(WIDE).matches ?? false);
+  useEffect(() => {
+    const q = window.matchMedia?.(WIDE);
+    if (!q) return;
+    const on = () => setWide(q.matches);
+    on();
+    q.addEventListener("change", on);
+    return () => q.removeEventListener("change", on);
+  }, []);
+  return wide;
+}
+
 /**
  * إطار المصدر بجانب إطار الناتج بسلسلة الفلاتر نفسها (D-84).
  * يُطلب بعد توقف التعديل قليلًا، والطلب الأحدث يلغي السابق في Rust.
@@ -562,6 +577,7 @@ export function ConvertView(props: {
   const previewFile = fmtPicture ? (editFile ?? ready.find((f) => f.info!.video)) : undefined;
   const previewPreset = previewFile ? conv(previewFile) : convPreset;
   const previewAt = previewFile ? (effective(previewPreset, previewFile).start ?? (previewFile.info!.duration ?? 0) / 3) : 0;
+  const wide = useWide();
   /** ملف خياراته الخاصة تختلف فعلًا عن المشتركة (العلامة على صفّه) */
   const differs = (f: SourceFile) =>
     !!overrides[f.path] && JSON.stringify(effective(conv(f), f)) !== JSON.stringify(effective(conv(f), f, true, shared));
@@ -791,560 +807,605 @@ export function ConvertView(props: {
 
   return (
     <>
-      {/* ============ الملفات ============ */}
-      <div className={`card ${props.dragging ? "drop-over" : ""}`}>
-        <div className="section-head">
-          <h2>
-            {props.dragging ? (
-              t.dropHere
-            ) : (
-              <>
-                {t.filesHeading} <span className="count-badge ltr-num">{files.length}</span>
-              </>
-            )}
-          </h2>
-          <span className="spacer" />
-          <button className="btn btn-sm" onClick={chooseFiles}>
-            <Icon name="plus" size={16} /> {t.addFiles}
-          </button>
-          <button className="btn btn-sm btn-ghost" onClick={props.onClearFiles}>
-            {t.clearFiles}
-          </button>
-        </div>
-        <AnimatedList className="file-list">
-          {files.map((f, i) => (
-            <div className="file-row" key={f.path}>
-              {f.info?.thumbnail ? (
-                <img className="file-thumb" src={f.info.thumbnail} alt="" />
+      {/* ============ عمود الأدوات: الملفات والأقسام. في النافذة العريضة عمود على جانب البداية ============ */}
+      <div className="cv-side">
+        {/* ============ الملفات ============ */}
+        <div className={`card ${props.dragging ? "drop-over" : ""}`}>
+          <div className="section-head">
+            <h2>
+              {props.dragging ? (
+                t.dropHere
               ) : (
-                <div className={`file-thumb ${!f.info && !f.error ? "skeleton" : ""}`}>
-                  {f.info && <Icon name={f.info.video ? "film" : "music"} />}
-                </div>
-              )}
-              <div className="file-body">
-                <div className="file-name" dir="auto" title={f.path}>
-                  {baseName(f.path)}
-                </div>
-                {differs(f) && (
-                  <span className="own-opts">
-                    <Icon name="settings" size={16} /> {t.customOpts}
-                  </span>
-                )}
-                {f.info ? <Specs m={f.info} /> : f.error ? null : <div className="faint">{t.analyzingFile}</div>}
-                {f.info && f.info.issues.length > 0 && (
-                  <div className="issues">
-                    {f.info.issues.map((i) => (
-                      <span key={i} className={`issue ${i === "noAudio" ? "" : "warn"}`} title={t.issues[i]}>
-                        <Icon name={ISSUE_ICON[i]} size={16} /> {t.issues[i]}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {f.error && <ErrorBox error={f.error} compact />}
-              </div>
-              {/* «دمج» يجمعها بهذا الترتيب، فيمكن تغييره (U-50) */}
-              {files.length > 1 && (
-                <div className="file-order">
-                  <button className="icon-btn sm" title={t.moveUp} aria-label={t.moveUp} disabled={i === 0} onClick={() => move(i, -1)}>
-                    <span className="flip-y">
-                      <Icon name="chevron" size={16} />
-                    </span>
-                  </button>
-                  <button
-                    className="icon-btn sm"
-                    title={t.moveDown}
-                    aria-label={t.moveDown}
-                    disabled={i === files.length - 1}
-                    onClick={() => move(i, 1)}
-                  >
-                    <Icon name="chevron" size={16} />
-                  </button>
-                </div>
-              )}
-              {ready.length > 1 && f.info && (
-                <button
-                  className="icon-btn sm"
-                  title={t.editFileOpts}
-                  aria-label={t.editFileOpts}
-                  aria-pressed={editFile?.path === f.path}
-                  onClick={() => setEditPath(editFile?.path === f.path ? null : f.path)}
-                >
-                  <Icon name="settings" size={16} />
-                </button>
-              )}
-              <button
-                className="icon-btn sm"
-                title={t.removeFile}
-                aria-label={t.removeFile}
-                onClick={() => props.setFiles((prev) => prev.filter((x) => x.path !== f.path))}
-              >
-                <Icon name="x" size={16} />
-              </button>
-            </div>
-          ))}
-        </AnimatedList>
-      </div>
-
-      {/* ============ مساحة العمل: الأقسام على الجانب، وأدوات القسم المختار في الوسط ============ */}
-      <div className="card workspace">
-        <nav className="cat-nav" aria-label={t.toolsHeading}>
-          {CATS.map((c) => (
-            <button key={c.id} aria-current={cat === c.id ? "true" : undefined} onClick={() => setCat(c.id)}>
-              <Icon name={c.icon} size={16} />
-              <span className="cat-name">{catLabel(c.id)}</span>
-              {counts[c.id] > 0 && <span className="cat-count ltr-num">{counts[c.id]}</span>}
-              {suggestion &&
-                cat !== c.id &&
-                c.id === (isFormat(presetById(suggestion)!) ? "format" : isAi(presetById(suggestion)!) ? "audio" : "analysis") && (
-                  <span className="suggest-dot" title={t.suggested} />
-                )}
-            </button>
-          ))}
-        </nav>
-
-        <div className={`cat-body ${editFile ? "scoped" : ""}`}>
-          {editFile && (
-            <div className="scoped-head">
-              <div>
-                <b dir="auto">{t.editingFor(baseName(editFile.path))}</b>
-                <div className="faint">{t.editingNote}</div>
-              </div>
-              <span className="spacer" />
-              {overrides[editFile.path] && (
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={() => {
-                    setOverrides(({ [editFile.path]: _drop, ...rest }) => rest);
-                    setEditPath(null);
-                  }}
-                >
-                  {t.useShared}
-                </button>
-              )}
-              <button className="btn btn-sm" onClick={() => setEditPath(null)}>
-                {t.doneEditing}
-              </button>
-            </div>
-          )}
-
-          <SlideSwitch id={cat} index={CATS.findIndex((c) => c.id === cat)} distance={24} fade>
-            <div className="cat-pane">
-              <div className="cat-head">
-                <h3>{catLabel(cat)}</h3>
-                <span className="faint">{t.catHint[cat]}</span>
-              </div>
-
-              {cat === "format" && (
                 <>
-                  <Segmented<FmtGroup>
-                    label={t.format}
-                    value={fmtGroup}
-                    onChange={setFmtGroup}
-                    options={(["edit", "publish", "audio", "tools"] as FmtGroup[]).map((g) => ({
-                      value: g,
-                      label: g === "tools" ? t.groupCopy : groupName(t, g),
-                    }))}
-                  />
-                  <div className="preset-grid">
-                    {PRESETS.filter((p) => p.group === fmtGroup && isFormat(p)).map((p) =>
-                      card(p, formatOn && p.id === fmt.id, () => pickFormat(p.id)),
-                    )}
-                  </div>
-                  {!formatOn && <div className="cat-note faint">{convNeeded ? t.noFormatFamily : t.noFormat}</div>}
-                  {formatOn && (fmt.quality || fmt.hw) && (
-                    <div className="options mt-4">
-                      {fmt.quality && (
-                        <div>
-                          <span className="field-label">{t.quality}</span>
-                          <Segmented<ConvertOptions["quality"]>
-                            label={t.quality}
-                            value={opts.quality}
-                            onChange={(quality) => set({ quality })}
-                            // الرقم خلف كل مستوى للمحترف: معدل البت التقريبي عند 1080p أو للصوت (F-13)
-                            options={(["high", "balanced", "small"] as const).map((q) => ({
-                              value: q,
-                              label: { high: t.qualityHigh, balanced: t.qualityBalanced, small: t.qualitySmall }[q],
-                              title: qualityRate(fmt, q),
-                            }))}
-                          />
-                        </div>
-                      )}
-                      {fmt.hw && (
-                        <div>
-                          <Toggle
-                            checked={s.convertHw && (props.hw?.length ?? 0) > 0}
-                            onChange={(convertHw) => update({ convertHw })}
-                            title={isMobile ? t.hwToggleMobile : t.hwToggle}
-                            hint={
-                              props.hw == null
-                                ? t.analyzingFile
-                                : props.hw.length
-                                  ? t.hwHint(hwLabel)
-                                  : isMobile
-                                    ? t.hwNoneMobile
-                                    : t.hwNone
-                            }
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {t.filesHeading} <span className="count-badge ltr-num">{files.length}</span>
                 </>
               )}
-
-              {cat === "enhance" &&
-                (!anyVideo || !fmtPicture ? (
-                  notHere(anyVideo ? t.needVideoFormat : t.needVideoFile)
+            </h2>
+            <span className="spacer" />
+            <button className="btn btn-sm" onClick={chooseFiles}>
+              <Icon name="plus" size={16} /> {t.addFiles}
+            </button>
+            <button className="btn btn-sm btn-ghost" onClick={props.onClearFiles}>
+              {t.clearFiles}
+            </button>
+          </div>
+          <AnimatedList className="file-list">
+            {files.map((f, i) => (
+              <div className="file-row" key={f.path}>
+                {f.info?.thumbnail ? (
+                  <img className="file-thumb" src={f.info.thumbnail} alt="" />
                 ) : (
-                  <section>
-                    {previewFile && (
-                      <BeforeAfter
-                        path={previewFile.path}
-                        presetId={previewPreset.id}
-                        options={effective(previewPreset, previewFile)}
-                        at={previewAt}
-                      />
-                    )}
-                    {audioOnly > 0 && <div className="faint mb-2">{t.pictureSkipsAudio(audioOnly)}</div>}
-                    {/* تحسين بلا نموذج (فلاتر FFmpeg): المعاينة «قبل وبعد» تعرضه، والتقدير المقيس يعرض وقته */}
-                    <span className="field-label">{t.enhance}</span>
-                    <Segmented<string>
-                      label={t.enhance}
-                      value={opts.enhance ?? "off"}
-                      onChange={(v) => set({ enhance: v === "off" ? null : v })}
-                      options={[
-                        { value: "off", label: t.enhanceOff },
-                        { value: "light", label: t.enhanceLight },
-                        { value: "strong", label: t.enhanceStrong },
-                        { value: "sharpen", label: t.enhanceSharpen },
-                      ]}
+                  <div className={`file-thumb ${!f.info && !f.error ? "skeleton" : ""}`}>
+                    {f.info && <Icon name={f.info.video ? "film" : "music"} />}
+                  </div>
+                )}
+                <div className="file-body">
+                  <div className="file-name" dir="auto" title={f.path}>
+                    {baseName(f.path)}
+                  </div>
+                  {differs(f) && (
+                    <span className="own-opts">
+                      <Icon name="settings" size={16} /> {t.customOpts}
+                    </span>
+                  )}
+                  {f.info ? <Specs m={f.info} /> : f.error ? null : <div className="faint">{t.analyzingFile}</div>}
+                  {f.info && f.info.issues.length > 0 && (
+                    <div className="issues">
+                      {f.info.issues.map((i) => (
+                        <span key={i} className={`issue ${i === "noAudio" ? "" : "warn"}`} title={t.issues[i]}>
+                          <Icon name={ISSUE_ICON[i]} size={16} /> {t.issues[i]}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {f.error && <ErrorBox error={f.error} compact />}
+                </div>
+                {/* «دمج» يجمعها بهذا الترتيب، فيمكن تغييره (U-50) */}
+                {files.length > 1 && (
+                  <div className="file-order">
+                    <button className="icon-btn sm" title={t.moveUp} aria-label={t.moveUp} disabled={i === 0} onClick={() => move(i, -1)}>
+                      <span className="flip-y">
+                        <Icon name="chevron" size={16} />
+                      </span>
+                    </button>
+                    <button
+                      className="icon-btn sm"
+                      title={t.moveDown}
+                      aria-label={t.moveDown}
+                      disabled={i === files.length - 1}
+                      onClick={() => move(i, 1)}
+                    >
+                      <Icon name="chevron" size={16} />
+                    </button>
+                  </div>
+                )}
+                {ready.length > 1 && f.info && (
+                  <button
+                    className="icon-btn sm"
+                    title={t.editFileOpts}
+                    aria-label={t.editFileOpts}
+                    aria-pressed={editFile?.path === f.path}
+                    onClick={() => setEditPath(editFile?.path === f.path ? null : f.path)}
+                  >
+                    <Icon name="settings" size={16} />
+                  </button>
+                )}
+                <button
+                  className="icon-btn sm"
+                  title={t.removeFile}
+                  aria-label={t.removeFile}
+                  onClick={() => props.setFiles((prev) => prev.filter((x) => x.path !== f.path))}
+                >
+                  <Icon name="x" size={16} />
+                </button>
+              </div>
+            ))}
+          </AnimatedList>
+        </div>
+
+        {/* ============ مساحة العمل: الأقسام على الجانب، وأدوات القسم المختار في الوسط ============ */}
+        <div className="card workspace">
+          <nav className="cat-nav" aria-label={t.toolsHeading}>
+            {CATS.map((c) => (
+              <button key={c.id} aria-current={cat === c.id ? "true" : undefined} onClick={() => setCat(c.id)}>
+                <Icon name={c.icon} size={16} />
+                <span className="cat-name">{catLabel(c.id)}</span>
+                {counts[c.id] > 0 && <span className="cat-count ltr-num">{counts[c.id]}</span>}
+                {suggestion &&
+                  cat !== c.id &&
+                  c.id === (isFormat(presetById(suggestion)!) ? "format" : isAi(presetById(suggestion)!) ? "audio" : "analysis") && (
+                    <span className="suggest-dot" title={t.suggested} />
+                  )}
+              </button>
+            ))}
+          </nav>
+
+          <div className={`cat-body ${editFile ? "scoped" : ""}`}>
+            {editFile && (
+              <div className="scoped-head">
+                <div>
+                  <b dir="auto">{t.editingFor(baseName(editFile.path))}</b>
+                  <div className="faint">{t.editingNote}</div>
+                </div>
+                <span className="spacer" />
+                {overrides[editFile.path] && (
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => {
+                      setOverrides(({ [editFile.path]: _drop, ...rest }) => rest);
+                      setEditPath(null);
+                    }}
+                  >
+                    {t.useShared}
+                  </button>
+                )}
+                <button className="btn btn-sm" onClick={() => setEditPath(null)}>
+                  {t.doneEditing}
+                </button>
+              </div>
+            )}
+
+            <SlideSwitch id={cat} index={CATS.findIndex((c) => c.id === cat)} distance={24} fade>
+              <div className="cat-pane">
+                <div className="cat-head">
+                  <h3>{catLabel(cat)}</h3>
+                  <span className="faint">{t.catHint[cat]}</span>
+                </div>
+
+                {cat === "format" && (
+                  <>
+                    <Segmented<FmtGroup>
+                      label={t.format}
+                      value={fmtGroup}
+                      onChange={setFmtGroup}
+                      options={(["edit", "publish", "audio", "tools"] as FmtGroup[]).map((g) => ({
+                        value: g,
+                        label: g === "tools" ? t.groupCopy : groupName(t, g),
+                      }))}
                     />
-                    {opts.enhance && <Hint className="mt-2" icon="contrast" text={t.enhanceHint} />}
-                    <div className="toggle-grid">
-                      <Toggle checked={opts.denoise} onChange={(denoise) => set({ denoise })} title={t.denoise} hint={t.denoiseHint} />
-                      <Toggle
-                        checked={opts.deinterlace}
-                        onChange={(deinterlace) => set({ deinterlace })}
-                        title={t.deinterlace}
-                        hint={t.deinterlaceHint}
-                      />
-                      <Toggle checked={opts.tonemap} onChange={(tonemap) => set({ tonemap })} title={t.tonemap} hint={t.tonemapHint} />
-                    </div>
-                    <FilePick label={t.lut} value={opts.lut} extensions={["cube"]} onChange={(lut) => set({ lut })} />
-                    {/* ما يفعله كل خيار بالضبط (F-45، F-46) */}
-                    {opts.lut && <Hint className="mt-2" icon="contrast" text={t.lutHint} />}
-                  </section>
-                ))}
-
-              {cat === "audio" && (
-                <section>
-                  <span className="field-label">{t.aiAudio}</span>
-                  <div className="preset-grid mt-0">
-                    {PRESETS.filter(isAi).map((p) => card(p, ai.includes(p.id), () => toggleAi(p.id)))}
-                  </div>
-                  {oneFile && convNeeded && <Hint className="mt-2" icon="info" text={t.aiOneAtATime} />}
-                  {fmtAudio ? (
-                    <>
-                      <div className="pick-grid mt-4">
-                        <Pick
-                          label={t.loudness}
-                          value={opts.loudness ?? null}
-                          onChange={(loudness) => set({ loudness })}
-                          options={[
-                            { value: null, label: t.loudOff },
-                            { value: -14, label: t.loudSocial },
-                            { value: -16, label: t.loudPodcast },
-                            { value: -23, label: t.loudBroadcast },
-                          ]}
-                        />
-                        <FilePick
-                          label={t.replaceAudio}
-                          value={opts.replaceAudio}
-                          extensions={MEDIA_FILTER.extensions}
-                          onChange={(replaceAudio) => set({ replaceAudio })}
-                        />
-                      </div>
-                      {/* ما يكلّفه كل خيار مكتوبًا تحته (F-40، F-41) */}
-                      {opts.loudness != null && <Hint className="mt-2" icon="volume" text={t.loudHint} />}
-                      {opts.replaceAudio && <Hint className="mt-2" icon="music" text={t.replaceAudioHint} />}
-                      {anyVideo && <Toggle checked={opts.mute} onChange={(mute) => set({ mute })} title={t.mute} />}
-                    </>
-                  ) : (
-                    fmt.kind === "copy" && <Toggle checked={opts.mute} onChange={(mute) => set({ mute })} title={t.mute} />
-                  )}
-                </section>
-              )}
-
-              {cat === "frame" &&
-                (!anyVideo || !fmtPicture ? (
-                  notHere(anyVideo ? t.needVideoFormat : t.needVideoFile)
-                ) : (
-                  <section>
-                    {previewFile && (
-                      <BeforeAfter
-                        path={previewFile.path}
-                        presetId={previewPreset.id}
-                        options={effective(previewPreset, previewFile)}
-                        at={previewAt}
-                      />
-                    )}
-                    <div className="pick-grid">
-                      <Pick
-                        label={t.size}
-                        value={opts.size ?? null}
-                        onChange={(size) => set({ size })}
-                        options={[null, 2160, 1440, 1080, 720, 540, 480].map((v) => ({
-                          value: v,
-                          label: v ? (v === 2160 ? "4K" : `${v}p`) : t.original,
-                        }))}
-                      />
-                      <Pick
-                        label={t.aspect}
-                        value={opts.aspect ?? null}
-                        onChange={(aspect) => set({ aspect })}
-                        options={[null, "16:9", "9:16", "1:1", "4:5", "21:9"].map((v) => ({ value: v, label: v ?? t.original }))}
-                      />
-                      <Pick
-                        label={t.fps}
-                        value={opts.fps ?? null}
-                        onChange={(fps) => set({ fps })}
-                        options={[null, "23.976", "24", "25", "29.97", "30", "50", "59.94", "60"].map((v) => ({
-                          value: v,
-                          label: v ?? t.original,
-                        }))}
-                      />
-                      <Pick
-                        label={t.speed}
-                        value={opts.speed ?? 1}
-                        onChange={(speed) => set({ speed: speed === 1 ? null : speed })}
-                        options={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4].map((v) => ({ value: v, label: `${v}×` }))}
-                      />
-                    </div>
-                    <RotatePick value={opts.rotate ?? null} onChange={(rotate) => set({ rotate })} />
-                    {opts.speed != null && opts.speed !== 1 && <Hint className="mt-2" icon="gauge" text={t.speedHint} />}
-                  </section>
-                ))}
-
-              {cat === "text" && (
-                <section>
-                  {canTrim ? (
-                    <>
-                      <Toggle checked={trimOn} onChange={setTrimOn} title={t.optTrim} hint={t.trimToolsHint} />
-                      <div className="collapse" data-open={trimOn} inert={!trimOn || undefined}>
-                        <div>
-                          <TrimRange
-                            duration={trimInfo!.duration!}
-                            fps={trimInfo!.video?.fps}
-                            value={{ start: opts.start ?? 0, end: opts.end ?? trimInfo!.duration! }}
-                            onChange={(r) => set({ start: r.start, end: r.end })}
-                          />
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    ready.length > 1 && <Hint className="mb-2" icon="scissors" text={t.trimOneFile} />
-                  )}
-                  {anyVideo && (formatOn ? fmt.kind === "video" : true) ? (
-                    <>
-                      <div className="pick-grid mt-4">
-                        <FilePick
-                          label={t.subtitles}
-                          value={opts.subtitles}
-                          extensions={["srt", "ass", "ssa", "vtt"]}
-                          onChange={(subtitles) => set({ subtitles })}
-                        />
-                        <FilePick
-                          label={t.watermark}
-                          value={opts.watermark}
-                          extensions={["png", "jpg", "jpeg", "webp"]}
-                          onChange={(watermark) => set({ watermark })}
-                        />
-                        {opts.watermark && <PosGrid value={opts.watermarkPos ?? "br"} onChange={(watermarkPos) => set({ watermarkPos })} />}
-                      </div>
-                      {opts.subtitles && <Hint className="mt-2" icon="captions" text={t.subtitlesHint} />}
-                      {opts.watermark && <Hint className="mt-2" icon="image" text={t.watermarkHint} />}
-                      <Toggle checked={opts.timecode} onChange={(timecode) => set({ timecode })} title={t.timecode} hint={t.timecodeHint} />
-                    </>
-                  ) : (
-                    notHere(anyVideo ? t.needVideoFormat : t.needVideoFile)
-                  )}
-                </section>
-              )}
-
-              {cat === "analysis" && (
-                <section>
-                  <div className="preset-grid mt-0">
-                    {PRESETS.filter(isAnalysis).map((p) => card(p, analysis.includes(p.id), () => toggleAnalysis(p.id)))}
-                  </div>
-                  {/* كشف الصمت: ما يُعدّ صمتًا، وكم يبقى من طرفيه عند حذفه */}
-                  {(analysis.includes("detect_silence") || analysis.includes("topics")) && (
-                    <div className="mt-4">
-                      <div className="pick-grid">
-                        {analysis.includes("topics") && (
-                          <>
-                            <Pick
-                              label={`${t.reelLength} · ${t.reelMin}`}
-                              value={opts.reelMin ?? 15}
-                              onChange={(v) => set({ reelMin: v === 15 ? null : v })}
-                              options={[5, 10, 15, 20, 30, 45, 60].map((v) => ({ value: v, label: t.secs(v) }))}
-                            />
-                            <Pick
-                              label={`${t.reelLength} · ${t.reelMax}`}
-                              value={opts.reelMax ?? 90}
-                              onChange={(v) => set({ reelMax: v === 90 ? null : v })}
-                              options={[30, 45, 60, 90, 120, 180].map((v) => ({ value: v, label: t.secs(v) }))}
-                            />
-                          </>
-                        )}
-                        {/* تلقائي = عتبة تُقاس من ضجيج الملف نفسه؛ -40 الثابتة لم تجد شيئًا في تسجيلات فيها ضجيج غرفة */}
-                        <Pick<number | null>
-                          label={t.silenceLevel}
-                          value={opts.silenceDb ?? null}
-                          onChange={(v) => set({ silenceDb: v })}
-                          options={[
-                            { value: null, label: t.silenceAuto },
-                            ...[-25, -30, -35, -40, -50, -60].map((v) => ({ value: v, label: `${v} dB` })),
-                          ]}
-                        />
-                        <Pick
-                          label={t.silenceMin}
-                          value={opts.silenceMin ?? 0.6}
-                          onChange={(v) => set({ silenceMin: v === 0.6 ? null : v })}
-                          options={[0.3, 0.4, 0.5, 0.6, 0.8, 1, 1.5, 2, 3].map((v) => ({ value: v, label: t.secs(v) }))}
-                        />
-                        {/* ما يبقى قبل الكلام منفصل عمّا يبقى بعده (كما في auto-editor): النَّفَس قبل الجملة غير ذيلها */}
-                        <Pick<number | null>
-                          label={t.silencePadBefore}
-                          value={opts.silencePadBefore ?? null}
-                          onChange={(v) => set({ silencePadBefore: v })}
-                          options={[
-                            { value: null, label: t.sameAsAfter },
-                            ...[0, 0.05, 0.1, 0.2, 0.3, 0.5].map((v) => ({ value: v, label: t.secs(v) })),
-                          ]}
-                        />
-                        <Pick
-                          label={t.silencePad}
-                          value={opts.silencePad ?? 0.15}
-                          onChange={(v) => set({ silencePad: v === 0.15 ? null : v })}
-                          options={[0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5].map((v) => ({ value: v, label: t.secs(v) }))}
-                        />
-                      </div>
-                      <Hint className="mt-2" icon="wave" text={t.silenceHint} />
-                      {analysis.includes("topics") && <Hint className="mt-2" icon="list" text={t.topicsHint} />}
-                      {analysis.includes("topics") && (
-                        <div className="mt-2">
-                          <Toggle
-                            checked={!!opts.alignSpeech}
-                            onChange={(alignSpeech) => set({ alignSpeech })}
-                            title={t.alignSpeech}
-                            hint={t.alignSpeechHint}
-                          />
-                        </div>
+                    <div className="preset-grid">
+                      {PRESETS.filter((p) => p.group === fmtGroup && isFormat(p)).map((p) =>
+                        card(p, formatOn && p.id === fmt.id, () => pickFormat(p.id)),
                       )}
                     </div>
-                  )}
-                </section>
-              )}
-            </div>
-          </SlideSwitch>
+                    {!formatOn && <div className="cat-note faint">{convNeeded ? t.noFormatFamily : t.noFormat}</div>}
+                    {formatOn && (fmt.quality || fmt.hw) && (
+                      <div className="options mt-4">
+                        {fmt.quality && (
+                          <div>
+                            <span className="field-label">{t.quality}</span>
+                            <Segmented<ConvertOptions["quality"]>
+                              label={t.quality}
+                              value={opts.quality}
+                              onChange={(quality) => set({ quality })}
+                              // الرقم خلف كل مستوى للمحترف: معدل البت التقريبي عند 1080p أو للصوت (F-13)
+                              options={(["high", "balanced", "small"] as const).map((q) => ({
+                                value: q,
+                                label: { high: t.qualityHigh, balanced: t.qualityBalanced, small: t.qualitySmall }[q],
+                                title: qualityRate(fmt, q),
+                              }))}
+                            />
+                          </div>
+                        )}
+                        {fmt.hw && (
+                          <div>
+                            <Toggle
+                              checked={s.convertHw && (props.hw?.length ?? 0) > 0}
+                              onChange={(convertHw) => update({ convertHw })}
+                              title={isMobile ? t.hwToggleMobile : t.hwToggle}
+                              hint={
+                                props.hw == null
+                                  ? t.analyzingFile
+                                  : props.hw.length
+                                    ? t.hwHint(hwLabel)
+                                    : isMobile
+                                      ? t.hwNoneMobile
+                                      : t.hwNone
+                              }
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {cat === "enhance" &&
+                  (!anyVideo || !fmtPicture ? (
+                    notHere(anyVideo ? t.needVideoFormat : t.needVideoFile)
+                  ) : (
+                    <section>
+                      {previewFile && !wide && (
+                        <BeforeAfter
+                          path={previewFile.path}
+                          presetId={previewPreset.id}
+                          options={effective(previewPreset, previewFile)}
+                          at={previewAt}
+                        />
+                      )}
+                      {audioOnly > 0 && <div className="faint mb-2">{t.pictureSkipsAudio(audioOnly)}</div>}
+                      {/* تحسين بلا نموذج (فلاتر FFmpeg): المعاينة «قبل وبعد» تعرضه، والتقدير المقيس يعرض وقته */}
+                      <span className="field-label">{t.enhance}</span>
+                      <Segmented<string>
+                        label={t.enhance}
+                        value={opts.enhance ?? "off"}
+                        onChange={(v) => set({ enhance: v === "off" ? null : v })}
+                        options={[
+                          { value: "off", label: t.enhanceOff },
+                          { value: "light", label: t.enhanceLight },
+                          { value: "strong", label: t.enhanceStrong },
+                          { value: "sharpen", label: t.enhanceSharpen },
+                        ]}
+                      />
+                      {opts.enhance && <Hint className="mt-2" icon="contrast" text={t.enhanceHint} />}
+                      <div className="toggle-grid">
+                        <Toggle checked={opts.denoise} onChange={(denoise) => set({ denoise })} title={t.denoise} hint={t.denoiseHint} />
+                        <Toggle
+                          checked={opts.deinterlace}
+                          onChange={(deinterlace) => set({ deinterlace })}
+                          title={t.deinterlace}
+                          hint={t.deinterlaceHint}
+                        />
+                        <Toggle checked={opts.tonemap} onChange={(tonemap) => set({ tonemap })} title={t.tonemap} hint={t.tonemapHint} />
+                      </div>
+                      <FilePick label={t.lut} value={opts.lut} extensions={["cube"]} onChange={(lut) => set({ lut })} />
+                      {/* ما يفعله كل خيار بالضبط (F-45، F-46) */}
+                      {opts.lut && <Hint className="mt-2" icon="contrast" text={t.lutHint} />}
+                    </section>
+                  ))}
+
+                {cat === "audio" && (
+                  <section>
+                    <span className="field-label">{t.aiAudio}</span>
+                    <div className="preset-grid mt-0">
+                      {PRESETS.filter(isAi).map((p) => card(p, ai.includes(p.id), () => toggleAi(p.id)))}
+                    </div>
+                    {oneFile && convNeeded && <Hint className="mt-2" icon="info" text={t.aiOneAtATime} />}
+                    {fmtAudio ? (
+                      <>
+                        <div className="pick-grid mt-4">
+                          <Pick
+                            label={t.loudness}
+                            value={opts.loudness ?? null}
+                            onChange={(loudness) => set({ loudness })}
+                            options={[
+                              { value: null, label: t.loudOff },
+                              { value: -14, label: t.loudSocial },
+                              { value: -16, label: t.loudPodcast },
+                              { value: -23, label: t.loudBroadcast },
+                            ]}
+                          />
+                          <FilePick
+                            label={t.replaceAudio}
+                            value={opts.replaceAudio}
+                            extensions={MEDIA_FILTER.extensions}
+                            onChange={(replaceAudio) => set({ replaceAudio })}
+                          />
+                        </div>
+                        {/* ما يكلّفه كل خيار مكتوبًا تحته (F-40، F-41) */}
+                        {opts.loudness != null && <Hint className="mt-2" icon="volume" text={t.loudHint} />}
+                        {opts.replaceAudio && <Hint className="mt-2" icon="music" text={t.replaceAudioHint} />}
+                        {anyVideo && <Toggle checked={opts.mute} onChange={(mute) => set({ mute })} title={t.mute} />}
+                      </>
+                    ) : (
+                      fmt.kind === "copy" && <Toggle checked={opts.mute} onChange={(mute) => set({ mute })} title={t.mute} />
+                    )}
+                  </section>
+                )}
+
+                {cat === "frame" &&
+                  (!anyVideo || !fmtPicture ? (
+                    notHere(anyVideo ? t.needVideoFormat : t.needVideoFile)
+                  ) : (
+                    <section>
+                      {previewFile && !wide && (
+                        <BeforeAfter
+                          path={previewFile.path}
+                          presetId={previewPreset.id}
+                          options={effective(previewPreset, previewFile)}
+                          at={previewAt}
+                        />
+                      )}
+                      <div className="pick-grid">
+                        <Pick
+                          label={t.size}
+                          value={opts.size ?? null}
+                          onChange={(size) => set({ size })}
+                          options={[null, 2160, 1440, 1080, 720, 540, 480].map((v) => ({
+                            value: v,
+                            label: v ? (v === 2160 ? "4K" : `${v}p`) : t.original,
+                          }))}
+                        />
+                        <Pick
+                          label={t.aspect}
+                          value={opts.aspect ?? null}
+                          onChange={(aspect) => set({ aspect })}
+                          options={[null, "16:9", "9:16", "1:1", "4:5", "21:9"].map((v) => ({ value: v, label: v ?? t.original }))}
+                        />
+                        <Pick
+                          label={t.fps}
+                          value={opts.fps ?? null}
+                          onChange={(fps) => set({ fps })}
+                          options={[null, "23.976", "24", "25", "29.97", "30", "50", "59.94", "60"].map((v) => ({
+                            value: v,
+                            label: v ?? t.original,
+                          }))}
+                        />
+                        <Pick
+                          label={t.speed}
+                          value={opts.speed ?? 1}
+                          onChange={(speed) => set({ speed: speed === 1 ? null : speed })}
+                          options={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4].map((v) => ({ value: v, label: `${v}×` }))}
+                        />
+                      </div>
+                      <RotatePick value={opts.rotate ?? null} onChange={(rotate) => set({ rotate })} />
+                      {opts.speed != null && opts.speed !== 1 && <Hint className="mt-2" icon="gauge" text={t.speedHint} />}
+                    </section>
+                  ))}
+
+                {cat === "text" && (
+                  <section>
+                    {canTrim ? (
+                      <>
+                        <Toggle checked={trimOn} onChange={setTrimOn} title={t.optTrim} hint={t.trimToolsHint} />
+                        <div className="collapse" data-open={trimOn} inert={!trimOn || undefined}>
+                          <div>
+                            <TrimRange
+                              duration={trimInfo!.duration!}
+                              fps={trimInfo!.video?.fps}
+                              value={{ start: opts.start ?? 0, end: opts.end ?? trimInfo!.duration! }}
+                              onChange={(r) => set({ start: r.start, end: r.end })}
+                            />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      ready.length > 1 && <Hint className="mb-2" icon="scissors" text={t.trimOneFile} />
+                    )}
+                    {anyVideo && (formatOn ? fmt.kind === "video" : true) ? (
+                      <>
+                        <div className="pick-grid mt-4">
+                          <FilePick
+                            label={t.subtitles}
+                            value={opts.subtitles}
+                            extensions={["srt", "ass", "ssa", "vtt"]}
+                            onChange={(subtitles) => set({ subtitles })}
+                          />
+                          <FilePick
+                            label={t.watermark}
+                            value={opts.watermark}
+                            extensions={["png", "jpg", "jpeg", "webp"]}
+                            onChange={(watermark) => set({ watermark })}
+                          />
+                          {opts.watermark && (
+                            <PosGrid value={opts.watermarkPos ?? "br"} onChange={(watermarkPos) => set({ watermarkPos })} />
+                          )}
+                        </div>
+                        {opts.subtitles && <Hint className="mt-2" icon="captions" text={t.subtitlesHint} />}
+                        {opts.watermark && <Hint className="mt-2" icon="image" text={t.watermarkHint} />}
+                        <Toggle
+                          checked={opts.timecode}
+                          onChange={(timecode) => set({ timecode })}
+                          title={t.timecode}
+                          hint={t.timecodeHint}
+                        />
+                      </>
+                    ) : (
+                      notHere(anyVideo ? t.needVideoFormat : t.needVideoFile)
+                    )}
+                  </section>
+                )}
+
+                {cat === "analysis" && (
+                  <section>
+                    <div className="preset-grid mt-0">
+                      {PRESETS.filter(isAnalysis).map((p) => card(p, analysis.includes(p.id), () => toggleAnalysis(p.id)))}
+                    </div>
+                    {/* كشف الصمت: ما يُعدّ صمتًا، وكم يبقى من طرفيه عند حذفه */}
+                    {(analysis.includes("detect_silence") || analysis.includes("topics")) && (
+                      <div className="mt-4">
+                        <div className="pick-grid">
+                          {analysis.includes("topics") && (
+                            <>
+                              <Pick
+                                label={`${t.reelLength} · ${t.reelMin}`}
+                                value={opts.reelMin ?? 15}
+                                onChange={(v) => set({ reelMin: v === 15 ? null : v })}
+                                options={[5, 10, 15, 20, 30, 45, 60].map((v) => ({ value: v, label: t.secs(v) }))}
+                              />
+                              <Pick
+                                label={`${t.reelLength} · ${t.reelMax}`}
+                                value={opts.reelMax ?? 90}
+                                onChange={(v) => set({ reelMax: v === 90 ? null : v })}
+                                options={[30, 45, 60, 90, 120, 180].map((v) => ({ value: v, label: t.secs(v) }))}
+                              />
+                            </>
+                          )}
+                          {/* تلقائي = عتبة تُقاس من ضجيج الملف نفسه؛ -40 الثابتة لم تجد شيئًا في تسجيلات فيها ضجيج غرفة */}
+                          <Pick<number | null>
+                            label={t.silenceLevel}
+                            value={opts.silenceDb ?? null}
+                            onChange={(v) => set({ silenceDb: v })}
+                            options={[
+                              { value: null, label: t.silenceAuto },
+                              ...[-25, -30, -35, -40, -50, -60].map((v) => ({ value: v, label: `${v} dB` })),
+                            ]}
+                          />
+                          <Pick
+                            label={t.silenceMin}
+                            value={opts.silenceMin ?? 0.6}
+                            onChange={(v) => set({ silenceMin: v === 0.6 ? null : v })}
+                            options={[0.3, 0.4, 0.5, 0.6, 0.8, 1, 1.5, 2, 3].map((v) => ({ value: v, label: t.secs(v) }))}
+                          />
+                          {/* ما يبقى قبل الكلام منفصل عمّا يبقى بعده (كما في auto-editor): النَّفَس قبل الجملة غير ذيلها */}
+                          <Pick<number | null>
+                            label={t.silencePadBefore}
+                            value={opts.silencePadBefore ?? null}
+                            onChange={(v) => set({ silencePadBefore: v })}
+                            options={[
+                              { value: null, label: t.sameAsAfter },
+                              ...[0, 0.05, 0.1, 0.2, 0.3, 0.5].map((v) => ({ value: v, label: t.secs(v) })),
+                            ]}
+                          />
+                          <Pick
+                            label={t.silencePad}
+                            value={opts.silencePad ?? 0.15}
+                            onChange={(v) => set({ silencePad: v === 0.15 ? null : v })}
+                            options={[0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5].map((v) => ({ value: v, label: t.secs(v) }))}
+                          />
+                        </div>
+                        <Hint className="mt-2" icon="wave" text={t.silenceHint} />
+                        {analysis.includes("topics") && <Hint className="mt-2" icon="list" text={t.topicsHint} />}
+                        {analysis.includes("topics") && (
+                          <div className="mt-2">
+                            <Toggle
+                              checked={!!opts.alignSpeech}
+                              onChange={(alignSpeech) => set({ alignSpeech })}
+                              title={t.alignSpeech}
+                              hint={t.alignSpeechHint}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </section>
+                )}
+              </div>
+            </SlideSwitch>
+          </div>
         </div>
       </div>
 
-      {/* ============ الوصفة: كل ما اختير من كل الأقسام، ثم البدء ============ */}
-      <div className="card recipe-card">
-        <div className="recipe" aria-label={t.recipe}>
-          <span className="field-label m-0">{t.recipe}</span>
-          {recipe.length === 0 ? (
-            <span className="faint">{t.recipeEmpty}</span>
+      {/* ============ الوسط في النافذة العريضة: المعاينة، وتحتها قائمة التحويلات (من App) ============ */}
+      {wide && (
+        <section className="card cv-stage" aria-label={t.previewLabel}>
+          {previewFile ? (
+            <>
+              <div className="cv-stage-head">
+                <h3>{t.previewLabel}</h3>
+                <span className="faint" dir="auto">
+                  {baseName(previewFile.path)}
+                </span>
+              </div>
+              <BeforeAfter
+                path={previewFile.path}
+                presetId={previewPreset.id}
+                options={effective(previewPreset, previewFile)}
+                at={previewAt}
+              />
+            </>
           ) : (
-            recipe.map((r, i) => (
-              <span key={`${r.cat}-${r.label}`} className="recipe-chip" style={{ "--i": i } as CSSProperties}>
-                <button className="recipe-go" onClick={() => setCat(r.cat)} title={catLabel(r.cat)}>
-                  {r.label}
-                </button>
-                <button className="recipe-x" aria-label={`${t.unpick}: ${r.label}`} title={t.unpick} onClick={r.clear}>
-                  <Icon name="x" size={14} />
-                </button>
-              </span>
-            ))
+            <figure className="cv-still">
+              <div className="ba-frame">
+                {(ready[0] ?? files[0]).info?.thumbnail ? (
+                  <img src={(ready[0] ?? files[0]).info!.thumbnail!} alt="" />
+                ) : (
+                  <Icon name={(ready[0] ?? files[0]).info?.video ? "convert" : "music"} size={32} />
+                )}
+              </div>
+              <figcaption dir="auto">{baseName((ready[0] ?? files[0]).path)}</figcaption>
+            </figure>
           )}
-          {recipe.length > 0 && (
-            <button
-              className="btn btn-sm btn-ghost recipe-reset"
-              onClick={() => {
-                resetOpts();
-                setAi([]);
-                setAnalysis([]);
-              }}
-            >
-              {t.resetOptions}
-            </button>
-          )}
-        </div>
+        </section>
+      )}
 
-        {error && <ErrorBox error={error} />}
-
-        <div className="action-row">
-          {askMode && (
-            <div className="dest">
-              <Segmented<"one" | "each">
-                label={t.outputMode}
-                value={oneFile ? "one" : "each"}
-                onChange={(v) => {
-                  setOneFile(v === "one");
-                  // ملف واحد: أداة ذكاء واحدة فقط قبل التحويل (لا يُجمع صوتان متعارضان)
-                  if (v === "one" && convNeeded) setAi((cur) => cur.slice(0, 1));
+      <div className="cv-aside">
+        {/* ============ الوصفة: كل ما اختير من كل الأقسام، ثم البدء ============ */}
+        <div className="card recipe-card">
+          <div className="recipe" aria-label={t.recipe}>
+            <span className="field-label m-0">{t.recipe}</span>
+            {recipe.length === 0 ? (
+              <span className="faint">{t.recipeEmpty}</span>
+            ) : (
+              recipe.map((r, i) => (
+                <span key={`${r.cat}-${r.label}`} className="recipe-chip" style={{ "--i": i } as CSSProperties}>
+                  <button className="recipe-go" onClick={() => setCat(r.cat)} title={catLabel(r.cat)}>
+                    {r.label}
+                  </button>
+                  <button className="recipe-x" aria-label={`${t.unpick}: ${r.label}`} title={t.unpick} onClick={r.clear}>
+                    <Icon name="x" size={14} />
+                  </button>
+                </span>
+              ))
+            )}
+            {recipe.length > 0 && (
+              <button
+                className="btn btn-sm btn-ghost recipe-reset"
+                onClick={() => {
+                  resetOpts();
+                  setAi([]);
+                  setAnalysis([]);
                 }}
-                options={[
-                  { value: "one", label: t.modeOne, title: t.modeOneHint },
-                  { value: "each", label: t.modeEach, title: t.modeEachHint },
-                ]}
-              />
-            </div>
-          )}
-          {isMobile ? (
-            <div className="dest faint">
-              <Icon name="folder" size={16} /> <span className="ltr">{mobileSaveDir(s)}</span>
-            </div>
-          ) : (
-            <div className="dest">
-              <span className="field-label m-0">{t.saveTo2}</span>
-              <Segmented<Settings["convertDest"]>
-                label={t.saveTo2}
-                value={s.convertDest}
-                onChange={(convertDest) => update({ convertDest })}
-                options={[
-                  { value: "source", label: t.destSource },
-                  { value: "output", label: t.destOutput },
-                ]}
-              />
-            </div>
-          )}
-          <span className="spacer" />
-          {(shown != null || stepCount > 1) && (
-            <span className="estimate ltr-num" title={exact ? t.estimateMeasuredHint : t.estimateHint}>
-              {[
-                stepCount > 1 && t.steps(stepCount),
-                shown != null && t.estimate(formatBytes(t, shown)),
-                expectedSecs != null && t.estimateTime(formatDuration(expectedSecs)),
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </span>
-          )}
-          {canMerge && (
-            <button
-              className="btn btn-lg"
-              disabled={busy || loading}
-              onClick={() => start(true)}
-              title={Object.keys(overrides).length ? `${t.mergeHint} ${t.mergeShared}` : t.mergeHint}
-            >
-              {t.mergeBtn}
+              >
+                {t.resetOptions}
+              </button>
+            )}
+          </div>
+
+          {error && <ErrorBox error={error} />}
+
+          <div className="action-row">
+            {askMode && (
+              <div className="dest">
+                <Segmented<"one" | "each">
+                  label={t.outputMode}
+                  value={oneFile ? "one" : "each"}
+                  onChange={(v) => {
+                    setOneFile(v === "one");
+                    // ملف واحد: أداة ذكاء واحدة فقط قبل التحويل (لا يُجمع صوتان متعارضان)
+                    if (v === "one" && convNeeded) setAi((cur) => cur.slice(0, 1));
+                  }}
+                  options={[
+                    { value: "one", label: t.modeOne, title: t.modeOneHint },
+                    { value: "each", label: t.modeEach, title: t.modeEachHint },
+                  ]}
+                />
+              </div>
+            )}
+            {isMobile ? (
+              <div className="dest faint">
+                <Icon name="folder" size={16} /> <span className="ltr">{mobileSaveDir(s)}</span>
+              </div>
+            ) : (
+              <div className="dest">
+                <span className="field-label m-0">{t.saveTo2}</span>
+                <Segmented<Settings["convertDest"]>
+                  label={t.saveTo2}
+                  value={s.convertDest}
+                  onChange={(convertDest) => update({ convertDest })}
+                  options={[
+                    { value: "source", label: t.destSource },
+                    { value: "output", label: t.destOutput },
+                  ]}
+                />
+              </div>
+            )}
+            <span className="spacer" />
+            {(shown != null || stepCount > 1) && (
+              <span className="estimate ltr-num" title={exact ? t.estimateMeasuredHint : t.estimateHint}>
+                {[
+                  stepCount > 1 && t.steps(stepCount),
+                  shown != null && t.estimate(formatBytes(t, shown)),
+                  expectedSecs != null && t.estimateTime(formatDuration(expectedSecs)),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            )}
+            {canMerge && (
+              <button
+                className="btn btn-lg"
+                disabled={busy || loading}
+                onClick={() => start(true)}
+                title={Object.keys(overrides).length ? `${t.mergeHint} ${t.mergeShared}` : t.mergeHint}
+              >
+                {t.mergeBtn}
+              </button>
+            )}
+            <button className="btn btn-primary btn-lg" disabled={busy || loading || stepCount === 0} onClick={() => start(false)}>
+              <Icon name="convert" /> {t.convertBtn(ready.length)}
             </button>
-          )}
-          <button className="btn btn-primary btn-lg" disabled={busy || loading || stepCount === 0} onClick={() => start(false)}>
-            <Icon name="convert" /> {t.convertBtn(ready.length)}
-          </button>
+          </div>
         </div>
       </div>
     </>

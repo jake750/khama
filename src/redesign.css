@@ -1643,3 +1643,125 @@ details.extras .schedule-row {
 .pl-list:has(.pl-row[data-editing]) {
   max-height: min(680px, 75vh);
 }
+
+/* ============ المحوّل في النافذة العريضة: ثلاثة أعمدة، الفيديو في الوسط ============
+   البداية: الملفات والأقسام وخياراتها. الوسط: المعاينة ثم قائمة التحويلات (تأتي من App
+   أخوةً لهذه الأعمدة داخل .view، فتوضع بالشبكة). النهاية: الوصفة والحفظ وزر التحويل، ثابتة.
+   تحت 1280 يبقى العمود الواحد كما كان: الغلافان مجرد حاويين بالمسافة نفسها بين البطاقات. */
+.cv-side,
+.cv-aside {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-4);
+  align-content: start;
+}
+.cv-side + .cv-aside,
+.cv-side + .cv-stage,
+.cv-stage + .cv-aside {
+  margin-top: var(--s-4);
+}
+.cv-stage-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+  min-width: 0;
+}
+.cv-stage-head h3 {
+  margin: 0;
+}
+.cv-stage-head .faint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.cv-stage .before-after {
+  margin-bottom: 0;
+}
+.cv-still {
+  margin: 0;
+  display: grid;
+  gap: var(--s-2);
+  color: var(--text-dim);
+}
+.cv-still .ba-frame {
+  background: var(--surface-2);
+}
+.cv-still figcaption {
+  font-size: var(--fs-cap);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 1280px) {
+  .container:has(> .slide-switch .cv-stage),
+  .container:has(.view > .cv-stage) {
+    max-width: 1840px;
+  }
+  .view:has(> .cv-stage) {
+    display: grid;
+    grid-template-columns: minmax(320px, 400px) minmax(0, 1fr) minmax(280px, 340px);
+    /* صفوف للوسط، والأخير مرن يأخذ ما زاد من طول العمودين الجانبيين بدل أن يفرّق بين المعاينة والقائمة */
+    grid-template-rows: repeat(4, auto) 1fr;
+    column-gap: var(--s-5);
+    align-items: start;
+  }
+  .view:has(> .cv-stage) > * {
+    grid-column: 2;
+    margin-top: 0;
+  }
+  .view:has(> .cv-stage) > .cv-side {
+    grid-column: 1;
+    grid-row: 1 / -1;
+  }
+  .view:has(> .cv-stage) > .cv-aside {
+    grid-column: 3;
+    grid-row: 1 / -1;
+    position: sticky;
+    top: 0;
+  }
+  .view:has(> .cv-stage) > .jobs-header {
+    margin-top: var(--s-4);
+  }
+  /* عمود جانبي أضيق: حشوة أقل، والمواصفات بعمودين بدل سطر لكل واحدة */
+  .cv-side > .card,
+  .cv-aside > .card {
+    padding: var(--s-4);
+  }
+  .cv-side .file-row {
+    align-items: flex-start;
+  }
+  .cv-side .file-thumb {
+    width: 64px;
+    height: 36px;
+    margin-top: 2px;
+  }
+  .cv-side .specs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px var(--s-3);
+  }
+  /* الأقسام فوق خياراتها في العمود نفسه، بعمودين من الأزرار بدل قائمة طويلة */
+  .cv-side .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cv-side .cat-nav {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cv-side .preset-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  /* الوصفة في عمود ضيق: الحفظ والتقدير والزر بعضها تحت بعض، والزر بعرض العمود */
+  .cv-aside .action-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cv-aside .action-row > .spacer {
+    display: none;
+  }
+  .cv-aside .action-row > .btn {
+    justify-content: center;
+  }
+}
