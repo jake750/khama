@@ -14,6 +14,8 @@
     "notification:allow-notify",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
-    "os:allow-platform"
+    "os:allow-platform",
+    "os:allow-version",
+    "core:window:allow-set-progress-bar"
   ]
 }

@@ -1,5 +1,6 @@
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow, ProgressBarStatus } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { isPermissionGranted, sendNotification } from "@tauri-apps/plugin-notification";
@@ -10,11 +11,12 @@ import { DownloadView, newDownloadSession, type StartMeta } from "./components/D
 import { HistoryView } from "./components/HistoryView";
 import { Icon, type IconName } from "./components/Icon";
 import { Dialog, useConfirm } from "./components/Dialog";
+import type { ErrorFix } from "./components/ErrorBox";
 import { isActive, JobCard, mergeUpdate, overallPercent, type Job } from "./components/JobCard";
 import { SettingsView } from "./components/SettingsView";
 import { Tour, Welcome, type TourStep } from "./components/Tour";
 import { UpdateDialog } from "./components/UpdateDialog";
-import { extractUrls, formatTimecode, youtubeChapters } from "./format";
+import { CHAPTER_MIN_COUNT, chapterStarts, extractUrls, formatTimecode, youtubeChapters } from "./format";
 import { dictionaries, errorText, I18n, type Dict, type Lang } from "./i18n";
 import { isMixed, resolveDir } from "./layoutDir";
 import { AnimatedList, Presence, reducedMotion, SlideSwitch, usePresence, useSlidingIndicator } from "./motion";
@@ -208,7 +210,6 @@ export default function App() {
       if (isMixed(w.layout, w.lang)) root.dataset.mixedDir = "";
       else delete root.dataset.mixedDir;
     };
-    document.title = t.appName;
     // انقلاب التخطيط بيد المستخدم: تلاشٍ قصير بين الصورتين بدل قفزة، بلا دوران.
     // أول تطبيق بعد قراءة الإعدادات فوري (لا انتقال عند فتح البرنامج)
     if (!prev.loaded || prev.dir === dir || reducedMotion() || !document.startViewTransition) return apply();
@@ -224,7 +225,10 @@ export default function App() {
       // أول تشغيل بالإنجليزية دائمًا (الافتراضي في settings.rs)، واللغة التي يختارها المستخدم تُحفظ فورًا وتبقى
       .then(setSettings)
       .catch((e) => setBootError(asAppError(e)));
-    api.defaultOutputDir().then((d) => setDefaultDir(d ?? ""));
+    api
+      .defaultOutputDir()
+      .then((d) => setDefaultDir(d ?? ""))
+      .catch(logError("defaultOutputDir"));
   }, []);
 
   // مشفّرات كرت الشاشة: نفحصها عند أول فتح للمحوّل (تأخذ ثوانٍ)
@@ -358,18 +362,35 @@ export default function App() {
 
   // مؤقّت واحد للتنبيه: رسالة جديدة (أو نفس الرسالة مرة ثانية) تبدأ مدتها من جديد
   const toastTimer = useRef<number | undefined>(undefined);
-  const toastMs = useRef(4000);
+  // إشعار بـ«تراجع» لا يمحوه إشعار عادي قبل مهلته (R2-6): العادي ينتظر ثم يظهر بعده
+  const toastNow = useRef<{ msg: string; action?: ToastAction } | null>(null);
+  const toastNext = useRef<{ msg: string; action?: ToastAction } | null>(null);
+  const endToast = useCallback(() => {
+    const next = toastNext.current;
+    toastNext.current = null;
+    toastNow.current = next;
+    setToastMsg(next);
+  }, []);
+  const armToast = useCallback(() => {
+    window.clearTimeout(toastTimer.current);
+    const m = toastNow.current;
+    if (m) toastTimer.current = window.setTimeout(endToast, m.action?.ms ?? 4000);
+  }, [endToast]);
+  useEffect(() => {
+    armToast();
+    return () => window.clearTimeout(toastTimer.current);
+  }, [toastMsg, armToast]);
   /** المؤشر أو التركيز على التنبيه يوقف عدّه، ومغادرته تعيده بمهلة كاملة (UX12) */
   const holdToast = () => window.clearTimeout(toastTimer.current);
-  const resumeToast = () => {
-    window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToastMsg(null), toastMs.current);
-  };
+  const resumeToast = armToast;
   const toast: Toast = useCallback((msg, action) => {
+    if (toastNow.current?.action?.ms && !action) {
+      toastNext.current = { msg };
+      return;
+    }
+    toastNext.current = null;
+    toastNow.current = { msg, action };
     setToastMsg({ msg, action });
-    window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToastMsg(null), action?.ms ?? 4000);
-    toastMs.current = action?.ms ?? 4000;
   }, []);
   // الملف نُقل أو حُذف (يحدث كثيرًا: الممنتج ينقل الملفات لمجلد المشروع): رسالة بدل نقرة بلا أثر
   const fileFailed = (e: unknown) => toast(errorText(t, asAppError(e)));
@@ -378,7 +399,6 @@ export default function App() {
     const id = window.setTimeout(() => void import("./components/GuideView"), 4000);
     return () => window.clearTimeout(id);
   }, []);
-  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
 
   // «ما الجديد» بعد التحديث، بلغة المستخدم: ننتظر الإعدادات (U-59)
   const announced = useRef(false);
@@ -395,6 +415,7 @@ export default function App() {
     tRef.current = t;
     tabNowRef.current = tab;
     saveFailed.current = () => toast(t.settingsSaveFailed);
+
     dragTip.current = () => toast(t.dragTip, { label: t.gotIt, run: () => {}, ms: 9000 });
     saveOk.current = () => {
       if (tab !== "settings" || Date.now() - lastSavedNote.current < 10_000) return;
@@ -415,7 +436,7 @@ export default function App() {
   );
 
   const chooseDir = useCallback(async () => {
-    const dir = await open({ directory: true, defaultPath: settings?.outputDir ?? defaultDir });
+    const dir = await open({ directory: true, defaultPath: settings?.outputDir ?? defaultDir }).catch(logError("chooseDir"));
     if (typeof dir === "string") pickDir(dir);
   }, [settings?.outputDir, defaultDir, pickDir]);
 
@@ -462,6 +483,28 @@ export default function App() {
     [launch],
   );
 
+  // التقدّم الكلي في عنوان النافذة وعلى أيقونة شريط المهام، واسم التبويب في العنوان (R2-31، R2-85):
+  // يُرى من Alt+Tab ومن شريط المهام والنافذة مصغّرة أو خلف غيرها
+  const titlePercent = useMemo(() => {
+    const live = jobs.filter(isActive);
+    if (!live.length) return null;
+    return Math.round(live.reduce((sum, j) => sum + (overallPercent(j) ?? 0), 0) / live.length);
+  }, [jobs]);
+  const tabTitle = { download: t.tabDownload, convert: t.tabConvert, history: t.tabHistory, settings: t.tabSettings, guide: t.guideTitle }[
+    tab
+  ];
+  useEffect(() => {
+    document.title = [titlePercent != null && `${titlePercent}%`, tabTitle, t.appName].filter(Boolean).join(" · ");
+  }, [titlePercent, tabTitle, t]);
+  useEffect(() => {
+    if (isMobile) return;
+    getCurrentWindow()
+      .setProgressBar(
+        titlePercent == null ? { status: ProgressBarStatus.None } : { status: ProgressBarStatus.Normal, progress: titlePercent },
+      )
+      .catch(() => {});
+  }, [titlePercent]);
+
   // فحص أسبوعي لتحديث yt-dlp، لمن فعّله فقط، وليس أثناء تنزيل (T-100)
   const ytdlpChecked = useRef(false);
   useEffect(() => {
@@ -484,7 +527,7 @@ export default function App() {
       setJobs((prev) => prev.map((x) => (x.id === j.id ? { ...x, state: "canceled" } : x)));
       return;
     }
-    api.cancelDownload(j.id);
+    api.cancelDownload(j.id).catch(logError("cancelDownload"));
   }, []);
 
   // العمليات التي ما زالت تعمل في Rust بعد إعادة تحميل الواجهة (T-17)
@@ -626,20 +669,25 @@ export default function App() {
           Promise.all(texts.map((x) => api.readLinksFile(x).catch(() => "")))
             .then((all) => {
               const links = extractUrls(all.join(" "));
-              if (!links.length) return;
+              // ملف نصي بلا روابط: نقول ذلك بدل إفلات بلا أثر (R2-87)
+              if (!links.length) return toast(tRef.current.noLinksInFile);
               setInject({ url: links.join(" "), n: Date.now() });
               setTab("download");
             })
             .catch(logError("readLinksFile"));
         }
         addFiles(p.paths);
+        // صور أو PDF أو ملفات لا يقرؤها المحوّل: رسالة بأسمائها بدل لا شيء (R2-10)
+        const skipped = p.paths.filter((x) => !isMedia(x) && !x.toLowerCase().endsWith(".txt"));
+        if (skipped.length) toast(tRef.current.dropSkipped(skipped.length, baseName(skipped[0])));
       }
     });
     return () => {
       un.then((f) => f());
     };
-  }, [addFiles]);
+  }, [addFiles, toast]);
 
+  const watchBurst = useRef({ n: 0, at: 0 });
   // المجلدات المراقَبة: Rust يخبرنا بالملف الجديد، ونضيفه لطابور التحويل
   useEffect(() => {
     const un = api.onWatchFile((hit) => {
@@ -651,7 +699,12 @@ export default function App() {
         // اللغة من المرجع: تغييرها لا يعيد الاشتراك فيضيع ملف وصل بين الإلغاء والاشتراك (FE22)
         meta: p?.name[settingsRef.current?.language ?? "en"] ?? hit.preset,
       });
-      toast(tRef.current.toastWatch(baseName(hit.path)));
+      // عشرة ملفات معًا = إشعار واحد بعددها، لا عشرة متتالية يمحو كل منها سابقه (R2-49)
+      const now = Date.now();
+      const w = watchBurst.current;
+      w.n = now - w.at < 4000 ? w.n + 1 : 1;
+      w.at = now;
+      toast(w.n > 1 ? tRef.current.toastWatchN(w.n) : tRef.current.toastWatch(baseName(hit.path)));
     });
     return () => {
       un.then((f) => f());
@@ -659,14 +712,25 @@ export default function App() {
   }, [addJob, toast]);
 
   useEffect(() => {
-    const order: Tab[] = ["download", "convert", "history", "settings"];
+    const order: Tab[] = ["download", "convert", "history", "settings", "guide"];
     const onKey = (e: KeyboardEvent) => {
       const typing = (e.target as HTMLElement | null)?.closest("input, textarea, select, [contenteditable]");
       // بالمفتاح الفعلي (e.code) لا بالحرف: مع لوحة المفاتيح العربية يكون «,» حرف «و» و«?» «؟»
-      const digit = /^Digit([1-4])$/.exec(e.code)?.[1];
+      const digit = /^Digit([1-5])$/.exec(e.code)?.[1];
       if ((e.ctrlKey || e.metaKey) && digit) {
         e.preventDefault();
         setTab(order[Number(digit) - 1]);
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        // Ctrl+Enter يبدأ التنزيل أو التحويل من أي مكان في الشاشة (R2-58)
+        const btn = document.querySelector<HTMLButtonElement>("main [data-primary]:not(:disabled)");
+        if (btn) {
+          e.preventDefault();
+          btn.click();
+        }
+      } else if (e.key === "F1") {
+        // F1 للدليل كما في أغلب البرامج (R2-47، R2-86)
+        e.preventDefault();
+        setTab("guide");
       } else if ((e.ctrlKey || e.metaKey) && e.code === "Comma") {
         e.preventDefault();
         setTab("settings");
@@ -693,6 +757,11 @@ export default function App() {
       })
       .catch(logError("setCompact"));
   }, [compact, tab]);
+
+  const openSettings = useCallback((id: string) => {
+    setSettingsSection({ id, n: Date.now() });
+    setTab("settings");
+  }, []);
 
   /** الجولة تبدّل التبويب بنفسها (دالة ثابتة حتى لا تعيد الخطوة الحالية) */
   const tourTab = useCallback((x: Tab) => setTab(x), []);
@@ -755,7 +824,8 @@ export default function App() {
         setJobs((cur) => {
           const have = new Set(cur.map((j) => j.id));
           const merged = [...cur, ...gone.filter((g) => !have.has(g.id))];
-          const pos = (j: Job) => (before.includes(j.id) ? before.indexOf(j.id) : -1);
+          const order = new Map(before.map((id, i) => [id, i]));
+          const pos = (j: Job) => order.get(j.id) ?? -1;
           return merged.sort((a, b) => pos(a) - pos(b));
         }),
     });
@@ -773,6 +843,21 @@ export default function App() {
     if (j.type === "download" && j.request)
       startDownload(j.request, { title: j.title, thumbnail: j.thumbnail, lastError: j.error }).catch(logError("retryDownload"));
     if (j.type === "convert" && j.convert) startConvert(j.convert, j.title, j.meta, j.error, j.inDownloads).catch(logError("retryConvert"));
+  };
+
+  /** زر الإصلاح على بطاقة تنزيل فاشلة (R2-2): الكوكيز تفتح الإعدادات، وyt-dlp يُحدَّث ثم يُعاد التنزيل */
+  const fixJob = async (j: Job, fix: ErrorFix) => {
+    if (fix === "cookies") return openSettings("cookies");
+    if (fix === "ytdlp") {
+      try {
+        const r = await api.updateYtdlp();
+        toast(r.updated ? t.updatedTo(r.version ?? "") : t.upToDate(r.version ?? ""));
+      } catch (e) {
+        toast(errorText(t, asAppError(e)));
+        return;
+      }
+    }
+    retry(j);
   };
 
   /** من نتائج الكشف: نقاط القطع = بداية المشهد، أو منتصف الفراغ الأسود/الصامت */
@@ -1050,7 +1135,7 @@ export default function App() {
             <img className="brand-mark" src="/logo.svg" alt="" />
             <h1 className="brand-name">{t.appName}</h1>
           </div>
-          <nav className="tabs" ref={tabsRef}>
+          <nav className="tabs" ref={tabsRef} aria-label={t.tabsLabel}>
             <span className="tab-pill" ref={tabPill} aria-hidden="true" />
             {tabs.map((x) => (
               <button
@@ -1069,7 +1154,9 @@ export default function App() {
                 {x.id === "settings" && updateVersion && <span className="tab-dot update" title={t.appUpdateTitle} />}
                 {(x.id === "download" || x.id === "convert") &&
                   jobs.some((j) => isActive(j) && (x.id === "convert") === (j.type === "convert")) && (
-                    <span className="tab-dot" aria-hidden="true" />
+                    <span className="tab-dot">
+                      <span className="sr-only">{t.jobsRunning}</span>
+                    </span>
                   )}
               </button>
             ))}
@@ -1150,6 +1237,17 @@ export default function App() {
                       const prev = files;
                       setFiles(() => []);
                       toast(t.filesCleared(prev.length), {
+                        label: t.undo,
+                        ms: 5000,
+                        run: () => setFiles(() => prev.map((f) => ({ ...f, ...analyzed.current.get(f.path) }))),
+                      });
+                    }}
+                    onRemoveFiles={(paths) => {
+                      // حذف ملف أو الفاشلة منها يُتراجع عنه بمواضعها كما كانت (R2-52، R2-53)
+                      const prev = files;
+                      const gone = new Set(paths);
+                      setFiles((cur) => cur.filter((f) => !gone.has(f.path)));
+                      toast(t.filesRemoved(paths.length), {
                         label: t.undo,
                         ms: 5000,
                         run: () => setFiles(() => prev.map((f) => ({ ...f, ...analyzed.current.get(f.path) }))),
@@ -1261,8 +1359,9 @@ export default function App() {
                           onCancel={() => cancel(j)}
                           onReveal={isMobile ? undefined : () => j.file && api.revealFile(j.file).catch(fileFailed)}
                           onOpen={isMobile ? undefined : () => j.file && api.openFile(j.file).catch(fileFailed)}
-                          onCopyPath={isMobile ? undefined : () => j.file && copyText(j.file)}
+                          onCopyPath={isMobile ? undefined : () => j.file && copyText(j.file, t.pathCopied)}
                           onRetry={() => retry(j)}
+                          onFix={j.type === "download" ? (fix) => fixJob(j, fix) : undefined}
                           onRemove={() => setJobs((p) => p.filter((x) => x.id !== j.id))}
                           onConvert={
                             j.type === "download" && j.file
@@ -1287,14 +1386,12 @@ export default function App() {
                           onCopyMarkers={j.markers?.length && !j.topics ? () => copyMarkers(j) : undefined}
                           onCopyChapters={
                             j.markers?.length && !j.topics
-                              ? () =>
-                                  copyText(
-                                    youtubeChapters(
-                                      j.markers!.map(([s, e]) => (s === e ? s : e)),
-                                      t.chapterName,
-                                    ),
-                                    t.chaptersCopied,
-                                  )
+                              ? () => {
+                                  const starts = j.markers!.map(([s, e]) => (s === e ? s : e));
+                                  // YouTube يتجاهل الفصول كلها إن قلّت عن 3 (R2-4)
+                                  const few = chapterStarts(starts).length < CHAPTER_MIN_COUNT;
+                                  copyText(youtubeChapters(starts, t.chapterName), few ? t.chaptersTooFew : t.chaptersCopied);
+                                }
                               : undefined
                           }
                           onDragOut={!isMobile && j.file ? () => dragOut(j.file!, j.thumbnail) : undefined}
@@ -1341,7 +1438,7 @@ export default function App() {
                 className="toast-action"
                 onClick={() => {
                   toastShown.action!.run();
-                  setToastMsg(null);
+                  endToast();
                 }}
               >
                 {toastShown.action.label}
@@ -1375,7 +1472,7 @@ export default function App() {
                 <button className="btn btn-ghost" onClick={() => setCloseAsk(false)}>
                   {t.stay}
                 </button>
-                <button className="btn btn-danger" onClick={() => api.quitApp()}>
+                <button className="btn btn-danger" onClick={() => api.quitApp().catch(logError("quitApp"))}>
                   {t.stopAndQuit}
                 </button>
                 <button

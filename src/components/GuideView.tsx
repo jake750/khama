@@ -4,12 +4,18 @@ import { useI18n } from "../i18n";
 import { isMobile } from "../platform";
 import { GuideArt } from "./GuideArt";
 import { Icon } from "./Icon";
+import { matches } from "../search";
 
 /** الدليل: مدخل قصير لكل خاصية، يُفتح ليعرض رسمًا توضيحيًا وخطوات وزر «أرني» */
 export function GuideView(props: { onGo: (tab: GuideTab, section?: string) => void; onTour: () => void }) {
   const { t, lang } = useI18n();
   const [open, setOpen] = useState<string | null>(null);
-  const entries = GUIDE.filter((e) => !e.only || e.only === (isMobile ? "mobile" : "desktop"));
+  // بحث في العنوان والشرح والخطوات، بالتطبيع العربي نفسه الذي في السجل (R2-46)
+  const [q, setQ] = useState("");
+  const entries = GUIDE.filter((e) => !e.only || e.only === (isMobile ? "mobile" : "desktop")).filter((e) => {
+    const x = entryText(e, lang, isMobile);
+    return matches(q, [x.title, x.what, x.when, ...x.steps]);
+  });
   const groups: { id: GuideGroup; label: string }[] = [
     { id: "download", label: t.guideGroupDownload },
     { id: "convert", label: t.guideGroupConvert },
@@ -30,40 +36,63 @@ export function GuideView(props: { onGo: (tab: GuideTab, section?: string) => vo
         <GuideArt name="guide" className="guide-hero-art" />
       </div>
 
-      {groups.map((g) => (
-        <section key={g.id} className="guide-group" aria-labelledby={`guide-${g.id}`}>
-          <h3 id={`guide-${g.id}`}>{g.label}</h3>
-          <div className="card guide-list">
-            {entries
-              .filter((e) => e.group === g.id)
-              .map((e) => (
-                <Entry
-                  key={e.id}
-                  entry={e}
-                  lang={lang}
-                  open={open === e.id}
-                  onToggle={() => setOpen(open === e.id ? null : e.id)}
-                  onGo={props.onGo}
-                />
-              ))}
-          </div>
-        </section>
-      ))}
+      <label className="search guide-search">
+        <Icon name="search" size={16} />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && q) {
+              e.stopPropagation();
+              setQ("");
+            }
+          }}
+          aria-label={t.guideSearch}
+          placeholder={t.guideSearch}
+          spellCheck={false}
+        />
+      </label>
+      {q.trim() && entries.length === 0 && <p className="faint text-center">{t.guideNoMatch}</p>}
+
+      {groups
+        .filter((g) => entries.some((e) => e.group === g.id))
+        .map((g) => (
+          <section key={g.id} className="guide-group" aria-labelledby={`guide-${g.id}`}>
+            <h3 id={`guide-${g.id}`}>{g.label}</h3>
+            <div className="card guide-list">
+              {entries
+                .filter((e) => e.group === g.id)
+                .map((e) => (
+                  <Entry
+                    key={e.id}
+                    entry={e}
+                    lang={lang}
+                    // نتيجة بحث واحدة تُفتح وحدها
+                    open={open === e.id || (!!q.trim() && entries.length === 1)}
+                    onToggle={() => setOpen(open === e.id ? null : e.id)}
+                    onGo={props.onGo}
+                  />
+                ))}
+            </div>
+          </section>
+        ))}
 
       {/* مسرد مختصر للمصطلحات الإنجليزية في الواجهة (F-75) */}
-      <section className="guide-group" aria-labelledby="guide-glossary">
-        <h3 id="guide-glossary">{t.glossaryTitle}</h3>
-        <dl className="card glossary">
-          {GLOSSARY.map((term) => (
-            <div key={term}>
-              <dt>
-                <bdi>{term}</bdi>
-              </dt>
-              <dd className="muted">{t.glossary[term]}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+      {!q.trim() && (
+        <section className="guide-group" aria-labelledby="guide-glossary">
+          <h3 id="guide-glossary">{t.glossaryTitle}</h3>
+          <dl className="card glossary">
+            {GLOSSARY.map((term) => (
+              <div key={term}>
+                <dt>
+                  <bdi>{term}</bdi>
+                </dt>
+                <dd className="muted">{t.glossary[term]}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
     </div>
   );
 }

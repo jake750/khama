@@ -18,6 +18,15 @@ Done on the interface in the browser preview (`npm run dev`), both languages, al
 | Reduced motion | ✓ animations shortened under `prefers-reduced-motion` |
 | Messages announced | Toasts are a `role="status"` live region. Job card progress is not announced; a screen reader user moves to the card to hear it |
 
+## Keyboard and contrast, 0.3.46 · لوحة المفاتيح والتباين
+
+- Segmented controls: arrow keys move the choice (reversed in Arabic, so → always goes to the next item on screen), Home and End jump to the ends. Folder menu: focus starts on the first item, arrows/Home/End move, Esc returns focus to the button.
+- Shortcuts: Ctrl+1…5 (Guide included), F1 Guide, Ctrl+Enter starts the download or conversion from anywhere, Ctrl+F or / searches the history, Esc clears the link or the search field. The list is under `?`.
+- Toggles: the explanation is linked with `aria-describedby`, so it is no longer part of the switch's name. `Hint` sets `aria-controls` only while open.
+- The tab bar has a name, and the "jobs running" dot has hidden text for screen readers; the window title shows overall progress and the tab name.
+- Windows high contrast (`forced-colors`): buttons, the current tab, selected presets and segmented choices keep a border or the system highlight colour.
+- Time fields say what is wrong (`aria-invalid` plus a message) instead of only turning red.
+
 ## Not yet checked · لم يُفحص بعد
 
 - A full pass with a real screen reader (NVDA on Windows, VoiceOver on macOS, TalkBack on Android). Expect issues in the trim timeline, which is built for the mouse and arrow keys.

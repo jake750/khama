@@ -248,7 +248,7 @@ export function SettingsView(props: {
         <BackgroundSection settings={s} update={update} />
         {<ProjectsSection settings={s} update={update} outputDir={props.outputDir} toast={props.toast} />}
         <CookiesSection settings={s} update={update} toast={props.toast} />
-        {!isMobile && <WatchSection settings={s} update={update} />}
+        {!isMobile && <WatchSection settings={s} update={update} toast={props.toast} />}
         <ToolsSection toast={props.toast} settings={s} update={update} />
 
         <Section id="about" title={t.aboutTitle}>
@@ -282,7 +282,10 @@ export function SettingsView(props: {
 
         {!isMobile && (
           <div className="settings-quit">
-            <button className="btn btn-danger" onClick={async () => (await confirm(t.quit, t.quitConfirm)) && api.quitApp()}>
+            <button
+              className="btn btn-danger"
+              onClick={async () => (await confirm(t.quit, t.quitConfirm)) && api.quitApp().catch(logError("quitApp"))}
+            >
               <Icon name="x" size={16} /> {t.quit}
             </button>
           </div>
@@ -558,10 +561,28 @@ function ProjectsSection(props: { settings: Settings; update: (p: Partial<Settin
   const [name, setName] = useState("");
   // إعادة التسمية في مكانها (U-34)
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+  // Escape يلغي، ثم يأتي blur من الحقل وهو يختفي: لا يُحفظ ما أُلغي (R2-44)
+  const renameCanceled = useRef(false);
   const rename = () => {
+    if (renameCanceled.current) {
+      renameCanceled.current = false;
+      return;
+    }
     const n = renaming?.name.trim();
+    // اسم مشروع آخر: مشروعان بالاسم نفسه لا يُفرَّق بينهما في القائمة (R2-43)
+    if (renaming && n && s.projects.some((x) => x.id !== renaming.id && x.name === n)) {
+      props.toast(t.projectNameTaken(n));
+      setRenaming(null);
+      return;
+    }
     if (renaming && n) update({ projects: s.projects.map((x) => (x.id === renaming.id ? { ...x, name: n } : x)) });
     setRenaming(null);
+  };
+  /** حذف مشروع بنقرة، مع «تراجع» (R2-13) */
+  const removeProject = (id: string, name: string) => {
+    const before = { projects: s.projects, activeProject: s.activeProject };
+    update({ projects: s.projects.filter((x) => x.id !== id), activeProject: s.activeProject === id ? null : s.activeProject });
+    props.toast(t.projectRemoved(name), { label: t.undo, ms: 6000, run: () => update(before) });
   };
   // ما في المشروع، سطرًا مختصرًا: النوع والصيغة والجودة
   const summary = (p: (typeof s.projects)[number]) =>
@@ -594,7 +615,13 @@ function ProjectsSection(props: { settings: Settings; update: (p: Partial<Settin
               value={renaming.name}
               aria-label={t.renameProject}
               onChange={(e) => setRenaming({ id: p.id, name: e.target.value })}
-              onKeyDown={(e) => (e.key === "Enter" ? rename() : e.key === "Escape" && setRenaming(null))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") rename();
+                else if (e.key === "Escape") {
+                  renameCanceled.current = true;
+                  setRenaming(null);
+                }
+              }}
               onBlur={rename}
             />
           ) : (
@@ -620,17 +647,7 @@ function ProjectsSection(props: { settings: Settings; update: (p: Partial<Settin
           <button className="btn btn-sm btn-ghost" onClick={() => setRenaming({ id: p.id, name: p.name })}>
             {t.renameProject}
           </button>
-          <button
-            className="icon-btn sm"
-            aria-label={t.remove}
-            title={t.remove}
-            onClick={() =>
-              update({
-                projects: s.projects.filter((x) => x.id !== p.id),
-                activeProject: s.activeProject === p.id ? null : s.activeProject,
-              })
-            }
-          >
+          <button className="icon-btn sm" aria-label={t.remove} title={t.remove} onClick={() => removeProject(p.id, p.name)}>
             <Icon name="x" size={16} />
           </button>
         </div>
@@ -858,13 +875,16 @@ function ToolsSection(props: { toast: Toast; settings: Settings; update: (p: Par
 }
 
 /** المجلدات المراقَبة: كل ملف جديد فيها يُحوَّل تلقائيًا */
-function WatchSection(props: { settings: Settings; update: (p: Partial<Settings>) => void }) {
+function WatchSection(props: { settings: Settings; update: (p: Partial<Settings>) => void; toast: Toast }) {
   const { t, lang } = useI18n();
   const list = props.settings.watchFolders;
   const set = (watchFolders: WatchFolder[]) => props.update({ watchFolders });
   const add = async () => {
-    const dir = await open({ directory: true });
-    if (typeof dir === "string" && !list.some((w) => w.dir === dir)) {
+    const dir = await open({ directory: true }).catch(logError("addWatch"));
+    if (typeof dir !== "string") return;
+    // موجود أصلًا: نقول ذلك بدل نقرة بلا أثر (R2-38)
+    if (list.some((w) => w.dir === dir)) return props.toast(t.watchExists);
+    {
       // آخر صيغة في المحوّل قد تكون «كشف» (صمت، مشاهد، مواضيع): لا تُنتج ملفًا ولا تظهر في قائمة المجلد
       const last = props.settings.convertPreset;
       const preset = last && presetById(last)?.kind !== "detect" ? last : "edit_h264";
@@ -894,7 +914,16 @@ function WatchSection(props: { settings: Settings; update: (p: Partial<Settings>
             onChange={(v) => set(list.map((x, k) => (k === i ? { ...x, preset: v } : x)))}
             options={PRESETS.filter((p) => p.kind !== "detect").map((p) => ({ value: p.id, label: p.name[lang], text: p.name[lang] }))}
           />
-          <button className="icon-btn sm" aria-label={t.remove} title={t.remove} onClick={() => set(list.filter((_, k) => k !== i))}>
+          <button
+            className="icon-btn sm"
+            aria-label={t.remove}
+            title={t.remove}
+            onClick={() => {
+              // حذف بتراجع (R2-88)
+              set(list.filter((_, k) => k !== i));
+              props.toast(t.removedN(1), { label: t.undo, ms: 5000, run: () => set(list) });
+            }}
+          >
             <Icon name="x" size={16} />
           </button>
         </div>

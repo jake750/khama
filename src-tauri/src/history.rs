@@ -150,6 +150,17 @@ pub fn remove_history(app: AppHandle, state: State<'_, HistoryState>, id: u64) -
     })
 }
 
+/// حذف عدة عناصر معًا (R2-35: «احذف المفقودة»)، بكتابة واحدة للملف
+#[tauri::command]
+pub fn remove_history_many(app: AppHandle, state: State<'_, HistoryState>, ids: Vec<u64>) -> Result<(), AppError> {
+    let ids: std::collections::HashSet<u64> = ids.into_iter().collect();
+    with_list(&app, &state, |list| {
+        let before = list.len();
+        list.retain(|e| !ids.contains(&e.id));
+        ((), list.len() != before)
+    })
+}
+
 #[tauri::command]
 pub fn clear_history(app: AppHandle, state: State<'_, HistoryState>) -> Result<(), AppError> {
     with_list(&app, &state, |list| {

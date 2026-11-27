@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from "react";
+import { useId, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { useSlidingIndicator } from "../motion";
 import { Hint } from "./Hint";
 
@@ -14,9 +14,31 @@ export function Segmented<T extends string>(props: { value: T; options: SegOptio
   const box = useRef<HTMLDivElement>(null);
   // «حبّة» واحدة تنزلق إلى الزر المختار
   const pill = useSlidingIndicator(box, 'button[aria-pressed="true"]', `${props.value}|${props.options.length}`);
+  // الأسهم تنقل الاختيار للخيار المجاور (يمينًا = التالي في الواجهة العربية)، وHome/End للطرفين (R2-19)
+  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const enabled = props.options.filter((o) => !o.disabled);
+    const i = enabled.findIndex((o) => o.value === props.value);
+    const rtl = getComputedStyle(e.currentTarget).direction === "rtl";
+    const step = { ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1, ArrowDown: 1, ArrowUp: -1 }[e.key];
+    let next: SegOption<T> | undefined;
+    if (step) next = enabled[(i + step + enabled.length) % enabled.length];
+    else if (e.key === "Home") next = enabled[0];
+    else if (e.key === "End") next = enabled[enabled.length - 1];
+    if (!next) return;
+    e.preventDefault();
+    props.onChange(next.value);
+    const btns = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("button")];
+    btns[props.options.indexOf(next)]?.focus();
+  };
   return (
     // أكثر من 3 خيارات: على الهاتف تصير شبكة من 3 أعمدة بدل سطر يخرج من الشاشة
-    <div className={`segmented ${props.options.length > 3 ? "seg-many" : ""}`} role="group" aria-label={props.label} ref={box}>
+    <div
+      className={`segmented ${props.options.length > 3 ? "seg-many" : ""}`}
+      role="group"
+      aria-label={props.label}
+      ref={box}
+      onKeyDown={onKey}
+    >
       <span className="seg-pill" ref={pill} aria-hidden="true" />
       {props.options.map((o) => (
         <button
@@ -35,14 +57,23 @@ export function Segmented<T extends string>(props: { value: T; options: SegOptio
 }
 
 export function Toggle(props: { checked: boolean; onChange: (v: boolean) => void; title: string; hint?: string }) {
+  // الاسم هو العنوان وحده، والشرح وصف له: كان الشرح كله وزر «المزيد» جزءًا من اسم المفتاح (R2-23)
+  const id = useId();
   return (
-    <label className="toggle">
-      <input type="checkbox" role="switch" checked={props.checked} onChange={(e) => props.onChange(e.target.checked)} />
-      <span className="switch" />
+    <div className="toggle">
+      <input
+        id={`${id}-in`}
+        type="checkbox"
+        role="switch"
+        checked={props.checked}
+        aria-describedby={props.hint ? `${id}-hint` : undefined}
+        onChange={(e) => props.onChange(e.target.checked)}
+      />
+      <label className="switch" htmlFor={`${id}-in`} aria-hidden="true" />
       <span>
-        <span>{props.title}</span>
-        {props.hint && <Hint className="hint-plain" text={props.hint} />}
+        <label htmlFor={`${id}-in`}>{props.title}</label>
+        {props.hint && <Hint id={`${id}-hint`} className="hint-plain" text={props.hint} />}
       </span>
-    </label>
+    </div>
   );
 }

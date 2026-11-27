@@ -2,12 +2,14 @@ import { numLocale, useI18n } from "../../i18n";
 import { scheduledAt } from "../../downloadPlan";
 import { Icon } from "../Icon";
 import { Segmented } from "../Segmented";
+import { Select } from "../Select";
 
 export type When = "now" | "later";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const HOURS = Array.from({ length: 24 }, (_, i) => pad(i));
-const MINUTES = Array.from({ length: 12 }, (_, i) => pad(i * 5));
+// كل دقيقة لا كل خمس: 14:07 ممكنة (R2-80). القائمة تقفز بالكتابة («0» ثم «7»)
+const MINUTES = Array.from({ length: 60 }, (_, i) => pad(i));
 
 /** متى يبدأ التنزيل: الآن أو في ساعة محددة */
 export function ScheduleRow(props: {
@@ -61,43 +63,32 @@ export function ScheduleRow(props: {
           ]}
         />
         {when === "later" && (
-          <select
-            className="select day-select"
-            value={props.atDay}
-            onChange={(e) => props.onAtDay(Number(e.target.value))}
-            aria-label={t.scheduleDay}
-          >
-            {[0, 1, 2, 3, 4, 5, 6].map((d) => (
-              <option key={d} value={d}>
-                {dayName(d)}
-              </option>
-            ))}
-          </select>
+          <Select
+            className="day-select"
+            label={t.scheduleDay}
+            value={String(props.atDay)}
+            onChange={(v) => props.onAtDay(Number(v))}
+            options={[0, 1, 2, 3, 4, 5, 6].map((d) => ({ value: String(d), label: dayName(d) }))}
+          />
         )}
         {when === "later" && (
           // ساعة ودقيقة بقائمتين بنظام 24 ساعة: مربع الوقت الأصلي يختلف شكله بين الأنظمة وبعضها 12 ساعة (D-89)
           <span className="time-pick ltr" role="group" aria-label={t.startLater}>
-            <select
-              className="select select-sm"
+            <Select
+              className="select-sm"
+              label={t.hourLabel}
               value={hh}
-              aria-label={t.hourLabel}
-              onChange={(e) => props.onAtTime(`${e.target.value}:${mm}`)}
-            >
-              {HOURS.map((h) => (
-                <option key={h}>{h}</option>
-              ))}
-            </select>
+              onChange={(v) => props.onAtTime(`${v}:${mm}`)}
+              options={HOURS.map((h) => ({ value: h, label: h, text: h }))}
+            />
             <span aria-hidden="true">:</span>
-            <select
-              className="select select-sm"
+            <Select
+              className="select-sm"
+              label={t.minuteLabel}
               value={mm}
-              aria-label={t.minuteLabel}
-              onChange={(e) => props.onAtTime(`${hh}:${e.target.value}`)}
-            >
-              {(MINUTES.includes(mm) ? MINUTES : [...MINUTES, mm].sort()).map((m) => (
-                <option key={m}>{m}</option>
-              ))}
-            </select>
+              onChange={(v) => props.onAtTime(`${hh}:${v}`)}
+              options={MINUTES.map((m) => ({ value: m, label: m, text: m }))}
+            />
           </span>
         )}
       </div>

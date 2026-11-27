@@ -15,7 +15,7 @@ import {
 import { extractUrls, formatBytes, formatDuration, isHttpUrl } from "../format";
 import { limiter } from "../limit";
 import { planDownloads, type EntryClips, RATES, scheduledAt, type Stills } from "../downloadPlan";
-import { useI18n } from "../i18n";
+import { numLocale, useI18n } from "../i18n";
 import { ErrorBox, type ErrorFix } from "./ErrorBox";
 import { Icon } from "./Icon";
 import { Segmented, Toggle } from "./Segmented";
@@ -40,6 +40,12 @@ type ProbeState = { status: "idle" } | { status: "loading" } | { status: "ok"; i
  * ما يجب أن يبقى عند الانتقال لتبويب آخر والعودة (الشاشة تُبنى من جديد).
  * يملكه App (useRef) ويمرّره صراحة، بدل متغيرات عامة في الوحدة (T-12).
  */
+/** الرابط الواحد في الحقل مكتملًا: «www.youtube.com/…» المكتوب بيده يُفحص كالملصوق (R2-39) */
+function singleUrl(text: string): string {
+  const found = extractUrls(text);
+  return found.length === 1 ? found[0] : text.trim();
+}
+
 export interface DownloadSession {
   /** النص في حقل الرابط */
   draftUrl: string;
@@ -91,7 +97,7 @@ export function DownloadView(props: {
   /** تحليل المواضيع قبل التنزيل (ترجمة الموقع أو الصوت وحده). range = المقطع المحدد إن وُجد */
   onAnalyze?: (url: string, title: string, thumbnail?: string | null, range?: [number, number] | null) => void;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { settings: s, update, session } = props;
   const [url, setUrl] = useState(() => session.draftUrl);
   useEffect(() => {
@@ -135,7 +141,7 @@ export function DownloadView(props: {
   // عند تغيّر الرابط: ننتظر نصف ثانية (حتى ينتهي اللصق/الكتابة) ثم نجلب معلوماته.
   // probeToken يمنع ردًّا قديمًا من الكتابة فوق رد أحدث.
   useEffect(() => {
-    const clean = url.trim();
+    const clean = singleUrl(url);
     setStartError(null);
     setClips(null);
     if (!isHttpUrl(clean)) {
@@ -312,7 +318,7 @@ export function DownloadView(props: {
   }
 
   async function start() {
-    const clean = url.trim();
+    const clean = singleUrl(url);
     if (starting || (!multiLinks && !isHttpUrl(clean))) return;
     if (entries && selected.size === 0) return;
     setStarting(true);
@@ -387,7 +393,7 @@ export function DownloadView(props: {
         : needsConvert
           ? t.qualityNeedsConvert + (convertMin ? " " + t.convertAbout(convertMin) : "")
           : null;
-  const canStart = (multiLinks || isHttpUrl(url)) && !starting && !(entries && selected.size === 0);
+  const canStart = (multiLinks || isHttpUrl(singleUrl(url))) && !starting && !(entries && selected.size === 0);
   // اقتراح واحد فقط: من مراقبة الحافظة أو مما وجدناه عند الرجوع للنافذة (U-82)
   const clipSuggest = [props.clipUrl, clipFound].find((c) => c && c !== url.trim()) ?? null;
 
@@ -413,14 +419,19 @@ export function DownloadView(props: {
   // ملخّص الإعداد الحالي: يظهر على سطر «الصيغة والجودة» المطويّ وعلى زر التنزيل،
   // فيعرف المستخدم ما سيحصل عليه دون أن يفتح الخيارات
   const formatName = s.kind === "video" ? s.videoFormat.toUpperCase() : s.audioFormat === "m4a" ? "AAC" : s.audioFormat.toUpperCase();
-  const optionsSummary = (
-    s.kind === "video" ? [t.video, formatName, qualityLabel(s.quality), s.editorReady && t.editorReady] : [t.audio, formatName]
-  )
-    .filter(Boolean)
-    .join(" · ");
+  const optionsSummary = // الدقة الفعلية لهذا الرابط لا المحفوظة: حين لا يوفّر الفيديو 1440 يُنزَّل 1080 ويُكتب 1080 (R2-3)
+    (s.kind === "video" ? [t.video, formatName, qualityLabel(effQuality), s.editorReady && t.editorReady] : [t.audio, formatName])
+      .filter(Boolean)
+      .join(" · ");
+  // موعد لغير اليوم: اليوم مع الساعة على الزر، لا الساعة وحدها (R2-41)
+  const laterAt = when === "later" ? scheduledAt(when, atTime, new Date(), atDay) : null;
+  const laterLabel =
+    laterAt && new Date(laterAt).toDateString() !== new Date().toDateString()
+      ? `${new Date(laterAt).toLocaleDateString(numLocale(lang), { weekday: "short" })} ${atTime}`
+      : atTime;
   const buttonMeta = original
     ? null
-    : [formatName, s.kind === "video" && qualityLabel(s.quality), when === "later" && atTime].filter(Boolean).join(" · ");
+    : [formatName, s.kind === "video" && qualityLabel(effQuality), when === "later" && laterLabel].filter(Boolean).join(" · ");
 
   return (
     <div className="card download-card">
@@ -474,7 +485,14 @@ export function DownloadView(props: {
               setStartedUrl(null);
             }}
             // Enter يبدأ فقط بعد اكتمال المعاينة: لا تنزيل بخيارات لم يرها المستخدم بعد (U-1)
-            onKeyDown={(e) => e.key === "Enter" && (multiLinks || probe.status === "ok") && start()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.ctrlKey && (multiLinks || probe.status === "ok")) start();
+              // Esc يمسح الرابط (R2-48)
+              else if (e.key === "Escape" && url) {
+                e.preventDefault();
+                clearUrl();
+              }
+            }}
             aria-label={t.urlAria}
           />
           {url ? (
@@ -506,7 +524,7 @@ export function DownloadView(props: {
       {probe.status === "error" && !multiLinks && <ErrorBox error={probe.error} inline onFix={fix} />}
       {startError && <ErrorBox error={startError} inline onFix={fix} />}
       {noRoom && (
-        <div className="alert warn">
+        <div className="alert warn" role="alert">
           <Icon name="alert" size={16} />
           <span>{t.noRoom(formatBytes(t, expected!), formatBytes(t, free!))}</span>
         </div>
@@ -521,7 +539,7 @@ export function DownloadView(props: {
             return (
               <div className="link-item" key={u} data-state={info ? "ok" : (li ?? "idle")}>
                 {info?.thumbnail ? (
-                  <img className="link-thumb" src={info.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                  <img className="link-thumb" src={info.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" decoding="async" />
                 ) : (
                   <span className={`link-thumb ${li === "loading" ? "skeleton" : ""}`}>
                     <Icon name={li === "error" ? "alert" : "link"} size={16} />
@@ -582,9 +600,23 @@ export function DownloadView(props: {
 
       {info && (
         <div className="preview">
-          {info.thumbnail ? <img className="thumb" src={info.thumbnail} alt="" /> : <div className="thumb" />}
+          {info.thumbnail ? (
+            <img
+              className="thumb"
+              src={info.thumbnail}
+              alt=""
+              referrerPolicy="no-referrer"
+              decoding="async"
+              // صورة محجوبة أو منتهية: مربع فارغ بدل أيقونة صورة مكسورة (R2-54)
+              onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+            />
+          ) : (
+            <div className="thumb" />
+          )}
           <div className="preview-body">
-            <div className="preview-title">{info.title}</div>
+            <div className="preview-title selectable" dir="auto">
+              {info.title}
+            </div>
             {/* شارات منفصلة بدل سطر واحد بنقاط فاصلة (D-74) */}
             <div className="meta-tags">
               {(entries
@@ -865,7 +897,7 @@ export function DownloadView(props: {
             <Icon name="captions" /> {t.analyzeVideo}
           </button>
         )}
-        <button className="btn btn-primary btn-lg download-btn" disabled={!canStart} onClick={start}>
+        <button className="btn btn-primary btn-lg download-btn" data-primary disabled={!canStart} onClick={start}>
           <Icon name={when === "later" ? "clock" : "download"} />
           <span className="download-btn-text">
             <span>{startCount ? t.downloadN(startCount) : t.download}</span>

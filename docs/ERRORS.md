@@ -8,6 +8,8 @@ Rust never sends a sentence to the screen. Every failure becomes an `AppError` (
 
 The interface looks the code up in `t.errors` (`src/i18n.ts`, English and Arabic) and `ErrorBox` shows the message, the button below, and `detail` under "Technical details". A code with no message falls back to `unknown`.
 
+Failed job cards show the same fix button (cookies, update yt-dlp) as the main error box, without "Try again" since the card has its own retry. "Copy for report" includes the app version and the operating system.
+
 لا يرسل Rust جملة إلى الشاشة: كل فشل يصبح رمزًا، والواجهة تترجمه وتعرض الزر المناسب، والنص التقني الأصلي تحت «تفاصيل تقنية».
 
 ## Adding a code · إضافة رمز

@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { dictionaries } from "./i18n";
-import { timeTicks, extractUrls, formatBytes, formatDuration, formatTimecode, isHttpUrl, parseTime, youtubeChapters } from "./format";
+import {
+  chapterStarts,
+  timeTicks,
+  extractUrls,
+  formatBytes,
+  formatDuration,
+  formatEta,
+  formatTimecode,
+  isHttpUrl,
+  parseTime,
+  youtubeChapters,
+} from "./format";
 
 describe("formatTimecode", () => {
   it("يعرض أجزاء الثانية", () => {
@@ -70,6 +81,12 @@ describe("extractUrls", () => {
   it("يبقي الأقواس المتوازنة داخل الرابط", () => {
     expect(extractUrls("https://en.wikipedia.org/wiki/Foo_(bar)")).toEqual(["https://en.wikipedia.org/wiki/Foo_(bar)"]);
   });
+  it("يقبل www. و youtu.be/ بلا https:// (R2-39)", () => {
+    expect(extractUrls("شوف www.youtube.com/watch?v=abc")).toEqual(["https://www.youtube.com/watch?v=abc"]);
+    expect(extractUrls("youtu.be/abc.")).toEqual(["https://youtu.be/abc"]);
+    expect(extractUrls("https://www.a.com/x")).toEqual(["https://www.a.com/x"]);
+    expect(extractUrls("me@www.a.com")).toEqual([]);
+  });
   it("يزيل التكرار", () => {
     expect(extractUrls("https://a.com https://a.com")).toEqual(["https://a.com"]);
   });
@@ -106,6 +123,23 @@ describe("formatBytes (T-69)", () => {
 describe("youtubeChapters (U-60)", () => {
   it("starts at 0:00 and uses h:mm:ss past an hour", () => {
     expect(youtubeChapters([65, 3725], (n) => `Part ${n}`)).toBe("0:00 Part 1\n1:05 Part 2\n1:02:05 Part 3");
+  });
+  it("drops chapters shorter than 10 s, which make YouTube ignore all of them (R2-4)", () => {
+    expect(chapterStarts([3, 9.5, 12, 15, 21.9, 22, 80])).toEqual([0, 12, 22, 80]);
+    expect(chapterStarts([])).toEqual([0]);
+  });
+});
+
+describe("formatBytes / formatEta at unit edges (R2-61, R2-62)", () => {
+  const t = dictionaries.en;
+  it("rolls 1023.7 KB over to MB", () => {
+    expect(formatBytes(t, 1023.7 * 1024)).toBe(`1.0 ${t.bytes[2]}`);
+    expect(formatBytes(t, 1023.4 * 1024)).toBe(`1023 ${t.bytes[1]}`);
+  });
+  it("never says 60 seconds or 60 minutes", () => {
+    expect(formatEta(t, 59.6)).toBe(t.minLeft(1));
+    expect(formatEta(t, 3590)).toBe(t.left(formatDuration(3590)));
+    expect(formatEta(t, 30)).toBe(t.secLeft(30));
   });
 });
 

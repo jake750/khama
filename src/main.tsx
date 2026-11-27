@@ -11,9 +11,12 @@ import "./bubbly.css";
 import App from "./App";
 import { followSystemMotion } from "./motion";
 import { installFocusTrap } from "./focusTrap";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { installGlobalErrorLog } from "./log";
 
 followSystemMotion();
 installFocusTrap();
+installGlobalErrorLog();
 
 // في المتصفح فقط (npm run dev): بيانات تجريبية بدل Rust لمعاينة التصميم. لا تدخل في نسخة التطبيق.
 const ready = import.meta.env.DEV ? import("./dev-mock") : Promise.resolve();
@@ -21,7 +24,9 @@ const ready = import.meta.env.DEV ? import("./dev-mock") : Promise.resolve();
 ready.then(() =>
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </React.StrictMode>,
   ),
 );

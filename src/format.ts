@@ -8,11 +8,13 @@ import type { Dict } from "./i18n";
 export function formatBytes(t: Dict, n?: number | null): string {
   if (n == null || !isFinite(n)) return "";
   let i = 0;
-  while (n >= 1024 && i < t.bytes.length - 1) {
+  const digits = (k: number) => (k >= 2 ? 1 : 0);
+  // بعد التقريب لا قبله: 1023.7 KB تُكتب «1.0 MB» لا «1024 KB» (R2-61)
+  while (Number(n.toFixed(digits(i))) >= 1024 && i < t.bytes.length - 1) {
     n /= 1024;
     i++;
   }
-  return `${n.toFixed(i >= 2 ? 1 : 0)} ${t.bytes[i]}`;
+  return `${n.toFixed(digits(i))} ${t.bytes[i]}`;
 }
 
 export function formatSpeed(t: Dict, bps?: number | null): string {
@@ -42,8 +44,9 @@ export function formatDuration(sec?: number | null): string {
 
 export function formatEta(t: Dict, sec?: number | null): string {
   if (sec == null || !isFinite(sec)) return "";
-  if (sec < 60) return t.secLeft(Math.max(1, Math.round(sec)));
-  if (sec < 3600) return t.minLeft(Math.round(sec / 60));
+  // الحدود بعد التقريب: 59.6 ث = «دقيقة»، و3590 ث = «0:59:50» لا «60 دقيقة» (R2-62)
+  if (Math.round(sec) < 60) return t.secLeft(Math.max(1, Math.round(sec)));
+  if (Math.round(sec / 60) < 60) return t.minLeft(Math.round(sec / 60));
   return t.left(formatDuration(sec));
 }
 
@@ -61,7 +64,9 @@ export function isHttpUrl(s: string): boolean {
 
 /** يستخرج كل الروابط من نص ملصوق (قد يحتوي عدة روابط أو نصًا حولها) */
 export function extractUrls(text: string): string[] {
-  const found = Array.from(new Set((text.match(/https?:\/\/[^\s"'<>]+/gi) ?? []).map(trimUrlTail)));
+  // رابط منسوخ من رسالة بلا https:// (www.… أو youtu.be/…) يُقبل ويُكمَل (R2-39)
+  const raw = text.match(/(?:https?:\/\/|(?<![\w./@])(?:www\.|youtu\.be\/))[^\s"'<>]+/gi) ?? [];
+  const found = Array.from(new Set(raw.map((u) => trimUrlTail(/^https?:/i.test(u) ? u : `https://${u}`))));
   // فقرة ملصوقة فيها رابط الفيديو ورابط صاحبه: نُسقط روابط الحسابات والقنوات (U-66).
   // رابط قناة وحده يبقى (قد يريد المستخدم تنزيل القناة كلها)
   if (found.length < 2) return found;
@@ -149,6 +154,18 @@ export function youtubeChapters(starts: number[], label: (n: number) => string):
     const ss = String(s % 60).padStart(2, "0");
     return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
   };
-  const points = [0, ...starts.filter((s) => s >= 1)].sort((a, b) => a - b);
-  return points.map((s, i) => `${fmt(s)} ${label(i + 1)}`).join("\n");
+  return chapterStarts(starts)
+    .map((s, i) => `${fmt(s)} ${label(i + 1)}`)
+    .join("\n");
+}
+
+/** أقصر فصل يقبله YouTube، وأقل عدد فصول (وإلا تجاهلها كلها) (R2-4) */
+export const CHAPTER_MIN_SECS = 10;
+export const CHAPTER_MIN_COUNT = 3;
+
+/** بدايات الفصول: من 0:00، وكل فصل 10 ثوانٍ على الأقل (نقطة أقرب من ذلك إلى سابقتها تُسقط) */
+export function chapterStarts(starts: number[]): number[] {
+  const out = [0];
+  for (const s of [...starts].sort((a, b) => a - b)) if (s - out[out.length - 1] >= CHAPTER_MIN_SECS) out.push(s);
+  return out;
 }

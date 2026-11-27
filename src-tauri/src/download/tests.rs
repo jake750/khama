@@ -517,3 +517,52 @@ fn delivered_clip_is_remembered_only_while_file_exists() {
     assert_eq!(delivered_before(&clip), None, "المستخدم حذف الملف: يُنزَّل من جديد");
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// ملف روابط من Notepad («Unicode» = UTF-16 بـ BOM) أو بترميز Windows-1256 يُقرأ نصًا سليمًا (R2-5)
+#[test]
+fn links_file_in_utf16_and_cp1256() {
+    let dir = std::env::temp_dir().join(format!("khama-links-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let text = "روابط: https://youtu.be/abc https://example.com/v";
+    let mut utf16 = vec![0xFF, 0xFE];
+    for u in text.encode_utf16() {
+        utf16.extend(u.to_le_bytes());
+    }
+    let a = dir.join("u16.txt");
+    std::fs::write(&a, &utf16).unwrap();
+    assert_eq!(super::commands::read_links_file(a.to_string_lossy().into_owned()).unwrap(), text);
+    let (cp, _, _) = encoding_rs::WINDOWS_1256.encode(text);
+    let b = dir.join("cp1256.txt");
+    std::fs::write(&b, &cp).unwrap();
+    assert!(
+        super::commands::read_links_file(b.to_string_lossy().into_owned())
+            .unwrap()
+            .contains("https://youtu.be/abc")
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// أجزاء HLS/DASH تُجلب معًا، إلا مع حد السرعة (R2-18)
+#[test]
+fn concurrent_fragments_only_without_rate_limit() {
+    let tools = Tools {
+        ytdlp: PathBuf::from("yt-dlp"),
+        ytdlp_prefix: vec![],
+        env: vec![],
+        js_runtime: String::new(),
+        ffmpeg: PathBuf::new(),
+        ffprobe: PathBuf::new(),
+        ffmpeg_dir: PathBuf::new(),
+    };
+    let r = req("video", "mp4", "best", false);
+    let mut o = JobOptions {
+        template: "%(title)s".into(),
+        rate_limit_kb: 0,
+        max_name: 120,
+    };
+    let a = download_args(&tools, vec![], &r, &o, None, Path::new("out"), Path::new("work"));
+    assert!(a.windows(2).any(|w| w[0] == "--concurrent-fragments" && w[1] == "4"));
+    o.rate_limit_kb = 500;
+    let a = download_args(&tools, vec![], &r, &o, None, Path::new("out"), Path::new("work"));
+    assert!(!a.iter().any(|x| x == "--concurrent-fragments"));
+}

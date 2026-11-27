@@ -2160,6 +2160,14 @@ img.file-thumb {
   text-align: center;
 }
 
+/* خطأ أثناء الرسم (R2-1): الزران في سطر واحد بالوسط */
+.crash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s-2);
+}
+
 /* =====================================================================
    الدفعة الثانية: هوية أوضح، سلّم خطوط، حقل رابط أكبر، إضافات، سجلّ، إعدادات بأقسام.
    يُحمَّل بعد styles.css فيتقدّم عليه عند التعارض.
@@ -4610,4 +4618,50 @@ kbd {
   align-items: center;
   gap: 4px;
   margin-inline-start: 8px;
+}
+
+/* عناوين ومسارات قابلة للتحديد والنسخ (R2-30) */
+.selectable {
+  user-select: text;
+}
+
+/* قائمة العلامات الطويلة: شريط تمرير ظاهر فلا يظن المستخدم أن ما يُرى هو كل شيء (R2-75) */
+.marker-list {
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+}
+
+/* وضع التباين العالي في Windows (R2-24): الأزرار والتبويب الحالي والتركيز تبقى ظاهرة
+   حين يستبدل النظام الألوان، وما يُرسم بالخلفية وحدها يحصل على حدّ */
+@media (forced-colors: active) {
+  .btn,
+  .icon-btn,
+  .preset,
+  .segmented button,
+  .chip,
+  .card {
+    border: 1px solid ButtonText;
+  }
+  .btn-primary,
+  .tab[aria-current="page"],
+  .preset[aria-pressed="true"],
+  .segmented button[aria-pressed="true"] {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+  .progress,
+  .tab-dot,
+  .suggest-dot {
+    border: 1px solid CanvasText;
+  }
+  .progress > *,
+  .seg-pill {
+    background: Highlight;
+  }
+  :focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px;
+  }
 }

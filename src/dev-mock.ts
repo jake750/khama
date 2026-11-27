@@ -271,6 +271,11 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return "C:\\Users\\me\\Downloads";
     case "get_history":
       return history;
+    case "remove_history_many": {
+      const ids = new Set((args as { ids: number[] }).ids);
+      for (let i = history.length - 1; i >= 0; i--) if (ids.has(history[i].id)) history.splice(i, 1);
+      return null;
+    }
     case "get_scheduled":
       return [];
     case "tools_info":

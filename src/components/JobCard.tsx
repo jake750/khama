@@ -5,7 +5,7 @@ import { LevelsLine, TopicPanel, type ExportOptions } from "./TopicPanel";
 import { SilenceView } from "./SilenceView";
 import { formatDuration, formatEta, formatSpeed, formatTimecode } from "../format";
 import { errorText, numLocale, useI18n, type Dict } from "../i18n";
-import { ErrorBox } from "./ErrorBox";
+import { ErrorBox, type ErrorFix } from "./ErrorBox";
 import { Icon } from "./Icon";
 import { MoreMenu, type MenuItem } from "./MoreMenu";
 
@@ -176,6 +176,8 @@ export function JobCard(props: {
   onExportTopics?: (sections: Range[], o: ExportOptions) => void;
   /** بطاقة تنزيل مكتمل: حلّل مواضيعه */
   onFindTopics?: () => void;
+  /** زر الإصلاح المقترح للخطأ (تحديث yt-dlp ثم إعادة، أو الكوكيز) (R2-2) */
+  onFix?: (fix: ErrorFix) => Promise<void>;
 }) {
   const { t, lang } = useI18n();
   const j = props.job;
@@ -231,7 +233,7 @@ export function JobCard(props: {
       title={draggable ? t.dragHint : undefined}
     >
       <div className={`job-icon ${j.state === "done" ? "done" : j.state === "error" ? "error" : ""} ${j.thumbnail ? "has-thumb" : ""}`}>
-        {j.thumbnail && <img src={j.thumbnail} alt="" />}
+        {j.thumbnail && <img src={j.thumbnail} alt="" loading="lazy" decoding="async" />}
         <span className="job-badge">
           <Icon
             name={
@@ -352,7 +354,7 @@ export function JobCard(props: {
           </div>
         )}
 
-        {j.state === "error" && j.error && <ErrorBox error={j.error} compact />}
+        {j.state === "error" && j.error && <ErrorBox error={j.error} compact noRetry onFix={props.onFix} />}
         {j.source && j.source !== j.title && (
           <div className="faint job-source" dir="auto" title={j.source}>
             {t.matchedFrom(j.source)}

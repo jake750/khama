@@ -427,6 +427,7 @@ export const api = {
   saveThumbnail: (url: string) => invoke<string>("save_thumbnail", { url }),
   getHistory: () => invoke<HistoryEntry[]>("get_history"),
   removeHistory: (id: number) => invoke<void>("remove_history", { id }),
+  removeHistoryMany: (ids: number[]) => invoke<void>("remove_history_many", { ids }),
   clearHistory: () => invoke<void>("clear_history"),
   setCompact: (compact: boolean) => invoke<void>("set_compact", { compact }),
   quitApp: () => invoke<void>("quit_app"),

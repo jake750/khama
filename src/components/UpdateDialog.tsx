@@ -16,6 +16,7 @@ const RELEASES_URL = "https://github.com/jake750/khama/releases/latest";
 const LATEST_API = "https://api.github.com/repos/jake750/khama/releases/latest";
 /** ننتظر قليلًا بعد الفتح حتى لا ينافس الفحصُ تحميلَ الواجهة */
 const CHECK_DELAY_MS = 2500;
+const RECHECK_MS = 12 * 3600_000;
 const EXIT_MS = 220;
 
 type Phase =
@@ -113,18 +114,28 @@ export function UpdateDialog(props: {
     // StrictMode يركّب ويفكّ ثم يركّب في التطوير: الإلغاء يمسح المؤقّت الأول،
     // والعلَم يُرفع عند انطلاق الفحص فعلًا، فيحدث مرة واحدة فقط
     if (started.current || !props.enabled) return;
-    const timer = window.setTimeout(() => {
-      started.current = true;
+    const check = (first: boolean) =>
       (isMobile ? checkMobile() : checkDesktop())
         .then((u) => {
+          // فحص لاحق لا يعيد فتح نافذة رآها المستخدم لنفس الإصدار
+          const fresh = u && u.version !== found.current?.version;
           found.current = u;
           onAvailable.current(u?.version ?? null);
-          // نخبر المستخدم فور الفتح، إلا إن بدأ تنزيلًا: عندها تبقى الشارة على «الإعدادات»
-          if (u && !busyRef.current) setUpdate(u);
+          // نخبر المستخدم فور الفتح، إلا إن بدأ تنزيلًا: عندها تبقى الشارة على «الإعدادات».
+          // في الفحوص اللاحقة الشارة وحدها، بلا نافذة تقاطع عمله
+          if (u && first && fresh && !busyRef.current) setUpdate(u);
         })
         .catch(() => {}); // بلا اتصال، أو لا يوجد إصدار منشور بعد
+    const timer = window.setTimeout(() => {
+      started.current = true;
+      void check(true);
     }, CHECK_DELAY_MS);
-    return () => window.clearTimeout(timer);
+    // التطبيق يبقى مفتوحًا في الخلفية أيامًا: فحص كل 12 ساعة، وإلا لا يرى الإصدار الجديد حتى يُعاد تشغيله (R2-16)
+    const every = window.setInterval(() => void check(false), RECHECK_MS);
+    return () => {
+      window.clearTimeout(timer);
+      window.clearInterval(every);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- مرة عند الفتح فقط
   }, []);
 

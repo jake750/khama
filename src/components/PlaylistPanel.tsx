@@ -1,4 +1,4 @@
-import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { api, type PlaylistEntry } from "../api";
 import type { EntryClips } from "../downloadPlan";
 import { formatDuration } from "../format";
@@ -54,6 +54,26 @@ export function PlaylistPanel(props: {
       }
       return next;
     });
+
+  // Shift+نقر يحدد (أو يلغي) كل ما بين آخر عنصر نُقر وهذا، ضمن النتائج الظاهرة (R2-37)
+  const lastClicked = useRef<number | null>(null);
+  const toggleRow = (i: number, shift: boolean) => {
+    const from = lastClicked.current;
+    lastClicked.current = i;
+    if (!shift || from == null || from === i) return props.onSelected((cur) => toggle(cur, i));
+    const on = !selected.has(i);
+    const pos = (n: number) => matches.findIndex((m) => m.i === n);
+    const [a, b] = [pos(from), pos(i)].sort((x, y) => x - y);
+    if (a < 0) return props.onSelected((cur) => toggle(cur, i));
+    props.onSelected((cur) => {
+      const next = new Set(cur);
+      for (const { i: k } of matches.slice(a, b + 1)) {
+        if (on) next.add(k);
+        else next.delete(k);
+      }
+      return next;
+    });
+  };
 
   // العنصر المفتوح للقص، وما جُلب لكل عنصر (المدة الدقيقة ورابط المعاينة)
   const [open, setOpen] = useState<number | null>(null);
@@ -127,17 +147,17 @@ export function PlaylistPanel(props: {
           return (
             <li key={i} className="pl-row" data-on={on} data-editing={editing || undefined}>
               <label className="pl-main">
-                <input type="checkbox" checked={on} onChange={() => props.onSelected((cur) => toggle(cur, i))} />
+                <input type="checkbox" checked={on} onChange={() => {}} onClick={(ev) => toggleRow(i, ev.shiftKey)} title={t.plShiftHint} />
                 <span className="pl-idx">{i + 1}</span>
                 {e.thumbnail ? (
-                  <img className="pl-thumb" src={e.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                  <img className="pl-thumb" src={e.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" decoding="async" />
                 ) : (
                   <span className="pl-thumb pl-thumb-empty">
                     <Icon name="music" size={16} />
                   </span>
                 )}
                 <span className="pl-text">
-                  <span className="pl-title" title={e.title}>
+                  <span className="pl-title" dir="auto" title={e.title}>
                     {e.title}
                   </span>
                   {sub && <span className="pl-sub faint">{sub}</span>}

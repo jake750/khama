@@ -31,12 +31,35 @@ export function FolderPicker(props: {
   const [open, setOpen] = useState(false);
   const [shown, leaving] = usePresence(open || null, D_ANTICIPATE);
   const box = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  // بلوحة المفاتيح: التركيز على أول عنصر عند الفتح، والأسهم وHome/End بين العناصر، وEscape يعيد التركيز للزر (R2-22)
+  const items = () => [...(menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])];
+  useEffect(() => {
+    if (!shown || leaving) return;
+    const id = requestAnimationFrame(() => items()[0]?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [shown, leaving]);
+  const onMenuKey = (e: React.KeyboardEvent) => {
+    const all = items();
+    const i = all.indexOf(document.activeElement as HTMLButtonElement);
+    const go = (n: number) => all[(n + all.length) % all.length]?.focus();
+    if (e.key === "ArrowDown") go(i + 1);
+    else if (e.key === "ArrowUp") go(i < 0 ? all.length - 1 : i - 1);
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(all.length - 1);
+    else return;
+    e.preventDefault();
+  };
   const others = props.recent.filter((d) => d !== props.current).slice(0, 5);
 
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent ? e.key === "Escape" : !box.current?.contains(e.target as Node)) setOpen(false);
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !box.current?.contains(e.target as Node)) {
+        setOpen(false);
+        if (e instanceof KeyboardEvent) trigger.current?.focus();
+      }
     };
     document.addEventListener("mousedown", close);
     document.addEventListener("keydown", close);
@@ -48,7 +71,14 @@ export function FolderPicker(props: {
 
   return (
     <div className="folder-picker" ref={box}>
-      <button className="folder-btn" onClick={() => setOpen((o) => !o)} title={props.current} aria-expanded={open} aria-haspopup="menu">
+      <button
+        ref={trigger}
+        className="folder-btn"
+        onClick={() => setOpen((o) => !o)}
+        title={props.current}
+        aria-expanded={open}
+        aria-haspopup="menu"
+      >
         <Icon name="folder" size={16} />
         <span className="faint">{t.saveTo}</span>
         <span className="folder-name ltr">
@@ -59,7 +89,15 @@ export function FolderPicker(props: {
         <Icon name="chevron" size={16} />
       </button>
       {shown && (
-        <div className="menu" role="menu" data-leaving={leaving || undefined} inert={leaving || undefined}>
+        <div
+          ref={menu}
+          className="menu"
+          role="menu"
+          aria-label={t.saveTo}
+          onKeyDown={onMenuKey}
+          data-leaving={leaving || undefined}
+          inert={leaving || undefined}
+        >
           <div className="menu-item current" title={props.current}>
             <Icon name="check" size={16} />
             <span className="ltr">{props.current}</span>

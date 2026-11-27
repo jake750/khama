@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { laneClips, nextClip } from "../downloadPlan";
 import { useI18n } from "../i18n";
 import { PreviewVideo } from "./download/PreviewVideo";
@@ -27,6 +27,9 @@ export function ClipEditor(props: {
   const { t } = useI18n();
   const { duration, clips } = props;
   const video = useRef<HTMLVideoElement>(null);
+  // آخر مقطع حُذف: سطر «تراجع» حتى التعديل التالي، فمقطع ضُبط بدقة لا يضيع بنقرة خاطئة (R2-89)
+  const [removed, setRemoved] = useState<{ clip: Range; at: number; from: Range[] } | null>(null);
+  const undoable = removed && JSON.stringify(removed.from.filter((_, j) => j !== removed.at)) === JSON.stringify(clips) ? removed : null;
   const multi = clips.length > 1;
   // المقاطع المتداخلة في صفوف منفصلة على الخط الزمني الموحّد (D-103)
   const lanes = laneClips(clips);
@@ -74,7 +77,10 @@ export function ClipEditor(props: {
               <span className="clip-name">{t.clipN(i + 1)}</span>
               <button
                 className="btn btn-sm btn-ghost"
-                onClick={() => props.onClips(clips.filter((_, j) => j !== i))}
+                onClick={() => {
+                  setRemoved({ clip: c, at: i, from: clips });
+                  props.onClips(clips.filter((_, j) => j !== i));
+                }}
                 title={t.removeClip}
                 aria-label={t.removeClip}
               >
@@ -90,6 +96,20 @@ export function ClipEditor(props: {
           />
         </div>
       ))}
+      {undoable && (
+        <div className="url-note" role="status">
+          <span className="grow">{t.clipRemoved(undoable.at + 1)}</span>
+          <button
+            className="btn btn-sm btn-ghost"
+            onClick={() => {
+              props.onClips(undoable.from);
+              setRemoved(null);
+            }}
+          >
+            {t.undo}
+          </button>
+        </div>
+      )}
       <div className="clips-footer">
         <button className="btn btn-sm" onClick={() => props.onClips([...clips, nextClip(duration, clips, preview?.now())])}>
           <Icon name="plus" size={16} /> {t.addClip}

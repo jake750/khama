@@ -12,13 +12,13 @@ export function splitHint(text: string): [string, string] {
  * شرح قصير بأيقونة: أول جملة ظاهرة، والتفاصيل خلف «المزيد» حتى لا يصبح كل خيار فقرة.
  * يُستعمل بدل <div className="faint">نص طويل</div> تحت الخيارات.
  */
-export function Hint(props: { text: string; icon?: IconName; className?: string }) {
+export function Hint(props: { text: string; icon?: IconName; className?: string; id?: string }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const id = useId();
   const [first, rest] = splitHint(props.text);
   return (
-    <div className={`hint ${props.className ?? ""}`}>
+    <div className={`hint ${props.className ?? ""}`} id={props.id}>
       <span className="hint-icon" aria-hidden="true">
         <Icon name={props.icon ?? "info"} size={16} />
       </span>
@@ -36,7 +36,8 @@ export function Hint(props: { text: string; icon?: IconName; className?: string 
               type="button"
               className="hint-more"
               aria-expanded={open}
-              aria-controls={id}
+              // يشير إلى التفاصيل فقط حين تكون موجودة (R2-63)
+              aria-controls={open ? id : undefined}
               onClick={(e) => {
                 // داخل <label>: لا نترك النقرة تقلب المفتاح
                 e.preventDefault();

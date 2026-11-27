@@ -5,8 +5,9 @@ use crate::errors::LockExt;
 
 #[cfg(desktop)]
 pub(super) const MEDIA_EXT: &[&str] = &[
-    "mp4", "mov", "mkv", "avi", "mxf", "m4v", "webm", "mts", "m2ts", "wmv", "flv", "3gp", "mpg", "mpeg", "wav", "mp3", "m4a", "aac",
-    "flac", "ogg", "opus", "aiff", "aif",
+    // نفس src/mediaExt.ts (يطابقهما mediaExt.test.ts)
+    "mp4", "mov", "mkv", "avi", "mxf", "m4v", "webm", "mts", "m2ts", "wmv", "flv", "3gp", "3g2", "mpg", "mpeg", "m2v", "ts", "vob", "ogv",
+    "f4v", "wav", "mp3", "m4a", "aac", "flac", "ogg", "opus", "aiff", "aif", "wma", "mka", "ac3", "caf", "mp2", "amr",
 ];
 
 #[cfg(desktop)]

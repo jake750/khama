@@ -1765,3 +1765,26 @@ details.extras .schedule-row {
     justify-content: center;
   }
 }
+
+/* حقل وقت لا يُفهم (R2-21): إطار أحمر وسطر يقول الصيغة */
+.input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.field-error {
+  display: block;
+  margin-top: var(--s-1);
+  color: var(--danger);
+  font-size: var(--fs-meta);
+}
+
+/* السجل: «12 من 340» و«احذف المفقودة» في سطر واحد (R2-35، R2-82) */
+.history-found {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.history-loading .history-thumb {
+  border-radius: var(--r-xs);
+}

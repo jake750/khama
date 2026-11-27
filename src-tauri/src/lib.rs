@@ -150,6 +150,7 @@ macro_rules! handlers_with {
             download::free_space,
             history::get_history,
             history::remove_history,
+            history::remove_history_many,
             history::clear_history,
             history::get_scheduled,
             history::save_scheduled,

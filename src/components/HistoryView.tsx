@@ -1,6 +1,7 @@
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { Toast } from "../toast";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { matches } from "../search";
 import { api, asAppError, type AppError, type HistoryEntry } from "../api";
 import { errorText, numLocale, useI18n } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
@@ -11,12 +12,23 @@ import { Segmented } from "./Segmented";
 import { presetById } from "../presets";
 import { logError } from "../log";
 
+/** منسّق واحد لكل لغة، لا واحد لكل عنصر في كل رسم (R2-67) */
+const relFormats = new Map<string, Intl.RelativeTimeFormat>();
+function relFormat(lang: string): Intl.RelativeTimeFormat {
+  let f = relFormats.get(lang);
+  if (!f) relFormats.set(lang, (f = new Intl.RelativeTimeFormat(numLocale(lang), { numeric: "auto" })));
+  return f;
+}
+
+/** حذف من السجل ينتظر مهلة «تراجع» ثم يُكتب، حتى لو غادر المستخدم التبويب (R2-34) */
+const UNDO_MS = 5000;
+
 /** «اليوم»، «أمس»، أو التاريخ: عنوان كل مجموعة في السجلّ */
 function dayLabel(lang: string, ms: number): string {
   const d = new Date(ms);
   const today = new Date();
   const days = Math.round((new Date(today.toDateString()).getTime() - new Date(d.toDateString()).getTime()) / 86_400_000);
-  const rtf = new Intl.RelativeTimeFormat(numLocale(lang), { numeric: "auto" });
+  const rtf = relFormat(lang);
   if (days <= 1) {
     const s = rtf.format(-days, "day");
     return s.charAt(0).toLocaleUpperCase(lang) + s.slice(1);
@@ -71,33 +83,82 @@ export function HistoryView(props: {
   }, [props.version, reload]);
   const fail = (e: unknown) => props.toast(errorText(t, asAppError(e)));
 
-  const shown = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+  // ما يُحذف الآن ويُنتظر «تراجع» عنه: مخفي من القائمة حتى يُكتب الحذف أو يُلغى
+  const [hidden, setHidden] = useState<Set<number>>(() => new Set());
+  // كل ما يطابق البحث والفلتر (قبل حد العرض): عدده يقرر زر «المزيد» ويظهر بجانب البحث (R2-12، R2-82)
+  const filtered = useMemo(() => {
     // eslint-disable-next-line react-hooks/purity -- يكفي حساب الوقت عند تغيّر الفلتر
     const from = since === "all" ? 0 : Date.now() - Number(since) * 86_400_000;
-    const items = (list ?? [])
-      .filter((e) => !needle || [e.title, e.url, e.meta, e.file].some((x) => x.toLowerCase().includes(needle)))
-      .filter((e) => kind === "all" || (kind === "video" ? e.kind === "video" : e.kind === kind))
-      .filter((e) => e.date >= from)
-      .slice(0, limit);
+    return (list ?? [])
+      .filter((e) => !hidden.has(e.id))
+      .filter((e) => matches(q, [e.title, e.url, e.meta, e.file]))
+      .filter((e) => kind === "all" || e.kind === kind)
+      .filter((e) => e.date >= from);
+  }, [list, q, kind, since, hidden]);
+  const shown = useMemo(() => {
     // مجموعات حسب اليوم
     const groups: { label: string; items: HistoryEntry[] }[] = [];
-    for (const e of items) {
+    for (const e of filtered.slice(0, limit)) {
       const label = dayLabel(lang, e.date);
       const g = groups[groups.length - 1];
       if (g?.label === label) g.items.push(e);
       else groups.push({ label, items: [e] });
     }
     return groups;
-  }, [list, q, lang, kind, since, limit]);
+  }, [filtered, lang, limit]);
   const total = list?.length ?? 0;
 
-  // القائمة تتغيّر بعد نجاح الحذف فقط: إن فشل لا نوهم المستخدم بأنه حُذف ثم يعود في القراءة التالية
-  const remove = (id: number) =>
-    api
-      .removeHistory(id)
-      .then(() => setList((l) => l?.filter((e) => e.id !== id) ?? null))
-      .catch(fail);
+  /** يخفي العناصر فورًا مع «تراجع»، ويكتب الحذف بعد المهلة. فشل الكتابة يعيدها ويقول السبب */
+  const remove = (gone: HistoryEntry[]) => {
+    if (!gone.length) return;
+    const ids = gone.map((e) => e.id);
+    setHidden((h) => new Set([...h, ...ids]));
+    let undone = false;
+    const unhide = () =>
+      setHidden((h) => {
+        const n = new Set(h);
+        ids.forEach((id) => n.delete(id));
+        return n;
+      });
+    props.toast(t.removedN(gone.length), {
+      label: t.undo,
+      ms: UNDO_MS,
+      run: () => {
+        undone = true;
+        unhide();
+      },
+    });
+    window.setTimeout(() => {
+      if (undone) return;
+      api
+        .removeHistoryMany(ids)
+        .then(() => {
+          setList((l) => l?.filter((e) => !ids.includes(e.id)) ?? null);
+          unhide();
+        })
+        .catch((e) => {
+          unhide();
+          fail(e);
+        });
+    }, UNDO_MS + 200);
+  };
+  const missing = filtered.filter((e) => !e.exists);
+
+  // Ctrl+F أو / يضعان المؤشر في البحث (R2-47)
+  const searchBox = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = (e.target as HTMLElement | null)?.closest("input, textarea, select, [contenteditable]");
+      if (((e.ctrlKey || e.metaKey) && e.code === "KeyF") || (!typing && e.key === "/")) {
+        if (!searchBox.current) return;
+        e.preventDefault();
+        searchBox.current.focus();
+        searchBox.current.select();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   const clear = async () => {
     if (!(await confirm(t.historyClear, t.historyConfirmClear))) return;
@@ -113,7 +174,7 @@ export function HistoryView(props: {
       <div className="history-head">
         <div>
           <h2>{t.historyTitle}</h2>
-          {list && list.length > 0 && <p className="faint">{t.historyCount(list.length)}</p>}
+          {list && list.length > 0 && <p className="faint">{t.historyCount(list.length - hidden.size)}</p>}
         </div>
         {list && list.length > 0 && (
           <button className="btn btn-sm btn-danger" onClick={clear}>
@@ -126,12 +187,28 @@ export function HistoryView(props: {
         <label className="search">
           <Icon name="search" size={16} />
           <input
+            ref={searchBox}
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setLimit(100);
+            }}
+            // Escape يمسح البحث (R2-81)
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && q) {
+                e.stopPropagation();
+                setQ("");
+              }
+            }}
             aria-label={t.historySearch}
             placeholder={t.historySearch}
             spellCheck={false}
           />
+          {q && (
+            <button type="button" className="icon-btn sm" aria-label={t.clearSearch} title={t.clearSearch} onClick={() => setQ("")}>
+              <Icon name="x" size={14} />
+            </button>
+          )}
         </label>
       )}
       {list && list.length > 0 && (
@@ -176,6 +253,37 @@ export function HistoryView(props: {
           <p>{t.historyEmpty}</p>
         </div>
       )}
+      {list && list.length > 0 && (q.trim() || kind !== "all" || since !== "all" || (!isMobile && missing.length > 0)) && (
+        <div className="history-found mt-2">
+          {/* كم يطابق من كم (R2-82) */}
+          {(q.trim() || kind !== "all" || since !== "all") && (
+            <span className="faint ltr-num" role="status">
+              {t.historyFound(filtered.length, total)}
+            </span>
+          )}
+          <span className="spacer" />
+          {/* كل ما فُقد ملفه بنقرة، مع تراجع (R2-35) */}
+          {!isMobile && missing.length > 0 && (
+            <button className="btn btn-sm btn-ghost" onClick={() => remove(missing)}>
+              <Icon name="trash" size={16} /> {t.removeMissing(missing.length)}
+            </button>
+          )}
+        </div>
+      )}
+      {list === null && !loadError && (
+        // هيكل بشكل السجل بدل صفحة فارغة أثناء القراءة (R2-32)
+        <div className="history-loading" aria-busy="true" aria-label={t.historyLoading}>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="history-item">
+              <div className="history-thumb skeleton" />
+              <div className="history-body stack-2">
+                <div className="skeleton skeleton-title" />
+                <div className="skeleton skeleton-tag" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {list && list.length > 0 && shown.length === 0 && <p className="faint text-center">{t.historyNoMatch}</p>}
 
       {shown.map((g) => (
@@ -198,23 +306,26 @@ export function HistoryView(props: {
                       }
                     : undefined
                 }
-                title={canDrag ? t.dragHint : undefined}
               >
+                {/* تلميح السحب على الصورة لا على السطر كله، فلا يظهر مع كل مرور (R2-55) */}
                 {e.thumbnail && !brokenThumbs.has(e.id) ? (
                   <img
                     className="history-thumb"
                     src={e.thumbnail}
                     alt=""
+                    title={canDrag ? t.dragHint : undefined}
+                    loading="lazy"
+                    decoding="async"
                     // سجلّات قديمة حفظت رابطًا انتهت صلاحيته: نعرض الأيقونة بدل صورة مكسورة
                     onError={() => setBrokenThumbs((b) => new Set(b).add(e.id))}
                   />
                 ) : (
-                  <div className={`history-thumb kind-${e.kind === "audio" ? "audio" : "video"}`}>
+                  <div className={`history-thumb kind-${e.kind === "audio" ? "audio" : "video"}`} title={canDrag ? t.dragHint : undefined}>
                     <Icon name={e.kind === "audio" ? "music" : e.kind === "convert" ? "convert" : "film"} size={20} />
                   </div>
                 )}
                 <div className="history-body">
-                  <div className="job-title" dir="auto" title={e.title}>
+                  <div className="job-title selectable" dir="auto" title={e.title}>
                     {e.title}
                   </div>
                   <div className="job-meta">
@@ -260,7 +371,7 @@ export function HistoryView(props: {
                   >
                     <Icon name="copy" size={16} />
                   </button>
-                  <button className="icon-btn sm" title={t.remove} aria-label={t.remove} onClick={() => remove(e.id)}>
+                  <button className="icon-btn sm" title={t.remove} aria-label={t.remove} onClick={() => remove([e])}>
                     <Icon name="x" size={16} />
                   </button>
                 </div>
@@ -269,7 +380,7 @@ export function HistoryView(props: {
           })}
         </section>
       ))}
-      {shown.reduce((n, g) => n + g.items.length, 0) >= limit && total > limit && (
+      {filtered.length > limit && (
         <button className="btn btn-sm mt-3" onClick={() => setLimit((l) => l + 100)}>
           {t.showMore}
         </button>

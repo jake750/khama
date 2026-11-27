@@ -13,6 +13,7 @@ import {
 } from "../api";
 import { formatBytes, formatDuration } from "../format";
 import { Pick } from "./Pick";
+import { MEDIA_EXTENSIONS } from "../mediaExt";
 import { useI18n, type Dict } from "../i18n";
 import { estimateSize, presetById, presetFits, PRESETS, suggestPreset, suggestReason, type PresetDef, type PresetGroup } from "../presets";
 import { ErrorBox } from "./ErrorBox";
@@ -52,33 +53,8 @@ export interface SourceFile {
 
 export const MEDIA_FILTER = {
   name: "Media",
-  extensions: [
-    "mp4",
-    "mov",
-    "mkv",
-    "avi",
-    "mxf",
-    "m4v",
-    "webm",
-    "mts",
-    "m2ts",
-    "wmv",
-    "flv",
-    "3gp",
-    "mpg",
-    "mpeg",
-    "ts",
-    "wav",
-    "mp3",
-    "m4a",
-    "aac",
-    "flac",
-    "ogg",
-    "opus",
-    "aiff",
-    "aif",
-    "wma",
-  ],
+  // قائمة واحدة للإفلات والاختيار، وRust يطابقها للمجلدات المراقَبة (اختبار mediaExt.test.ts) (R2-9)
+  extensions: MEDIA_EXTENSIONS,
 };
 
 export const defaultOptions = (): ConvertOptions => ({
@@ -404,6 +380,7 @@ export function ConvertView(props: {
   dragging: boolean;
   /** «امسح القائمة» مع «تراجع» (U-98) */
   onClearFiles: () => void;
+  onRemoveFiles: (paths: string[]) => void;
   onStart: (req: ConvertRequest, title: string, meta: string) => Promise<void>;
   /** خطوتان على ملف واحد: الثانية تبدأ على ناتج الأولى حين تكتمل */
   onChain: (
@@ -451,6 +428,7 @@ export function ConvertView(props: {
   const audioOnly = ready.filter((f) => !f.info!.video).length;
   const anyVideo = ready.some((f) => f.info!.video);
   const loading = files.some((f) => !f.info && !f.error);
+  const failedFiles = files.filter((f) => f.error);
   const single = ready.length === 1 ? ready[0].info! : null;
   const fits = (p: PresetDef) => ready.every((f) => presetFits(p, f.info));
   const suggestion = single ? suggestPreset(single.issues) : null;
@@ -768,7 +746,7 @@ export function ConvertView(props: {
       ? [
           {
             cat: "enhance" as Cat,
-            label: enhanceOn.join("، "),
+            label: enhanceOn.join(t.listSep),
             clear: () => set({ enhance: null, denoise: false, deinterlace: false, tonemap: false, lut: null }),
           },
         ]
@@ -777,7 +755,7 @@ export function ConvertView(props: {
       ? [
           {
             cat: "frame" as Cat,
-            label: frameOn.join("، "),
+            label: frameOn.join(t.listSep),
             clear: () => set({ size: null, aspect: null, fps: null, speed: null, rotate: null }),
           },
         ]
@@ -786,7 +764,7 @@ export function ConvertView(props: {
       ? [
           {
             cat: "text" as Cat,
-            label: textOn.join("، "),
+            label: textOn.join(t.listSep),
             clear: () => {
               set({ subtitles: null, watermark: null, timecode: false });
               setTrimOn(false);
@@ -795,7 +773,7 @@ export function ConvertView(props: {
         ]
       : []),
     ...(fmtAudio && audioOptsOn.length
-      ? [{ cat: "audio" as Cat, label: audioOptsOn.join("، "), clear: () => set({ loudness: null, replaceAudio: null, mute: false }) }]
+      ? [{ cat: "audio" as Cat, label: audioOptsOn.join(t.listSep), clear: () => set({ loudness: null, replaceAudio: null, mute: false }) }]
       : []),
     ...(formatOn ? [{ cat: "format" as Cat, label: fmt.name[lang], clear: () => setFormatOn(false) }] : []),
     ...analysis.map((id) => ({
@@ -825,6 +803,11 @@ export function ConvertView(props: {
             <button className="btn btn-sm" onClick={chooseFiles}>
               <Icon name="plus" size={16} /> {t.addFiles}
             </button>
+            {failedFiles.length > 0 && failedFiles.length < files.length && (
+              <button className="btn btn-sm btn-ghost" onClick={() => props.onRemoveFiles(failedFiles.map((f) => f.path))}>
+                {t.removeFailedFiles(failedFiles.length)}
+              </button>
+            )}
             <button className="btn btn-sm btn-ghost" onClick={props.onClearFiles}>
               {t.clearFiles}
             </button>
@@ -833,7 +816,7 @@ export function ConvertView(props: {
             {files.map((f, i) => (
               <div className="file-row" key={f.path}>
                 {f.info?.thumbnail ? (
-                  <img className="file-thumb" src={f.info.thumbnail} alt="" />
+                  <img className="file-thumb" src={f.info.thumbnail} alt="" loading="lazy" decoding="async" />
                 ) : (
                   <div className={`file-thumb ${!f.info && !f.error ? "skeleton" : ""}`}>
                     {f.info && <Icon name={f.info.video ? "film" : "music"} />}
@@ -894,7 +877,7 @@ export function ConvertView(props: {
                   className="icon-btn sm"
                   title={t.removeFile}
                   aria-label={t.removeFile}
-                  onClick={() => props.setFiles((prev) => prev.filter((x) => x.path !== f.path))}
+                  onClick={() => props.onRemoveFiles([f.path])}
                 >
                   <Icon name="x" size={16} />
                 </button>
@@ -914,7 +897,9 @@ export function ConvertView(props: {
                 {suggestion &&
                   cat !== c.id &&
                   c.id === (isFormat(presetById(suggestion)!) ? "format" : isAi(presetById(suggestion)!) ? "audio" : "analysis") && (
-                    <span className="suggest-dot" title={t.suggested} />
+                    <span className="suggest-dot" title={t.suggested}>
+                      <span className="sr-only">{t.suggested}</span>
+                    </span>
                   )}
               </button>
             ))}
@@ -1312,7 +1297,7 @@ export function ConvertView(props: {
       <div className="cv-aside">
         {/* ============ الوصفة: كل ما اختير من كل الأقسام، ثم البدء ============ */}
         <div className="card recipe-card">
-          <div className="recipe" aria-label={t.recipe}>
+          <div className="recipe" role="group" aria-label={t.recipe}>
             <span className="field-label m-0">{t.recipe}</span>
             {recipe.length === 0 ? (
               <span className="faint">{t.recipeEmpty}</span>
@@ -1402,7 +1387,14 @@ export function ConvertView(props: {
                 {t.mergeBtn}
               </button>
             )}
-            <button className="btn btn-primary btn-lg" disabled={busy || loading || stepCount === 0} onClick={() => start(false)}>
+            <button
+              className="btn btn-primary btn-lg"
+              data-primary
+              disabled={busy || loading || stepCount === 0}
+              // زر معطّل يقول لماذا (R2-51)
+              title={stepCount === 0 ? t.recipeEmpty : undefined}
+              onClick={() => start(false)}
+            >
               <Icon name="convert" /> {t.convertBtn(ready.length)}
             </button>
           </div>

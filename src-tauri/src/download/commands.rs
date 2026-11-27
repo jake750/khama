@@ -527,6 +527,17 @@ pub fn reveal_file(app: AppHandle, path: String) -> Result<(), AppError> {
     if !was_produced(&path) && !crate::history::contains_file(&app, &path) {
         return Err(AppError::with_detail("openFolder", "not a file produced by Khama"));
     }
+    // الملف نُقل أو حُذف (الممنتج نقله لمجلد المشروع): نفتح مجلده إن بقي، ونقول إن الملف لم يعد فيه (R2-17)
+    let p = Path::new(&path);
+    if !p.exists() {
+        if let Some(dir) = p.parent().filter(|d| d.is_dir()) {
+            app.opener()
+                .open_path(dir.to_string_lossy(), None::<&str>)
+                .map_err(|e| AppError::with_detail("openFolder", e.to_string()))?;
+            return Err(AppError::with_detail("fileGoneFolderOpened", path));
+        }
+        return Err(AppError::with_detail("fileGone", path));
+    }
     app.opener()
         .reveal_item_in_dir(&path)
         .map_err(|e| AppError::with_detail("openFolder", e.to_string()))
@@ -541,7 +552,8 @@ pub fn read_links_file(path: String) -> Result<String, AppError> {
     if !is_txt || !small {
         return Err(AppError::with_detail("linksFile", "only .txt up to 1MB"));
     }
-    Ok(String::from_utf8_lossy(&std::fs::read(p)?).into_owned())
+    // Notepad يحفظ «Unicode» بـ UTF-16، وملفات عربية قديمة بـ Windows-1256: نفس فك الترميز المستعمل للترجمات
+    Ok(crate::srt::decode(&std::fs::read(p)?))
 }
 
 /// يفتح الملف ببرنامجه الافتراضي (U-64)، بنفس شرط reveal_file: ملفات أنتجها التطبيق فقط
