@@ -354,25 +354,34 @@ export function SlideSwitch(props: {
     last.current = props.children;
   });
 
-  // عند التبديل فقط (لا عند كل رسم): نعرف الارتفاع القديم من المراقب
+  // كل تغيّر في ارتفاع المحتوى (تبديل، أو مجموعة صيغ فيها بطاقات أكثر) ينساب بدل أن يقفز ما تحته.
+  // نراقب اللوح الحالي لا الحاوي: ارتفاع الحاوي نفسه هو ما نحرّكه
   useLayoutEffect(() => {
     const el = box.current;
-    if (!el) return;
-    // الارتفاع ينتقل من القديم إلى الجديد بدل أن يقفز ما تحته
-    const h = el.offsetHeight;
-    if (ready.current && lastH.current && h !== lastH.current && !reducedMotion()) {
-      el.animate([{ height: `${lastH.current}px` }, { height: `${h}px` }], { duration: D_SOFT, easing: SOFT });
-    }
-    lastH.current = h;
+    const pane = el?.querySelector<HTMLElement>(":scope > .slide-pane:not([data-out])");
+    if (!el || !pane) return;
+    const resize = (h: number) => {
+      const from = el.getAnimations().length ? el.getBoundingClientRect().height : lastH.current;
+      lastH.current = h;
+      if (!ready.current || !from || Math.abs(from - h) < 1 || reducedMotion()) return;
+      el.getAnimations().forEach((a) => a.cancel());
+      // أثناء النمو يُقصّ ما يتجاوز الحاوي، فلا يغطّي المحتوى الجديد ما تحته
+      el.style.overflow = "clip";
+      el.style.overflowClipMargin = "12px";
+      const a = el.animate([{ height: `${from}px` }, { height: `${h}px` }], { duration: D_SOFT, easing: EASE_OUT });
+      a.onfinish = a.oncancel = () => {
+        if (!el.getAnimations().length) el.style.overflow = "";
+      };
+    };
+
+    resize(pane.getBoundingClientRect().height);
+    const ro = new ResizeObserver(() => resize(pane.getBoundingClientRect().height));
+    ro.observe(pane);
+    return () => ro.disconnect();
   }, [cur.id]);
 
   useEffect(() => {
     ready.current = true;
-    const el = box.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => (lastH.current = el.offsetHeight));
-    ro.observe(el);
-    return () => ro.disconnect();
   }, []);
 
   const D = props.distance ?? 48;

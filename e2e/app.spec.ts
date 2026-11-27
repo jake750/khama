@@ -119,3 +119,38 @@ test("رابط يفشل: رسالة مفهومة وزر إعادة المحاو�
   // التفاصيل التقنية مطويّة تحت الرسالة
   await expect(page.getByText("Technical details")).toBeVisible();
 });
+
+test("تغيّر ارتفاع لوح المحوّل ينساب ولا يقفز (مجموعات الصيغ)", async ({ page }) => {
+  await open(page);
+  await tab(page, "Convert").click();
+  await page.getByRole("button", { name: "Choose files" }).click();
+  await expect(page.getByText("clip-phone.mp4").first()).toBeVisible();
+  const box = page.locator(".slide-switch").first();
+  // كل تحريك لارتفاع الحاوي يُسجَّل: من، إلى
+  await box.evaluate((el) => {
+    const w = window as unknown as { heights: string[] };
+    w.heights = [];
+    const orig = el.animate.bind(el);
+    el.animate = (k, o) => {
+      const f = k as Keyframe[];
+      if (f[0]?.height) w.heights.push(`${f[0].height}→${f[1].height}`);
+      return orig(k, o);
+    };
+  });
+  for (const g of ["Audio", "For publishing", "For editing"]) {
+    const before = await box.evaluate((el) => el.getBoundingClientRect().height);
+    await page
+      .locator(".cat-pane")
+      .getByRole("radio", { name: g, exact: true })
+      .or(page.locator(".cat-pane").getByRole("button", { name: g, exact: true }))
+      .first()
+      .click();
+    await expect.poll(() => box.evaluate((el) => el.getAnimations().length === 0)).toBe(true);
+    const after = await box.evaluate((el) => el.getBoundingClientRect().height);
+    const log: string[] = await page.evaluate(() => (window as unknown as { heights: string[] }).heights);
+    expect(before).not.toBe(after);
+    // آخر تحريك ينتهي عند الارتفاع الجديد (بفارق كسور البكسل): الارتفاع انساب ولم يقفز
+    const px = (v: string) => parseFloat(v);
+    expect(Math.abs(px(log.at(-1)!.split("→")[1]) - after)).toBeLessThan(2);
+  }
+});
