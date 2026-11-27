@@ -4585,6 +4585,11 @@ kbd {
 }
 .preset-desc {
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 /* سهم «أرني» من أيقونة الشيفرون، يشير إلى جهة القراءة */
 .guide-go-arrow {

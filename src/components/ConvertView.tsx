@@ -231,6 +231,13 @@ function BeforeAfter(props: { path: string; presetId: string; options: ConvertOp
   );
 }
 
+/** وصف البطاقة: أول جملة بلا تفاصيل بين قوسين (اسم النموذج وحجمه) */
+function cardDesc(text: string): string {
+  return splitHint(text)[0]
+    .replace(/\s*\([^()]*\)/g, "")
+    .trim();
+}
+
 /** التدوير والقلب بأيقونات مرسومة بدل أسهم نصية (D-54) */
 function RotatePick(props: { value: ConvertOptions["rotate"] | null; onChange: (v: ConvertOptions["rotate"] | null) => void }) {
   const { t } = useI18n();
@@ -699,8 +706,10 @@ export function ConvertView(props: {
           <b>{p.name[lang]}</b>
           {tag && <span className={`preset-tag ${tag}`}>{tag === "fast" ? t.tagFast : t.tagHeavy}</span>}
         </span>
-        {/* أول جملة فقط، والوصف كامل حين تُختار البطاقة: لا تصبح كل بطاقة فقرة */}
-        <span className="preset-desc">{on ? p.desc[lang] : splitHint(p.desc[lang])[0]}</span>
+        {/* أول جملة بلا ما بين القوسين، في سطرين على الأكثر، والوصف كامل عند المرور: لا تصبح كل بطاقة فقرة */}
+        <span className="preset-desc" title={p.desc[lang]}>
+          {cardDesc(p.desc[lang])}
+        </span>
         {p.id === suggestion && (
           <span className="preset-suggested">
             <Icon name="check" size={16} /> {t.suggestedFor}
