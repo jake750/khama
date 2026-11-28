@@ -18,7 +18,7 @@ const D = require("docx");
 const {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell,
   WidthType, ShadingType, BorderStyle, PageBreak, Footer, Header, PageNumber, TableOfContents,
-  LevelFormat, ExternalHyperlink, TabStopType,
+  LevelFormat, ExternalHyperlink, TabStopType, NumberFormat, StyleLevel,
 } = D;
 
 const argv = process.argv.slice(2);
@@ -41,6 +41,10 @@ const REF = opt("ref") || (SUBMIT ? CFG.defenseTag || "v1.0-defense" : "main");
 const REPO_ROOT = path.resolve(dir, "../..");
 const SKIP = /^(README|defense|PROCESS)/i; // notes that are not part of the submitted report
 const FILES = CFG.files || fs.readdirSync(dir).filter((f) => f.endsWith(".md") && !SKIP.test(f)).sort();
+// Front matter (numbered with Arabic abjad letters; chapter 1 starts at page 1): report.json "front", where "toc"
+// marks the place of the contents and the lists of figures and tables.
+const FRONT = CFG.front || ["toc"];
+const ALL = [...FRONT.filter((f) => f !== "toc"), ...FILES];
 const TITLE = CFG.title || "[يكتبه الطالب] عنوان المشروع";
 const SUBTITLE = CFG.subtitle || "";
 const HEADER = CFG.header || `${TITLE} · تقرير مشروع التخرج`;
@@ -95,7 +99,7 @@ function linkTarget(href) {
   if (!href || href.startsWith("#")) return null;
   const [p, hash] = href.split("#");
   const abs = path.resolve(dir, decodeURI(p));
-  if (path.dirname(abs) === path.resolve(dir) && FILES.includes(path.basename(abs))) return null;
+  if (path.dirname(abs) === path.resolve(dir) && ALL.includes(path.basename(abs))) return null;
   const rel = path.relative(REPO_ROOT, abs).split(path.sep).join("/");
   if (!rel || rel.startsWith("..")) return null;
   const isDir = p.endsWith("/") || (fs.existsSync(abs) && fs.statSync(abs).isDirectory());
@@ -160,7 +164,28 @@ function blocks(tokens, ctx) {
         // figure (the figure paragraph keeps with it), so it does not keep with what follows
         const caption = /^\*\*(الجدول|الشكل|المقتطف)/.exec(t.raw);
         const ltr = isLtr(t.raw);
-        out.push(para(inline(t.tokens), caption ? { extra: { keepNext: caption[1] !== "الشكل" }, align: AlignmentType.CENTER } : { ltr, align: ltr ? AlignmentType.BOTH : undefined }));
+        if (caption && t.tokens[0].type === "strong") {
+          // The bold title is the caption proper, in a caption style that the lists of figures and tables collect;
+          // what follows it (source file, notes) goes on a smaller line under it, so it stays out of the lists.
+          const keepNext = caption[1] !== "الشكل";
+          const style = { الجدول: "TableCaption", الشكل: "FigureCaption" }[caption[1]];
+          const rest = t.tokens.slice(1);
+          const hasRest = plain(rest).trim().length > 0;
+          out.push(new Paragraph({
+            style, bidirectional: true, alignment: AlignmentType.CENTER, keepNext: keepNext || hasRest,
+            spacing: { after: hasRest ? 0 : 120, line: 312 },
+            children: inline(t.tokens[0].tokens, { bold: true }),
+          }));
+          if (hasRest) {
+            if (rest[0].type === "text") rest[0] = { ...rest[0], text: rest[0].text.replace(/^\s+/, ""), tokens: undefined };
+            out.push(new Paragraph({
+              bidirectional: true, alignment: AlignmentType.CENTER, keepNext, spacing: { after: 120, line: 276 },
+              children: inline(rest, { size: 20, color: "555555" }),
+            }));
+          }
+          break;
+        }
+        out.push(para(inline(t.tokens), { ltr, align: ltr ? AlignmentType.BOTH : undefined }));
         break;
       }
       case "list": out.push(...list(t, 0)); break;
@@ -360,14 +385,30 @@ const cover = [
   center(`إشراف: ${field("supervisor")}`, 26, { after: 1400 }),
   center(`السنة الجامعية ${field("year")}`, 24),
   new Paragraph({ children: [new PageBreak()] }),
-  new Paragraph({ heading: HeadingLevel.HEADING_1, bidirectional: true, children: [run("الإهداء", { rtl: true })] }),
+  frontTitle("الإهداء", false),
   para(textRuns(field("dedication"), {})),
-  new Paragraph({ heading: HeadingLevel.HEADING_1, bidirectional: true, pageBreakBefore: true, children: [run("شكر وتقدير", { rtl: true })] }),
+  frontTitle("شكر وتقدير"),
   para(textRuns(field("thanks"), {})),
-  new Paragraph({ heading: HeadingLevel.HEADING_1, bidirectional: true, pageBreakBefore: true, children: [run("فهرس المحتويات", { rtl: true })] }),
+];
+
+// A title of the front matter that looks like a chapter title but stays out of the table of contents.
+function frontTitle(text, newPage = true) {
+  return new Paragraph({
+    bidirectional: true, alignment: AlignmentType.START, pageBreakBefore: newPage, keepNext: true,
+    spacing: { after: 280 }, children: [run(text, { size: 36, bold: true, color: ACCENT, rtl: true })],
+  });
+}
+
+// Contents, then the lists of figures and of tables: Word fields filled when export-pdf.ps1 updates them.
+// The lists collect the paragraphs in the caption styles (the bold caption only, see blocks()).
+const contents = [
+  frontTitle("فهرس المحتويات"),
   new TableOfContents("فهرس المحتويات", { hyperlink: true, headingStyleRange: "1-3" }),
   para(textRuns("(إن لم يظهر الفهرس: انقر عليه بالزر الأيمن ← تحديث الحقل ← تحديث الجدول بأكمله)", { size: 18, color: "777777" })),
-  new Paragraph({ children: [new PageBreak()] }),
+  frontTitle("قائمة الأشكال"),
+  new TableOfContents("قائمة الأشكال", { hyperlink: true, stylesWithLevels: [new StyleLevel("FigureCaption", 1)] }),
+  frontTitle("قائمة الجداول"),
+  new TableOfContents("قائمة الجداول", { hyperlink: true, stylesWithLevels: [new StyleLevel("TableCaption", 1)] }),
 ];
 
 // ---------- checks before converting ----------
@@ -397,7 +438,7 @@ function checkTables(file, md) {
   return bad;
 }
 const problems = [];
-for (const f of FILES) problems.push(...checkTables(f, fs.readFileSync(path.join(dir, f), "utf8")));
+for (const f of ALL) problems.push(...checkTables(f, fs.readFileSync(path.join(dir, f), "utf8")));
 if (problems.length) {
   console.error("Tables with a wrong number of cells:\n  " + problems.join("\n  "));
   process.exit(1);
@@ -428,7 +469,7 @@ function stripCodes(md) {
 
 // ---------- body ----------
 const left = [];
-const sources = FILES.map((f) => {
+const read = (f) => {
   let md = fs.readFileSync(path.join(dir, f), "utf8");
   if (!KEEP_CODES) {
     md = stripCodes(md);
@@ -437,7 +478,8 @@ const sources = FILES.map((f) => {
   }
   md.split("\n").forEach((l, i) => { if (l.includes(STUDENT)) left.push(`${f}:${i + 1}`); });
   return md;
-});
+};
+const sources = new Map(ALL.map((f) => [f, read(f)]));
 const coverLeft = ["degree", "student", "supervisor", "year", "dedication", "thanks", "university"].filter((k) => !CFG[k]);
 if (SUBMIT && (left.length || coverLeft.length)) {
   console.error(`--submit: ${left.length} "[${STUDENT}]" placeholder(s) are left:\n  ${left.join("\n  ")}`);
@@ -445,9 +487,16 @@ if (SUBMIT && (left.length || coverLeft.length)) {
   process.exit(1);
 }
 console.log(`${SUBMIT ? "submitted copy" : "draft"}: links to ${REPO} at ${REF}; ${left.length} placeholder line(s) left`);
+const front = [...cover];
+const fctx = { first: false };
+for (const f of FRONT) front.push(...(f === "toc" ? contents : blocks(marked.lexer(sources.get(f)), fctx)));
 const body = [];
-const ctx = { first: true };
-for (const md of sources) body.push(...blocks(marked.lexer(md), ctx));
+const ctx = { first: true }; // the body is a new section, which starts on a new page by itself
+for (const f of FILES) body.push(...blocks(marked.lexer(sources.get(f)), ctx));
+
+// Document properties (the PDF takes them from Word): keywords from the abstract
+const abstractMd = [...sources.values()].find((md) => /\*\*Keywords\*\*/.test(md)) || "";
+const KEYWORDS = (/\*\*Keywords\*\*:\s*(.+)/.exec(abstractMd) || [])[1]?.replace(/\.$/, "") || "";
 
 const heading = (size, before, after, color = ACCENT) => ({
   run: { font: FONT, size, bold: true, color },
@@ -455,7 +504,12 @@ const heading = (size, before, after, color = ACCENT) => ({
 });
 
 const doc = new Document({
-  creator: "report", title: `${TITLE}: تقرير مشروع التخرج`,
+  title: `${TITLE}: تقرير مشروع التخرج`,
+  subject: SUBTITLE,
+  creator: CFG.student || "",
+  lastModifiedBy: CFG.student || "",
+  keywords: KEYWORDS,
+  description: CFG.year ? `السنة الجامعية ${CFG.year}` : "",
   features: { updateFields: true },
   styles: {
     default: {
@@ -465,7 +519,11 @@ const doc = new Document({
       heading3: heading(26, 240, 120, "2F5A86"),
       heading4: heading(24, 200, 100, "2F5A86"),
     },
-    paragraphStyles: [1, 2, 3].map((l) => ({ id: `TOC${l}`, name: `toc ${l}`, basedOn: "Normal", run: { font: FONT, size: l === 1 ? 24 : 22, bold: l === 1, rightToLeft: true }, paragraph: { bidirectional: true, indent: { right: (l - 1) * 360 }, spacing: { after: 60 } } })),
+    paragraphStyles: [
+      ...[1, 2, 3].map((l) => ({ id: `TOC${l}`, name: `toc ${l}`, basedOn: "Normal", run: { font: FONT, size: l === 1 ? 24 : 22, bold: l === 1, rightToLeft: true }, paragraph: { bidirectional: true, indent: { right: (l - 1) * 360 }, spacing: { after: 60 } } })),
+      // caption styles collected by the lists of figures and tables (TOC \t "FigureCaption,1")
+      ...["FigureCaption", "TableCaption"].map((id) => ({ id, name: id, basedOn: "Normal", next: "Normal", run: { font: FONT, size: BODY, bold: true, rightToLeft: true }, paragraph: { bidirectional: true, alignment: AlignmentType.CENTER } })),
+    ],
   },
   numbering: {
     config: [
@@ -473,20 +531,24 @@ const doc = new Document({
       { reference: "num", levels: [0, 1, 2].map((level) => ({ level, format: [LevelFormat.DECIMAL, LevelFormat.LOWER_LETTER, LevelFormat.LOWER_ROMAN][level], text: `%${level + 1}.`, alignment: AlignmentType.START, style: { paragraph: { indent: { right: 540 + level * 360, hanging: 360 } } } })) },
     ],
   },
+  // Two sections: the front matter numbered أ، ب، ج… (the cover counts as أ and shows no number), and the
+  // chapters numbered 1, 2, 3… from the first page of chapter 1.
   sections: [
-    {
-      properties: { page: { size: { width: PAGE_W, height: 16838 }, margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN } }, titlePage: true, rightToLeft: true },
-      headers: {
-        default: new Header({ children: [new Paragraph({ bidirectional: true, alignment: AlignmentType.START, border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "B7C3D0", space: 4 } }, children: [run(HEADER, { size: 18, color: "6B7785", rtl: true })] })] }),
-        first: new Header({ children: [new Paragraph({ children: [] })] }),
-      },
-      footers: {
-        default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ children: [PageNumber.CURRENT], font: FONT, size: 20 })] })] }),
-        first: new Footer({ children: [new Paragraph({ children: [] })] }),
-      },
-      children: [...cover, ...body],
-    },
+    { ...section(NumberFormat.ARABIC_ABJAD, true), children: front },
+    { ...section(NumberFormat.DECIMAL, false), children: body },
   ],
 });
+
+function section(format, titlePage) {
+  const page = { size: { width: PAGE_W, height: 16838 }, margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, pageNumbers: { start: 1, formatType: format } };
+  const header = new Header({ children: [new Paragraph({ bidirectional: true, alignment: AlignmentType.START, border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "B7C3D0", space: 4 } }, children: [run(HEADER, { size: 18, color: "6B7785", rtl: true })] })] });
+  const footer = new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ children: [PageNumber.CURRENT], font: FONT, size: 20 })] })] });
+  const empty = () => new Header({ children: [new Paragraph({ children: [] })] });
+  return {
+    properties: { page, titlePage, rightToLeft: true },
+    headers: titlePage ? { default: header, first: empty() } : { default: header },
+    footers: titlePage ? { default: footer, first: new Footer({ children: [new Paragraph({ children: [] })] }) } : { default: footer },
+  };
+}
 
 Packer.toBuffer(doc).then((b) => { fs.writeFileSync(out, b); console.log("wrote", out, b.length); });
