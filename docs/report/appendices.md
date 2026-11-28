@@ -75,7 +75,7 @@
 | 12 | SoundCloud | https://soundcloud.com/this-user-does-not-exist-khama/none | `unavailable` | ✓ |
 | 13–50 | **[يكتبه الطالب]** | منشور عام من إنستغرام وتيك توك وX وفيسبوك وGoogle Drive؛ قائمة تشغيل؛ بث مباشر قادم (`live`)؛ فيديو مقيّد بالعمر (`ageRestricted`)؛ فيديو خاص (`privateVideo`)؛ فيديو محجوب جغرافيًا (`geoBlocked`)؛ مقطع قصير جدًا (أقل من 5 ث) وطويل جدًا (أكثر من ساعتين)؛ 4K؛ 60 fps؛ صوت فقط | حسب الحالة | |
 
-**قابلية التكرار** (A-51): كل الأدوات بنسخ مثبّتة. yt-dlp 2026.10.26 وDeno v2.9.8 وبناء FFmpeg بتاريخ 2026-11-14 في [scripts/binaries.lock.json](../../scripts/binaries.lock.json) مع بصماتها، ونسخ المكتبات في `Cargo.lock` و`package-lock.json`. تُعاد كل تجربة في الفصل 6 بأوامر مذكورة بجانبها، بنفس النسخ، من الوسم `v1.0-defense` ([defense.md](defense.md)). لكن نتيجة التنزيل نفسها تتغيّر مع الوقت لأن المواقع تتغيّر، كما يُظهر السطر 2.
+**قابلية التكرار** (A-51): كل الأدوات بنسخ مثبّتة. yt-dlp 2026.10.26 وDeno v2.9.8 وبناء FFmpeg بتاريخ 2026-10-31 في [scripts/binaries.lock.json](../../scripts/binaries.lock.json) مع بصماتها، ونسخ المكتبات في `Cargo.lock` و`package-lock.json`. تُعاد كل تجربة في الفصل 6 بأوامر الملحق ط، بنفس النسخ، من الوسم `v1.0-defense` ([defense.md](defense.md)). لكن نتيجة التنزيل نفسها تتغيّر مع الوقت لأن المواقع تتغيّر، كما يُظهر السطر 2.
 
 
 ### نتائج تحويل الصيغ لكل مقطع
@@ -84,7 +84,6 @@
 
 | المقطع | الصيغة | الجودة | التقدير MB | الفعلي MB | الخطأ % | SSIM | الزمن ث |
 |---|---|---|---|---|---|---|---|
-| stdout | src/estimate.eval.test.ts > estimateSize على ملفات حقيقية (A-30) > يطبع الجدول |
 | broll-1080p.mp4 | edit_h264 | high | 13.9 | 10.5 | 32 | 0.991 | 10.91 ± 2.84 |
 | broll-1080p.mp4 | edit_h264 | balanced | 9.6 | 7.8 | 23 | 0.990 | 15.37 ± 1.06 |
 | broll-1080p.mp4 | edit_h264 | small | 5.4 | 4.2 | 27 | 0.986 | 13.22 ± 1.25 |
@@ -207,6 +206,74 @@
 
 داخل التطبيق دليل وجولة تعريفية (الإعدادات ← حول ← الدليل)، وهي مصدر جيد للقطات.
 
+اللقطات الموجودة في المستودع (`docs/screenshots/`، بيانات تجريبية، 2026-11-19) تغطي الشاشات دون ترقيم الخطوات، فهي نقطة البداية:
+
+![](../screenshots/download-empty-ar-dark.png)
+
+**الشكل ز.1: شاشة التنزيل فارغة.** حقل الرابط هو البطل، وتحته المواقع المدعومة.
+
+![](../screenshots/history-ar-dark.png)
+
+**الشكل ز.2: السجلّ.** كل عملية ناجحة مع «أظهر في المجلد» و«نزّله مرة أخرى»، وتصفية بالنوع والتاريخ، والملف المنقول أو المحذوف باهت مع تنبيه.
+
+![](../screenshots/settings-ar-dark.png)
+
+**الشكل ز.3: الإعدادات.**
+
+![](../screenshots/compact-ready-ar-dark.png)
+
+**الشكل ز.4: الوضع المصغّر** بعد لصق رابط.
+
 ## الملحق ح: دليل المطوّر (A-65)
 
 [docs/DEVELOPMENT.md](../DEVELOPMENT.md) (الإعداد، والبيانات التجريبية، والتصحيح، والسكربتات)، و[docs/TESTING.md](../TESTING.md) (الاختبار)، و[docs/RELEASING.md](../RELEASING.md) (الإصدار)، و[CONTRIBUTING.md](../../CONTRIBUTING.md).
+
+## الملحق ط: إعادة الإنتاج (A-45)
+
+كل رقم في الفصل 6 يعود إلى ملف في المستودع: سكربت يعيد القياس، أو ملف CSV في `bench/results/` تُرسم منه الأشكال وتُحسب منه الإحصاءات، ولا يُكتب رقم في الجداول إلا منهما. الجدول ط.1 يربط كل نتيجة بسكربتها وأمرها وملفها، وتعمل أوامر Python من مجلد `bench/` بعد إعداده مرة واحدة كما في [bench/README.md](../../bench/README.md).
+
+**الجدول ط.1: من النتيجة إلى السكربت والأمر والملف**
+
+| النتيجة | السكربت | الأمر | الملف الناتج |
+|---|---|---|---|
+| الجدول 6.1 (KLM) | `bench/stats/klm.py` | `python stats/klm.py` | `stats_klm.csv` |
+| الجدول 6.2 (الاختبارات) | اختبارات Rust وVitest | `cargo test -q --manifest-path src-tauri/Cargo.toml` و`npx vitest run` | سجلّ CI لكل إصدار |
+| الجدولان 6.5 و6.6 (الصيغ وتقدير الحجم بالمعادلة) | `presets_eval` في Rust، و`src/estimate.eval.test.ts` | الأمران 1 و2 أدناه | `eval.jsonl` محليًا، ومنه `estimate_formula.csv` (جدول الملحق د لكل مقطع) |
+| الجدول 6.6 (التقدير بثلاث شرائح) | `sampled_estimate_eval` في Rust | الأمر 3 أدناه | `eval.jsonl` |
+| الفترات واختبارات الدلالة في §6.6 و§6.14 | `bench/stats/report_stats.py` | `python stats/report_stats.py` | `stats_estimate.csv`، `stats_scenes.csv`، `stats_bdrate.csv`، `stats_separation.csv` |
+| الجدول 6.7 (أحجام المثبّتات) | صفحة الإصدار | `gh release view v0.3.46 --json assets` | — |
+| الجدول 6.12 (مقاييس الصيانة) والجدولان 5.1 و5.3 | `scripts/code-metrics.mjs`، `bench/stats/repo_counts.mjs` | `node scripts/code-metrics.mjs` و`node bench/stats/repo_counts.mjs 0.3.46` | على الشاشة |
+| الجدولان 6.13 و6.14، والشكلان 6.1 و6.2 (الكاشف) | `scenes/make_dataset.py`، `scenes/evaluate.py`، `scenes/film_strip.py` | `python scenes/make_dataset.py --videos 24 --seed 7` ثم `python scenes/evaluate.py` | `scenes_test.csv`، `scenes_ablation.csv`، `scenes_films.csv`، `scenes_speed.csv`، `scenes_grid_dev.csv`، `scenes_ffmpeg_dev.csv`، `scenes_pr.png`، `scenes_film_strip.png` |
+| الجدول 6.15 والشكلان 6.3 و6.4 (الترميز والمعايرة) | `codecs/run_bench.py`، `codecs/analyze.py` | `python codecs/run_bench.py` ثم `python codecs/analyze.py` (ساعات) | `codecs_raw.csv`، `codecs_hw.csv`، `codecs_bdrate.csv`، `codecs_calibration.csv`، `codecs_calibration_check.csv`، `codecs_summary.csv`، `codecs_rd_vmaf.png`، `codecs_calibration.png` |
+| الجدول 6.16 (المعايرة خارج العيّنة) | `bench/stats/calibration_loco.py` | `python stats/calibration_loco.py` | `stats_calibration_loco.csv` |
+| الجدول 6.17 والشكل 6.5 (الفصل) | `separation/evaluate.py` (يشغّل `khama-bench separate`) | `python separation/evaluate.py` | `separation.csv`، `separation_tracks.csv`، `separation.png` |
+| §6.15 (المحور D) | `khama-bench topics` و`khama-bench silence` | `khama-bench topics <فيديو> <ترجمة>`، `khama-bench silence <ملف>` | JSON على الشاشة؛ الملفات الحقيقية لا تُنشر (الجدول 7.2)، فالنتائج غير محفوظة |
+
+أوامر §6.6، من جذر المستودع. الأول يحوّل كل مقطع في المجلد بالصيغ الاثنتي عشرة ثلاث مرات ويكتب سطرًا لكل تحويل، والثاني يضيف تقدير الواجهة، والثالث يقيس التقدير بثلاث شرائح:
+
+```bash
+KHAMA_EVAL_DIR=<مجلد المقاطع> KHAMA_EVAL_OUT=eval.jsonl KHAMA_REPEAT=3 cargo test --release --manifest-path src-tauri/Cargo.toml presets_eval -- --ignored --nocapture
+```
+
+```bash
+KHAMA_EVAL_OUT=eval.jsonl npx vitest run src/estimate.eval.test.ts --silent=false
+```
+
+```bash
+KHAMA_EVAL_DIR=<مجلد المقاطع> KHAMA_EVAL_OUT=eval.jsonl cargo test --release --manifest-path src-tauri/Cargo.toml sampled_estimate_eval -- --ignored --nocapture
+```
+
+**الجدول ط.2: النسخ المستعملة في القياس**
+
+| المكوّن | النسخة | المصدر |
+|---|---|---|
+| الجهاز | Intel Core i5-1135G7، ‏16 GB، Iris Xe (Quick Sync)، GeForce MX350 (بلا NVENC)، Windows 11 | `bench/README.md` |
+| FFmpeg (مع libvmaf) | البناء المضمّن في التطبيق: ‏BtbN وyt-dlp FFmpeg-Builds بتاريخ 2026-10-31 | `scripts/binaries.lock.json` |
+| yt-dlp وDeno | 2026.10.26 وv2.9.8 | `scripts/binaries.lock.json` |
+| ONNX Runtime | 1.22.0 | `src-tauri/src/separate.rs` |
+| whisper.cpp | b5907 | `src-tauri/src/convert/topics.rs` |
+| حزم Python | numpy 2.5.4، scipy 1.18.1، pandas 3.1.1، matplotlib 3.11.2، musdb 0.4.3، museval 0.4.1 | `bench/requirements.txt` |
+| خامة | 0.3.46، وكود الكاشف والمعايرة والفصل كما في الوسم | `git tag` |
+
+**الأرشفة**: **[يكتبه الطالب]** رفع `bench/results/` وسكربتات `bench/` في نسخة المناقشة إلى Zenodo، وكتابة معرّف DOI هنا وفي المراجع، حتى تبقى البيانات متاحة إن تغيّر المستودع.
+

@@ -1,0 +1,13 @@
+preset,quality,clips,mean_abs_error,ci_lo,ci_hi,median_abs_error
+edit_h264,high,8,135.4,53.38,264.5,75
+edit_h264,balanced,8,98.5,34.38,199.2,47
+edit_h264,small,8,64.5,20.5,132.5,37.5
+youtube,balanced,8,129.5,50.75,250,69.5
+whatsapp,balanced,8,34.25,14.25,60.26,27
+h265,balanced,8,143.9,61.12,256,84
+av1,balanced,8,84.62,40.5,136.5,59
+webm,balanced,8,95.12,46,152.1,53
+prores_proxy,balanced,8,27.12,9.25,51.12,10
+prores_422,balanced,8,29,7.625,62.38,7
+dnxhr_sq,balanced,8,7.25,0,21.25,0
+proxy,balanced,7,34.29,22,47.86,37

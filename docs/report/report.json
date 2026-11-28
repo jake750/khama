@@ -4,7 +4,6 @@
   "header": "خامة · تقرير مشروع التخرج",
   "year": "2026–2027",
   "files": [
-    "00-abstract.md",
     "01-introduction.md",
     "02-related-work.md",
     "03-requirements.md",
@@ -16,5 +15,6 @@
     "glossary.md",
     "references.md",
     "appendices.md"
-  ]
+  ],
+  "front": ["00-abstract.md", "toc", "abbreviations.md"]
 }

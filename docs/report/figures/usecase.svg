@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="800" viewBox="0 0 1000 800" font-family="Arial, sans-serif">
+  <!-- UML use-case diagram of Khama (figure 3.1). Source of figures/usecase.png:
+       chrome --headless=new --hide-scrollbars --force-device-scale-factor=2 --window-size=1000,800
+              --screenshot=figures/usecase.png figures/usecase.svg -->
+  <defs>
+    <marker id="open" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="12" orient="auto-start-reverse">
+      <path d="M1,1 L11,6 L1,11" fill="none" stroke="#1F3A5F" stroke-width="1.6"/>
+    </marker>
+    <symbol id="actor" viewBox="-30 -50 60 100" overflow="visible">
+      <circle cx="0" cy="-36" r="12" fill="#fff" stroke="#1F3A5F" stroke-width="2.4"/>
+      <line x1="0" y1="-24" x2="0" y2="10" stroke="#1F3A5F" stroke-width="2.4"/>
+      <line x1="-22" y1="-12" x2="22" y2="-12" stroke="#1F3A5F" stroke-width="2.4"/>
+      <line x1="0" y1="10" x2="-18" y2="40" stroke="#1F3A5F" stroke-width="2.4"/>
+      <line x1="0" y1="10" x2="18" y2="40" stroke="#1F3A5F" stroke-width="2.4"/>
+    </symbol>
+  </defs>
+  <rect width="1000" height="800" fill="#fff"/>
+
+  <!-- system boundary -->
+  <rect x="200" y="22" width="630" height="742" rx="6" fill="#FAFBFD" stroke="#1F3A5F" stroke-width="2"/>
+  <text x="515" y="52" text-anchor="middle" font-size="21" font-weight="bold" fill="#1F3A5F" direction="rtl">خامة</text>
+
+  <!-- associations: editor (right) -->
+  <g stroke="#1F3A5F" stroke-width="1.6">
+    <line x1="881" y1="378" x2="805" y2="122"/>
+    <line x1="881" y1="378" x2="805" y2="207"/>
+    <line x1="881" y1="378" x2="805" y2="300"/>
+    <line x1="881" y1="378" x2="805" y2="385"/>
+    <line x1="881" y1="378" x2="805" y2="470"/>
+    <line x1="881" y1="378" x2="805" y2="555"/>
+    <line x1="881" y1="378" x2="805" y2="640"/>
+    <line x1="881" y1="378" x2="805" y2="720"/>
+  </g>
+  <!-- associations: secondary actors (left) -->
+  <g stroke="#1F3A5F" stroke-width="1.6">
+    <line x1="136" y1="156" x2="555" y2="122"/>
+    <line x1="136" y1="156" x2="555" y2="207"/>
+    <line x1="136" y1="508" x2="235" y2="236"/>
+    <line x1="136" y1="508" x2="235" y2="590"/>
+    <line x1="136" y1="700" x2="555" y2="720"/>
+  </g>
+
+  <!-- include / extend -->
+  <g stroke="#1F3A5F" stroke-width="1.5" stroke-dasharray="6 4" fill="none" marker-end="url(#open)">
+    <line x1="485" y1="100" x2="557" y2="116"/>
+    <line x1="480" y1="218" x2="560" y2="132"/>
+    <line x1="482" y1="246" x2="560" y2="290"/>
+    <line x1="485" y1="335" x2="557" y2="310"/>
+    <line x1="680" y1="357" x2="680" y2="330"/>
+    <line x1="557" y1="562" x2="485" y2="582"/>
+  </g>
+  <g font-size="14" fill="#1F3A5F" text-anchor="middle">
+    <text x="521" y="96">«extend»</text>
+    <text x="498" y="152">«extend»</text>
+    <text x="538" y="262">«extend»</text>
+    <text x="515" y="352">«extend»</text>
+    <text x="737" y="349">«include»</text>
+    <text x="521" y="560">«include»</text>
+  </g>
+
+  <!-- use cases: right column, used directly by the editor -->
+  <g stroke="#1F3A5F" stroke-width="2" font-size="18" text-anchor="middle" direction="rtl">
+    <ellipse cx="680" cy="122" rx="125" ry="29" fill="#fff"/>
+    <ellipse cx="680" cy="207" rx="125" ry="29" fill="#fff"/>
+    <ellipse cx="680" cy="300" rx="125" ry="29" fill="#fff"/>
+    <ellipse cx="680" cy="385" rx="125" ry="29" fill="#fff"/>
+    <ellipse cx="680" cy="470" rx="125" ry="29" fill="#DCE8F5"/>
+    <ellipse cx="680" cy="555" rx="125" ry="29" fill="#fff"/>
+    <ellipse cx="680" cy="640" rx="125" ry="29" fill="#fff"/>
+    <ellipse cx="680" cy="720" rx="125" ry="29" fill="#fff"/>
+    <!-- use cases: left column, extensions and included parts -->
+    <ellipse cx="360" cy="98" rx="125" ry="29" fill="#fff"/>
+    <ellipse cx="360" cy="232" rx="125" ry="29" fill="#DCE8F5"/>
+    <ellipse cx="360" cy="335" rx="125" ry="29" fill="#DCE8F5"/>
+    <ellipse cx="360" cy="590" rx="125" ry="29" fill="#DCE8F5"/>
+  </g>
+  <g font-size="18" fill="#111" text-anchor="middle" direction="rtl">
+    <text x="680" y="128">تنزيل رابط</text>
+    <text x="680" y="213">تنزيل قائمة أو دفعة</text>
+    <text x="680" y="306">تحويل ملف محلي</text>
+    <text x="680" y="391">مراقبة مجلد</text>
+    <text x="680" y="476">كشف اللقطات والصمت</text>
+    <text x="680" y="552" font-size="17">محاضرة إلى مقاطع</text>
+    <text x="680" y="572" font-size="17">قصيرة مترجمة</text>
+    <text x="680" y="646">تصفّح السجلّ</text>
+    <text x="680" y="726">تحديث yt-dlp والتطبيق</text>
+    <text x="360" y="104">تنزيل جزء أو عدة مقاطع</text>
+    <text x="360" y="238">فصل الصوت أو تنظيفه</text>
+    <text x="360" y="332" font-size="17">ترميز بالعتاد</text>
+    <text x="360" y="352" font-size="17">بجودة معايرة</text>
+    <text x="360" y="587" font-size="17">تفريغ الكلام</text>
+    <text x="360" y="607" font-size="17">وتوقيت الكلمات</text>
+  </g>
+
+  <!-- actors -->
+  <use href="#actor" x="875" y="340" width="60" height="100"/>
+  <text x="905" y="322" text-anchor="middle" font-size="18" font-weight="bold" fill="#111" direction="rtl">الممنتج</text>
+
+  <use href="#actor" x="82" y="118" width="60" height="100"/>
+  <text x="112" y="238" text-anchor="middle" font-size="16" fill="#111" direction="rtl">مواقع الفيديو</text>
+  <text x="112" y="258" text-anchor="middle" font-size="14" fill="#555" direction="rtl">(عبر yt-dlp)</text>
+
+  <use href="#actor" x="82" y="470" width="60" height="100"/>
+  <text x="112" y="602" text-anchor="middle" font-size="16" fill="#111" direction="rtl">مستودعات النماذج</text>
+  <text x="112" y="622" text-anchor="middle" font-size="14" fill="#555">GitHub · Hugging Face</text>
+
+  <use href="#actor" x="82" y="662" width="60" height="100"/>
+  <text x="112" y="782" text-anchor="middle" font-size="16" fill="#111">GitHub</text>
+
+  <!-- legend -->
+  <rect x="812" y="776" width="18" height="14" fill="#DCE8F5" stroke="#1F3A5F" stroke-width="1.5"/>
+  <text x="804" y="788" text-anchor="start" font-size="14" fill="#333" direction="rtl">حالة فيها خوارزمية من المحاور البحثية (القسمان 6.14 و6.15)</text>
+</svg>

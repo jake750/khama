@@ -1,0 +1,4 @@
+path,steps,K,P,H,M,seconds_k028,seconds_k020,seconds_without_m
+A. Khama,7,24,4,4,8,23.5,21.6,12.7
+B. yt-dlp + FFmpeg,5,174,1,1,23,81.3,67.4,50.2
+C. website + HandBrake,12,68,13,8,19,62.2,56.8,36.5
