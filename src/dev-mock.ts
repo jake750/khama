@@ -355,6 +355,9 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return 1;
     case "new_job_id":
       return nextJob++;
+    // المتصفح لا يقرأ المجلدات: المسارات كما هي
+    case "expand_media_paths":
+      return (args.paths as string[] | undefined) ?? [];
     case "start_download":
     case "start_convert": {
       const id = typeof args.id === "number" ? args.id : nextJob++;
