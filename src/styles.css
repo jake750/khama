@@ -4665,3 +4665,15 @@ kbd {
     outline-offset: 2px;
   }
 }
+
+/* تايم لاين للمونتاج (R3-F10): الزر وما حُفظ بجانبه، يلتفّان على الشاشة الضيقة */
+.topic-export-actions,
+.sv-export {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+.sv-export {
+  margin-top: var(--s-2);
+}

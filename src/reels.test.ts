@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   exportCues,
+  fileStem,
   keptPieces,
+  keptSource,
   planTopic,
+  savedSummary,
+  scenePieces,
   silenceCuts,
   timeline,
   toSrt,
@@ -210,5 +214,51 @@ describe("trimToSilences", () => {
   it("never starts a word before the previous one ends", () => {
     const out = trimToSilences([w("a", 0, 1.3), w("b", 1.3, 2)], [[1.0, 1.2]]);
     expect(out[1].start).toBeGreaterThanOrEqual(out[0].end);
+  });
+});
+
+describe("timeline export (R3-F10)", () => {
+  it("sends the kept source pieces in timeline order, matching the subtitles", () => {
+    const sections: [number, number][] = [
+      [10, 20],
+      [40, 50],
+    ];
+    const cuts: [number, number][] = [
+      [12, 13],
+      [45, 46],
+    ];
+    expect(keptSource(sections, cuts)).toEqual([
+      [10, 12],
+      [13, 20],
+      [40, 45],
+      [46, 50],
+    ]);
+    // الترجمة على الناتج نفسه: سطر بعد القطع الأول يبدأ من 2 ث
+    const out = exportCues([cue(13, 14, "x")], sections, cuts);
+    expect(out[0].start).toBe(2);
+  });
+  it("names files from the original", () => {
+    expect(fileStem("C:\\a b\\درس.مع.نقاط.mp4")).toBe("درس.مع.نقاط");
+    expect(fileStem("/x/.hidden")).toBe(".hidden");
+    expect(fileStem("noext")).toBe("noext");
+    expect(savedSummary(["C:\\o\\a timeline.xml", "C:\\o\\a timeline.edl", "C:\\o\\a timeline.srt"])).toEqual([
+      "a timeline.xml",
+      "XML, EDL, SRT",
+    ]);
+  });
+  it("cuts the analysed range at every scene change", () => {
+    // قطع حاد عند 5، وانتقال من 9 إلى 11 يُقطع عند منتصفه، وما خارج المدى يُهمل
+    const changes: [number, number][] = [
+      [5, 5],
+      [9, 11],
+      [0.5, 0.5],
+      [30, 30],
+    ];
+    expect(scenePieces(changes, 1, 20)).toEqual([
+      [1, 5],
+      [5, 10],
+      [10, 20],
+    ]);
+    expect(scenePieces([], 0, 8)).toEqual([[0, 8]]);
   });
 });

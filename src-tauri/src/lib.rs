@@ -21,6 +21,8 @@ pub mod topics_bench {
 }
 mod settings;
 mod srt;
+#[cfg(desktop)]
+mod timeline;
 mod tools;
 
 use std::sync::Mutex;
@@ -172,7 +174,8 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         background::quit_app,
         background::set_compact,
         background::hide_main,
-        background::take_deep_link
+        background::take_deep_link,
+        timeline::export_timeline
     ]
 }
 

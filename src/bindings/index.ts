@@ -16,6 +16,8 @@ export type { SampleEstimate } from "./SampleEstimate";
 export type { Settings } from "./Settings";
 export type { SilenceLevels } from "./SilenceLevels";
 export type { SubLang } from "./SubLang";
+export type { TimelineCue } from "./TimelineCue";
+export type { TimelineRequest } from "./TimelineRequest";
 export type { ToolsInfo } from "./ToolsInfo";
 export type { Topic } from "./Topic";
 export type { VideoInfo } from "./VideoInfo";

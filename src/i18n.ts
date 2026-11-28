@@ -785,6 +785,12 @@ const en = {
   noLimit: "No limit",
   exportSelected: (n: number) => (n === 1 ? "Export 1 clip" : `Export ${n} clips`),
   exportHint: "Each clip gets an SRT file next to it, timed from the clip's start, with the silences taken out if you removed them.",
+  timelineExport: "Export a timeline",
+  timelineExportHint:
+    "Writes an XML (Premiere, DaVinci Resolve) and an EDL that point to the original file, one clip for each part kept, plus the subtitles as SRT on the same timeline. Nothing is converted, so it takes seconds and every cut stays editable.",
+  timelineSaved: (name: string, kinds: string) => `Saved ${name} · ${kinds}`,
+  sceneTimelineHint:
+    "Writes an XML (Premiere, DaVinci Resolve) and an EDL on the original file, cut at every scene change so each scene is its own clip. Nothing is converted.",
   silenceAuto: "Auto",
   silenceHint:
     "Auto measures each file's own background noise, so pauses are found in noisy rooms and quiet studios alike. Pick a level only if it misses pauses (raise it, e.g. −25 dB) or cuts quiet words (lower it). \"Keep at each edge\" leaves a little of every pause so words don't run into each other.",
@@ -848,6 +854,7 @@ const en = {
       "The AI model failed while processing this file. Try again; if it keeps failing, convert the file to WAV first, then run AI clean-up on that.",
     badInput: "This file couldn't be read. It may be damaged or not a media file.",
     noVideoStream: "This file has no video, so this option can't be used. Pick an audio option.",
+    timelineEmpty: "Nothing is left to put on the timeline: the parts are outside the file. Check the times and try again.",
     noAudioStream: "This file has no audio track. Pick a video-only option, or add sound with “Replace audio”.",
     fileCorrupt: "The file is damaged or incomplete (maybe it was still being copied). Copy it again, or try another copy.",
     hwEncoder: "The graphics card encoder failed. Turn off the graphics card option and try again.",
@@ -1654,6 +1661,12 @@ const ar: Dict = {
   noLimit: "بلا حد",
   exportSelected: (n) => (n === 1 ? "صدّر مقطعًا واحدًا" : n === 2 ? "صدّر مقطعين" : `صدّر ${n} مقاطع`),
   exportHint: "بجانب كل مقطع ملف SRT توقيته يبدأ من أوله، وبعد حذف الصمت إن حذفته.",
+  timelineExport: "صدّر تايم لاين",
+  timelineExportHint:
+    "يكتب ملف XML (لـ Premiere وDaVinci Resolve) وملف EDL يشيران إلى الملف الأصلي، بمقطع لكل جزء يبقى، والترجمة SRT على التايم لاين نفسه. لا يُحوَّل الفيديو، فيأخذ ثوانيَ ويبقى كل قطع قابلًا للتعديل.",
+  timelineSaved: (name, kinds) => `حُفظ ${name} · ${kinds}`,
+  sceneTimelineHint:
+    "يكتب ملف XML (لـ Premiere وDaVinci Resolve) وملف EDL على الملف الأصلي، مقطوعًا عند كل تغيّر مشهد فيصير كل مشهد مقطعًا وحده. لا يُحوَّل الفيديو.",
   silenceAuto: "تلقائي",
   silenceHint:
     "«تلقائي» يقيس ضجيج الخلفية في كل ملف، فيجد الوقفات في الغرفة المزعجة والاستوديو الهادئ معًا. اختر مستوى بنفسك فقط إن فاتته وقفات (ارفعه، مثل −25 dB) أو قطع كلامًا هادئًا (اخفضه). «اترك من كل طرف» يبقي جزءًا صغيرًا من كل وقفة حتى لا يلتصق الكلام ببعضه.",
@@ -1713,6 +1726,7 @@ const ar: Dict = {
     aiRun: "فشل نموذج الذكاء الاصطناعي أثناء معالجة هذا الملف. أعد المحاولة، وإن تكرّر فحوّل الملف إلى WAV أولًا ثم نظّفه.",
     badInput: "تعذّرت قراءة هذا الملف. قد يكون تالفًا أو ليس ملف وسائط.",
     noVideoStream: "هذا الملف بلا فيديو، فلا يصلح معه هذا الخيار. اختر أحد خيارات الصوت.",
+    timelineEmpty: "لا يبقى شيء يوضع على التايم لاين: الأجزاء خارج الملف. راجع الأوقات وأعد المحاولة.",
     noAudioStream: "هذا الملف بلا مسار صوت. اختر خيارًا للصورة فقط، أو أضف صوتًا بـ«استبدال الصوت».",
     fileCorrupt: "الملف تالف أو ناقص (ربما لم يكتمل نسخه بعد). انسخه من جديد أو جرّب نسخة أخرى.",
     hwEncoder: "فشل الترميز بكرت الشاشة. أوقف خيار كرت الشاشة ثم أعد المحاولة.",

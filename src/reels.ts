@@ -63,6 +63,40 @@ export function timeline(sections: Range[], cuts: Range[]): { src: Range; at: nu
   return out;
 }
 
+/** قطع المصدر التي تبقى بترتيبها على الناتج: ما يُرسل لـ«تايم لاين للمونتاج» (R3-F10) */
+export function keptSource(sections: Range[], cuts: Range[]): Range[] {
+  return timeline(sections, cuts).map((p) => p.src);
+}
+
+/**
+ * المدى [start, end] مقطوعًا عند كل تغيّر مشهد: قطع حاد عند وقته، وانتقال تدريجي عند منتصفه،
+ * فيصير كل مشهد قطعة على التايم لاين (R3-F10)
+ */
+export function scenePieces(changes: Range[], start: number, end: number): Range[] {
+  const at = changes
+    .map(([s, e]) => (s === e ? s : (s + e) / 2))
+    .filter((x) => x > start + 1e-3 && x < end - 1e-3)
+    .sort((a, b) => a - b);
+  const points = [start, ...at, end];
+  return points
+    .slice(1)
+    .map((b, i) => [points[i], b] as Range)
+    .filter(([a, b]) => b - a > 1e-3);
+}
+
+/** اسم الملف بلا مجلد ولا امتداد */
+export function fileStem(path: string): string {
+  const name = path.split(/[\\/]/).pop() ?? path;
+  return name.includes(".") ? name.slice(0, name.lastIndexOf(".")) || name : name;
+}
+
+/** للإشعار بعد حفظ التايم لاين: اسم أول ملف وأنواع الملفات كلها («درس timeline.xml» و«XML، EDL، SRT») */
+export function savedSummary(paths: string[], sep = ", "): [string, string] {
+  const name = paths[0]?.split(/[\\/]/).pop() ?? "";
+  const kinds = [...new Set(paths.map((p) => p.split(".").pop()?.toUpperCase() ?? ""))].filter(Boolean).join(sep);
+  return [name, kinds];
+}
+
 // ======================= الترجمة لكل مقطع =======================
 
 const SENTENCE_END = /[.!?؟…۔]["»”')\]]*$/;

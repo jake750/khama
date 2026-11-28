@@ -3,6 +3,7 @@ import type { Cue, SilenceLevels } from "../api";
 import { formatDuration, formatTimecode } from "../format";
 import { useI18n } from "../i18n";
 import type { Range, TopicPlan } from "../reels";
+import { isMobile } from "../platform";
 import { Icon } from "./Icon";
 import type { TopicRow } from "./JobCard";
 import { Pick } from "./Pick";
@@ -16,6 +17,8 @@ export interface ExportOptions {
   subs: boolean;
   maxWords: number | null;
   maxSecs: number | null;
+  /** "timeline" = XML وEDL (وSRT) تشير إلى الأصل بلا تحويل (R3-F10). فارغ = ملفات فيديو */
+  as?: "video" | "timeline";
 }
 
 /** المقاطع المختارة بالترتيب: موضوع كامل أو أجزاء منه (لا يجتمعان في موضوع واحد) */
@@ -223,9 +226,21 @@ export function TopicPanel(props: {
             )}
           </div>
           {props.hasCues && o.subs && <div className="faint">{t.exportHint}</div>}
-          <button className="btn btn-primary btn-sm mt-2" onClick={() => props.onExport!(sections, o)}>
-            <Icon name="scissors" size={14} /> {t.exportSelected(o.join ? 1 : sections.length)}
-          </button>
+          <div className="topic-export-actions">
+            <button className="btn btn-primary btn-sm mt-2" onClick={() => props.onExport!(sections, o)}>
+              <Icon name="scissors" size={14} /> {t.exportSelected(o.join ? 1 : sections.length)}
+            </button>
+            {/* تايم لاين للمونتاج: المقاطع متتالية بقطعها على الأصل، بلا تحويل (R3-F10) */}
+            {!isMobile && (
+              <button
+                className="btn btn-sm mt-2"
+                title={t.timelineExportHint}
+                onClick={() => props.onExport!(sections, { ...o, join: true, as: "timeline" })}
+              >
+                <Icon name="timeline" size={14} /> {t.timelineExport}
+              </button>
+            )}
+          </div>
         </div>
       )}
 

@@ -5,7 +5,16 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { isPermissionGranted, sendNotification } from "@tauri-apps/plugin-notification";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { api, asAppError, type AppError, type ConvertRequest, type DownloadRequest, type JobUpdate, type Settings } from "./api";
+import {
+  api,
+  asAppError,
+  type AppError,
+  type ConvertRequest,
+  type DownloadRequest,
+  type JobUpdate,
+  type Settings,
+  type TimelineRequest,
+} from "./api";
 import { ConvertView, defaultOptions, MEDIA_FILTER, type SourceFile } from "./components/ConvertView";
 import { DownloadView, newDownloadSession, type StartMeta } from "./components/DownloadView";
 import { HistoryView } from "./components/HistoryView";
@@ -28,7 +37,7 @@ import { nextTheme } from "./theme";
 import { limiter } from "./limit";
 import { announceUpdate } from "./whatsNew";
 import { REEL_MAX, REEL_MIN, silenceCuts, topicRows, topicsText } from "./topics";
-import { exportCues, keptLength, planTopic, toSrt, type Range } from "./reels";
+import { exportCues, fileStem, keptLength, keptSource, planTopic, savedSummary, toSrt, type Range } from "./reels";
 import type { ExportOptions } from "./components/TopicPanel";
 import { optionsFromMeta } from "./downloadPlan";
 
@@ -1027,12 +1036,33 @@ export default function App() {
     }
   };
 
+  /** يكتب ملفات التايم لاين (XML وEDL وSRT) بجانب التحويلات، ويقول أين (R3-F10) */
+  const saveTimeline = (request: TimelineRequest) =>
+    api
+      .exportTimeline(request)
+      .then((paths) => {
+        const [name, kinds] = savedSummary(paths);
+        toast(t.timelineSaved(name, kinds), { label: t.showInFolder, run: () => api.revealFile(paths[0]).catch(fileFailed), ms: 6000 });
+      })
+      .catch((e) => toast(errorText(t, asAppError(e))));
+
   const exportFromFile = (j: Job, input: string, sections: Range[], o: ExportOptions) => {
     const preset = sameFamily(input);
     const silence = o.tight ? allCuts(j) : [];
     const lines = { maxWords: o.maxWords, maxSecs: o.maxSecs };
-    const srt = (secs: Range[]) =>
-      o.subs && j.cues?.length ? toSrt(exportCues(j.cues, secs, silence, lines, j.words, j.markers ?? [])) : null;
+    const cuesFor = (secs: Range[]) => (o.subs && j.cues?.length ? exportCues(j.cues, secs, silence, lines, j.words, j.markers ?? []) : []);
+    const srt = (secs: Range[]) => (o.subs && j.cues?.length ? toSrt(cuesFor(secs)) : null);
+    // تايم لاين: المقاطع كلها متتالية بقطعها على الأصل، بلا تحويل
+    if (o.as === "timeline") {
+      saveTimeline({
+        input,
+        pieces: keptSource(sections, silence),
+        cues: cuesFor(sections),
+        name: `${fileStem(input)} timeline`,
+        keepCuts: false,
+      });
+      return;
+    }
     const groups: Range[][] = o.join ? [sections] : sections.map((s) => [s]);
     groups.forEach((secs, n) => {
       const start = secs[0][0];

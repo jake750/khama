@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import type { AppError, ConvertRequest, Cue, DownloadRequest, Word, JobState, JobUpdate, SilenceLevels, Topic } from "../api";
 import type { Range, TopicPlan } from "../reels";
 import { LevelsLine, TopicPanel, type ExportOptions } from "./TopicPanel";
-import { SilenceView } from "./SilenceView";
+import { SceneExport, SilenceView } from "./SilenceView";
 import { formatDuration, formatEta, formatSpeed, formatTimecode } from "../format";
 import { errorText, numLocale, useI18n, type Dict } from "../i18n";
 import { ErrorBox, type ErrorFix } from "./ErrorBox";
@@ -343,6 +343,14 @@ export function JobCard(props: {
               ))}
               {j.markers.length > 40 && <span className="chip">+{j.markers.length - 40}</span>}
             </div>
+            {/* تايم لاين مقطوع عند كل مشهد (R3-F10). بلا نهاية = آخر الملف، يقصّه Rust إلى طوله */}
+            {j.convert?.preset === "detect_scenes" && j.convert.inputs[0] && (
+              <SceneExport
+                path={j.convert.inputs[0]}
+                changes={j.markers}
+                range={[j.convert.options.start ?? 0, j.convert.options.end ?? 1e9]}
+              />
+            )}
             {props.lengths && (
               <div className="faint mt-2">{t.lengthAfter(formatTimecode(props.lengths[0]), formatTimecode(props.lengths[1]))}</div>
             )}

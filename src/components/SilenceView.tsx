@@ -1,12 +1,90 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type SilenceLevels } from "../api";
+import { api, asAppError, type SilenceLevels, type TimelineRequest } from "../api";
 import { formatDuration, formatTimecode } from "../format";
-import { useI18n } from "../i18n";
-import { Icon } from "./Icon";
+import { errorText, useI18n } from "../i18n";
+import { isMobile } from "../platform";
+import { fileStem, keptPieces, savedSummary, scenePieces } from "../reels";
+import { Icon, type IconName } from "./Icon";
 import { Segmented } from "./Segmented";
 
 type Range = [number, number];
+
+/** ملف على الجهاز (لا رابط): التايم لاين يشير إليه */
+const isLocal = (p: string) => !/^https?:\/\//.test(p);
+
+/** طلب تايم لاين بلا ترجمة ولا علامات */
+const timelineRequest = (input: string, pieces: Range[], name: string, keepCuts = false): TimelineRequest => ({
+  input,
+  pieces,
+  cues: [],
+  name,
+  keepCuts,
+});
+
+export interface EditorAction {
+  label: string;
+  hint: string;
+  icon: IconName;
+  request: () => TimelineRequest;
+}
+
+/**
+ * أزرار التصدير لبرامج المونتاج (R3-F10): تكتب الملفات بجانب التحويلات بلا تحويل، ثم تقول أين.
+ * لا تظهر على الهاتف (لا برنامج مونتاج يفتحها هناك)
+ */
+export function EditorExport({ actions }: { actions: EditorAction[] }) {
+  const { t } = useI18n();
+  const [saved, setSaved] = useState<{ paths: string[] } | { error: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (isMobile || !actions.length) return null;
+  const run = (a: EditorAction) => {
+    setBusy(true);
+    api
+      .exportTimeline(a.request())
+      .then((paths) => setSaved({ paths }))
+      .catch((e) => setSaved({ error: errorText(t, asAppError(e)) }))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <div className="sv-export">
+      {actions.map((a) => (
+        <button key={a.label} className="btn btn-sm" disabled={busy} title={a.hint} onClick={() => run(a)}>
+          <Icon name={a.icon} size={16} /> {a.label}
+        </button>
+      ))}
+      {saved && "paths" in saved && (
+        <span className="faint" dir="auto">
+          {t.timelineSaved(...savedSummary(saved.paths))}{" "}
+          <button className="btn btn-sm btn-ghost" onClick={() => api.revealFile(saved.paths[0]).catch(() => {})}>
+            {t.showInFolder}
+          </button>
+        </span>
+      )}
+      {saved && "error" in saved && (
+        <span className="faint" role="alert">
+          {saved.error}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** نتيجة كشف المشاهد: تايم لاين على الأصل مقطوع عند كل تغيّر مشهد، فيصير كل مشهد قطعة (R3-F10) */
+export function SceneExport(props: { path: string; changes: Range[]; range: Range }) {
+  const { t } = useI18n();
+  const actions: EditorAction[] = isLocal(props.path)
+    ? [
+        {
+          label: t.timelineExport,
+          hint: t.sceneTimelineHint,
+          icon: "timeline",
+          request: () => timelineRequest(props.path, scenePieces(props.changes, ...props.range), `${fileStem(props.path)} scenes`, true),
+        },
+      ]
+    : [];
+  return <EditorExport actions={actions} />;
+}
 
 /** مجموع أطوال الفترات (ث) */
 const total = (rs: Range[]) => rs.reduce((n, [s, e]) => n + Math.max(0, e - s), 0);
@@ -112,6 +190,20 @@ export function SilenceView(props: {
   const silent = total(props.found);
   const kept = Math.max(0, silent - removed);
   const [showList, setShowList] = useState(false);
+
+  // ===== تايم لاين للمونتاج (R3-F10): ما يبقى بعد الحذف قطعًا على الأصل، بلا تحويل =====
+  const path = props.path && isLocal(props.path) ? props.path : null;
+  const actions: EditorAction[] =
+    path && props.cuts.length > 0
+      ? [
+          {
+            label: t.timelineExport,
+            hint: t.timelineExportHint,
+            icon: "timeline",
+            request: () => timelineRequest(path, keptPieces(lo, hi, props.cuts), `${fileStem(path)} timeline`),
+          },
+        ]
+      : [];
 
   return (
     <div className="silence-view">
@@ -248,6 +340,8 @@ export function SilenceView(props: {
           </div>
         </div>
       )}
+
+      <EditorExport actions={actions} />
 
       {/* كل فترة: نقرة تشغّل من قبلها بثانيتين لتسمع ما حولها */}
       {props.found.length > 0 && (
