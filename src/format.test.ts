@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { dictionaries } from "./i18n";
 import {
+  mediaKey,
   chapterStarts,
   timeTicks,
   extractUrls,
@@ -149,5 +150,18 @@ describe("timeTicks (D-102)", () => {
     expect(timeTicks(10)).toEqual([0, 2, 4, 6, 8, 10]);
     expect(timeTicks(212)).toEqual([0, 60, 120, 180]);
     expect(timeTicks(3600).length).toBeLessThanOrEqual(7);
+  });
+});
+
+describe("mediaKey (R3-U11)", () => {
+  it("treats the forms of one YouTube video as the same", () => {
+    const k = mediaKey("https://www.youtube.com/watch?v=abc123XYZ_-&t=40s");
+    expect(mediaKey("https://youtu.be/abc123XYZ_-?si=track")).toBe(k);
+    expect(mediaKey("https://m.youtube.com/shorts/abc123XYZ_-")).toBe(k);
+    expect(mediaKey("https://youtube.com/watch?v=other")).not.toBe(k);
+  });
+  it("drops www, the trailing slash and tracking parameters", () => {
+    expect(mediaKey("https://www.instagram.com/reel/XYZ/?igsh=aaa")).toBe(mediaKey("https://instagram.com/reel/XYZ"));
+    expect(mediaKey("https://vimeo.com/123?utm_source=x")).toBe("vimeo.com/123");
   });
 });

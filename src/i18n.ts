@@ -579,6 +579,8 @@ const en = {
   chooseFolder: "Choose a folder…",
   fixCookies: "Cookie settings",
   cookiesPickFrom: "Use cookies from:",
+  alreadyDownloaded: (when: string, meta: string) =>
+    `You downloaded this on ${when} (${meta}). Download it again only if you need another format.`,
   cookiesOther: "Another browser or a file…",
   updateYtdlpAction: "Update yt-dlp",
   tryAgain: "Try again",
@@ -1476,6 +1478,7 @@ const ar: Dict = {
   chooseFolder: "اختيار مجلد…",
   fixCookies: "إعدادات الكوكيز",
   cookiesPickFrom: "استعمل كوكيز من:",
+  alreadyDownloaded: (when, meta) => `نزّلته يوم ${when} (${meta}). نزّله مرة أخرى فقط إن أردت صيغة أخرى.`,
   cookiesOther: "متصفح آخر أو ملف…",
   updateYtdlpAction: "تحديث yt-dlp",
   tryAgain: "أعد المحاولة",

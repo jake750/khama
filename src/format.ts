@@ -62,6 +62,26 @@ export function isHttpUrl(s: string): boolean {
   }
 }
 
+/** R3-U11: مفتاح واحد للرابط نفسه بصيغه المختلفة: youtu.be/ID وwatch?v=ID وshorts/ID واحد،
+ * وبلا www أو m. أو / أخيرة أو # أو بارامترات التتبّع (utm_، si، igsh، fbclid، feature) */
+export function mediaKey(url: string): string {
+  try {
+    const u = new URL(url.trim());
+    const host = u.hostname.toLowerCase().replace(/^(www\.|m\.)/, "");
+    if (host === "youtu.be") return `yt:${u.pathname.slice(1).split("/")[0]}`;
+    if (host === "youtube.com" || host === "music.youtube.com") {
+      const v = u.searchParams.get("v");
+      if (v) return `yt:${v}`;
+      const m = u.pathname.match(/^\/(?:shorts|live|embed)\/([\w-]+)/);
+      if (m) return `yt:${m[1]}`;
+    }
+    for (const k of [...u.searchParams.keys()]) if (/^(utm_|si$|igsh|fbclid$|feature$)/.test(k)) u.searchParams.delete(k);
+    return `${host}${u.pathname.replace(/\/+$/, "")}${u.search}`;
+  } catch {
+    return url.trim();
+  }
+}
+
 /** يستخرج كل الروابط من نص ملصوق (قد يحتوي عدة روابط أو نصًا حولها) */
 export function extractUrls(text: string): string[] {
   // رابط منسوخ من رسالة بلا https:// (www.… أو youtu.be/…) يُقبل ويُكمَل (R2-39)

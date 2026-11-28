@@ -7,12 +7,13 @@ import {
   type AppError,
   type AudioFormat,
   type DownloadRequest,
+  type HistoryEntry,
   type Kind,
   type ProbeInfo,
   type Settings,
   type VideoFormat,
 } from "../api";
-import { extractUrls, formatBytes, formatDuration, isHttpUrl } from "../format";
+import { extractUrls, formatBytes, formatDuration, isHttpUrl, mediaKey } from "../format";
 import { limiter } from "../limit";
 import { planDownloads, type EntryClips, RATES, scheduledAt, type Stills } from "../downloadPlan";
 import { numLocale, useI18n } from "../i18n";
@@ -176,6 +177,28 @@ export function DownloadView(props: {
     }, 500);
     return () => clearTimeout(timer);
   }, [session, url, reprobe]);
+
+  // R3-U11: رابط نُزّل من قبل: سطر يقول متى وبأي صيغة، بدل إعادة كل شيء بلا تنبيه.
+  // الحالة تحمل مفتاح الرابط الذي بُحث عنه، فلا يظهر سطر رابط قديم على رابط جديد
+  const [already, setAlready] = useState<{ key: string; entry: HistoryEntry | null } | null>(null);
+  const urlKey = isHttpUrl(singleUrl(url)) ? mediaKey(singleUrl(url)) : null;
+  useEffect(() => {
+    if (!urlKey) return;
+    let live = true;
+    api
+      .getHistory()
+      .then((list) => {
+        if (!live) return;
+        const hits = list.filter((e) => e.kind !== "convert" && mediaKey(e.url) === urlKey);
+        const entry = hits.reduce<HistoryEntry | null>((a, e) => (!a || e.date > a.date ? e : a), null);
+        setAlready({ key: urlKey, entry });
+      })
+      .catch(logError("getHistory"));
+    return () => {
+      live = false;
+    };
+  }, [urlKey]);
+  const before = already && already.key === urlKey ? already.entry : null;
 
   // عدة روابط: نقرأ عنوان كل واحد وصورته (أول 10) بدل عرض الروابط نفسها (U-65، U-94)
   const [, bumpLinks] = useState(0);
@@ -535,6 +558,22 @@ export function DownloadView(props: {
 
       {probe.status === "error" && !multiLinks && <ErrorBox error={probe.error} inline onFix={fix} onCookies={useBrowserCookies} />}
       {startError && <ErrorBox error={startError} inline onFix={fix} onCookies={useBrowserCookies} />}
+      {before && !multiLinks && (
+        <div className="alert info already">
+          <Icon name="history" size={16} />
+          <span className="grow">
+            {t.alreadyDownloaded(
+              new Date(before.date).toLocaleDateString(numLocale(lang), { weekday: "long", day: "numeric", month: "long" }),
+              before.meta,
+            )}
+          </span>
+          {before.exists && !isMobile && (
+            <button className="btn btn-sm" onClick={() => api.revealFile(before.file).catch(logError("revealFile"))}>
+              <Icon name="folder" size={16} /> {t.showInFolder}
+            </button>
+          )}
+        </div>
+      )}
       {noRoom && (
         <div className="alert warn" role="alert">
           <Icon name="alert" size={16} />
