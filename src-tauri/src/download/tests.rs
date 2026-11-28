@@ -898,6 +898,26 @@ fn rate_limit_throttles_to_one_download() {
     assert_eq!(q.0.available_permits(), 4);
 }
 
+/// حدّ السرعة للمجموع (R3-F31): وحده يأخذ الحد كله، ومعًا يُقسم بعدد الخانات على الأكثر
+#[test]
+fn rate_limit_is_shared_between_downloads() {
+    assert_eq!(rate_share(3000, 1, 3), 3000);
+    assert_eq!(rate_share(3000, 2, 3), 1500);
+    assert_eq!(rate_share(3000, 3, 3), 1000);
+    assert_eq!(rate_share(3000, 10, 3), 1000, "قائمة تشغيل: ثلاثة يعملون معًا");
+    assert_eq!(rate_share(3000, 0, 3), 3000);
+    assert_eq!(rate_share(0, 5, 3), 0, "بلا حد");
+    assert_eq!(rate_share(2, 5, 5), 1, "لا يصير صفرًا (= بلا حد)");
+    let before = Live::count();
+    let a = Live::new();
+    let b = Live::new();
+    assert_eq!(Live::count(), before + 2);
+    drop((a, b));
+    assert_eq!(Live::count(), before);
+    let q = DownloadQueue::default();
+    assert_eq!(q.slots(), 3);
+}
+
 /// موقع احتاج تقمّص Chrome مرة (R3-F6): معاينته وتنزيلاته التالية تبدأ به، بالخادم لا بالرابط كله
 #[test]
 fn sites_that_needed_a_browser_are_remembered() {

@@ -100,6 +100,40 @@ impl Default for DownloadQueue {
 /// تنزيلات ردّها الموقع بـ «طلبات كثيرة» (rateLimited) وتنتظر إعادتها: ما دامت موجودة يعمل تنزيل واحد (R3-F4)
 static THROTTLED: AtomicUsize = AtomicUsize::new(0);
 
+/// تنزيلات حية الآن (تنتظر خانة أو تعمل أو تنتظر إعادة): حدّ السرعة يُقسم عليها (R3-F31)
+static LIVE_DOWNLOADS: AtomicUsize = AtomicUsize::new(0);
+
+/// يُحسب التنزيل حيًّا ما دامت هذه القيمة موجودة
+pub(super) struct Live;
+
+impl Live {
+    pub(super) fn new() -> Self {
+        LIVE_DOWNLOADS.fetch_add(1, Ordering::SeqCst);
+        Self
+    }
+
+    pub(super) fn count() -> usize {
+        LIVE_DOWNLOADS.load(Ordering::SeqCst)
+    }
+}
+
+impl Drop for Live {
+    fn drop(&mut self) {
+        LIVE_DOWNLOADS.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// حدّ السرعة في الإعدادات للمجموع لا لكل تنزيل، كما يشرحه rateLimitHint (R3-F31): نصيب تنزيل
+/// يبدأ = الحد مقسومًا على التنزيلات الحية، بحد أقصى عدد الخانات (لا يعمل أكثر منها معًا). 0 = بلا حد.
+/// yt-dlp لا يغيّر -r أثناء العمل، فتنزيل بدأ وحده يبقى على نصيبه حتى ينتهي أو يُعاد
+pub(crate) fn rate_share(limit_kb: u32, live: usize, slots: usize) -> u32 {
+    if limit_kb == 0 {
+        return 0;
+    }
+    let n = live.clamp(1, slots.max(1)) as u32;
+    (limit_kb / n).max(1)
+}
+
 impl DownloadQueue {
     /// يغيّر عدد الخانات. الزيادة فورية؛ والنقص يأخذ الخانات الفارغة الآن،
     /// والباقي يُسحب حين تنتهي تنزيلات جارية (لا نوقف تنزيلًا بدأ)
@@ -122,6 +156,11 @@ impl DownloadQueue {
             }
         }
         *cur = n;
+    }
+
+    /// عدد الخانات الآن (تنزيلات تعمل معًا)
+    pub(super) fn slots(&self) -> usize {
+        *self.1.lock_ok()
     }
 
     /// بدء التباطؤ بعد rateLimited أو نهايته: الحد ينزل إلى 1، ثم يعود إلى `user` (الإعدادات) حين لا يبقى تنزيل محظور

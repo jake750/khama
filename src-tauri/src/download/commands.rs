@@ -21,6 +21,8 @@ pub async fn start_download(
 
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
+        // حدّ السرعة يُقسم على التنزيلات الحية (R3-F31)
+        let _live = Live::new();
         let mut job_dir: Result<PathBuf, AppError> = Err(AppError::new("canceled"));
         let mut dir_key: Option<String> = None;
         // إعادات بعد خطأ عابر (R3-F4)، و«ابدأ الآن» أثناء انتظار إحداها، والتباطؤ بعد rateLimited
@@ -90,7 +92,10 @@ pub async fn start_download(
                 // وتُحرَّر الخانة والمجلد تحته، بدل بطاقة عالقة وخانة محجوزة إلى الأبد (RD7)
                 Ok(dir) => {
                     let (app3, dir, mut rx2) = (app2.clone(), dir.clone(), rx.clone());
-                    let (req, settings) = (req.clone(), settings.clone());
+                    let (req, mut settings) = (req.clone(), settings.clone());
+                    // نصيب هذا التنزيل من الحد حين يبدأ (R3-F31)
+                    let slots = app3.state::<DownloadQueue>().slots();
+                    settings.rate_limit_kb = rate_share(settings.rate_limit_kb, Live::count(), slots);
                     tauri::async_runtime::spawn(async move { run_job(&app3, id, req, settings, &dir, impersonate, &mut rx2).await })
                         .await
                         .unwrap_or_else(|e| {
