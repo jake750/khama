@@ -23,6 +23,7 @@ import { AnimatedList, SlideSwitch } from "../motion";
 import { Segmented, Toggle } from "./Segmented";
 import { TrimRange } from "./TrimRange";
 import { isMobile, mobileSaveDir } from "../platform";
+import { logError } from "../log";
 
 /**
  * يختار ملفات. على الهاتف يعطينا أندرويد روابط content:// بلا اسم ملف حقيقي،
@@ -423,6 +424,9 @@ export function ConvertView(props: {
   const [oneFile, setOneFile] = useKept(session, "oneFile", () => true);
   const [cat, setCat] = useKept<Cat>(session, "cat", () => (isAi(saved) ? "audio" : isAnalysis(saved) ? "analysis" : "format"));
   const [fmtGroup, setFmtGroup] = useKept<FmtGroup>(session, "fmtGroup", () => fmt.group);
+  // R3-U39: في الدفعة تُحرق ترجمة كل فيديو (الملف الذي يحمل اسمه) لا ملف واحد للكل
+  const [eachSubs, setEachSubs] = useKept(session, "eachSubs", () => false);
+  const [subsFound, setSubsFound] = useState<Record<string, string>>({});
 
   const ready = files.filter((f) => f.info);
   const editFile = (editPath && ready.find((f) => f.path === editPath)) || null;
@@ -443,6 +447,24 @@ export function ConvertView(props: {
   }, [files, setOverrides]);
   const audioOnly = ready.filter((f) => !f.info!.video).length;
   const anyVideo = ready.some((f) => f.info!.video);
+  const videoPaths = ready.filter((f) => f.info!.video).map((f) => f.path);
+  // «|» لا يقع في مسار ملف، فيصلح فاصلًا لمفتاح القائمة
+  const videoKey = videoPaths.join("|");
+  const batchSubs = eachSubs && videoPaths.length > 1;
+  useEffect(() => {
+    if (!eachSubs || !videoKey) return;
+    const paths = videoKey.split("|");
+    let live = true;
+    api
+      .findSubtitles(paths)
+      .then((found) => {
+        if (live) setSubsFound(Object.fromEntries(paths.flatMap((p, i) => (found[i] ? [[p, found[i]!]] : []))));
+      })
+      .catch(logError("findSubtitles"));
+    return () => {
+      live = false;
+    };
+  }, [eachSubs, videoKey]);
   const loading = files.some((f) => !f.info && !f.error);
   const failedFiles = files.filter((f) => f.error);
   const single = ready.length === 1 ? ready[0].info! : null;
@@ -549,6 +571,8 @@ export function ConvertView(props: {
     }
     if (kind === "video") {
       Object.assign(o, { subtitles: opts.subtitles, watermark: opts.watermark, watermarkPos: opts.watermarkPos, timecode: opts.timecode });
+      // ترجمة كل فيديو باسمه، إلا ملفًا اختار له المستخدم ترجمة بنفسه
+      if (batchSubs && f && sc === shared) o.subtitles = subsFound[f.path] ?? null;
     }
     return o;
   };
@@ -809,7 +833,7 @@ export function ConvertView(props: {
             <Icon name="plus" /> {importing ? t.importing : t.chooseFiles}
           </button>
           {!isMobile && (
-            <button className="btn btn-lg" onClick={chooseFolder} disabled={importing}>
+            <button className="btn" onClick={chooseFolder} disabled={importing}>
               <Icon name="folder" /> {t.chooseFolder}
             </button>
           )}
@@ -915,6 +939,11 @@ export function ConvertView(props: {
                   <div className="file-name" dir="auto" title={f.path}>
                     {baseName(f.path)}
                   </div>
+                  {batchSubs && subsFound[f.path] && (
+                    <span className="own-opts" title={subsFound[f.path]}>
+                      <Icon name="captions" size={16} /> {t.hasOwnSubs}
+                    </span>
+                  )}
                   {differs(f) && (
                     <span className="own-opts">
                       <Icon name="settings" size={16} /> {t.customOpts}
@@ -1238,13 +1267,27 @@ export function ConvertView(props: {
                     )}
                     {anyVideo && (formatOn ? fmt.kind === "video" : true) ? (
                       <>
-                        <div className="pick-grid mt-4">
-                          <FilePick
-                            label={t.subtitles}
-                            value={opts.subtitles}
-                            extensions={["srt", "ass", "ssa", "vtt"]}
-                            onChange={(subtitles) => set({ subtitles })}
+                        {!editFile && videoPaths.length > 1 && (
+                          <Toggle
+                            checked={eachSubs}
+                            onChange={setEachSubs}
+                            title={t.eachSubs}
+                            hint={
+                              eachSubs
+                                ? t.eachSubsFound(Object.keys(subsFound).filter((p) => videoPaths.includes(p)).length, videoPaths.length)
+                                : t.eachSubsHint
+                            }
                           />
+                        )}
+                        <div className="pick-grid mt-4">
+                          {!(batchSubs && !editFile) && (
+                            <FilePick
+                              label={t.subtitles}
+                              value={opts.subtitles}
+                              extensions={["srt", "ass", "ssa", "vtt"]}
+                              onChange={(subtitles) => set({ subtitles })}
+                            />
+                          )}
                           <FilePick
                             label={t.watermark}
                             value={opts.watermark}
@@ -1459,18 +1502,25 @@ export function ConvertView(props: {
             <span className="spacer" />
             {(shown != null || stepCount > 1) && (
               <span className="estimate ltr-num" title={exact ? t.estimateMeasuredHint : t.estimateHint}>
-                {[
-                  stepCount > 1 && t.steps(stepCount),
-                  shown != null && t.estimate(formatBytes(t, shown)),
-                  expectedSecs != null && t.estimateTime(formatDuration(expectedSecs)),
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
+                {(() => {
+                  const text = [
+                    stepCount > 1 && t.steps(stepCount),
+                    shown != null && t.estimate(formatBytes(t, shown)),
+                    expectedSecs != null && t.estimateTime(formatDuration(expectedSecs)),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ");
+                  return (
+                    <span key={text} className="roll">
+                      {text}
+                    </span>
+                  );
+                })()}
               </span>
             )}
             {canMerge && (
               <button
-                className="btn btn-lg"
+                className="btn"
                 disabled={busy || loading}
                 onClick={() => start(true)}
                 title={Object.keys(overrides).length ? `${t.mergeHint} ${t.mergeShared}` : t.mergeHint}

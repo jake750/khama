@@ -318,6 +318,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     }
     // المحوّل في المتصفح: اختيار ملف وهمي وتحليله
     case "plugin:dialog|open":
+      // «أضف مجلدًا» يعطي مجلدًا يتوسّع إلى ملفين (expand_media_paths أدناه)
+      if ((args.options as { directory?: boolean } | undefined)?.directory) return ["C:\\Users\\me\\Videos\\Shoot"];
       return ["C:\\Users\\me\\Videos\\clip-phone.mp4"];
     case "sample_estimate":
       return { bytes: 41_500_000, seconds: (args.options as { enhance?: string }).enhance === "strong" ? 412 : 95 };
@@ -355,9 +357,14 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return 1;
     case "new_job_id":
       return nextJob++;
-    // المتصفح لا يقرأ المجلدات: المسارات كما هي
+    // المتصفح لا يقرأ المجلدات: الملف كما هو، والمجلد (بلا امتداد) ملفان وهميان
     case "expand_media_paths":
-      return (args.paths as string[] | undefined) ?? [];
+      return ((args.paths as string[] | undefined) ?? []).flatMap((p) =>
+        /[.][^\\/]+$/.test(p) ? [p] : [`${p}\\interview-a.mp4`, `${p}\\interview-b.mp4`],
+      );
+    case "find_subtitles":
+      // الملف الأول في القائمة له ترجمة بجانبه، والباقي بلا
+      return ((args.paths as string[] | undefined) ?? []).map((p, i) => (i === 0 ? p.replace(/[.][^.]+$/, ".srt") : null));
     case "start_download":
     case "start_convert": {
       const id = typeof args.id === "number" ? args.id : nextJob++;

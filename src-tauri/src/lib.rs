@@ -161,6 +161,7 @@ macro_rules! handlers_with {
             convert::hw_encoders,
             convert::start_convert,
             convert::import_files,
+            convert::find_subtitles,
             $($m::$f),*
         ]
     };

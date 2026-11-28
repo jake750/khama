@@ -39,6 +39,8 @@
   --fs-title: 24px;
   --fs-display: 28px;
   --fw-regular: 400;
+  /* R3-V39: 500 للأزرار والتبويبات والتسميات والرقائق، و600 للعناوين الصغيرة، و700 لعنوان الشاشة */
+  --fw-medium: 500;
   --fw-semi: 600;
   --fw-bold: 700;
 
@@ -61,7 +63,8 @@
   --danger: #ff7a72;
   --danger-soft: rgb(255 122 114 / 0.12);
   --ok: #5fd38d;
-  --warn: #f3b950;
+  /* R3-V6: التحذير برتقالي (درجة 55 في OKLCH) لا أصفر كالتمييز --spark، فلا يبدوان شيئًا واحدًا */
+  --warn: #ff9a52;
   --on-hero: #effaf7;
   --hero-1: #116b63;
   --hero-2: #0a3b38;
@@ -91,7 +94,7 @@
   --danger: #b83530; /* تباين AA على --bg و--surface-2 (CS7) */
   --danger-soft: rgb(184 53 48 / 0.08);
   --ok: #1f8f50;
-  --warn: #8a5a10;
+  --warn: #a44a12;
   --hero-1: #0f6f66;
   --hero-2: #0c4f4a;
   --scrim: rgb(13 40 37 / 0.35);
@@ -234,7 +237,7 @@ button:disabled {
   border-radius: var(--r-sm);
   background: transparent;
   color: var(--text-dim);
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
 }
 
 .tab:hover {
@@ -330,7 +333,7 @@ button:disabled {
   padding: 0 var(--s-4);
   border: 1px solid var(--border);
   background: var(--surface-2);
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
   white-space: nowrap;
 }
 
@@ -459,7 +462,7 @@ button:disabled {
   border-radius: var(--r-xs);
   background: transparent;
   color: var(--text-dim);
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
 }
 
 .segmented button:hover:not(:disabled) {
@@ -1374,7 +1377,7 @@ img.file-thumb {
 }
 
 .issue.warn {
-  background: rgb(243 185 80 / 0.12);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
   color: var(--warn);
 }
 
@@ -1487,7 +1490,7 @@ img.file-thumb {
   border: 0;
   background: none;
   color: var(--text-dim);
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
 }
 
 .more-head {
@@ -1638,7 +1641,7 @@ img.file-thumb {
 .topic .chip-reel {
   background: var(--accent);
   color: var(--accent-ink);
-  font-weight: 600;
+  font-weight: var(--fw-medium);
 }
 
 .topic-title {
@@ -1654,7 +1657,7 @@ img.file-thumb {
 
 /* أنواع المواضيع: يصلح (لون التمييز)، بعد تقسيمه (تحذير هادئ)، لا يصلح (باهت) */
 .topic.kind-split {
-  border-inline-start-color: var(--warn, #d9a441);
+  border-inline-start-color: var(--warn);
 }
 .topic.kind-no {
   opacity: 0.72;
@@ -1663,11 +1666,11 @@ img.file-thumb {
 .topic .chip-kind.chip-reel {
   background: var(--accent);
   color: var(--accent-ink);
-  font-weight: 600;
+  font-weight: var(--fw-medium);
 }
 .topic .chip-kind.chip-split {
-  background: color-mix(in srgb, var(--warn, #d9a441) 22%, var(--surface));
-  font-weight: 600;
+  background: color-mix(in srgb, var(--warn) 22%, var(--surface));
+  font-weight: var(--fw-medium);
 }
 .topic-check,
 .topic-parts input,
@@ -1998,7 +2001,7 @@ img.file-thumb {
 
 .pl-count {
   font-size: var(--fs-meta);
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
@@ -2285,7 +2288,7 @@ h1.brand-name {
   border: 0;
   background: transparent;
   color: var(--text-dim);
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
 }
 
 .url-action:hover {
@@ -2422,7 +2425,7 @@ details.extras > summary {
   padding: var(--s-3) var(--s-4);
   cursor: pointer;
   list-style: none;
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
 }
 
 details.extras > summary::-webkit-details-marker {
@@ -2442,7 +2445,7 @@ details.extras[open] > summary > svg:last-child {
 .extras-count {
   color: var(--accent);
   font-size: var(--fs-cap);
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
 }
 
 .extras-grid {
@@ -2853,7 +2856,7 @@ button.menu-item:hover {
   border-radius: var(--r-sm);
   background: transparent;
   color: var(--text-dim);
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
   text-align: start;
 }
 
@@ -3055,7 +3058,7 @@ button.menu-item:hover {
 
 .field-label {
   font-size: var(--fs-cap);
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
   line-height: 16px;
 }
 
@@ -3517,7 +3520,7 @@ button.menu-item:hover {
 }
 .segmented button[aria-pressed="true"] {
   color: var(--accent-ink);
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
 }
 .segmented button:disabled {
   cursor: not-allowed;
@@ -3565,7 +3568,7 @@ button.menu-item:hover {
   background: var(--accent-soft);
   color: var(--accent);
   font-size: var(--fs-meta);
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
   vertical-align: middle;
 }
 
@@ -3608,7 +3611,7 @@ button.menu-item:hover {
   padding: 0 var(--s-2);
   border-radius: 999px;
   font-size: var(--fs-cap); /* أصغر حجم في السلّم، لا 11px (CS20) */
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
   line-height: 20px;
 }
 .preset-tag.fast {
@@ -3631,7 +3634,7 @@ button.menu-item:hover {
   gap: var(--s-1);
   margin-top: var(--s-1);
   color: var(--accent);
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
 }
 .suggest-dot {
   display: inline-block;
@@ -3713,6 +3716,29 @@ button.menu-item:hover {
   font-size: var(--fs-body);
 }
 
+/* R3-V43: الأرقام لا تقفز: عرض ثابت لكل رقم، والتقدير يتدحرج حين يتغيّر بدل أن يتبدّل فجأة */
+.estimate,
+.job-meta,
+.job-status,
+.count-badge,
+.progress-text,
+.tab .badge {
+  font-variant-numeric: tabular-nums;
+}
+.estimate .roll {
+  display: inline-block;
+  animation: num-roll 250ms var(--ease-out, ease-out);
+}
+@keyframes num-roll {
+  from {
+    opacity: 0;
+    transform: translateY(35%);
+  }
+}
+:root[data-motion="reduce"] .estimate .roll {
+  animation: none;
+}
+
 /* =====================================================================
    بطاقة العملية والسجلّ (القسم 5 من مقترح التصميم)
    ===================================================================== */
@@ -3768,10 +3794,13 @@ button.menu-item:hover {
 :root {
   --phase-proc: #5b8def;
   --phase-ai: #a77bf3;
+  /* لون ثابت لكل نوع وسائط، منفصل عن ألوان المراحل (R3-V6) */
+  --media-audio: #f08fb5;
 }
 :root[data-theme="light"] {
   --phase-proc: #2f6fd6;
   --phase-ai: #7c4ad8;
+  --media-audio: #a3366a;
 }
 .progress.phase-proc > div {
   background: var(--phase-proc);
@@ -3803,8 +3832,8 @@ button.menu-item:hover {
   color: var(--accent);
 }
 .history-thumb.kind-audio {
-  background: color-mix(in srgb, var(--phase-ai) 16%, transparent);
-  color: var(--phase-ai);
+  background: color-mix(in srgb, var(--media-audio) 16%, transparent);
+  color: var(--media-audio);
 }
 
 /* الملف المحذوف (D-42) */
@@ -4178,7 +4207,7 @@ kbd {
   border-radius: var(--r-sm);
   background: transparent;
   color: var(--text-dim);
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
   text-align: start;
   transition:
     transform var(--d-bounce) var(--m-bounce),
@@ -4385,7 +4414,7 @@ kbd {
 .select-list button[aria-selected="true"] {
   color: var(--accent);
   background: var(--accent-soft);
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
 }
 .select-list button:focus-visible {
   outline: 2px solid var(--accent);
@@ -4434,7 +4463,7 @@ kbd {
 }
 .sv-mark.threshold,
 .sv-dot.threshold {
-  background: var(--warn, #d9a441);
+  background: var(--warn);
 }
 .sv-mark.speech,
 .sv-dot.speech {
@@ -4501,7 +4530,7 @@ kbd {
   opacity: 0.55;
 }
 .sv-kept {
-  fill: var(--warn, #d9a441);
+  fill: var(--warn);
   opacity: 0.28;
 }
 .sv-cut {
@@ -4513,7 +4542,7 @@ kbd {
   border-radius: 2px;
 }
 .sv-swatch.kept {
-  background: color-mix(in srgb, var(--warn, #d9a441) 50%, transparent);
+  background: color-mix(in srgb, var(--warn) 50%, transparent);
   border-radius: 2px;
 }
 .sv-swatch.cut {
@@ -4521,7 +4550,7 @@ kbd {
   border-radius: 2px;
 }
 .sv-limit {
-  stroke: var(--warn, #d9a441);
+  stroke: var(--warn);
   stroke-width: 1.5;
   stroke-dasharray: 6 4;
   vector-effect: non-scaling-stroke;
@@ -4609,7 +4638,7 @@ kbd {
   all: unset;
   cursor: pointer;
   color: var(--accent);
-  font-weight: var(--fw-semi);
+  font-weight: var(--fw-medium);
   white-space: nowrap;
   border-radius: var(--r-xs);
   padding: 0 2px;

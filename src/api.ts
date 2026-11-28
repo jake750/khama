@@ -416,6 +416,8 @@ export const api = {
   readLinksFile: (path: string) => invoke<string>("read_links_file", { path }),
   /** R3-U13: المجلدات تُستبدل بما فيها من وسائط (الكمبيوتر فقط) */
   expandMediaPaths: (paths: string[]) => invoke<string[]>("expand_media_paths", { paths }),
+  /** ملف الترجمة الذي يحمل اسم كل فيديو، بالترتيب نفسه (null إن لم يوجد) (R3-U39) */
+  findSubtitles: (paths: string[]) => invoke<(string | null)[]>("find_subtitles", { paths }),
   openOutputDir: () => invoke<void>("open_output_dir"),
   onJobUpdate: (cb: (u: JobUpdate) => void): Promise<UnlistenFn> => listen<JobUpdate>("job-update", (e) => cb(e.payload)),
   analyzeFile: (path: string) => invoke<MediaInfo>("analyze_file", { path }),

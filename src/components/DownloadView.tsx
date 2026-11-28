@@ -928,13 +928,15 @@ export function DownloadView(props: {
         <span className="spacer" />
         {expected != null && (
           <span className="estimate ltr-num" title={t.estimateHint}>
-            {t.estimate(formatBytes(t, expected))}
+            <span key={formatBytes(t, expected)} className="roll">
+              {t.estimate(formatBytes(t, expected))}
+            </span>
           </span>
         )}
         {/* رابط فيديو واحد: تحليل مواضيعه قبل تنزيله، بلا تنزيل الفيديو */}
         {props.onAnalyze && info && duration && (
           <button
-            className="btn btn-lg"
+            className="btn"
             onClick={() =>
               props.onAnalyze!(
                 urls[0] ?? url.trim(),

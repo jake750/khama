@@ -410,6 +410,13 @@ const en = {
   lutHint:
     "Applied to the original colors, after HDR → SDR and before resizing. Use a LUT made for your footage, for example Log to Rec.709.",
   speedHint: "Audio keeps its pitch, so voices don't sound high or low.",
+  eachSubs: "Each video's own subtitles",
+  eachSubsHint: "Burns the subtitle file named like each video (video.srt) instead of one file for all.",
+  eachSubsFound: (n: number, total: number) =>
+    n === 0
+      ? "None of these videos has a subtitle file with its name next to it."
+      : `${n} of ${total} videos have their own subtitles; the rest are converted without.`,
+  hasOwnSubs: "Own subtitles",
   subtitlesHint:
     "An .srt gets white text at the bottom with Arabic shaping. For your own font, size, color or position, use an .ass file styled in Aegisub or Subtitle Edit.",
   watermarkHint: "The logo is scaled to 16% of the video width at 90% opacity. Use a PNG with transparency.",
@@ -1312,6 +1319,11 @@ const ar: Dict = {
   tonemapHint: "يصلح الألوان الباهتة حين تضع لقطات HDR على تايملاين عادي (تحويل Hable إلى Rec.709).",
   lutHint: "يُطبَّق على الألوان الأصلية بعد HDR ← SDR وقبل تغيير المقاس. استعمل LUT مصنوعًا للقطاتك، مثل Log إلى Rec.709.",
   speedHint: "الصوت يحافظ على طبقته، فلا يصبح حادًا ولا غليظًا.",
+  eachSubs: "ترجمة كل فيديو باسمه",
+  eachSubsHint: "يُحرق ملف الترجمة الذي يحمل اسم كل فيديو (فيديو.srt) بدل ملف واحد للكل.",
+  eachSubsFound: (n: number, total: number) =>
+    n === 0 ? "لا ترجمة باسم أي من هذه الفيديوهات بجانبه." : `${n} من ${total} لها ترجمة باسمها، والباقي يُحوَّل بلا ترجمة.`,
+  hasOwnSubs: "له ترجمته",
   subtitlesHint:
     "ملف ‎.srt يُكتب بخط أبيض في الأسفل مع دعم تشكيل العربية. لخط أو حجم أو لون أو موضع خاص، استعمل ملف ‎.ass منسّقًا في Aegisub أو Subtitle Edit.",
   watermarkHint: "يُصغَّر الشعار إلى 16% من عرض الفيديو بشفافية 90%. استعمل PNG بخلفية شفافة.",

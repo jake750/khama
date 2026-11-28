@@ -378,6 +378,19 @@ fn sidecar(input: &Path) -> Option<PathBuf> {
     found.into_iter().next()
 }
 
+/// R3-U39: ملف الترجمة الذي يحمل اسم كل فيديو (أو null)، لحرق ترجمة كل فيديو في الدفعة لا ملف واحد للكل
+#[tauri::command]
+pub async fn find_subtitles(paths: Vec<String>) -> Vec<Option<String>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        paths
+            .iter()
+            .map(|p| sidecar(Path::new(p)).map(|s| s.to_string_lossy().into_owned()))
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
+}
+
 fn read_subs(path: &Path) -> Vec<Cue> {
     std::fs::read(path)
         .map(|b| clean_cues(srt::parse(&srt::decode(&b))))
