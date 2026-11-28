@@ -42,7 +42,7 @@
 
 [20] ISO/IEC 25010:2023, *Systems and software engineering — Systems and software Quality Requirements and Evaluation (SQuaRE) — Product quality model*.
 
-[21] IEEE Std 830-1998, *IEEE Recommended Practice for Software Requirements Specifications*.
+[21] *Systems and Software Engineering — Life Cycle Processes — Requirements Engineering*, ISO/IEC/IEEE 29148:2018, 2nd ed., Nov. 2018.
 
 [22] J. Nielsen, "Enhancing the explanatory power of usability heuristics," in *Proc. ACM CHI*, 1994, pp. 152–158.
 

@@ -12,7 +12,7 @@
 
 ## 3.2 المتطلبات الوظيفية
 
-**الجدول 3.2: المتطلبات الوظيفية** (A-7، بأسلوب IEEE 830 المختصر: كل متطلب قابل للاختبار وله معيار قبول)
+**الجدول 3.2: المتطلبات الوظيفية** (A-7، A-34، بأسلوب ISO/IEC/IEEE 29148 [21] المختصر: كل متطلب قابل للاختبار وله معيار قبول)
 
 | # | المتطلب | الأولوية | معيار القبول |
 |---|---|---|---|
@@ -35,8 +35,13 @@
 | FR-17 | محوّل للملفات المحلية بصيغ للمونتاج والنشر | Should (إضافة) | كل صيغة تنجح في اختبار `presets_real` |
 | FR-18 | مجلدات مراقَبة تُحوَّل ملفاتها آليًا | Could (إضافة) | ملف جديد يُحوَّل مرة واحدة |
 | FR-19 | نسخة أندرويد | Could (إضافة) | تنزيل وقص وتحويل على هاتف arm64 |
+| FR-20 | كشف تغيّر اللقطات في الفيديو (لقطات الشاشة وتقسيم المشاهد) بكاشف خامة بدل عتبة FFmpeg | Should (المحور C) | F₁ ≥ 0.90 على مجموعة الاختبار، وفرق ≥ 0.15 عن أفضل عتبة لـ FFmpeg، وسرعة ≥ 0.75 من فلتره (H5) |
+| FR-21 | ترميز H.264 وHEVC بالعتاد بجودة تعادل قيمة CRF المطلوبة | Should (المحور A) | خطأ VMAF الوسيط عن x264 بالقيمة نفسها ضمن ±0.5 خارج العيّنة (H6) |
+| FR-22 | فصل الصوت بإعدادات مقيسة على مجموعة مرجعية | Should (المحور B) | لا إعداد بديل يرفع SDR الصوت أكثر من 0.1 dB بفرق دالّ بعد Holm على MUSDB18 (H7) |
+| FR-23 | تقسيم محاضرة طويلة إلى مواضيع، وتصدير كل موضوع مقطعًا قصيرًا بلا صمت | Could (المحور D) | الحدود الأربعة في مجموعة الدروس الخمسة تُكشف في الأطوال الثلاثة (معيار كُتب بعد القياس) |
+| FR-24 | ترجمة المقاطع القصيرة بتوقيت الكلمة وأسطر محدودة الطول | Could (المحور D) | خطأ بداية الكلمة بعد الوقفات أقل بـ 20% على الأقل للمصدرين، ولا تداخل ولا تجاوز للحد في الأسطر (H8) |
 
-المتطلبات 1–16 من الكرّاس؛ 17–19 إضافات موثّقة في «سجلّ تغيّر المواصفات» في [PROJECT_BRIEF.md](../../PROJECT_BRIEF.md).
+المتطلبات 1–16 من الكرّاس؛ 17–19 إضافات موثّقة في «سجلّ تغيّر المواصفات» في [PROJECT_BRIEF.md](../../PROJECT_BRIEF.md)؛ و20–24 متطلبات المحاور البحثية (§2.4)، كُتبت في المراجعة الثالثة بعد أن بُنيت الميزات. معايير FR-20 حتى FR-22 وFR-24 هي الفرضيات H5–H8 (§1.5)، أما FR-23 فلا فرضية له، فمعياره وصف لما قيس لا اختبار معلن قبل القياس.
 
 ## 3.3 المتطلبات غير الوظيفية
 
@@ -53,6 +58,9 @@
 | NFR-7 | الرخص: مفتوح المصدر متوافق مع رخص الأدوات | إشعارات الأطراف الأخرى ونصوص الرخص مرفقة | ✓ §7.3 |
 | NFR-8 | الوصول | WCAG 2.2 AA للتباين ولوحة المفاتيح | جزئي §6.10 |
 | NFR-9 | قابلية الصيانة | اختبارات آلية في CI؛ توثيق القرارات | 146 اختبار Rust + 120 للواجهة تعمل آليًا في 0.3.46 (§6.2) |
+| NFR-10 | كلفة الخوارزميات الجديدة | الكاشف ≥ 0.75 من سرعة فلتر FFmpeg على الجهاز نفسه | 0.82 (802 مقابل 977 إطار/ث، §6.14.1) |
+| NFR-11 | النماذج اختيارية ومفحوصة | لا نموذج داخل المثبّت؛ كل نموذج يُنزَّل عند أول استعمال ويُحذف إن لم تطابق بصمته SHA-256 | ✓ الجدول 6.7، §7.1 |
+| NFR-12 | قابلية إعادة إنتاج النتائج | كل جدول في §6.14 و§6.15 يذكر ملف CSV أو سكربتًا يعيده | §6.14 كاملًا؛ §6.15 جزئيًا، لأن ملفاته الحقيقية لا تُنشر (الجدول 7.2؛ الملحق ط) |
 
 ## 3.4 حالات الاستخدام
 
@@ -76,24 +84,30 @@
 
 **الجدول 3.4: من المتطلب إلى الكود إلى الاختبار** (A-75)
 
-| المتطلب | الكود | الاختبار |
-|---|---|---|
-| FR-1، FR-3 | `download/args.rs` (`-S res:…`) | `video_1080_editor_ready_prefers_h264`، `video_best_without_editor_ready` |
-| FR-2 | `download/args.rs`، `downloadPlan.ts` | `downloadPlan.test.ts` |
-| FR-4 | `download/progress.rs`، `download/mod.rs` (الإلغاء بشجرة العمليات) | `parses_progress_line`، `parses_fragment_progress`، `kill_tree_ends_grandchildren_through_the_job_object` |
-| FR-5 | `settings.rs` | `settings` (8 اختبارات) |
-| FR-6 | `i18n.ts`، `errors.rs` | `i18nText.test.ts`، `rtl.test.ts`، `errorCodes.test.ts`، اختبارات `errors.rs` |
-| FR-7 | `downloadPlan.ts` (`laneClips`)، `--download-sections` | `sections`، `multiple_clips`، `downloadPlan.test.ts` |
-| FR-8 | `download/mod.rs` (`DownloadQueue`)، `playlist.rs` | `limit.test.ts`، اختبارات `playlist.rs` |
-| FR-9، FR-10 | `download/extras.rs`، `srt.rs` | اختبارات `srt.rs` |
-| FR-11 | `download/editready.rs` | `video_1080_editor_ready_prefers_h264`؛ يدويًا في Premiere وResolve |
-| FR-13 | `separate.rs` | `stft_roundtrip`، `separates_voice_from_music` (يدوي) |
-| FR-14 | `background.rs` | يدويًا (TESTING.md) |
-| FR-15 | `history.rs`، `HistoryView.tsx` | اختبارات `history.rs` |
-| FR-16 | `tools.rs` (`update_ytdlp` مع نسخة احتياطية) | يدويًا |
-| FR-17 | `convert/args.rs` (`build_plan`)، `presets.ts` | `presets_real` (26 حالة)، `presets.test.ts` |
-| FR-18 | `convert/watcher.rs` | `watched_folder_converts_files_that_arrived_while_closed` |
-| FR-19 | `mobile.rs`، `ToolsPlugin.kt` | clippy لأندرويد في CI؛ يدويًا على الهاتف |
+| المتطلب | الكود | الاختبار | الدليل |
+|---|---|---|---|
+| FR-1، FR-3 | `download/args.rs` (`-S res:…`) | `video_1080_editor_ready_prefers_h264`، `video_best_without_editor_ready` | الجدول 6.2 (CI) |
+| FR-2 | `download/args.rs`، `downloadPlan.ts` | `downloadPlan.test.ts` | الجدول 6.2 (CI) |
+| FR-4 | `download/progress.rs`، `download/mod.rs` (الإلغاء بشجرة العمليات) | `parses_progress_line`، `parses_fragment_progress`، `kill_tree_ends_grandchildren_through_the_job_object` | الجدول 6.2 (CI) |
+| FR-5 | `settings.rs` | `settings` (8 اختبارات) | الجدول 6.2 (CI) |
+| FR-6 | `i18n.ts`، `errors.rs` | `i18nText.test.ts`، `rtl.test.ts`، `errorCodes.test.ts`، اختبارات `errors.rs` | الجدول 6.9 (دقة تصنيف الأخطاء)، §6.10 |
+| FR-7 | `downloadPlan.ts` (`laneClips`)، `--download-sections` | `sections`، `multiple_clips`، `downloadPlan.test.ts` | الجدول 6.3 (تنزيل جزء مقابل الكامل) |
+| FR-8 | `download/mod.rs` (`DownloadQueue`)، `playlist.rs` | `limit.test.ts`، اختبارات `playlist.rs` | الجدول 6.2 (CI) |
+| FR-9، FR-10 | `download/extras.rs`، `srt.rs` | اختبارات `srt.rs` | الجدول 6.2 (CI) |
+| FR-11 | `download/editready.rs` | `video_1080_editor_ready_prefers_h264`؛ يدويًا في Premiere وResolve | §6.4؛ H1 غير مختبرة |
+| FR-12 | `download/commands.rs` (المجلد قائمة تشغيل، `original` لملفات Drive)، `download/args.rs` (صيغة `source`) | `downloadPlan.test.ts` («الملف الأصلي (Drive) بلا تحويل»)؛ المجلد كاملًا يدويًا | لا دليل مسجّل |
+| FR-13 | `separate.rs` | `stft_roundtrip`، `separates_voice_from_music` (يدوي) | الجداول 6.4 و6.17 (`separation.csv`) |
+| FR-14 | `background.rs` | يدويًا (TESTING.md) | لا دليل مسجّل |
+| FR-15 | `history.rs`، `HistoryView.tsx` | اختبارات `history.rs` | الجدول 6.2 (CI) |
+| FR-16 | `tools.rs` (`update_ytdlp` مع نسخة احتياطية) | يدويًا | لا دليل مسجّل |
+| FR-17 | `convert/args.rs` (`build_plan`)، `presets.ts` | `presets_real` (26 حالة)، `presets.test.ts` | الجدول 6.5 (`presets_real`) |
+| FR-18 | `convert/watcher.rs` | `watched_folder_converts_files_that_arrived_while_closed` | الجدول 6.2 (CI) |
+| FR-19 | `mobile.rs`، `ToolsPlugin.kt` | clippy لأندرويد في CI؛ يدويًا على الهاتف | بناء الـ APK في CI؛ لا قياس على الهاتف |
+| FR-20 | `scenes.rs` (`detect`) | `finds_a_hard_cut_and_ignores_motion`، `rejects_a_flash`، `finds_a_dissolve_as_one_gradual_transition` | الجدولان 6.13 و6.14 (`scenes_test.csv`، `scenes_ablation.csv`) |
+| FR-21 | `convert/args.rs` (`calibrated_quality`) | `calibrated_quality_interpolates_and_falls_back` | الجدول 6.16 (`codecs_calibration.csv`) |
+| FR-22 | `separate.rs` | `stft_roundtrip` | الجدول 6.17 (`separation.csv`، `separation_tracks.csv`) |
+| FR-23 | `convert/silence.rs`، `convert/topics.rs`، `TopicPanel.tsx` | `auto_finds_pauses_in_noisy_room`، `splits_where_vocabulary_changes`، `reels.test.ts` (`planTopic`) | §6.15.1 (دون CSV) |
+| FR-24 | `src/reels.ts` (`trimToSilences`، `wordsToLines`)، `convert/words.rs` | `reels.test.ts` (`trimToSilences`، `wordsToLines`) | الجدولان 6.19 و6.20 (دون CSV) |
 
 ## 3.6 المتطلب «لا اتصالات غير ضرورية»
 
