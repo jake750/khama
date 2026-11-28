@@ -194,6 +194,8 @@ export interface ConvertOptions {
   reelMin?: number | null;
   reelMax?: number | null;
   outDir?: string | null;
+  /** ملف بعدة مسارات صوت: ادمجها في مسار واحد (R3-F12). بدونه تبقى منفصلة في صيغ المونتاج والبروكسي */
+  mixAudio?: boolean;
 }
 
 export interface ConvertRequest {
@@ -251,8 +253,9 @@ export interface DownloadRequest {
   /** تحميل جزء فقط (بالثواني) */
   start?: number | null;
   end?: number | null;
-  /** إزالة بالذكاء الاصطناعي: "voice" = أبقِ الصوت البشري (احذف الموسيقى) | "music" = أبقِ الموسيقى */
-  stems?: "voice" | "music" | null;
+  /** إزالة بالذكاء الاصطناعي: "voice" = أبقِ الصوت البشري (احذف الموسيقى) | "music" = أبقِ الموسيقى
+   * | "both" = الاثنان من مرور واحد (R3-F21) */
+  stems?: "voice" | "music" | "both" | null;
   /** عدة مقاطع [بداية، نهاية] بالثواني (تتقدّم على start/end) */
   clips?: [number, number][];
   /** مع عدة مقاطع: true = فيديو واحد، false = ملف لكل مقطع */
@@ -363,6 +366,21 @@ export interface JobUpdate {
   /** العنوان والصورة من yt-dlp أثناء التنزيل */
   title?: string;
   thumbnail?: string;
+  /** إعادة تلقائية جارية أو منتظرة (R3-F4) */
+  retry?: Retry;
+}
+
+/** إعادة تلقائية (R3-F4، F5، F6) */
+export interface Retry {
+  /** رقم الإعادة: 1 = الأولى */
+  attempt: number;
+  max: number;
+  /** متى تبدأ (ms) أثناء الانتظار؛ فارغ = تبدأ الآن */
+  at?: number;
+  /** network | timeout | rateLimited | incomplete: انتظار؛ update: تحديث yt-dlp؛ impersonate: تقمّص متصفح */
+  reason: string;
+  /** خطأ المحاولة السابقة */
+  error: AppError;
 }
 
 export interface ToolsInfo {

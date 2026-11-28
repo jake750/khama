@@ -29,6 +29,17 @@ impl std::ops::Deref for Cookies {
     }
 }
 
+impl Cookies {
+    /// إعادة بتقمّص Chrome بعد 403 (R3-F6): مع الكوكيز لأنها تصل كل أوامر yt-dlp في المهمة (الصفحة، والترجمة،
+    /// والصورة، والتنزيل)
+    pub(super) fn impersonating(mut self, on: bool) -> Self {
+        if on {
+            self.args.extend(["--impersonate".into(), "chrome".into()]);
+        }
+        self
+    }
+}
+
 impl Drop for Cookies {
     fn drop(&mut self) {
         if let Some(p) = &self.copy {
@@ -91,13 +102,14 @@ pub fn format_args(req: &DownloadRequest) -> Vec<String> {
     } else {
         let container = if req.video_format == "mov" { "mov" } else { "mp4" };
         // -S = ترتيب الأفضلية: أولًا الدقة (لا تتجاوز المطلوبة)،
-        // ثم - إن كان "جاهز للمونتاج" مفعّلًا - نفضّل H.264 و AAC حتى لا نحتاج تحويلًا.
+        // ثم - إن كان "جاهز للمونتاج" مفعّلًا - نفضّل SDR ثم H.264 و AAC حتى لا نحتاج تحويلًا.
+        // hdr:SDR بعد الدقة (R3-F8): نسخة SDR بنفس الدقة إن وُجدت، وإلا فـ HDR يُحوَّل بـ tonemap في editready
         let mut sort = match req.quality.as_str() {
             q @ ("2160" | "1440" | "1080" | "720" | "480" | "360") => format!("res:{q}"),
             _ => "res".to_string(),
         };
         if req.editor_ready || container == "mov" {
-            sort.push_str(",vcodec:h264,acodec:aac");
+            sort.push_str(",hdr:SDR,vcodec:h264,acodec:aac");
         }
         a.extend([
             "-f".into(),
@@ -132,6 +144,17 @@ pub(super) fn download_args(
         // مع حد السرعة لا: الحد في yt-dlp لكل اتصال، فأربعة أجزاء تتجاوزه
         a.extend(["--concurrent-fragments".into(), "4".into()]);
     }
+    // جزء HLS/DASH لم يصل بعد كل المحاولات كان يُتخطّى بصمت، فيصل الملف بفجوة لا يراها أحد (R3-F2).
+    // الآن يتوقف التنزيل بخطأ incomplete (والإعادة تكمل من حيث توقّف). المحاولات 15 بدل 10 وبينها
+    // انتظار متزايد حتى 8 ثوانٍ: نحو دقيقة و40 ثانية تغطي انقطاعًا قصيرًا. 20 حتى 20 ثانية كانت
+    // تنتظر 5:35 قبل أن تعترف بجزء محذوف (404) على خادم تجربة محلي
+    a.extend([
+        "--abort-on-unavailable-fragments".into(),
+        "--fragment-retries".into(),
+        "15".into(),
+        "--retry-sleep".into(),
+        "fragment:exp=1:8".into(),
+    ]);
     // ملف واحد لكل مهمة: رابط قائمة أو قناة بدأ قبل وصول المعاينة كان يُنزّل القائمة كلها
     // ولا يُسلَّم منها إلا آخر ملف. أغنية سبوتيفاي (رابط بحث) تأخذ أول نتيجة بالقاعدة نفسها
     a.extend(single_item());
@@ -168,7 +191,8 @@ pub(super) fn download_args(
         "after_move:KHAMA_FILE %(filepath)s".into(),
         // العنوان والصورة أثناء التنزيل، فلا نحتاج معاينة ثانية للسجلّ إن بدأ التنزيل قبلها (T-43)
         "--print".into(),
-        "before_dl:KHAMA_META %(.{title,thumbnail})j".into(),
+        // والمدة لمقارنتها بمدة الملف الناتج (R3-F2)
+        "before_dl:KHAMA_META %(.{title,thumbnail,duration})j".into(),
         "--".into(), // ما بعده رابط وليس خيارًا (حماية من روابط تبدأ بـ -)
         req.url.clone(),
     ]);

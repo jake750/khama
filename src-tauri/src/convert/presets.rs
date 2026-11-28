@@ -254,6 +254,18 @@ pub(super) const PRESETS: &[Preset] = &[
     },
 ];
 
+/// صيغ جاهزة في Rust لم تُضف إلى الواجهة (presets.ts) بعد. خارج PRESETS لأن عقد T-54 (presets.test.ts) يطابق
+/// الجدولين: حين تُضاف هناك تنتقل إلى PRESETS
+const PENDING_UI: &[Preset] = &[
+    // الحوار والموسيقى من مرور واحد للنموذج (R3-F21): فيديو بمسارين، أو ملفّا WAV
+    Preset {
+        id: "stem_both",
+        kind: PKind::Stems,
+        ext: "wav",
+        suffix: "voice + music",
+    },
+];
+
 pub fn preset(id: &str) -> Option<Preset> {
-    PRESETS.iter().copied().find(|p| p.id == id)
+    PRESETS.iter().chain(PENDING_UI).copied().find(|p| p.id == id)
 }

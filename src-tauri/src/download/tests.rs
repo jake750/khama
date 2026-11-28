@@ -115,7 +115,7 @@ fn sections() {
 fn video_1080_editor_ready_prefers_h264() {
     let a = format_args(&req("video", "mp4", "1080", true));
     let i = a.iter().position(|x| x == "-S").unwrap();
-    assert_eq!(a[i + 1], "res:1080,vcodec:h264,acodec:aac");
+    assert_eq!(a[i + 1], "res:1080,hdr:SDR,vcodec:h264,acodec:aac");
     assert!(a.contains(&"mp4".to_string()));
 }
 
@@ -249,6 +249,99 @@ fn meta_line_gives_title_and_thumbnail() {
     );
     assert_eq!(parse_meta_line("NA"), None);
     assert_eq!(parse_meta_line(r#"{"title": null}"#), None);
+}
+
+/// مدة الملف تُقارن بمدة الموقع أو المقطع المطلوب (R3-F2)
+#[test]
+fn short_downloads_are_incomplete() {
+    assert_eq!(meta_duration(r#"{"title": "x", "duration": 212.5}"#), Some(212.5));
+    assert_eq!(meta_duration(r#"{"title": "x", "duration": null}"#), None);
+    assert_eq!(meta_duration("NA"), None);
+    assert_eq!(expected_duration(Some(600.0), None), Some(600.0));
+    assert_eq!(expected_duration(Some(600.0), Some((10.0, 20.0))), Some(10.0));
+    // نهاية المقطع بعد آخر الفيديو: المتوقع حتى آخره فقط
+    assert_eq!(expected_duration(Some(15.0), Some((10.0, 20.0))), Some(5.0));
+    assert_eq!(expected_duration(None, Some((10.0, 20.0))), Some(10.0));
+    assert_eq!(expected_duration(None, None), None);
+    // ساعة ناقصة دقيقة: ناقص. ساعة ناقصة 30 ثانية (أقل من 1%): مقبول
+    assert!(is_incomplete(3600.0, 3540.0));
+    assert!(!is_incomplete(3600.0, 3570.0));
+    // يوتيوب يقرّب المدة: 4.6 ثوانٍ لفيديو «5 ثوانٍ» ليس نقصًا، و3 ثوانٍ نقص
+    assert!(!is_incomplete(5.0, 4.6));
+    assert!(is_incomplete(5.0, 3.0));
+    assert!(!is_incomplete(10.0, 12.0), "الأطول لا يُعدّ ناقصًا");
+}
+
+/// تنزيل HLS/DASH يتوقف عند جزء مفقود بدل أن يتخطّاه (R3-F2)
+#[test]
+fn missing_fragments_abort_the_download() {
+    let tools = Tools {
+        ytdlp: PathBuf::from("yt-dlp"),
+        ytdlp_prefix: vec![],
+        env: vec![],
+        js_runtime: String::new(),
+        ffmpeg: PathBuf::new(),
+        ffprobe: PathBuf::new(),
+        ffmpeg_dir: PathBuf::new(),
+    };
+    let o = JobOptions {
+        template: "%(title)s".into(),
+        rate_limit_kb: 0,
+        max_name: 120,
+    };
+    let a = download_args(
+        &tools,
+        vec![],
+        &req("video", "mp4", "best", false),
+        &o,
+        None,
+        Path::new("out"),
+        Path::new("work"),
+    );
+    assert!(a.iter().any(|x| x == "--abort-on-unavailable-fragments"));
+    assert!(a.windows(2).any(|w| w[0] == "--fragment-retries" && w[1] == "15"));
+    assert!(a.iter().any(|x| x.starts_with("before_dl:KHAMA_META") && x.contains("duration")));
+}
+
+/// ملف أقصر من مدة الموقع (R3-F2) بـ ffprobe الحقيقي: الأول خطأ ويُحذف، وإعادته بالمدة نفسها تُقبل
+/// (المدة المعلنة هي الخاطئة). KHAMA_FFMPEG=<مجلد bin فيه ffmpeg وffprobe> cargo test -- --ignored check_length
+#[test]
+#[ignore]
+fn check_length_with_real_ffprobe() {
+    let bin = PathBuf::from(std::env::var("KHAMA_FFMPEG").expect("KHAMA_FFMPEG"));
+    let tools = Tools {
+        ytdlp: PathBuf::new(),
+        ytdlp_prefix: vec![],
+        env: vec![],
+        js_runtime: String::new(),
+        ffmpeg: bin.join(format!("ffmpeg{}", tools::EXE)),
+        ffprobe: bin.join(format!("ffprobe{}", tools::EXE)),
+        ffmpeg_dir: bin.clone(),
+    };
+    let dir = std::env::temp_dir().join(format!("khama-short-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let make = |name: &str, secs: &str| {
+        let f = dir.join(name);
+        let ok = std::process::Command::new(&tools.ffmpeg)
+            .args(["-v", "error", "-y", "-f", "lavfi", "-i", "sine=f=440", "-t", secs, "-c:a", "aac"])
+            .arg(&f)
+            .status()
+            .unwrap();
+        assert!(ok.success());
+        f
+    };
+    tauri::async_runtime::block_on(async {
+        let full = make("full.m4a", "60");
+        assert!(check_length(&tools, &full, 60.0, &dir).await.is_ok());
+        let short = make("short.m4a", "50");
+        let e = check_length(&tools, &short, 60.0, &dir).await.unwrap_err();
+        assert_eq!(e.code, "incomplete");
+        assert!(!short.exists(), "الملف الناقص لا يبقى لتسلّمه الإعادة");
+        let again = make("short.m4a", "50");
+        assert!(check_length(&tools, &again, 60.0, &dir).await.is_ok(), "المدة نفسها مرتين: تُقبل");
+    });
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]
@@ -565,4 +658,323 @@ fn concurrent_fragments_only_without_rate_limit() {
     o.rate_limit_kb = 500;
     let a = download_args(&tools, vec![], &r, &o, None, Path::new("out"), Path::new("work"));
     assert!(!a.iter().any(|x| x == "--concurrent-fragments"));
+}
+
+fn media_check(codec: &str, video_ok: bool, audio_ok: bool) -> MediaCheck {
+    MediaCheck {
+        duration: Some(60.0),
+        video_ok,
+        audio_ok,
+        video: Some(crate::convert::VideoInfo {
+            codec: codec.into(),
+            profile: None,
+            width: 3840,
+            height: 2160,
+            fps: Some(30.0),
+            vfr: false,
+            pix_fmt: "yuv420p".into(),
+            bit_depth: 8,
+            hdr: false,
+            interlaced: false,
+        }),
+    }
+}
+
+/// «جاهز للمونتاج» بمشفّر كرت الشاشة نفسه الذي يستعمله المحوّل، والمعالج بلا كرت (R3-F7)
+#[test]
+fn editready_uses_the_gpu_encoder_like_the_converter() {
+    let (i, o) = (Path::new("in.webm"), Path::new("out/in.webm"));
+    let j = |a: Vec<String>| a.join(" ");
+    let cpu = j(editready_args(i, o, &media_check("av1", false, false), None));
+    assert!(
+        cpu.contains("-c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p -fps_mode cfr"),
+        "{cpu}"
+    );
+    assert!(cpu.contains("-c:a aac -b:a 320k"));
+    let qsv = j(editready_args(i, o, &media_check("av1", false, true), Some("h264_qsv")));
+    assert!(
+        qsv.contains("-c:v h264_qsv -preset medium -global_quality 20 -pix_fmt nv12"),
+        "{qsv}"
+    );
+    assert!(qsv.contains("-fps_mode cfr") && qsv.contains("-c:a copy"));
+    assert!(!qsv.contains("-hwaccel"), "فك الترميز بالعتاد لم يُسرّع شيئًا حين قيس");
+    assert!(
+        !qsv.contains("320k") && !qsv.contains("write_colr"),
+        "وسائط الصوت والحاوية من المحوّل لا تُنقل"
+    );
+    let nv = j(editready_args(i, o, &media_check("vp9", false, true), Some("h264_nvenc")));
+    assert!(nv.contains("-c:v h264_nvenc -preset p5 -rc vbr -cq 19"), "{nv}");
+    // الفيديو صالح: نسخ بلا مشفّر، حتى مع كرت الشاشة
+    let copy = j(editready_args(i, o, &media_check("h264", true, false), Some("h264_nvenc")));
+    assert!(copy.contains("-c:v copy") && !copy.contains("nvenc"));
+}
+
+/// HDR يُحوَّل إلى SDR بـ tonemap المحوّل ويوسم BT.709 (R3-F8)، وSDR بلا فلتر
+#[test]
+fn editready_tonemaps_hdr() {
+    let (i, o) = (Path::new("in.mp4"), Path::new("out/in.mp4"));
+    let mut hdr = media_check("hevc", false, true);
+    hdr.video.as_mut().unwrap().hdr = true;
+    for enc in [None, Some("h264_qsv")] {
+        let a = editready_args(i, o, &hdr, enc).join(" ");
+        assert!(a.contains(&format!("-vf {},format=yuv420p", crate::convert::TONEMAP)), "{a}");
+        assert!(a.contains("-color_primaries bt709 -color_trc bt709 -colorspace bt709"), "{a}");
+    }
+    let sdr = editready_args(i, o, &media_check("hevc", false, true), None).join(" ");
+    assert!(!sdr.contains("-vf") && !sdr.contains("bt709"), "{sdr}");
+}
+
+/// على ملف HDR10 حقيقي: check_media يكشفه، والناتج H.264 SDR موسوم BT.709 يقبله check_media كما هو.
+/// KHAMA_FFMPEG=<مجلد bin> KHAMA_HDR_FILE=<ملف HDR> cargo test -- --ignored editready_real_hdr --nocapture
+#[test]
+#[ignore]
+fn editready_real_hdr_is_tonemapped() {
+    let bin = PathBuf::from(std::env::var("KHAMA_FFMPEG").expect("KHAMA_FFMPEG"));
+    let src = PathBuf::from(std::env::var("KHAMA_HDR_FILE").expect("KHAMA_HDR_FILE"));
+    let tools = Tools {
+        ytdlp: PathBuf::new(),
+        ytdlp_prefix: vec![],
+        env: vec![],
+        js_runtime: String::new(),
+        ffmpeg: bin.join(format!("ffmpeg{}", tools::EXE)),
+        ffprobe: bin.join(format!("ffprobe{}", tools::EXE)),
+        ffmpeg_dir: bin.clone(),
+    };
+    let out = src.with_file_name("editready-out.mp4");
+    tauri::async_runtime::block_on(async {
+        let check = check_media(&tools, &src).await.unwrap();
+        assert!(check.video.as_ref().unwrap().hdr && !check.video_ok);
+        let args = editready_args(&src, &out, &check, None);
+        println!("ffmpeg {}", args.join(" "));
+        let ok = std::process::Command::new(&tools.ffmpeg)
+            .args(&args)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(ok.success());
+        let after = check_media(&tools, &out).await.unwrap();
+        assert!(after.video_ok && !after.video.unwrap().hdr, "SDR H.264 صالح للمونتاج كما هو");
+    });
+    let (_, tags, _) = tauri::async_runtime::block_on(tools::run_capture(
+        &tools.ffprobe,
+        &[
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=pix_fmt,color_transfer,color_primaries,color_space",
+            "-of",
+            "csv=p=0",
+            &out.to_string_lossy(),
+        ],
+    ))
+    .unwrap();
+    println!("out: {}", tags.trim());
+    assert_eq!(tags.trim(), "yuv420p,bt709,bt709,bt709");
+}
+
+/// الأمر نفسه على FFmpeg الحقيقي: مشفّر غير موجود يفشل، والمعالج بعده ينجح (الرجوع في convert_for_editing).
+/// KHAMA_FFMPEG=<مجلد bin> cargo test -- --ignored editready_real
+#[test]
+#[ignore]
+fn editready_real_ffmpeg_falls_back_to_cpu() {
+    let bin = PathBuf::from(std::env::var("KHAMA_FFMPEG").expect("KHAMA_FFMPEG"));
+    let ffmpeg = bin.join(format!("ffmpeg{}", tools::EXE));
+    let dir = std::env::temp_dir().join(format!("khama-editready-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("src.webm");
+    let made = std::process::Command::new(&ffmpeg)
+        .args([
+            "-v",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=640x360:r=30:d=2",
+            "-c:v",
+            "libvpx-vp9",
+        ])
+        .arg(&src)
+        .status()
+        .unwrap();
+    assert!(made.success());
+    let out = dir.join("out.mp4");
+    let check = media_check("vp9", false, true);
+    let run = |hw: Option<&str>| {
+        std::process::Command::new(&ffmpeg)
+            .args(editready_args(&src, &out, &check, hw))
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap()
+            .success()
+    };
+    // على جهاز بلا NVENC (هذا الجهاز: MX350) يفشل h264_nvenc، فيرجع الكود إلى المعالج
+    let nvenc = run(Some("h264_nvenc"));
+    assert!(run(Some("h264_qsv")) || run(None), "كرت آخر أو المعالج بعد فشل الأول");
+    println!("nvenc worked: {nvenc}");
+    assert!(out.exists());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// الإعادة التلقائية (R3-F4): أي الأخطاء تُعاد، ومتى
+#[test]
+fn transient_errors_are_retried_three_times() {
+    for c in ["network", "timeout", "rateLimited", "incomplete"] {
+        assert!(transient(c), "{c}");
+    }
+    for c in ["privateVideo", "forbidden", "extractorOutdated", "diskFull", "canceled", "unknown"] {
+        assert!(!transient(c), "{c}");
+    }
+    assert_eq!(RETRY_AFTER, [30, 120, 600]);
+    // تحديث yt-dlp ثم إعادة (R3-F5): الموقع تغيّر أو رفض، لا أخطاء الشبكة ولا ما لا يصلحه تحديث
+    for c in ["extractorOutdated", "forbidden"] {
+        assert!(heals(c) && !transient(c), "{c}");
+    }
+    for c in ["network", "privateVideo", "geoBlocked", "drm", "diskFull"] {
+        assert!(!heals(c), "{c}");
+    }
+    // رسائل yt-dlp 2026.10.26 المضمّن نفسه: خادم لا يرد، واسم لا يُحلّ (بلا إنترنت)
+    for e in [
+        "ERROR: [generic] a: Unable to download webpage: HTTPConnection(host='127.0.0.1', port=8799): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it (caused by TransportError(\"HTTPConnection(host='127.0.0.1', port=8799): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it\"))",
+        "ERROR: [generic] v: Unable to download webpage: HTTPSConnection(host='no-such-host-khama-test.invalid', port=443): Failed to resolve 'no-such-host-khama-test.invalid' ([Errno 11001] getaddrinfo failed) (caused by TransportError(\"HTTPSConnection(host='no-such-host-khama-test.invalid', port=443): Failed to resolve 'no-such-host-khama-test.invalid' ([Errno 11001] getaddrinfo failed)\"))",
+    ] {
+        assert_eq!(friendly_ytdlp_error(e).code, "network", "{e}");
+    }
+}
+
+#[test]
+fn host_port_from_links() {
+    let hp = |u: &str| host_port(u);
+    assert_eq!(hp("https://www.youtube.com/watch?v=x"), Some(("www.youtube.com".into(), 443)));
+    assert_eq!(hp("http://127.0.0.1:8765/a.m3u8"), Some(("127.0.0.1".into(), 8765)));
+    assert_eq!(hp("https://user:pw@vimeo.com"), Some(("vimeo.com".into(), 443)));
+    assert_eq!(hp("http://[::1]:8080/x"), Some(("::1".into(), 8080)));
+    assert_eq!(hp("HTTPS://Example.com?q=1"), Some(("Example.com".into(), 443)));
+    assert_eq!(hp("ytsearch:song"), None);
+    assert_eq!(hp("ftp://x.com"), None);
+}
+
+/// «عند عودة الاتصال» على منفذ حقيقي: مغلق ثم يُفتح، فيعود الانتظار قبل مؤقته. ومفتوح من البداية لا يعود
+#[test]
+fn back_online_waits_for_the_connection_to_return() {
+    let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+    let target = || Some(("127.0.0.1".to_string(), port));
+    tauri::async_runtime::block_on(async {
+        let t0 = Instant::now();
+        // Windows يعيد محاولة الاتصال المرفوض نحو ثانيتين قبل أن يعلن الرفض، فاتصال بدأ والمنفذ مغلق
+        // ينجح إن فُتح المنفذ خلالهما: نفتحه بعد أن تنتهي المحاولة الأولى مرفوضة
+        let reopen = tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(2500)).await;
+            std::net::TcpListener::bind(("127.0.0.1", port)).unwrap()
+        });
+        let back = tokio::time::timeout(Duration::from_secs(10), back_online(target(), Duration::from_millis(100))).await;
+        println!("back_online returned after {:?}", t0.elapsed());
+        assert!(back.is_ok(), "عاد الاتصال فانتهى الانتظار");
+        assert!(t0.elapsed() >= Duration::from_millis(2400), "لا يعود قبل أن يُفتح المنفذ");
+        let _listener = reopen.await.unwrap();
+        // المنفذ مفتوح من البداية: الموقع لم ينقطع، فالانتظار للمؤقت وحده
+        let never = tokio::time::timeout(Duration::from_millis(600), back_online(target(), Duration::from_millis(100))).await;
+        assert!(never.is_err());
+        let none = tokio::time::timeout(Duration::from_millis(200), back_online(None, Duration::from_millis(50))).await;
+        assert!(none.is_err());
+    });
+}
+
+/// rateLimited: تنزيل واحد في كل مرة حتى تنتهي إعادته، ثم حد الإعدادات (R3-F4). وحفظ الإعدادات أثناءه لا يرفعه
+#[test]
+fn rate_limit_throttles_to_one_download() {
+    let q = DownloadQueue::default();
+    assert_eq!(q.0.available_permits(), 3);
+    q.throttle(true, 3);
+    assert_eq!(q.0.available_permits(), 1);
+    q.set_limit(4);
+    assert_eq!(q.0.available_permits(), 1, "حفظ الإعدادات أثناء التباطؤ");
+    q.throttle(false, 4);
+    assert_eq!(q.0.available_permits(), 4);
+}
+
+/// حدّ السرعة للمجموع (R3-F31): وحده يأخذ الحد كله، ومعًا يُقسم بعدد الخانات على الأكثر
+#[test]
+fn rate_limit_is_shared_between_downloads() {
+    assert_eq!(rate_share(3000, 1, 3), 3000);
+    assert_eq!(rate_share(3000, 2, 3), 1500);
+    assert_eq!(rate_share(3000, 3, 3), 1000);
+    assert_eq!(rate_share(3000, 10, 3), 1000, "قائمة تشغيل: ثلاثة يعملون معًا");
+    assert_eq!(rate_share(3000, 0, 3), 3000);
+    assert_eq!(rate_share(0, 5, 3), 0, "بلا حد");
+    assert_eq!(rate_share(2, 5, 5), 1, "لا يصير صفرًا (= بلا حد)");
+    let before = Live::count();
+    let a = Live::new();
+    let b = Live::new();
+    assert_eq!(Live::count(), before + 2);
+    drop((a, b));
+    assert_eq!(Live::count(), before);
+    let q = DownloadQueue::default();
+    assert_eq!(q.slots(), 3);
+}
+
+/// موقع احتاج تقمّص Chrome مرة (R3-F6): معاينته وتنزيلاته التالية تبدأ به، بالخادم لا بالرابط كله
+#[test]
+fn sites_that_needed_a_browser_are_remembered() {
+    assert!(!wants_browser("https://cf-site-khama.example/v/1"));
+    remember_browser("https://CF-Site-Khama.example/v/1");
+    assert!(wants_browser("https://cf-site-khama.example/other?x=2"));
+    assert!(!wants_browser("https://www.youtube.com/watch?v=x"));
+}
+
+/// 403 بصفحة تشبه Cloudflare من خادم محلي لا يقبل إلا متصفحًا حقيقيًّا (scratchpad/f6/gate.py على 127.0.0.1:8766):
+/// بوسائط download_args نفسها يفشل التنزيل forbidden، ومع --impersonate chrome (Cookies::impersonating) ينجح.
+/// KHAMA_GATE_URL=http://127.0.0.1:8766/clip.mp4 cargo test -- --ignored impersonate_real --nocapture
+#[test]
+#[ignore]
+fn impersonate_real_ytdlp_passes_the_gate() {
+    let url = std::env::var("KHAMA_GATE_URL").expect("KHAMA_GATE_URL");
+    let bin = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries");
+    let tools = Tools {
+        ytdlp: bin.join(format!("khama-yt-dlp-x86_64-pc-windows-msvc{}", tools::EXE)),
+        ytdlp_prefix: vec![],
+        env: vec![],
+        js_runtime: format!("deno:{}", bin.join("khama-deno-x86_64-pc-windows-msvc.exe").display()),
+        ffmpeg: bin.join("ffmpeg/bin/ffmpeg.exe"),
+        ffprobe: bin.join("ffmpeg/bin/ffprobe.exe"),
+        ffmpeg_dir: bin.join("ffmpeg/bin"),
+    };
+    assert!(
+        tauri::async_runtime::block_on(tools::can_impersonate(&tools)),
+        "--list-impersonate-targets"
+    );
+    let opts = JobOptions {
+        template: "%(title)s".into(),
+        rate_limit_kb: 0,
+        max_name: 120,
+    };
+    let mut r = req("video", "mp4", "best", false);
+    r.url = url;
+    let dir = std::env::temp_dir().join(format!("khama-gate-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    for browser in [false, true] {
+        let extra: Vec<String> = if browser {
+            vec!["--impersonate".into(), "chrome".into()]
+        } else {
+            vec![]
+        };
+        let (out, work) = (dir.join(format!("out{browser}")), dir.join(format!("work{browser}")));
+        let a = download_args(&tools, extra, &r, &opts, None, &out, &work);
+        let o = std::process::Command::new(&tools.ytdlp).args(&a).output().unwrap();
+        let err = String::from_utf8_lossy(&o.stderr);
+        let files: Vec<_> = std::fs::read_dir(&out).map(|d| d.flatten().collect()).unwrap_or_default();
+        println!("impersonate={browser}: exit {:?}, files {}", o.status.code(), files.len());
+        if browser {
+            assert!(o.status.success() && files.len() == 1, "{err}");
+            println!("  {} bytes", files[0].metadata().unwrap().len());
+        } else {
+            assert_eq!(friendly_ytdlp_error(&err).code, "forbidden", "{err}");
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
 }

@@ -15,7 +15,7 @@ use std::{
     process::Stdio,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -97,11 +97,48 @@ impl Default for DownloadQueue {
     }
 }
 
+/// تنزيلات ردّها الموقع بـ «طلبات كثيرة» (rateLimited) وتنتظر إعادتها: ما دامت موجودة يعمل تنزيل واحد (R3-F4)
+static THROTTLED: AtomicUsize = AtomicUsize::new(0);
+
+/// تنزيلات حية الآن (تنتظر خانة أو تعمل أو تنتظر إعادة): حدّ السرعة يُقسم عليها (R3-F31)
+static LIVE_DOWNLOADS: AtomicUsize = AtomicUsize::new(0);
+
+/// يُحسب التنزيل حيًّا ما دامت هذه القيمة موجودة
+pub(super) struct Live;
+
+impl Live {
+    pub(super) fn new() -> Self {
+        LIVE_DOWNLOADS.fetch_add(1, Ordering::SeqCst);
+        Self
+    }
+
+    pub(super) fn count() -> usize {
+        LIVE_DOWNLOADS.load(Ordering::SeqCst)
+    }
+}
+
+impl Drop for Live {
+    fn drop(&mut self) {
+        LIVE_DOWNLOADS.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// حدّ السرعة في الإعدادات للمجموع لا لكل تنزيل، كما يشرحه rateLimitHint (R3-F31): نصيب تنزيل
+/// يبدأ = الحد مقسومًا على التنزيلات الحية، بحد أقصى عدد الخانات (لا يعمل أكثر منها معًا). 0 = بلا حد.
+/// yt-dlp لا يغيّر -r أثناء العمل، فتنزيل بدأ وحده يبقى على نصيبه حتى ينتهي أو يُعاد
+pub(crate) fn rate_share(limit_kb: u32, live: usize, slots: usize) -> u32 {
+    if limit_kb == 0 {
+        return 0;
+    }
+    let n = live.clamp(1, slots.max(1)) as u32;
+    (limit_kb / n).max(1)
+}
+
 impl DownloadQueue {
     /// يغيّر عدد الخانات. الزيادة فورية؛ والنقص يأخذ الخانات الفارغة الآن،
     /// والباقي يُسحب حين تنتهي تنزيلات جارية (لا نوقف تنزيلًا بدأ)
     pub fn set_limit(&self, n: usize) {
-        let n = n.clamp(1, 5);
+        let n = if THROTTLED.load(Ordering::SeqCst) > 0 { 1 } else { n.clamp(1, 5) };
         let mut cur = self.1.lock_ok();
         if n > *cur {
             self.0.add_permits(n - *cur);
@@ -119,6 +156,21 @@ impl DownloadQueue {
             }
         }
         *cur = n;
+    }
+
+    /// عدد الخانات الآن (تنزيلات تعمل معًا)
+    pub(super) fn slots(&self) -> usize {
+        *self.1.lock_ok()
+    }
+
+    /// بدء التباطؤ بعد rateLimited أو نهايته: الحد ينزل إلى 1، ثم يعود إلى `user` (الإعدادات) حين لا يبقى تنزيل محظور
+    pub(super) fn throttle(&self, on: bool, user: usize) {
+        if on {
+            THROTTLED.fetch_add(1, Ordering::SeqCst);
+        } else if THROTTLED.load(Ordering::SeqCst) > 0 {
+            THROTTLED.fetch_sub(1, Ordering::SeqCst);
+        }
+        self.set_limit(user);
     }
 }
 
@@ -363,6 +415,24 @@ fn ts_name(sec: f64) -> String {
     }
 }
 
+/// إعادة تلقائية بعد خطأ عابر (R3-F4) أو بعد تحديث yt-dlp (R3-F5) أو بتقمّص متصفح (R3-F6)
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
+#[serde(rename_all = "camelCase")]
+pub struct Retry {
+    /// رقم الإعادة: 1 = الأولى
+    pub attempt: u32,
+    /// أقصى عدد للإعادات من هذا النوع
+    pub max: u32,
+    /// متى تبدأ (ms منذ 1970) أثناء الانتظار؛ فارغ = تبدأ الآن
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub at: Option<u64>,
+    /// لماذا: network | timeout | rateLimited | incomplete (انتظار)، update (تحديث yt-dlp)، impersonate (تقمّص متصفح)
+    pub reason: &'static str,
+    /// خطأ المحاولة السابقة
+    pub error: AppError,
+}
+
 /// تحديث تستقبله الواجهة. الحقول الفارغة لا تُرسل، فتدمجها الواجهة مع ما لديها.
 #[derive(Debug, Clone, Default, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS), ts(export))]
@@ -409,6 +479,9 @@ pub struct JobUpdate {
     pub title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thumbnail: Option<String>,
+    /// إعادة تلقائية جارية أو منتظرة (R3-F4)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retry: Option<Retry>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -481,6 +554,29 @@ pub(super) fn parse_meta_line(rest: &str) -> Option<(Option<String>, Option<Stri
     let text = |k: &str| v.get(k).and_then(|x| x.as_str()).filter(|s| !s.is_empty()).map(String::from);
     let (title, thumbnail) = (text("title"), text("thumbnail"));
     (title.is_some() || thumbnail.is_some()).then_some((title, thumbnail))
+}
+
+/// المدة من سطر KHAMA_META (ثوانٍ)، إن عرفها الموقع (R3-F2)
+pub(super) fn meta_duration(rest: &str) -> Option<f64> {
+    let v: serde_json::Value = serde_json::from_str(rest.trim()).ok()?;
+    v.get("duration")?.as_f64().filter(|d| d.is_finite() && *d > 0.0)
+}
+
+/// المدة التي يجب أن يصل بها الملف: الفيديو كله، أو المقطع المطلوب منه (ونهايته لا تتجاوز آخر الفيديو)
+pub fn expected_duration(total: Option<f64>, section: Option<(f64, f64)>) -> Option<f64> {
+    match section {
+        Some((s, e)) => {
+            let end = total.map_or(e, |t| e.min(t));
+            Some(end - s).filter(|d| *d > 0.0)
+        }
+        None => total,
+    }
+}
+
+/// أقصر مما يجب (R3-F2)؟ الهامش 1% ولا يقل عن ثانية: يوتيوب يقرّب المدة إلى ثانية كاملة،
+/// فمقطع مدته المعلنة 5 ثوانٍ قد يكون 4.6. الأطول لا يُعدّ ناقصًا (القص يبدأ من إطار مفتاحي قبله)
+pub fn is_incomplete(expected: f64, got: f64) -> bool {
+    got < expected - (expected * 0.01).max(1.0)
 }
 
 /// حال كل عملية جارية كما يعرفها Rust (T-17): بطاقة الواجهة + آخر تحديث مدموج.

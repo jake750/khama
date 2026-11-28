@@ -191,6 +191,7 @@ pub(super) async fn run_job(
     req: DownloadRequest,
     settings: Settings,
     job_dir: &Path,
+    impersonate: bool,
     cancel: &mut watch::Receiver<bool>,
 ) -> Result<Option<PathBuf>, AppError> {
     let tools = tools::resolve(app)?;
@@ -216,7 +217,7 @@ pub(super) async fn run_job(
         }
     };
     std::fs::create_dir_all(&final_dir).map_err(|e| AppError::with_detail("outputDirCreate", e.to_string()))?;
-    let cookies = cookie_args(app, &settings);
+    let cookies = cookie_args(app, &settings).impersonating(impersonate);
     let user_tpl = &settings.filename_template;
     let n = if user_tpl.contains("{n}") {
         settings::reserve_counter(app, id, &settings)

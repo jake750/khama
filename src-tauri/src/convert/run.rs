@@ -164,13 +164,21 @@ pub(super) async fn run_convert(app: &AppHandle, id: u64, req: ConvertRequest, c
     let hw = if o.hw { hw_list(app, &tools).await } else { vec![] };
 
     // ---- توحيد الصوت: مرور أول للقياس ----
-    let loudnorm = match o.loudness.filter(|_| matches!(p.kind, PKind::Video | PKind::Audio) && !o.mute) {
-        Some(target) => match measure_loudness(&c, o, &infos, target, cancel).await? {
-            Some(l) => Some(l),
-            None => return Ok(None),
-        },
-        None => None,
-    };
+    // كل مسار يُقاس وحده حين تبقى المسارات منفصلة (R3-F12): المايك والصوت الداخلي بعلوّين مختلفين
+    let mut loudnorm = Vec::new();
+    if let Some(target) = o.loudness.filter(|_| matches!(p.kind, PKind::Video | PKind::Audio) && !o.mute) {
+        let tracks = if keeps_all_audio(&p, o, &infos) { infos[0].audio.len() } else { 1 };
+        for t in 0..tracks {
+            let m = ConvertOptions {
+                audio_track: (tracks > 1).then_some(t),
+                ..o.clone()
+            };
+            match measure_loudness(&c, &m, &infos, target, cancel).await? {
+                Some(l) => loudnorm.push(l),
+                None => return Ok(None),
+            }
+        }
+    }
 
     // ---- مكان الناتج ----
     let dir = output_dir_for(app, o, &first_path)?;
@@ -207,7 +215,7 @@ pub(super) async fn run_convert(app: &AppHandle, id: u64, req: ConvertRequest, c
         temp.clone()
     };
 
-    let plan = build_plan(&p, o, &infos, &hw, &target, loudnorm.as_deref())?;
+    let plan = build_plan_tracks(&p, o, &infos, &hw, &target, &loudnorm)?;
     emit(
         app,
         JobUpdate {
@@ -232,7 +240,7 @@ pub(super) async fn run_convert(app: &AppHandle, id: u64, req: ConvertRequest, c
             result.as_ref().err()
         );
         let _ = std::fs::remove_file(&temp);
-        let plan = build_plan(&p, o, &infos, &[], &target, loudnorm.as_deref())?;
+        let plan = build_plan_tracks(&p, o, &infos, &[], &target, &loudnorm)?;
         emit(
             app,
             JobUpdate {
@@ -372,11 +380,13 @@ pub async fn start_convert(app: AppHandle, request: ConvertRequest, id: Option<u
 pub fn queue_convert(app: &AppHandle, request: ConvertRequest, id: Option<u64>) -> Result<u64, AppError> {
     let jobs = app.state::<Jobs>();
     let queue = app.state::<ConvertQueue>();
-    if preset(&request.preset).is_none() {
+    let Some(p) = preset(&request.preset) else {
         return Err(AppError::with_param("unknownPreset", request.preset.clone(), ""));
-    }
+    };
     let (id, mut rx) = jobs.claim(id);
-    let sem = queue.0.clone();
+    // الخفيف في مساره ولا يأخذ من الحد المشترك مع التنزيلات (R3-F22)
+    let light = is_light(&p);
+    let sem = queue.lane(&p);
     let app2 = app.clone();
     // للسجلّ: التحويلات (ومنها المجلدات المراقَبة) تُسجَّل كالتنزيلات (U-62، U-75)
     let (source, preset_id) = (request.inputs.first().cloned().unwrap_or_default(), request.preset.clone());
@@ -395,9 +405,10 @@ pub fn queue_convert(app: &AppHandle, request: ConvertRequest, id: Option<u64>) 
             p = sem.acquire_owned() => p.ok(),
             _ = download::canceled(&mut rx) => None,
         };
-        // ثم دورنا في الحدّ المشترك مع التنزيلات (T-41)
+        // ثم دورنا في الحدّ المشترك مع التنزيلات (T-41)، للثقيل وحده
         let heavy = match permit {
-            Some(_) => download::heavy_turn(&mut rx).await,
+            Some(_) if light => Some(None),
+            Some(_) => download::heavy_turn(&mut rx).await.map(Some),
             None => None,
         };
         let result = match (permit, heavy) {
@@ -651,11 +662,13 @@ async fn run_stems(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOptions
     };
     // الصوت الأساسي وحده (KARA_2)، وإلا إزالة الموسيقى (Voc_FT)
     let model = separate::sep_model(if p.id == "stem_lead" { "lead" } else { "voice" });
-    let keep = if p.id == "stem_music" {
-        separate::Keep::Music
-    } else {
-        separate::Keep::Voice
+    let keep = match p.id {
+        "stem_music" => separate::Keep::Music,
+        "stem_both" => separate::Keep::Both,
+        _ => separate::Keep::Voice,
     };
+    // «الاثنان» لملف صوتي (R3-F21): ملفان بجانب بعضهما، الحوار والموسيقى. والفيديو: ملف واحد بمسارين
+    let two_files = keep == separate::Keep::Both && info.video.is_none();
     let dir = output_dir_for(c.app, o, &first_path)?;
     std::fs::create_dir_all(&dir).map_err(|e| AppError::with_detail("outputDirCreate", e.to_string()))?;
     let stem = first_path
@@ -680,22 +693,33 @@ async fn run_stems(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOptions
         cancel,
     )
     .await;
+    let music_temp = separate::music_companion(&temp);
     match ok {
         Ok(true) => {}
         Ok(false) => {
             let _ = std::fs::remove_file(&temp);
+            let _ = std::fs::remove_file(&music_temp);
             return Ok(None);
         }
         Err(e) => {
             let _ = std::fs::remove_file(&temp);
+            let _ = std::fs::remove_file(&music_temp);
             return Err(e);
         }
     }
-    let dest = unique_path(&dir, &format!("{stem} [{}].{ext}", p.suffix));
+    let suffix = if two_files { "no music" } else { p.suffix };
+    let dest = unique_path(&dir, &format!("{stem} [{suffix}].{ext}"));
     std::fs::rename(&temp, &dest).map_err(|e| {
         let _ = std::fs::remove_file(&dest);
         AppError::with_detail("moveFailed", e.to_string())
     })?;
+    if two_files {
+        let music = unique_path(&dir, &format!("{stem} [music only].{ext}"));
+        std::fs::rename(&music_temp, &music).map_err(|e| AppError::with_detail("moveFailed", e.to_string()))?;
+        if let Err(e) = deliver(c.app, music).await {
+            log::warn!("convert {}: music file: {e:?}", c.id);
+        }
+    }
     Ok(Some((deliver(c.app, dest).await?, None)))
 }
 

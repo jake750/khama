@@ -600,6 +600,8 @@ pub enum Keep {
     Voice,
     /// الموسيقى فقط (= إزالة الصوت البشري)
     Music,
+    /// الاثنان من مرور واحد للنموذج (R3-F21): فيديو بمسارين (الصوت ثم الموسيقى)، أو ملفّا صوت
+    Both,
 }
 
 impl Keep {
@@ -607,9 +609,23 @@ impl Keep {
         match s {
             "voice" => Some(Self::Voice),
             "music" => Some(Self::Music),
+            "both" => Some(Self::Both),
             _ => None,
         }
     }
+}
+
+/// ملف الموسيقى بجانب `voice` حين يُطلب «الاثنان» (R3-F21): «x.wav» ← «x-music.wav»
+pub fn music_companion(voice: &Path) -> PathBuf {
+    let stem = voice.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    let ext = voice.extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default();
+    voice.with_file_name(format!("{stem}-music{ext}"))
+}
+
+/// امتداد صوتي: الناتج صوت فقط (وإلا فالفيديو الأصلي بالصوت الجديد)
+pub fn audio_ext(path: &Path) -> bool {
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    matches!(ext.as_str(), "wav" | "mp3" | "m4a" | "aac" | "flac" | "opus" | "ogg")
 }
 
 #[cfg(windows)]
@@ -668,9 +684,11 @@ pub fn separate_blocking(
     progress: &AtomicU64,
     cancel: &AtomicBool,
 ) -> Result<bool, AppError> {
+    let both = music_companion(out_wav);
     let (voice, music) = match keep {
         Keep::Voice => (Some(out_wav), None),
         Keep::Music => (None, Some(out_wav)),
+        Keep::Both => (Some(out_wav), Some(both.as_path())),
     };
     separate_stems(
         ffmpeg,
@@ -972,7 +990,87 @@ fn drain_stderr(c: &mut std::process::Child) -> Option<std::thread::JoinHandle<S
     }))
 }
 
-/// يفصل الصوت ثم يكتب الناتج النهائي:
+/// أمر ffmpeg للناتج النهائي بعد الفصل. `wav` ناتج النموذج، وفي «الاثنان» موسيقاه في music_companion(wav).
+/// - امتداد صوتي: صوت فقط بتلك الصيغة (و«الاثنان»: ملفان من أمر واحد، الموسيقى في music_companion(output))
+/// - وإلا: الفيديو الأصلي + الصوت الجديد (و«الاثنان»: مساران، الحوار أولًا ثم الموسيقى)
+pub(crate) fn final_args(
+    input: &Path,
+    wav: &Path,
+    output: &Path,
+    start: Option<f64>,
+    end: Option<f64>,
+    keep: Keep,
+) -> Vec<std::ffi::OsString> {
+    let mut a: Vec<std::ffi::OsString> = Vec::new();
+    let mut push = |v: &[&str]| a.extend(v.iter().map(std::ffi::OsString::from));
+    push(&["-hide_banner", "-nostdin", "-y", "-v", "error"]);
+    let ext = output.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    let music = music_companion(wav);
+    let both = keep == Keep::Both;
+    if audio_ext(output) {
+        let codec: &[&str] = match ext.as_str() {
+            "mp3" => &["-c:a", "libmp3lame", "-b:a", "320k"],
+            "m4a" | "aac" => &["-c:a", "aac", "-b:a", "320k"],
+            "flac" => &["-c:a", "flac"],
+            "opus" | "ogg" => &["-c:a", "libopus", "-b:a", "192k"],
+            _ => &["-c:a", "pcm_s16le"],
+        };
+        push(&["-i"]);
+        a.push(wav.into());
+        if both {
+            a.extend(["-i".into(), music.into_os_string()]);
+            a.extend(["-map", "0:a:0"].map(Into::into));
+            a.extend(codec.iter().map(Into::into));
+            a.push(output.into());
+            a.extend(["-map", "1:a:0"].map(Into::into));
+            a.extend(codec.iter().map(Into::into));
+            a.push(music_companion(output).into_os_string());
+        } else {
+            a.extend(codec.iter().map(Into::into));
+            a.push(output.into());
+        }
+        return a;
+    }
+    let trimmed = start.is_some() || end.is_some();
+    if let Some(s) = start {
+        a.extend(["-ss".into(), format!("{s:.3}").into()]);
+    }
+    if let Some(e) = end {
+        a.extend(["-to".into(), format!("{e:.3}").into()]);
+    }
+    a.extend(["-i".into(), input.into(), "-i".into(), wav.into()]);
+    if both {
+        a.extend(["-i".into(), music.into_os_string()]);
+    }
+    let mut push = |v: &[&str]| a.extend(v.iter().map(std::ffi::OsString::from));
+    push(&["-map", "0:v:0", "-map", "1:a:0"]);
+    if both {
+        // مساران في الفيديو نفسه: الحوار أولًا (الافتراضي) ثم الموسيقى، باسميهما في برنامج المونتاج.
+        // MP4 يكتب title في «name» وMOV في «title»، وبعض البرامج تعرض handler_name: نكتب الاثنين
+        push(&["-map", "2:a:0"]);
+        push(&["-metadata:s:a:0", "title=Voice", "-metadata:s:a:0", "handler_name=Voice"]);
+        push(&["-metadata:s:a:1", "title=Music", "-metadata:s:a:1", "handler_name=Music"]);
+    }
+    if trimmed {
+        // القص الدقيق يحتاج إعادة ترميز الصورة حتى تتطابق مع الصوت المقصوص
+        push(&["-c:v", "libx264", "-preset", "fast", "-crf", "17", "-pix_fmt", "yuv420p"]);
+    } else {
+        push(&["-c:v", "copy"]);
+    }
+    if ext == "mov" {
+        push(&["-c:a", "pcm_s16le"]);
+    } else if ext == "webm" || ext == "mkv" {
+        push(&["-c:a", "libopus", "-b:a", "192k"]);
+    } else {
+        push(&["-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart"]);
+    }
+    // 48kHz = المعدل القياسي في برامج المونتاج
+    push(&["-ar", "48000", "-shortest"]);
+    a.push(output.into());
+    a
+}
+
+/// يفصل الصوت ثم يكتب الناتج النهائي (final_args):
 /// - إن كان امتداد الناتج صوتيًا: صوت فقط بتلك الصيغة
 /// - وإلا: الفيديو الأصلي + الصوت الجديد
 #[allow(clippy::too_many_arguments)]
@@ -1056,49 +1154,11 @@ pub async fn process_file(
             ..Default::default()
         },
     );
-    let ext = output.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
     let mut cmd = tools::command(&tools.ffmpeg);
-    cmd.args(["-hide_banner", "-nostdin", "-y", "-v", "error"]);
-    let audio_only = matches!(ext.as_str(), "wav" | "mp3" | "m4a" | "aac" | "flac" | "opus" | "ogg");
-    if audio_only {
-        cmd.arg("-i").arg(&wav);
-        let codec: &[&str] = match ext.as_str() {
-            "mp3" => &["-c:a", "libmp3lame", "-b:a", "320k"],
-            "m4a" | "aac" => &["-c:a", "aac", "-b:a", "320k"],
-            "flac" => &["-c:a", "flac"],
-            "opus" | "ogg" => &["-c:a", "libopus", "-b:a", "192k"],
-            _ => &["-c:a", "pcm_s16le"],
-        };
-        cmd.args(codec);
-    } else {
-        let trimmed = start.is_some() || end.is_some();
-        if let Some(s) = start {
-            cmd.args(["-ss", &format!("{s:.3}")]);
-        }
-        if let Some(e) = end {
-            cmd.args(["-to", &format!("{e:.3}")]);
-        }
-        cmd.arg("-i").arg(input).arg("-i").arg(&wav);
-        cmd.args(["-map", "0:v:0", "-map", "1:a:0"]);
-        if trimmed {
-            // القص الدقيق يحتاج إعادة ترميز الصورة حتى تتطابق مع الصوت المقصوص
-            cmd.args(["-c:v", "libx264", "-preset", "fast", "-crf", "17", "-pix_fmt", "yuv420p"]);
-        } else {
-            cmd.args(["-c:v", "copy"]);
-        }
-        if ext == "mov" {
-            cmd.args(["-c:a", "pcm_s16le"]);
-        } else if ext == "webm" || ext == "mkv" {
-            cmd.args(["-c:a", "libopus", "-b:a", "192k"]);
-        } else {
-            cmd.args(["-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart"]);
-        }
-        // 48kHz = المعدل القياسي في برامج المونتاج
-        cmd.args(["-ar", "48000", "-shortest"]);
-    }
-    cmd.arg(output);
+    cmd.args(final_args(input, &wav, output, start, end, keep));
     let out = cmd.output().await?;
     let _ = std::fs::remove_file(&wav);
+    let _ = std::fs::remove_file(music_companion(&wav));
     if !out.status.success() {
         return Err(AppError::with_detail(
             "encodeFailed",
@@ -1208,5 +1268,163 @@ mod tests {
         let voice_snr = snr(&read(&tmp.join("voice.wav")));
         println!("SNR vs clean voice — mix: {mix_snr:.1} dB, separated: {voice_snr:.1} dB");
         assert!(voice_snr > mix_snr + 6.0, "separation did not improve the voice");
+    }
+
+    fn strs(a: &[std::ffi::OsString]) -> Vec<String> {
+        a.iter().map(|x| x.to_string_lossy().into_owned()).collect()
+    }
+
+    /// «الاثنان» (R3-F21): الصوت ملفان من أمر واحد، والفيديو مساران بالترتيب والاسمين
+    #[test]
+    fn both_writes_two_files_or_two_tracks() {
+        assert_eq!(
+            music_companion(Path::new("w/x [no music].mp3")),
+            Path::new("w/x [no music]-music.mp3")
+        );
+        assert_eq!(Keep::parse("both"), Some(Keep::Both));
+
+        let a = strs(&final_args(
+            Path::new("in.mp3"),
+            Path::new("stem.wav"),
+            Path::new("x.mp3"),
+            None,
+            None,
+            Keep::Both,
+        ));
+        let at = |v: &str| a.iter().position(|x| x == v).unwrap();
+        assert_eq!(a.iter().filter(|x| *x == "-i").count(), 2);
+        assert!(a.contains(&"stem-music.wav".to_string()));
+        assert!(at("0:a:0") < at("x.mp3") && at("x.mp3") < at("1:a:0"));
+        assert_eq!(a.last().unwrap(), "x-music.mp3");
+        assert_eq!(a.iter().filter(|x| *x == "libmp3lame").count(), 2, "كل ملف بترميزه");
+
+        let v = strs(&final_args(
+            Path::new("in.mp4"),
+            Path::new("stem.wav"),
+            Path::new("x.mp4"),
+            None,
+            None,
+            Keep::Both,
+        ));
+        let maps: Vec<&String> = v
+            .iter()
+            .zip(v.iter().skip(1))
+            .filter(|(k, _)| *k == "-map")
+            .map(|(_, m)| m)
+            .collect();
+        assert_eq!(maps, ["0:v:0", "1:a:0", "2:a:0"]);
+        assert!(
+            ["title=Voice", "handler_name=Voice", "title=Music", "handler_name=Music"]
+                .iter()
+                .all(|t| v.contains(&t.to_string()))
+        );
+        assert_eq!(v.last().unwrap(), "x.mp4");
+
+        // صوت واحد كما كان
+        let one = strs(&final_args(
+            Path::new("in.mp4"),
+            Path::new("stem.wav"),
+            Path::new("x.mp4"),
+            None,
+            None,
+            Keep::Voice,
+        ));
+        assert_eq!(one.iter().filter(|x| *x == "-i").count(), 2);
+        assert!(!one.iter().any(|x| x.contains("title=")));
+    }
+
+    /// اختبار حقيقي (يدوي) لـ«الاثنان»: مرور واحد للنموذج بدل مرورين، ثم أوامر الناتج كما يبنيها الكود
+    /// KHAMA_AI=<مجلد onnxruntime والنموذج> KHAMA_SONG=<أغنية> KHAMA_VIDEO=<فيديو بكلام وموسيقى>
+    #[test]
+    #[ignore]
+    fn both_real_one_pass() {
+        let ai = PathBuf::from(std::env::var("KHAMA_AI").unwrap());
+        let bin = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries/ffmpeg/bin");
+        let ffmpeg = bin.join(format!("ffmpeg{}", tools::EXE));
+        let ffprobe = bin.join(format!("ffprobe{}", tools::EXE));
+        let song = PathBuf::from(std::env::var("KHAMA_SONG").unwrap());
+        let video = PathBuf::from(std::env::var("KHAMA_VIDEO").unwrap());
+        let lib = ai.join(if cfg!(windows) {
+            "onnxruntime.dll"
+        } else if cfg!(target_os = "macos") {
+            "libonnxruntime.dylib"
+        } else {
+            "libonnxruntime.so"
+        });
+        let model = ai.join(VOICE.asset.name);
+        let tmp = std::env::temp_dir().join("khama-both");
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let (p, c) = (AtomicU64::new(0), AtomicBool::new(false));
+        let (s, e) = (Some(30.0), Some(90.0));
+        let run = |keep: Keep, out: &Path| {
+            let t0 = std::time::Instant::now();
+            assert!(separate_blocking(&ffmpeg, &lib, &VOICE, &model, &song, s, e, keep, out, &p, &c).unwrap());
+            t0.elapsed().as_secs_f64()
+        };
+        let tv = run(Keep::Voice, &tmp.join("v.wav"));
+        let tm = run(Keep::Music, &tmp.join("m.wav"));
+        let tb = run(Keep::Both, &tmp.join("b.wav"));
+        println!("60s of song: voice {tv:.1}s + music {tm:.1}s = {:.1}s, both {tb:.1}s", tv + tm);
+        let read = |p: &Path| -> Vec<f32> {
+            let o = std::process::Command::new(&ffmpeg)
+                .args(["-v", "error", "-i"])
+                .arg(p)
+                .args(["-ac", "1", "-f", "f32le", "-"])
+                .output()
+                .unwrap();
+            o.stdout.chunks(4).map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect()
+        };
+        let diff = |x: &[f32], y: &[f32]| x.iter().zip(y).map(|(a, b)| (a - b).abs()).fold(0f32, f32::max);
+        let dv = diff(&read(&tmp.join("v.wav")), &read(&tmp.join("b.wav")));
+        let dm = diff(&read(&tmp.join("m.wav")), &read(&music_companion(&tmp.join("b.wav"))));
+        println!("max diff vs separate passes: voice {dv:.5}, music {dm:.5}");
+        assert!(dv < 1e-3 && dm < 1e-3, "one pass gives the same two stems");
+        assert!(tb < (tv + tm) * 0.75, "one pass is clearly faster than two");
+
+        let probe = |f: &Path| -> String {
+            let o = std::process::Command::new(&ffprobe)
+                .args([
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "stream=codec_type,codec_name,channels:stream_tags=title,name,handler_name:format=duration",
+                    "-of",
+                    "compact",
+                ])
+                .arg(f)
+                .output()
+                .unwrap();
+            String::from_utf8_lossy(&o.stdout).into_owned()
+        };
+        let ffrun = |a: Vec<std::ffi::OsString>| {
+            let o = std::process::Command::new(&ffmpeg).args(a).output().unwrap();
+            assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+        };
+        // صوت: ملفان mp3 من الأمر نفسه
+        let out = tmp.join("song [no music].mp3");
+        ffrun(final_args(&song, &tmp.join("b.wav"), &out, s, e, Keep::Both));
+        println!("{}\n{}", probe(&out), probe(&music_companion(&out)));
+        assert!(probe(&music_companion(&out)).contains("codec_name=mp3"));
+
+        // فيديو: مساران، كاملًا ثم مقصوصًا (يعيد ترميز الصورة)
+        for (vs, ve, name) in [(None, None, "full"), (Some(5.0), Some(20.0), "trim")] {
+            let wav = tmp.join(format!("{name}.wav"));
+            let t0 = std::time::Instant::now();
+            assert!(separate_blocking(&ffmpeg, &lib, &VOICE, &model, &video, vs, ve, Keep::Both, &wav, &p, &c).unwrap());
+            let out = tmp.join(format!("{name} [voice + music].mp4"));
+            ffrun(final_args(&video, &wav, &out, vs, ve, Keep::Both));
+            let info = probe(&out);
+            println!("{name} ({:.1}s):\n{info}", t0.elapsed().as_secs_f64());
+            assert_eq!(info.matches("codec_type=audio").count(), 2);
+            assert!(info.contains("=Voice") && info.contains("=Music"));
+        }
+        // MOV للمونتاج: PCM ومساران باسميهما
+        let out = tmp.join("full [voice + music].mov");
+        ffrun(final_args(&video, &tmp.join("full.wav"), &out, None, None, Keep::Both));
+        let info = probe(&out);
+        println!("mov:\n{info}");
+        assert_eq!(info.matches("codec_name=pcm_s16le").count(), 2);
+        assert!(info.contains("=Voice") && info.contains("=Music"));
     }
 }

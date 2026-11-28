@@ -325,6 +325,9 @@ pub async fn update_ytdlp(app: AppHandle) -> Result<UpdateResult, AppError> {
     let r = tauri::async_runtime::spawn_blocking(move || crate::mobile::update_ytdlp(&app))
         .await
         .map_err(|e| AppError::with_detail("updateFailed", e.to_string()))??;
+    if r.updated {
+        new_ytdlp();
+    }
     Ok(UpdateResult {
         updated: r.updated,
         version: r.version,
@@ -369,10 +372,105 @@ pub async fn update_ytdlp(app: AppHandle) -> Result<UpdateResult, AppError> {
         ));
     }
     let _ = tokio::fs::remove_file(&backup).await;
+    if before != after {
+        new_ytdlp();
+    }
     Ok(UpdateResult {
         updated: before != after,
         version: after,
     })
+}
+
+// ======================= إصلاح yt-dlp تلقائيًا (R3-F5) =======================
+
+/// يزيد كلما حلّت نسخة yt-dlp جديدة محل القديمة (بالزر أو تلقائيًا): مهمة فشلت بالنسخة القديمة تُعاد
+static YTDLP_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+fn new_ytdlp() {
+    YTDLP_GEN.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// رقم نسخة yt-dlp الحالية (تأخذه المهمة قبل أن تبدأ)
+pub fn ytdlp_generation() -> u64 {
+    YTDLP_GEN.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+/// آخر محاولة تحديث تلقائي، وقفل يجعل المهام الفاشلة معًا تنتظر تحديثًا واحدًا
+static AUTO_UPDATE: tokio::sync::Mutex<Option<std::time::Instant>> = tokio::sync::Mutex::const_new(None);
+
+/// مرة في الساعة على الأكثر: المواقع تتعطّل لساعات قبل أن يصدر yt-dlp إصلاحه، وكل فشل لا يستحق اتصالًا بـ GitHub
+pub(crate) const AUTO_UPDATE_EVERY: std::time::Duration = std::time::Duration::from_secs(3600);
+
+/// هل يُحدَّث الآن؟ نعم إن لم يُحاوَل من قبل أو مرّت ساعة منذ آخر محاولة (نجحت أو فشلت)
+pub(crate) fn auto_update_due(last: Option<std::time::Instant>, now: std::time::Instant) -> bool {
+    last.is_none_or(|t| now.saturating_duration_since(t) >= AUTO_UPDATE_EVERY)
+}
+
+/// تنزيل فشل لأن yt-dlp لم يعد يفهم الموقع (extractorOutdated) أو رُفض (forbidden): نحدّث yt-dlp مرة في الساعة
+/// على الأكثر. `since` = ytdlp_generation() قبل أن تبدأ المهمة. true = هناك الآن نسخة أحدث مما فشلت به المهمة،
+/// سواء حدّثناها هنا أو حدّثها المستخدم أو مهمة أخرى في الأثناء، فتستحق الإعادة
+pub async fn heal_ytdlp(app: &AppHandle, since: u64) -> bool {
+    let mut last = AUTO_UPDATE.lock().await;
+    if ytdlp_generation() != since {
+        return true;
+    }
+    let now = std::time::Instant::now();
+    if !auto_update_due(*last, now) {
+        return false;
+    }
+    *last = Some(now);
+    match update_ytdlp(app.clone()).await {
+        Ok(r) => {
+            log::info!("auto-update yt-dlp: updated={} version={:?}", r.updated, r.version);
+            r.updated
+        }
+        Err(e) => {
+            log::warn!("auto-update yt-dlp failed: {e:?}");
+            false
+        }
+    }
+}
+
+// ======================= تقمّص متصفح (R3-F6) =======================
+
+/// هل في قائمة `--list-impersonate-targets` هدف Chrome متاح؟ السطر "Chrome-136      Macos-15     curl_cffi"،
+/// والهدف الذي تنقصه مكتبته يُكتب "(unavailable)"
+pub(crate) fn lists_chrome(out: &str) -> bool {
+    out.lines().any(|l| {
+        let l = l.trim().to_ascii_lowercase();
+        l.starts_with("chrome") && !l.contains("unavailable")
+    })
+}
+
+/// نتيجة الفحص لكل نسخة yt-dlp: (رقم النسخة، يستطيع)
+static IMPERSONATE: tokio::sync::Mutex<Option<(u64, bool)>> = tokio::sync::Mutex::const_new(None);
+
+/// هل يستطيع yt-dlp على هذا الجهاز تقمّص Chrome (curl_cffi)؟ يُسأل yt-dlp نفسه مرة لكل نسخة منه، لأن
+/// المكتبة مضمّنة في بعض نسخه وأنظمته دون غيرها (الهاتف مثلًا)
+pub async fn can_impersonate(tools: &Tools) -> bool {
+    let mut cached = IMPERSONATE.lock().await;
+    let generation = ytdlp_generation();
+    if let Some((g, ok)) = *cached
+        && g == generation
+    {
+        return ok;
+    }
+    let mut cmd = ytdlp_command(tools);
+    cmd.args(ytdlp_base_args(tools)).arg("--list-impersonate-targets");
+    let ok = match cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).output().await {
+        Ok(o) => lists_chrome(&format!(
+            "{}\n{}",
+            String::from_utf8_lossy(&o.stdout),
+            String::from_utf8_lossy(&o.stderr)
+        )),
+        Err(e) => {
+            log::warn!("--list-impersonate-targets: {e}");
+            false
+        }
+    };
+    log::info!("yt-dlp can impersonate Chrome: {ok}");
+    *cached = Some((generation, ok));
+    ok
 }
 
 #[cfg(test)]
@@ -397,5 +495,29 @@ mod tests {
         assert_eq!(after("--encoding"), Some("utf-8"));
         assert_eq!(after("--ffmpeg-location"), Some("/x/ffmpeg"));
         assert_eq!(after("--js-runtimes"), Some("deno:/x/deno"));
+    }
+
+    /// التحديث التلقائي بعد فشل (R3-F5): أول مرة، ثم لا شيء قبل ساعة
+    #[test]
+    fn auto_update_at_most_once_an_hour() {
+        use std::time::{Duration, Instant};
+        let now = Instant::now() + Duration::from_secs(2 * 3600);
+        assert!(auto_update_due(None, now));
+        assert!(!auto_update_due(Some(now - Duration::from_secs(59 * 60)), now));
+        assert!(auto_update_due(Some(now - Duration::from_secs(3600)), now));
+        let g = ytdlp_generation();
+        new_ytdlp();
+        assert!(ytdlp_generation() > g, "نسخة جديدة: المهمة التي فشلت بالقديمة تُعاد");
+    }
+
+    /// مخرجات yt-dlp 2026.10.26 المضمّن (مختصرة)، وهي نفسها بلا curl_cffi
+    #[test]
+    fn impersonate_targets_need_an_available_chrome() {
+        let ok = "[info] Available impersonate targets\nClient          OS           Source\n--------------------------------------\nChrome-133      Macos-15     curl_cffi\nSafari-17.2     Ios-17.2     curl_cffi\n";
+        assert!(lists_chrome(ok));
+        let missing = "[info] Available impersonate targets\nClient          OS           Source\n--------------------------------------\nChrome          -            curl_cffi (unavailable)\nSafari          -            curl_cffi (unavailable)\n";
+        assert!(!lists_chrome(missing));
+        assert!(!lists_chrome("Safari-17.2     Ios-17.2     curl_cffi\n"));
+        assert!(!lists_chrome(""));
     }
 }

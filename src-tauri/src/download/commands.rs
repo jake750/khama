@@ -21,64 +21,208 @@ pub async fn start_download(
 
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
-        // ننتظر دورنا إن كانت كل الخانات مشغولة (والإلغاء ممكن أثناء الانتظار)
-        let slot = match slots.clone().try_acquire_owned() {
-            Ok(p) => Some(p),
-            Err(_) => {
-                let jump = jump_signal(id);
-                emit(
-                    &app2,
-                    JobUpdate {
-                        id,
-                        state: "queued",
-                        ..Default::default()
-                    },
-                );
-                let got = tokio::select! {
-                    p = slots.acquire_owned() => Some(p.expect("semaphore never closed")),
-                    // «ابدأ الآن»: بلا خانة، فوق العدد المحدد (U-11)
-                    _ = jump.notified() => None,
-                    _ = canceled(&mut rx) => {
+        // حدّ السرعة يُقسم على التنزيلات الحية (R3-F31)
+        let _live = Live::new();
+        let mut job_dir: Result<PathBuf, AppError> = Err(AppError::new("canceled"));
+        let mut dir_key: Option<String> = None;
+        // إعادات بعد خطأ عابر (R3-F4)، و«ابدأ الآن» أثناء انتظار إحداها، والتباطؤ بعد rateLimited
+        let mut retries = 0;
+        let mut jumped = false;
+        let mut throttled = false;
+        // تحديث yt-dlp ثم إعادة واحدة (R3-F5)، والخانة تبقى محجوزة له
+        let mut healed = false;
+        let mut keep_slot = false;
+        // 403 أو Cloudflare: إعادة واحدة بتقمّص Chrome (R3-F6)
+        let mut impersonate = wants_browser(&req.url);
+        let result = loop {
+            // ننتظر دورنا إن كانت كل الخانات مشغولة (والإلغاء ممكن أثناء الانتظار)
+            let slot = if keep_slot {
+                None
+            } else {
+                match slots.clone().try_acquire_owned() {
+                    Ok(p) => Some(p),
+                    Err(_) if jumped => None,
+                    Err(_) => {
+                        let jump = jump_signal(id);
+                        emit(
+                            &app2,
+                            JobUpdate {
+                                id,
+                                state: "queued",
+                                ..Default::default()
+                            },
+                        );
+                        let got = tokio::select! {
+                            p = slots.clone().acquire_owned() => Some(p.expect("semaphore never closed")),
+                            // «ابدأ الآن»: بلا خانة، فوق العدد المحدد (U-11)
+                            _ = jump.notified() => None,
+                            _ = canceled(&mut rx) => {
+                                forget_jump(id);
+                                break Ok(None);
+                            }
+                        };
                         forget_jump(id);
-                        app2.state::<Jobs>().cancels.lock_ok().remove(&id);
-                        emit(&app2, JobUpdate { id, state: "canceled", ..Default::default() });
-                        return;
+                        got
                     }
+                }
+            };
+            jumped = false;
+            keep_slot = false;
+            if let Some(slot) = slot {
+                hold_slot(id, slot);
+            }
+            emit(
+                &app2,
+                JobUpdate {
+                    id,
+                    state: "starting",
+                    ..Default::default()
+                },
+            );
+            // المجلد نفسه في كل إعادة: yt-dlp يكمل من ملفات .part (T-56)
+            release_job_dir(dir_key.take());
+            let claimed = jobs_root(&app2).map(|r| claim_job_dir(&r, id, &req));
+            (job_dir, dir_key) = match claimed {
+                Ok((d, k)) => (Ok(d), k),
+                Err(e) => (Err(e), None),
+            };
+            let generation = crate::tools::ytdlp_generation();
+            let result = match &job_dir {
+                // في مهمة منفصلة: panic داخلها (خلل غير متوقع) يصير خطأً على البطاقة،
+                // وتُحرَّر الخانة والمجلد تحته، بدل بطاقة عالقة وخانة محجوزة إلى الأبد (RD7)
+                Ok(dir) => {
+                    let (app3, dir, mut rx2) = (app2.clone(), dir.clone(), rx.clone());
+                    let (req, mut settings) = (req.clone(), settings.clone());
+                    // نصيب هذا التنزيل من الحد حين يبدأ (R3-F31)
+                    let slots = app3.state::<DownloadQueue>().slots();
+                    settings.rate_limit_kb = rate_share(settings.rate_limit_kb, Live::count(), slots);
+                    tauri::async_runtime::spawn(async move { run_job(&app3, id, req, settings, &dir, impersonate, &mut rx2).await })
+                        .await
+                        .unwrap_or_else(|e| {
+                            log::error!("download {id}: task panicked: {e}");
+                            Err(AppError::with_detail("unknown", e.to_string()))
+                        })
+                }
+                Err(e) => Err(e.clone()),
+            };
+            // قبل تحديث yt-dlp: الرفض غالبًا من حماية الموقع (Cloudflare) لا من نسخة قديمة. ونسأل yt-dlp مرة لكل نسخة
+            // هل يستطيع التقمّص هنا، فلا نعيد بخيار يفشل فورًا («Impersonate target "chrome" is not available»)
+            let as_browser = !impersonate
+                && !*rx.borrow()
+                && matches!(&result, Err(e) if e.code == "forbidden")
+                && match tools::resolve(&app2) {
+                    Ok(t) => tools::can_impersonate(&t).await,
+                    Err(_) => false,
                 };
-                forget_jump(id);
-                got
+            let error = match result {
+                Err(e) if !*rx.borrow() && transient(e.code) && retries < RETRY_AFTER.len() => e,
+                Err(e) if as_browser => {
+                    impersonate = true;
+                    log::warn!("download {id}: forbidden, retrying once as Chrome: {:?}", e.detail);
+                    crate::settings::finish_counter(&app2, id, false);
+                    emit(
+                        &app2,
+                        JobUpdate {
+                            id,
+                            state: "starting",
+                            retry: Some(Retry {
+                                attempt: 1,
+                                max: 1,
+                                at: None,
+                                reason: "impersonate",
+                                error: e,
+                            }),
+                            ..Default::default()
+                        },
+                    );
+                    keep_slot = true;
+                    continue;
+                }
+                // الموقع تغيّر أو رفض: تحديث yt-dlp (مرة في الساعة على الأكثر) ثم إعادة هذه المهمة وحدها مرة (R3-F5)
+                Err(e) if !*rx.borrow() && !healed && heals(e.code) => {
+                    healed = true;
+                    emit(
+                        &app2,
+                        JobUpdate {
+                            id,
+                            state: "queued",
+                            retry: Some(Retry {
+                                attempt: 1,
+                                max: 1,
+                                at: None,
+                                reason: "update",
+                                error: e.clone(),
+                            }),
+                            ..Default::default()
+                        },
+                    );
+                    // التحديث لا يُقطع بالإلغاء (نسخته الاحتياطية تُعاد في آخره)، ثم يُحترم الإلغاء
+                    let newer = crate::tools::heal_ytdlp(&app2, generation).await;
+                    if *rx.borrow() {
+                        break Ok(None);
+                    }
+                    if !newer {
+                        break Err(e);
+                    }
+                    log::warn!("download {id}: {}, retrying once with the updated yt-dlp", e.code);
+                    crate::settings::finish_counter(&app2, id, false);
+                    keep_slot = true;
+                    continue;
+                }
+                other => break other,
+            };
+
+            // ---- إعادة تلقائية بعد خطأ عابر (R3-F4): الخانة تُحرَّر أثناء الانتظار ----
+            release_slot(id);
+            crate::settings::finish_counter(&app2, id, false);
+            let reason = error.code;
+            if reason == "rateLimited" && !throttled {
+                throttled = true;
+                app2.state::<DownloadQueue>().throttle(true, user_parallel(&app2));
             }
+            let wait = RETRY_AFTER[retries];
+            retries += 1;
+            log::warn!(
+                "download {id}: {reason}, retry {retries}/{} in {wait}s: {:?}",
+                RETRY_AFTER.len(),
+                error.detail
+            );
+            emit(
+                &app2,
+                JobUpdate {
+                    id,
+                    state: "queued",
+                    retry: Some(Retry {
+                        attempt: retries as u32,
+                        max: RETRY_AFTER.len() as u32,
+                        at: Some(now_ms() + wait * 1000),
+                        reason,
+                        error,
+                    }),
+                    ..Default::default()
+                },
+            );
+            let jump = jump_signal(id);
+            let target = if reason == "network" { host_port(&req.url) } else { None };
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_secs(wait)) => {}
+                // انقطع الاتصال ثم عاد: لا ننتظر بقية المدة
+                _ = back_online(target, Duration::from_secs(5)) => {}
+                // «ابدأ الآن» على البطاقة المنتظرة: الآن، وبلا انتظار خانة
+                _ = jump.notified() => jumped = true,
+                _ = canceled(&mut rx) => {
+                    forget_jump(id);
+                    break Ok(None);
+                }
+            }
+            forget_jump(id);
         };
-        if let Some(slot) = slot {
-            hold_slot(id, slot);
+        if impersonate && matches!(result, Ok(Some(_))) {
+            remember_browser(&history_url);
         }
-        emit(
-            &app2,
-            JobUpdate {
-                id,
-                state: "starting",
-                ..Default::default()
-            },
-        );
-        let claimed = jobs_root(&app2).map(|r| claim_job_dir(&r, id, &req));
-        let (job_dir, dir_key) = match claimed {
-            Ok((d, k)) => (Ok(d), k),
-            Err(e) => (Err(e), None),
-        };
-        let result = match &job_dir {
-            // في مهمة منفصلة: panic داخلها (خلل غير متوقع) يصير خطأً على البطاقة،
-            // وتُحرَّر الخانة والمجلد تحته، بدل بطاقة عالقة وخانة محجوزة إلى الأبد (RD7)
-            Ok(dir) => {
-                let (app3, dir, mut rx2) = (app2.clone(), dir.clone(), rx.clone());
-                tauri::async_runtime::spawn(async move { run_job(&app3, id, req, settings, &dir, &mut rx2).await })
-                    .await
-                    .unwrap_or_else(|e| {
-                        log::error!("download {id}: task panicked: {e}");
-                        Err(AppError::with_detail("unknown", e.to_string()))
-                    })
-            }
-            Err(e) => Err(e.clone()),
-        };
+        if throttled {
+            app2.state::<DownloadQueue>().throttle(false, user_parallel(&app2));
+        }
         let update = match result {
             Ok(Some(path)) => JobUpdate {
                 id,
@@ -130,6 +274,102 @@ pub async fn start_download(
         emit(&app2, update);
     });
     Ok(id)
+}
+
+/// إعادة المحاولة التلقائية بعد خطأ عابر (R3-F4): بعد 30 ث، ثم 2 د، ثم 10 د
+pub(super) const RETRY_AFTER: [u64; 3] = [30, 120, 600];
+
+/// أخطاء تزول وحدها غالبًا: انقطاع الاتصال، مهلة، حظر مؤقت لكثرة الطلبات، تنزيل وصل ناقصًا
+pub(super) fn transient(code: &str) -> bool {
+    matches!(code, "network" | "timeout" | "rateLimited" | "incomplete")
+}
+
+/// مواقع احتاجت تقمّص Chrome في هذه الجلسة (R3-F6): معاينتها وتنزيلاتها التالية تبدأ به بدل 403 أولًا
+static AS_BROWSER: Mutex<Option<std::collections::HashSet<String>>> = Mutex::new(None);
+
+pub(super) fn remember_browser(url: &str) {
+    if let Some((host, _)) = host_port(url) {
+        AS_BROWSER
+            .lock_ok()
+            .get_or_insert_with(Default::default)
+            .insert(host.to_ascii_lowercase());
+    }
+}
+
+pub(super) fn wants_browser(url: &str) -> bool {
+    host_port(url).is_some_and(|(h, _)| AS_BROWSER.lock_ok().as_ref().is_some_and(|s| s.contains(&h.to_ascii_lowercase())))
+}
+
+/// أخطاء يصلحها تحديث yt-dlp غالبًا (R3-F5): الموقع تغيّر، أو صار يرفض النسخة القديمة (403)
+pub(super) fn heals(code: &str) -> bool {
+    matches!(code, "extractorOutdated" | "forbidden")
+}
+
+/// عدد التنزيلات معًا كما في الإعدادات الآن (يعود إليه الحد بعد التباطؤ)
+fn user_parallel(app: &AppHandle) -> usize {
+    app.state::<SettingsState>().0.lock_ok().parallel_downloads.into()
+}
+
+pub(super) fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// الخادم والمنفذ من رابط http(s)، لفحص عودة الاتصال
+pub(super) fn host_port(url: &str) -> Option<(String, u16)> {
+    let (scheme, rest) = url.split_once("://")?;
+    let default = match scheme.to_ascii_lowercase().as_str() {
+        "https" => 443,
+        "http" => 80,
+        _ => return None,
+    };
+    let auth = rest.split(['/', '?', '#']).next()?;
+    let auth = auth.rsplit_once('@').map_or(auth, |(_, h)| h);
+    let (host, port) = match auth.strip_prefix('[') {
+        // IPv6: [::1]:8080
+        Some(v6) => {
+            let (h, after) = v6.split_once(']')?;
+            (h, after.strip_prefix(':'))
+        }
+        None => match auth.rsplit_once(':') {
+            Some((h, p)) => (h, Some(p)),
+            None => (auth, None),
+        },
+    };
+    let port = match port {
+        Some(p) => p.parse().ok()?,
+        None => default,
+    };
+    (!host.is_empty()).then(|| (host.to_string(), port))
+}
+
+/// يعود حين يصل الجهاز إلى الموقع بعد أن تعذّر الوصول إليه (R3-F4: «عند عودة الاتصال»).
+/// اتصال TCP فقط كل `every`. بلا هدف، أو إن لم ينقطع أصلًا (الموقع نفسه يرفض)، لا يعود: ينتظر المؤقت
+pub(super) async fn back_online(target: Option<(String, u16)>, every: Duration) {
+    let Some((host, port)) = target else {
+        return std::future::pending().await;
+    };
+    let mut was_down = false;
+    loop {
+        let h = host.clone();
+        let up = tokio::task::spawn_blocking(move || {
+            use std::net::{TcpStream, ToSocketAddrs};
+            (h.as_str(), port)
+                .to_socket_addrs()
+                .ok()
+                .and_then(|mut a| a.next())
+                .is_some_and(|a| TcpStream::connect_timeout(&a, Duration::from_secs(4)).is_ok())
+        })
+        .await
+        .unwrap_or(false);
+        if up && was_down {
+            return;
+        }
+        was_down |= !up;
+        tokio::time::sleep(every).await;
+    }
 }
 
 #[tauri::command]
@@ -338,14 +578,29 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
     if let Some(embed) = playlist::spotify_embed_url(&url) {
         return probe_spotify(&tools, embed).await;
     }
-    let mut args = tools::ytdlp_base_args(&tools);
-    let cookies = cookie_args(&app, &s);
-    args.extend(cookies.iter().cloned());
-    // --flat-playlist: عناصر القائمة دون فتح كل واحد منها (لا يؤثّر على رابط فيديو واحد)
-    args.extend(["-J".to_string(), "--flat-playlist".to_string(), "--".to_string(), url]);
+    let site = url.clone();
+    let probe_args = |browser: bool| {
+        let mut args = tools::ytdlp_base_args(&tools);
+        let cookies = cookie_args(&app, &s).impersonating(browser);
+        args.extend(cookies.iter().cloned());
+        // --flat-playlist: عناصر القائمة دون فتح كل واحد منها (لا يؤثّر على رابط فيديو واحد)
+        args.extend(["-J".to_string(), "--flat-playlist".to_string(), "--".to_string(), url.clone()]);
+        args
+    };
+    let browser = wants_browser(&site);
+    let args = probe_args(browser);
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
 
-    let (ok, out, err) = run_probe(&tools, &args, replace.unwrap_or(false)).await?;
+    let (mut ok, mut out, mut err) = run_probe(&tools, &args, replace.unwrap_or(false)).await?;
+    // 403 أو Cloudflare: مرة بتقمّص Chrome، ويتذكّر الموقع لتنزيله (R3-F6)
+    if !ok && !browser && friendly_ytdlp_error(&err).code == "forbidden" && tools::can_impersonate(&tools).await {
+        let again = probe_args(true);
+        let again: Vec<&str> = again.iter().map(String::as_str).collect();
+        (ok, out, err) = run_probe(&tools, &again, replace.unwrap_or(false)).await?;
+        if ok {
+            remember_browser(&site);
+        }
+    }
     if !ok {
         return Err(friendly_ytdlp_error(&err));
     }
