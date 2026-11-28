@@ -236,10 +236,14 @@ same quality; `results/codecs_bdrate.csv`):
 
 | Encoder | VMAF | PSNR-YUV | SSIM |
 |---|---|---|---|
-| x265 (preset fast) | −22.2 % [−58.6, +8.1] | −26.4 % [−54.0, +2.2] | −20.8 % [−45.5, +5.3] |
-| SVT-AV1 (preset 8) | **−41.8 %** [−71.0, −5.4] | −45.2 % [−67.9, +10.0] | −30.6 % [−54.8, +7.5] |
-| h264_qsv (medium) | +36.1 % [+7.8, +70.9] | +29.3 % [+12.6, +81.3] | +22.9 % [+5.4, +31.4] |
-| hevc_qsv (medium) | −21.0 % [−51.3, −1.6] | −27.0 % [−43.1, +0.8] | −16.9 % [−36.1, +9.8] |
+| x265 (preset fast) | −24.1 % [−58.6, +8.1] | −29.9 % [−54.0, +2.2] | −21.5 % [−45.5, +5.3] |
+| SVT-AV1 (preset 8) | **−43.5 %** [−71.0, −5.4] | −47.3 % [−67.9, +10.0] | −33.6 % [−54.8, +7.5] |
+| h264_qsv (medium) | +36.2 % [+7.8, +70.9] | +25.9 % [+12.6, +81.3] | +23.2 % [+5.4, +31.4] |
+| hevc_qsv (medium) | −21.2 % [−51.3, −1.6] | −29.5 % [−43.1, +0.8] | −18.3 % [−36.1, +9.8] |
+
+The medians are recomputed from `codecs_bdrate.csv` by `stats/report_stats.py` (`results/stats_bdrate.csv`,
+which also gives the quartiles, the mean and a bootstrap 95 % interval of each median). An earlier version of
+this table had stale centre values; the ranges were already right.
 
 **Speed** (720p, encode frames/s, mean over all encodes; `results/codecs_summary.csv`): h264_qsv 62.9,
 hevc_qsv 51.9, SVT-AV1 49.8, x264 44.8, x265 27.0.
