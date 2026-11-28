@@ -19,6 +19,7 @@ pub mod topics_bench {
     pub use crate::convert::{ConvertOptions, SegParams, Topic, clean_cues, detect_args, gaps_as_silences, parse_markers, topics_from};
     pub use crate::srt::parse as parse_subs;
 }
+mod analysis_cache;
 mod settings;
 mod srt;
 #[cfg(desktop)]

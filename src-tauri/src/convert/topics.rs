@@ -728,6 +728,143 @@ async fn transcribe(
     unreachable!("the second attempt always returns")
 }
 
+// ======================= ذاكرة التحليل (R3-F19) =======================
+
+/// يتغيّر حين تتغيّر قراءة ناتج whisper (read_subs، parse_whisper_json): التفريغ المحفوظ قبله يُعاد
+const SPEECH_FORMAT: u32 = 1;
+
+/// التفريغ كما يُحفظ: صفوف مختصرة (الجملة: بداية ونهاية ونص؛ الكلمة: نص وبداية ونهاية وآخر جملتها)
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SpeechRows {
+    cues: Vec<(f64, f64, String)>,
+    words: Vec<(String, f64, f64, bool)>,
+}
+
+impl SpeechRows {
+    fn new(cues: &[Cue], words: &[Word]) -> Self {
+        SpeechRows {
+            cues: cues.iter().map(|c| (c.start, c.end, c.text.clone())).collect(),
+            words: words.iter().map(|w| (w.w.clone(), w.start, w.end, w.last)).collect(),
+        }
+    }
+
+    fn into_parts(self) -> (Vec<Cue>, Vec<Word>) {
+        (
+            self.cues.into_iter().map(|(start, end, text)| Cue { start, end, text }).collect(),
+            self.words
+                .into_iter()
+                .map(|(w, start, end, last)| Word { w, start, end, last })
+                .collect(),
+        )
+    }
+}
+
+/// الصمت كما يُحفظ: الفترات وما قيس (مع رسم المستوى)
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SilenceRows {
+    silences: Vec<[f64; 2]>,
+    levels: Option<super::SilenceLevels>,
+}
+
+/// ذاكرة ملف محلي: المجلد وبصمة الملف. لا شيء لصوت رابط نُزّل للتو في مجلد العمل (يتغيّر كل مرة)
+/// ولا لملف لا تُقرأ بصمته: يُحسب التحليل كما كان
+struct Memo {
+    cache: crate::analysis_cache::Cache,
+    fingerprint: String,
+}
+
+impl Memo {
+    fn open(c: &Ctx<'_>, input: &Path) -> Option<Self> {
+        if input.starts_with(c.work) {
+            return None;
+        }
+        let cache = crate::analysis_cache::Cache::for_app(c.app)?;
+        match crate::analysis_cache::fingerprint(input) {
+            Ok(fingerprint) => Some(Memo { cache, fingerprint }),
+            Err(e) => {
+                log::info!("analysis cache: no fingerprint for {}: {e}", input.display());
+                None
+            }
+        }
+    }
+}
+
+/// المدى المحلَّل بالميلي ثانية: جزء آخر من الملف تحليل آخر
+fn span_key(o: &ConvertOptions) -> String {
+    let ms = |v: Option<f64>| v.filter(|x| x.is_finite() && *x > 0.0).map_or(0, |x| (x * 1000.0).round() as i64);
+    format!("{}-{}", ms(o.start), ms(o.end))
+}
+
+/// مفتاح التفريغ: النموذج ونسخة whisper وصيغة القراءة والمدى
+fn speech_params(o: &ConvertOptions) -> String {
+    format!("{MODEL_NAME}|{}|{SPEECH_FORMAT}|{}", WHISPER.map_or("", |a| a.url), span_key(o))
+}
+
+/// مفتاح الصمت: المدى والعتبة وأقصر صمت، ونسخة التطبيق (حسابه رخيص: يُعاد بعد كل تحديث)
+fn silence_params(o: &ConvertOptions) -> String {
+    format!(
+        "{}|{}|{:?}|{:?}",
+        env!("CARGO_PKG_VERSION"),
+        span_key(o),
+        o.silence_db,
+        o.silence_min
+    )
+}
+
+/// التفريغ من الذاكرة إن حُلّل الملف نفسه بالمدى والنموذج نفسيهما، وإلا whisper ثم الحفظ
+async fn transcribe_cached(
+    c: &Ctx<'_>,
+    info: &MediaInfo,
+    o: &ConvertOptions,
+    memo: Option<&Memo>,
+    cancel: &mut watch::Receiver<bool>,
+) -> Result<Option<(Vec<Cue>, Vec<Word>)>, AppError> {
+    let params = speech_params(o);
+    if let Some(m) = memo
+        && let Some(rows) = m.cache.get::<SpeechRows>("speech", &m.fingerprint, &params)
+    {
+        log::info!(
+            "analysis cache: transcript reused ({} lines, {} words)",
+            rows.cues.len(),
+            rows.words.len()
+        );
+        return Ok(Some(rows.into_parts()));
+    }
+    let found = transcribe(c, info, o, cancel).await?;
+    if let (Some(m), Some((cues, words))) = (memo, &found)
+        && !cues.is_empty()
+    {
+        m.cache.put("speech", &m.fingerprint, &params, &SpeechRows::new(cues, words));
+    }
+    Ok(found)
+}
+
+/// الصمت من الذاكرة بالخيارات نفسها، وإلا القياس ثم الحفظ
+async fn silences_cached(
+    c: &Ctx<'_>,
+    info: &MediaInfo,
+    o: &ConvertOptions,
+    memo: Option<&Memo>,
+    cancel: &mut watch::Receiver<bool>,
+) -> Result<Option<(Vec<[f64; 2]>, Option<super::SilenceLevels>)>, AppError> {
+    let params = silence_params(o);
+    if let Some(m) = memo
+        && let Some(rows) = m.cache.get::<SilenceRows>("silences", &m.fingerprint, &params)
+    {
+        log::info!("analysis cache: silences reused ({})", rows.silences.len());
+        return Ok(Some((rows.silences, rows.levels)));
+    }
+    let found = detect_silences(c, info, o, cancel).await?;
+    if let (Some(m), Some((silences, levels))) = (memo, &found) {
+        let rows = SilenceRows {
+            silences: silences.clone(),
+            levels: levels.clone(),
+        };
+        m.cache.put("silences", &m.fingerprint, &params, &rows);
+    }
+    Ok(found)
+}
+
 // ======================= التشغيل =======================
 
 pub(super) struct TopicsResult {
@@ -749,6 +886,8 @@ pub(super) async fn run_topics(
         return Err(AppError::new("noAudioStream"));
     }
     let input = Path::new(&info.path);
+    // ذاكرة التحليل (R3-F19): تحليل الملف نفسه مرة ثانية لا يعيد whisper ولا قياس الصمت
+    let memo = Memo::open(c, input);
     let lo = o.start.filter(|v| *v > 0.0).unwrap_or(0.0);
     let hi = o.end.filter(|e| *e > lo).unwrap_or(f64::INFINITY);
 
@@ -787,13 +926,13 @@ pub(super) async fn run_topics(
     // 4: تفريغ الكلام
     if cues.is_empty() {
         source = "speech";
-        match transcribe(c, info, o, cancel).await? {
+        match transcribe_cached(c, info, o, memo.as_ref(), cancel).await? {
             Some((found, w)) => (cues, words) = (found, w),
             None => return Ok(None),
         }
     } else if o.align_speech && words.is_empty() && WHISPER.is_some() {
         // «موازنة الترجمة مع الصوت»: نص الترجمة كما هو، بأوقات الكلمات المسموعة
-        match transcribe(c, info, o, cancel).await? {
+        match transcribe_cached(c, info, o, memo.as_ref(), cancel).await? {
             Some((_, heard)) if !heard.is_empty() => words = words::align(&cues, &heard),
             Some(_) => {}
             None => return Ok(None),
@@ -804,7 +943,7 @@ pub(super) async fn run_topics(
     }
 
     // الصمت، لمدة كل موضوع بعد حذفه
-    let Some((silences, levels)) = detect_silences(c, info, o, cancel).await? else {
+    let Some((silences, levels)) = silences_cached(c, info, o, memo.as_ref(), cancel).await? else {
         return Ok(None);
     };
 
@@ -1077,6 +1216,127 @@ mod tests {
         let cues = read_subs(&found);
         assert_eq!(cues.len(), 1);
         assert_eq!((cues[0].start, cues[0].text.as_str()), (1.0, "مرحبا"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn cached_speech_round_trips() {
+        let cues = vec![cue(1.0, 2.5, "بسم الله"), cue(3.0, 4.0, "a, \"b\"")];
+        let words = vec![
+            Word {
+                w: "بسم".into(),
+                start: 1.0,
+                end: 1.4,
+                last: false,
+            },
+            Word {
+                w: "الله".into(),
+                start: 1.5,
+                end: 2.5,
+                last: true,
+            },
+        ];
+        let json = serde_json::to_string(&SpeechRows::new(&cues, &words)).unwrap();
+        let (c2, w2) = serde_json::from_str::<SpeechRows>(&json).unwrap().into_parts();
+        assert_eq!((c2, w2), (cues, words));
+        // مدى آخر أو عتبة أخرى = مفتاح آخر
+        let a = ConvertOptions::default();
+        let b = ConvertOptions {
+            start: Some(10.0),
+            ..ConvertOptions::default()
+        };
+        let d = ConvertOptions {
+            silence_db: Some(-35.0),
+            ..ConvertOptions::default()
+        };
+        assert_ne!(speech_params(&a), speech_params(&b));
+        assert_eq!(speech_params(&a), speech_params(&d));
+        assert_ne!(silence_params(&a), silence_params(&d));
+        assert_eq!(span_key(&b), "10000-0");
+    }
+
+    /// على ملف حقيقي: whisper كما يشغّله التحليل، ثم القراءة من الذاكرة. يقيس ما يوفّره التحليل الثاني.
+    /// `KHAMA_CACHE_INPUT=<ملف> cargo test --lib real_analysis_cache -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn real_analysis_cache() {
+        use std::process::Command;
+        let input = PathBuf::from(std::env::var("KHAMA_CACHE_INPUT").expect("KHAMA_CACHE_INPUT"));
+        let ai = PathBuf::from(std::env::var("LOCALAPPDATA").unwrap()).join("com.jake750.khama/ai");
+        let (cli, model) = (ai.join("whisper/whisper-cli.exe"), ai.join(MODEL_NAME));
+        let ffmpeg = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries/ffmpeg/bin/ffmpeg");
+        let dir = std::env::temp_dir().join(format!("khama-cache-real-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let wav = dir.join("speech.wav");
+        let t0 = Instant::now();
+        let ok = Command::new(&ffmpeg)
+            .args(["-hide_banner", "-nostdin", "-y", "-v", "error", "-i"])
+            .arg(&input)
+            .args(["-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le"])
+            .arg(&wav)
+            .status()
+            .unwrap();
+        assert!(ok.success());
+        let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).clamp(2, 8);
+        let base = dir.join("speech");
+        let out = Command::new(&cli)
+            .current_dir(cli.parent().unwrap())
+            .arg("-m")
+            .arg(&model)
+            .arg("-f")
+            .arg(&wav)
+            .args(["-l", "auto", "-t", &threads.to_string(), "-osrt", "-of"])
+            .arg(&base)
+            .args(["-nfa", "-dtw", "small", "-ojf"])
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        let cues = read_subs(&base.with_extension("srt"));
+        let words = words::parse_whisper_json(&std::fs::read_to_string(base.with_extension("json")).unwrap(), 0.0);
+        let whisper_ms = t0.elapsed().as_millis();
+        // الحفظ ثم التحليل الثاني: البصمة والقراءة فقط
+        let cache = crate::analysis_cache::Cache::new(dir.join("analysis"));
+        let o = ConvertOptions::default();
+        let fp = crate::analysis_cache::fingerprint(&input).unwrap();
+        cache.put("speech", &fp, &speech_params(&o), &SpeechRows::new(&cues, &words));
+        let t1 = Instant::now();
+        let fp2 = crate::analysis_cache::fingerprint(&input).unwrap();
+        let (c2, w2) = cache.get::<SpeechRows>("speech", &fp2, &speech_params(&o)).unwrap().into_parts();
+        let hit_ms = t1.elapsed().as_secs_f64() * 1000.0;
+        // النصوص كما هي، والأوقات إلى جزء من مليار من الثانية (قراءة JSON قد تختلف في آخر رقم)
+        assert_eq!(
+            c2.iter().map(|c| &c.text).collect::<Vec<_>>(),
+            cues.iter().map(|c| &c.text).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            w2.iter().map(|w| (&w.w, w.last)).collect::<Vec<_>>(),
+            words.iter().map(|w| (&w.w, w.last)).collect::<Vec<_>>()
+        );
+        let drift = c2
+            .iter()
+            .zip(&cues)
+            .flat_map(|(a, b)| [a.start - b.start, a.end - b.end])
+            .chain(w2.iter().zip(&words).flat_map(|(a, b)| [a.start - b.start, a.end - b.end]))
+            .fold(0.0f64, |m, d| m.max(d.abs()));
+        assert!(drift < 1e-9, "drift {drift}");
+        let entry = std::fs::read_dir(dir.join("analysis"))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .metadata()
+            .unwrap()
+            .len();
+        println!(
+            "\n{}",
+            serde_json::json!({
+                "file": input.file_name().unwrap().to_string_lossy(),
+                "file_bytes": std::fs::metadata(&input).unwrap().len(),
+                "cues": cues.len(), "words": words.len(),
+                "first_run_ms": whisper_ms, "cache_hit_ms": hit_ms, "entry_bytes": entry,
+                "first_line": cues.first().map(|c| c.text.clone()),
+            })
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
