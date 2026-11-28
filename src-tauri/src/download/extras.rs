@@ -354,6 +354,8 @@ pub(super) async fn fetch(
 
     let (i, n) = (part.0 as f64, part.1.max(1) as f64);
     let mut file: Option<PathBuf> = None;
+    // مدة الفيديو كما يعرفها الموقع، لمقارنتها بالملف الناتج (R3-F2)
+    let mut total: Option<f64> = None;
     let mut last = Instant::now() - Duration::from_secs(1);
     let outcome = run_streaming(cmd, cancel, |line| {
         if let Some(rest) = line.strip_prefix("KHAMA_DL ") {
@@ -388,17 +390,20 @@ pub(super) async fn fetch(
             }
         } else if let Some(path) = line.strip_prefix("KHAMA_FILE ") {
             file = Some(PathBuf::from(path.trim()));
-        } else if let Some((title, thumbnail)) = line.strip_prefix("KHAMA_META ").and_then(parse_meta_line) {
-            emit(
-                app,
-                JobUpdate {
-                    id,
-                    state: "downloading",
-                    title,
-                    thumbnail,
-                    ..Default::default()
-                },
-            );
+        } else if let Some(rest) = line.strip_prefix("KHAMA_META ") {
+            total = meta_duration(rest).or(total);
+            if let Some((title, thumbnail)) = parse_meta_line(rest) {
+                emit(
+                    app,
+                    JobUpdate {
+                        id,
+                        state: "downloading",
+                        title,
+                        thumbnail,
+                        ..Default::default()
+                    },
+                );
+            }
         }
     })
     .await?;
@@ -410,6 +415,11 @@ pub(super) async fn fetch(
     }
     match file.filter(|f| f.exists()) {
         Some(f) => {
+            if !req.original
+                && let Some(want) = expected_duration(total, section)
+            {
+                check_length(tools, &f, want, dir).await?;
+            }
             // مجلد فرعي من القالب (مثل YouTube/) يُحفظ كما هو داخل مجلد الحفظ
             let sub = f
                 .parent()
@@ -420,6 +430,35 @@ pub(super) async fn fetch(
         }
         None => Err(AppError::new("noOutputFile")),
     }
+}
+
+/// أثر محاولة سابقة وصل ملفها قصيرًا: مدته (R3-F2)
+const SHORT_MARK: &str = "short.txt";
+
+/// يقارن مدة الملف بما يجب أن تكون (R3-F2). أقصر بأكثر من الهامش = خطأ incomplete، ويُحذف الملف
+/// حتى لا تجده «أعد المحاولة» فتسلّمه كما هو. وإن عادت المحاولة التالية بالمدة نفسها فالمدة المعلنة
+/// هي الخاطئة (بعض المواقع تعلن مدة تقريبية) لا التنزيل، فيُقبل الملف. ffprobe لا يقرأه: لا حكم
+pub(super) async fn check_length(tools: &Tools, file: &Path, want: f64, dir: &Path) -> Result<(), AppError> {
+    let Some(got) = check_media(tools, file).await.ok().and_then(|c| c.duration) else {
+        return Ok(());
+    };
+    if !is_incomplete(want, got) {
+        return Ok(());
+    }
+    // في work: يبقى بعد «أعد المحاولة» اليدوية أيضًا (claim_job_dir يُبقي work وout فقط)
+    let mark = dir.join("work").join(SHORT_MARK);
+    let _ = std::fs::create_dir_all(dir.join("work"));
+    let before = std::fs::read_to_string(&mark).ok().and_then(|s| s.trim().parse::<f64>().ok());
+    if before.is_some_and(|b| (b - got).abs() < 0.5) {
+        log::warn!("download is {got:.2}s, the site says {want:.2}s, same as the previous attempt: kept");
+        return Ok(());
+    }
+    let _ = std::fs::write(&mark, format!("{got}"));
+    let _ = tokio::fs::remove_file(file).await;
+    Err(AppError::with_detail(
+        "incomplete",
+        format!("the file is {got:.2} s long, the site says {want:.2} s"),
+    ))
 }
 
 /// ما بعد التنزيل: جاهز للمونتاج، ثم إزالة الموسيقى/الصوت. dir = مجلد عمل خاص بهذا الملف.

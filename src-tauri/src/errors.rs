@@ -68,6 +68,10 @@ const RULES: &[(&[&str], &str)] = &[
         "unsupportedUrl",
     ),
     (&["drm"], "drm"),
+    // --abort-on-unavailable-fragments (R3-F2): «fragment 12 not found, unable to continue»، أو جزء
+    // لم يصل بعد كل المحاولات: «Got error: HTTP Error 404: File not found. Giving up after 15 retries»
+    // (قبل قاعدة unavailable: الـ 404 هنا لجزء من الملف لا للفيديو)
+    (&["not found, unable to continue", "giving up after"], "incomplete"),
     (&["private video", "this video is private"], "privateVideo"),
     (
         &["confirm your age", "age-restricted", "inappropriate for some users"],
@@ -297,6 +301,11 @@ mod tests {
         let cases = [
             ("ERROR: [generic] Unsupported URL: https://example.com/", "unsupportedUrl"),
             ("ERROR: [generic] x: This video is DRM protected", "drm"),
+            ("ERROR: fragment 12 not found, unable to continue", "incomplete"),
+            (
+                "ERROR: [download] Got error: HTTP Error 404: File not found. Giving up after 15 retries",
+                "incomplete",
+            ),
             (
                 "ERROR: [youtube] x: Private video. Sign in if you've been granted access",
                 "privateVideo",

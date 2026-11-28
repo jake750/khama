@@ -57,6 +57,7 @@ Failed job cards show the same fix button (cookies, update yt-dlp) as the main e
 | `rateLimited` | The site is temporarily refusing requests (too many). Wait a few minutes and try again. | Try again |
 | `forbidden` | The site refused the download (403). Updating yt-dlp in Settings → Tools usually fixes this. | Update yt-dlp |
 | `network` | Couldn't reach the site. Check your internet connection and try again. | Try again |
+| `incomplete` | The download arrived with parts missing (the connection dropped or the site skipped pieces), so Khama didn't save it. Try again: it continues from where it stopped. | Try again (job card) |
 | `cookiesRead` | Couldn't read cookies from the browser. Fully close the browser and retry, use Firefox, or paste cookies manually. | Cookies settings |
 | `permission` | No permission to write to the save folder. Choose another folder in Settings. | — |
 | `diskFull` | Not enough disk space. Free some space, or choose a save folder on another drive. | — |

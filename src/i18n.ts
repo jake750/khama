@@ -872,6 +872,8 @@ const en = {
     rateLimited: "The site is temporarily refusing requests (too many). Wait a few minutes and try again.",
     forbidden: "The site refused the download (403). Updating yt-dlp in Settings → Tools usually fixes this.",
     network: "Couldn't reach the site. Check your internet connection and try again.",
+    incomplete:
+      "The download arrived with parts missing (the connection dropped or the site skipped pieces), so Khama didn't save it. Try again: it continues from where it stopped.",
     cookiesRead: "Couldn't read cookies from the browser. Fully close the browser and retry, use Firefox, or paste cookies manually.",
     permission: "No permission to write to the save folder. Choose another folder in Settings.",
     diskFull: "Not enough disk space. Free some space, or choose a save folder on another drive.",
@@ -1737,6 +1739,7 @@ const ar: Dict = {
     rateLimited: "الموقع يرفض الطلبات مؤقتًا بسبب كثرتها. انتظر بضع دقائق ثم أعد المحاولة.",
     forbidden: "الموقع رفض التنزيل (403). غالبًا يحل المشكلة تحديث yt-dlp من الإعدادات ← الأدوات.",
     network: "تعذّر الاتصال بالموقع. تحقق من اتصالك بالإنترنت ثم أعد المحاولة.",
+    incomplete: "وصل التنزيل ناقصًا (انقطع الاتصال أو أسقط الموقع أجزاءً منه)، فلم تحفظه خامة. أعد المحاولة، فيكمل من حيث توقّف.",
     cookiesRead: "تعذّرت قراءة الكوكيز من المتصفح. أغلق المتصفح تمامًا ثم أعد المحاولة، أو استخدم Firefox، أو الصق الكوكيز يدويًا.",
     permission: "لا توجد صلاحية للكتابة في مجلد الحفظ. اختر مجلدًا آخر من الإعدادات.",
     diskFull: "لا توجد مساحة كافية على القرص. أفرغ بعض المساحة، أو اختر مجلد حفظ على قرص آخر.",

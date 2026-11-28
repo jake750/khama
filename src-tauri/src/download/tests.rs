@@ -251,6 +251,99 @@ fn meta_line_gives_title_and_thumbnail() {
     assert_eq!(parse_meta_line(r#"{"title": null}"#), None);
 }
 
+/// مدة الملف تُقارن بمدة الموقع أو المقطع المطلوب (R3-F2)
+#[test]
+fn short_downloads_are_incomplete() {
+    assert_eq!(meta_duration(r#"{"title": "x", "duration": 212.5}"#), Some(212.5));
+    assert_eq!(meta_duration(r#"{"title": "x", "duration": null}"#), None);
+    assert_eq!(meta_duration("NA"), None);
+    assert_eq!(expected_duration(Some(600.0), None), Some(600.0));
+    assert_eq!(expected_duration(Some(600.0), Some((10.0, 20.0))), Some(10.0));
+    // نهاية المقطع بعد آخر الفيديو: المتوقع حتى آخره فقط
+    assert_eq!(expected_duration(Some(15.0), Some((10.0, 20.0))), Some(5.0));
+    assert_eq!(expected_duration(None, Some((10.0, 20.0))), Some(10.0));
+    assert_eq!(expected_duration(None, None), None);
+    // ساعة ناقصة دقيقة: ناقص. ساعة ناقصة 30 ثانية (أقل من 1%): مقبول
+    assert!(is_incomplete(3600.0, 3540.0));
+    assert!(!is_incomplete(3600.0, 3570.0));
+    // يوتيوب يقرّب المدة: 4.6 ثوانٍ لفيديو «5 ثوانٍ» ليس نقصًا، و3 ثوانٍ نقص
+    assert!(!is_incomplete(5.0, 4.6));
+    assert!(is_incomplete(5.0, 3.0));
+    assert!(!is_incomplete(10.0, 12.0), "الأطول لا يُعدّ ناقصًا");
+}
+
+/// تنزيل HLS/DASH يتوقف عند جزء مفقود بدل أن يتخطّاه (R3-F2)
+#[test]
+fn missing_fragments_abort_the_download() {
+    let tools = Tools {
+        ytdlp: PathBuf::from("yt-dlp"),
+        ytdlp_prefix: vec![],
+        env: vec![],
+        js_runtime: String::new(),
+        ffmpeg: PathBuf::new(),
+        ffprobe: PathBuf::new(),
+        ffmpeg_dir: PathBuf::new(),
+    };
+    let o = JobOptions {
+        template: "%(title)s".into(),
+        rate_limit_kb: 0,
+        max_name: 120,
+    };
+    let a = download_args(
+        &tools,
+        vec![],
+        &req("video", "mp4", "best", false),
+        &o,
+        None,
+        Path::new("out"),
+        Path::new("work"),
+    );
+    assert!(a.iter().any(|x| x == "--abort-on-unavailable-fragments"));
+    assert!(a.windows(2).any(|w| w[0] == "--fragment-retries" && w[1] == "15"));
+    assert!(a.iter().any(|x| x.starts_with("before_dl:KHAMA_META") && x.contains("duration")));
+}
+
+/// ملف أقصر من مدة الموقع (R3-F2) بـ ffprobe الحقيقي: الأول خطأ ويُحذف، وإعادته بالمدة نفسها تُقبل
+/// (المدة المعلنة هي الخاطئة). KHAMA_FFMPEG=<مجلد bin فيه ffmpeg وffprobe> cargo test -- --ignored check_length
+#[test]
+#[ignore]
+fn check_length_with_real_ffprobe() {
+    let bin = PathBuf::from(std::env::var("KHAMA_FFMPEG").expect("KHAMA_FFMPEG"));
+    let tools = Tools {
+        ytdlp: PathBuf::new(),
+        ytdlp_prefix: vec![],
+        env: vec![],
+        js_runtime: String::new(),
+        ffmpeg: bin.join(format!("ffmpeg{}", tools::EXE)),
+        ffprobe: bin.join(format!("ffprobe{}", tools::EXE)),
+        ffmpeg_dir: bin.clone(),
+    };
+    let dir = std::env::temp_dir().join(format!("khama-short-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let make = |name: &str, secs: &str| {
+        let f = dir.join(name);
+        let ok = std::process::Command::new(&tools.ffmpeg)
+            .args(["-v", "error", "-y", "-f", "lavfi", "-i", "sine=f=440", "-t", secs, "-c:a", "aac"])
+            .arg(&f)
+            .status()
+            .unwrap();
+        assert!(ok.success());
+        f
+    };
+    tauri::async_runtime::block_on(async {
+        let full = make("full.m4a", "60");
+        assert!(check_length(&tools, &full, 60.0, &dir).await.is_ok());
+        let short = make("short.m4a", "50");
+        let e = check_length(&tools, &short, 60.0, &dir).await.unwrap_err();
+        assert_eq!(e.code, "incomplete");
+        assert!(!short.exists(), "الملف الناقص لا يبقى لتسلّمه الإعادة");
+        let again = make("short.m4a", "50");
+        assert!(check_length(&tools, &again, 60.0, &dir).await.is_ok(), "المدة نفسها مرتين: تُقبل");
+    });
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn today_uses_the_local_offset() {
     // 2026-11-14 23:30 UTC

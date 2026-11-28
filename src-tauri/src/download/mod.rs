@@ -483,6 +483,29 @@ pub(super) fn parse_meta_line(rest: &str) -> Option<(Option<String>, Option<Stri
     (title.is_some() || thumbnail.is_some()).then_some((title, thumbnail))
 }
 
+/// المدة من سطر KHAMA_META (ثوانٍ)، إن عرفها الموقع (R3-F2)
+pub(super) fn meta_duration(rest: &str) -> Option<f64> {
+    let v: serde_json::Value = serde_json::from_str(rest.trim()).ok()?;
+    v.get("duration")?.as_f64().filter(|d| d.is_finite() && *d > 0.0)
+}
+
+/// المدة التي يجب أن يصل بها الملف: الفيديو كله، أو المقطع المطلوب منه (ونهايته لا تتجاوز آخر الفيديو)
+pub fn expected_duration(total: Option<f64>, section: Option<(f64, f64)>) -> Option<f64> {
+    match section {
+        Some((s, e)) => {
+            let end = total.map_or(e, |t| e.min(t));
+            Some(end - s).filter(|d| *d > 0.0)
+        }
+        None => total,
+    }
+}
+
+/// أقصر مما يجب (R3-F2)؟ الهامش 1% ولا يقل عن ثانية: يوتيوب يقرّب المدة إلى ثانية كاملة،
+/// فمقطع مدته المعلنة 5 ثوانٍ قد يكون 4.6. الأطول لا يُعدّ ناقصًا (القص يبدأ من إطار مفتاحي قبله)
+pub fn is_incomplete(expected: f64, got: f64) -> bool {
+    got < expected - (expected * 0.01).max(1.0)
+}
+
 /// حال كل عملية جارية كما يعرفها Rust (T-17): بطاقة الواجهة + آخر تحديث مدموج.
 /// لو أُعيد تحميل الواجهة (أو فُتحت النافذة من شريط المهام) تستعيد القائمة بـ list_jobs
 /// بدل أن تستمر التنزيلات في الخلفية والواجهة لا تعرف عنها.
