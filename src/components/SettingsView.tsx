@@ -33,6 +33,30 @@ const REPO = "https://github.com/jake750/khama";
 const openUrl = (url: string) => void invoke("plugin:opener|open_url", { url }).catch(logError("openUrl"));
 
 /** نسخة خامة وروابط الكود والرخصة وإشعارات الطرف الثالث (F-84، F-85، F-86) */
+/** R3-V45: بطاقة هوية أعلى «حول»: الشعار، والاسم ومعناه، والإصدار في رقاقة، والشكر للأدوات */
+function AboutCard() {
+  const { t } = useI18n();
+  const [version, setVersion] = useState<string | null>(null);
+  useEffect(() => {
+    getVersion()
+      .then(setVersion)
+      .catch(() => setVersion(null));
+  }, []);
+  return (
+    <div className="about-card">
+      <img className="about-logo" src="/logo.svg" alt="" width={56} height={56} />
+      <div className="min-w-0">
+        <div className="about-name">
+          {t.appName}
+          {version && <span className="spec about-version">{version}</span>}
+        </div>
+        <p className="about-tagline">{t.aboutTagline}</p>
+        <p className="faint about-thanks">{t.aboutThanks}</p>
+      </div>
+    </div>
+  );
+}
+
 function AboutLinks() {
   const { t } = useI18n();
   const [version, setVersion] = useState<string | null>(null);
@@ -43,7 +67,6 @@ function AboutLinks() {
   }, []);
   return (
     <div className="about-links">
-      {version && <span className="ltr-num">{t.aboutVersion(version)}</span>}
       <button className="btn btn-sm btn-ghost" onClick={() => openUrl(`${REPO}/`)}>
         {t.aboutSource}
       </button>
@@ -242,6 +265,7 @@ export function SettingsView(props: {
         <ToolsSection toast={props.toast} settings={s} update={update} />
 
         <Section id="about" title={t.aboutTitle}>
+          <AboutCard />
           {props.updateVersion && props.onInstallUpdate && (
             <div className="alert info center mb-2">
               <Icon name="download" size={16} />

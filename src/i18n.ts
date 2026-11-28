@@ -242,6 +242,8 @@ const en = {
 
   aboutTitle: "About",
   aboutVersion: (v: string) => `Khama ${v}`,
+  aboutTagline: "Khama (خامة) means raw material: from a link or a file to footage ready to edit.",
+  aboutThanks: "Built on yt-dlp and FFmpeg, with whisper.cpp for transcription. Thank you to their authors.",
   aboutSource: "Source code",
   aboutLicense: "License (MIT)",
   aboutNotices: "Third-party licenses",
@@ -1183,6 +1185,8 @@ const ar: Dict = {
 
   aboutTitle: "حول",
   aboutVersion: (v: string) => `خامة ${v}`,
+  aboutTagline: "خامة: المادة الخام. من الرابط أو الملف إلى لقطة جاهزة للمونتاج.",
+  aboutThanks: "مبني على yt-dlp وFFmpeg، ومعهما whisper.cpp للتفريغ. الشكر لأصحابها.",
   aboutSource: "الكود المصدري",
   aboutLicense: "الرخصة (MIT)",
   aboutNotices: "رخص الأطراف الأخرى",
