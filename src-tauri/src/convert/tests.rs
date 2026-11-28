@@ -892,3 +892,44 @@ fn mix_audio_merges_tracks_into_one() {
     let s = joined(&build_plan(&preset("wav").unwrap(), &o, &src, &[], Path::new("-"), None).unwrap());
     assert!(s.contains("[0:a:1]anull[aout]") && !s.contains("0:a:0"), "{s}");
 }
+
+/// مساران (R3-F22): نسخ أو صوت أو إطار أو كشف لا ينتظر خلف ترميز طويل، والثقيل الثاني ينتظر
+#[test]
+fn light_jobs_run_beside_a_heavy_one() {
+    let p = |id: &str| preset(id).unwrap();
+    for id in [
+        "rewrap_mp4",
+        "rewrap_mkv",
+        "mp3",
+        "wav",
+        "flac",
+        "frame_png",
+        "detect_scenes",
+        "detect_black",
+        "detect_silence",
+    ] {
+        assert!(is_light(&p(id)), "{id} خفيف");
+    }
+    for id in [
+        "edit_h264",
+        "prores_hq",
+        "dnxhr_sq",
+        "proxy",
+        "youtube",
+        "gif",
+        "sequence_png",
+        "stem_voice",
+        "stem_both",
+        "denoise_voice",
+        "topics",
+    ] {
+        assert!(!is_light(&p(id)), "{id} ثقيل");
+    }
+    let q = ConvertQueue::default();
+    let _prores = q.lane(&p("prores_hq")).try_acquire_owned().expect("الأول يبدأ");
+    assert!(q.lane(&p("edit_h264")).try_acquire_owned().is_err(), "الثقيل الثاني ينتظر");
+    let _a = q.lane(&p("rewrap_mp4")).try_acquire_owned().expect("النسخ بجانب ProRes");
+    let _b = q.lane(&p("mp3")).try_acquire_owned().expect("والصوت أيضًا");
+    assert!(q.lane(&p("frame_png")).try_acquire_owned().is_err(), "حتى LIGHT_JOBS خفيفين معًا");
+    assert_eq!(LIGHT_JOBS, 2);
+}

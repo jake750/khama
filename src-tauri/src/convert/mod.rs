@@ -5,7 +5,8 @@
 //! (قص، تغيير المقاس، LUT، ترجمة محروقة، علامة مائية، توحيد الصوت...)
 //! تُركّب كسلسلة فلاتر واحدة.
 //!
-//! التحويلات تمرّ بطابور: واحدة في كل مرة (FFmpeg يستهلك كل أنوية المعالج أصلًا).
+//! التحويلات تمرّ بطابور بمسارين (R3-F22): الثقيل (ترميز فيديو، فصل، تفريغ) واحد في كل مرة
+//! (FFmpeg يستهلك كل أنوية المعالج أصلًا)، والخفيف (نسخ، صوت، إطار، كشف) يعمل بجانبه.
 //! الناتج يُكتب باسم مؤقت مخفي في مجلد الحفظ، ثم يُعاد تسميته عند النجاح،
 //! فلا يرى المستخدم ملفًا ناقصًا أبدًا.
 
@@ -59,12 +60,39 @@ pub use watcher::*;
 
 // ======================= الحالة =======================
 
-/// طابور التحويل: تحويل واحد في كل مرة
-pub struct ConvertQueue(pub Arc<Semaphore>);
+/// طابور التحويل بمسارين (R3-F22): الثقيل واحد في كل مرة وتحت الحد المشترك مع التنزيلات (T-41)،
+/// والخفيف حتى LIGHT_JOBS بجانبه، فلا ينتظر نسخ أو استخراج صوت لثوانٍ خلف ترميز ProRes لساعة
+pub struct ConvertQueue {
+    pub heavy: Arc<Semaphore>,
+    pub light: Arc<Semaphore>,
+}
+
+/// تحويلات خفيفة تعمل معًا بجانب الثقيل
+pub const LIGHT_JOBS: usize = 2;
 
 impl Default for ConvertQueue {
     fn default() -> Self {
-        Self(Arc::new(Semaphore::new(1)))
+        Self {
+            heavy: Arc::new(Semaphore::new(1)),
+            light: Arc::new(Semaphore::new(LIGHT_JOBS)),
+        }
+    }
+}
+
+impl ConvertQueue {
+    /// المسار الذي ينتظر فيه تحويل بهذه الصيغة
+    pub fn lane(&self, p: &Preset) -> Arc<Semaphore> {
+        if is_light(p) { self.light.clone() } else { self.heavy.clone() }
+    }
+}
+
+/// خفيف: لا يرمّز صورة ولا يشغّل نموذجًا. نسخ بلا ترميز، صوت، إطار واحد، كشف (المشاهد والسواد والصمت).
+/// تحليل المواضيع ليس منها: يفرّغ الكلام بـ whisper
+pub fn is_light(p: &Preset) -> bool {
+    match p.kind {
+        PKind::Copy | PKind::Audio | PKind::Frame => true,
+        PKind::Detect => p.id != "topics",
+        PKind::Video | PKind::Gif | PKind::Sequence | PKind::Stems => false,
     }
 }
 

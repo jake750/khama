@@ -380,11 +380,13 @@ pub async fn start_convert(app: AppHandle, request: ConvertRequest, id: Option<u
 pub fn queue_convert(app: &AppHandle, request: ConvertRequest, id: Option<u64>) -> Result<u64, AppError> {
     let jobs = app.state::<Jobs>();
     let queue = app.state::<ConvertQueue>();
-    if preset(&request.preset).is_none() {
+    let Some(p) = preset(&request.preset) else {
         return Err(AppError::with_param("unknownPreset", request.preset.clone(), ""));
-    }
+    };
     let (id, mut rx) = jobs.claim(id);
-    let sem = queue.0.clone();
+    // الخفيف في مساره ولا يأخذ من الحد المشترك مع التنزيلات (R3-F22)
+    let light = is_light(&p);
+    let sem = queue.lane(&p);
     let app2 = app.clone();
     // للسجلّ: التحويلات (ومنها المجلدات المراقَبة) تُسجَّل كالتنزيلات (U-62، U-75)
     let (source, preset_id) = (request.inputs.first().cloned().unwrap_or_default(), request.preset.clone());
@@ -403,9 +405,10 @@ pub fn queue_convert(app: &AppHandle, request: ConvertRequest, id: Option<u64>) 
             p = sem.acquire_owned() => p.ok(),
             _ = download::canceled(&mut rx) => None,
         };
-        // ثم دورنا في الحدّ المشترك مع التنزيلات (T-41)
+        // ثم دورنا في الحدّ المشترك مع التنزيلات (T-41)، للثقيل وحده
         let heavy = match permit {
-            Some(_) => download::heavy_turn(&mut rx).await,
+            Some(_) if light => Some(None),
+            Some(_) => download::heavy_turn(&mut rx).await.map(Some),
             None => None,
         };
         let result = match (permit, heavy) {
