@@ -897,3 +897,64 @@ fn rate_limit_throttles_to_one_download() {
     q.throttle(false, 4);
     assert_eq!(q.0.available_permits(), 4);
 }
+
+/// موقع احتاج تقمّص Chrome مرة (R3-F6): معاينته وتنزيلاته التالية تبدأ به، بالخادم لا بالرابط كله
+#[test]
+fn sites_that_needed_a_browser_are_remembered() {
+    assert!(!wants_browser("https://cf-site-khama.example/v/1"));
+    remember_browser("https://CF-Site-Khama.example/v/1");
+    assert!(wants_browser("https://cf-site-khama.example/other?x=2"));
+    assert!(!wants_browser("https://www.youtube.com/watch?v=x"));
+}
+
+/// 403 بصفحة تشبه Cloudflare من خادم محلي لا يقبل إلا متصفحًا حقيقيًّا (scratchpad/f6/gate.py على 127.0.0.1:8766):
+/// بوسائط download_args نفسها يفشل التنزيل forbidden، ومع --impersonate chrome (Cookies::impersonating) ينجح.
+/// KHAMA_GATE_URL=http://127.0.0.1:8766/clip.mp4 cargo test -- --ignored impersonate_real --nocapture
+#[test]
+#[ignore]
+fn impersonate_real_ytdlp_passes_the_gate() {
+    let url = std::env::var("KHAMA_GATE_URL").expect("KHAMA_GATE_URL");
+    let bin = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries");
+    let tools = Tools {
+        ytdlp: bin.join(format!("khama-yt-dlp-x86_64-pc-windows-msvc{}", tools::EXE)),
+        ytdlp_prefix: vec![],
+        env: vec![],
+        js_runtime: format!("deno:{}", bin.join("khama-deno-x86_64-pc-windows-msvc.exe").display()),
+        ffmpeg: bin.join("ffmpeg/bin/ffmpeg.exe"),
+        ffprobe: bin.join("ffmpeg/bin/ffprobe.exe"),
+        ffmpeg_dir: bin.join("ffmpeg/bin"),
+    };
+    assert!(
+        tauri::async_runtime::block_on(tools::can_impersonate(&tools)),
+        "--list-impersonate-targets"
+    );
+    let opts = JobOptions {
+        template: "%(title)s".into(),
+        rate_limit_kb: 0,
+        max_name: 120,
+    };
+    let mut r = req("video", "mp4", "best", false);
+    r.url = url;
+    let dir = std::env::temp_dir().join(format!("khama-gate-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    for browser in [false, true] {
+        let extra: Vec<String> = if browser {
+            vec!["--impersonate".into(), "chrome".into()]
+        } else {
+            vec![]
+        };
+        let (out, work) = (dir.join(format!("out{browser}")), dir.join(format!("work{browser}")));
+        let a = download_args(&tools, extra, &r, &opts, None, &out, &work);
+        let o = std::process::Command::new(&tools.ytdlp).args(&a).output().unwrap();
+        let err = String::from_utf8_lossy(&o.stderr);
+        let files: Vec<_> = std::fs::read_dir(&out).map(|d| d.flatten().collect()).unwrap_or_default();
+        println!("impersonate={browser}: exit {:?}, files {}", o.status.code(), files.len());
+        if browser {
+            assert!(o.status.success() && files.len() == 1, "{err}");
+            println!("  {} bytes", files[0].metadata().unwrap().len());
+        } else {
+            assert_eq!(friendly_ytdlp_error(&err).code, "forbidden", "{err}");
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

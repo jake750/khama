@@ -30,6 +30,8 @@ pub async fn start_download(
         // تحديث yt-dlp ثم إعادة واحدة (R3-F5)، والخانة تبقى محجوزة له
         let mut healed = false;
         let mut keep_slot = false;
+        // 403 أو Cloudflare: إعادة واحدة بتقمّص Chrome (R3-F6)
+        let mut impersonate = wants_browser(&req.url);
         let result = loop {
             // ننتظر دورنا إن كانت كل الخانات مشغولة (والإلغاء ممكن أثناء الانتظار)
             let slot = if keep_slot {
@@ -89,7 +91,7 @@ pub async fn start_download(
                 Ok(dir) => {
                     let (app3, dir, mut rx2) = (app2.clone(), dir.clone(), rx.clone());
                     let (req, settings) = (req.clone(), settings.clone());
-                    tauri::async_runtime::spawn(async move { run_job(&app3, id, req, settings, &dir, &mut rx2).await })
+                    tauri::async_runtime::spawn(async move { run_job(&app3, id, req, settings, &dir, impersonate, &mut rx2).await })
                         .await
                         .unwrap_or_else(|e| {
                             log::error!("download {id}: task panicked: {e}");
@@ -98,8 +100,39 @@ pub async fn start_download(
                 }
                 Err(e) => Err(e.clone()),
             };
+            // قبل تحديث yt-dlp: الرفض غالبًا من حماية الموقع (Cloudflare) لا من نسخة قديمة. ونسأل yt-dlp مرة لكل نسخة
+            // هل يستطيع التقمّص هنا، فلا نعيد بخيار يفشل فورًا («Impersonate target "chrome" is not available»)
+            let as_browser = !impersonate
+                && !*rx.borrow()
+                && matches!(&result, Err(e) if e.code == "forbidden")
+                && match tools::resolve(&app2) {
+                    Ok(t) => tools::can_impersonate(&t).await,
+                    Err(_) => false,
+                };
             let error = match result {
                 Err(e) if !*rx.borrow() && transient(e.code) && retries < RETRY_AFTER.len() => e,
+                Err(e) if as_browser => {
+                    impersonate = true;
+                    log::warn!("download {id}: forbidden, retrying once as Chrome: {:?}", e.detail);
+                    crate::settings::finish_counter(&app2, id, false);
+                    emit(
+                        &app2,
+                        JobUpdate {
+                            id,
+                            state: "starting",
+                            retry: Some(Retry {
+                                attempt: 1,
+                                max: 1,
+                                at: None,
+                                reason: "impersonate",
+                                error: e,
+                            }),
+                            ..Default::default()
+                        },
+                    );
+                    keep_slot = true;
+                    continue;
+                }
                 // الموقع تغيّر أو رفض: تحديث yt-dlp (مرة في الساعة على الأكثر) ثم إعادة هذه المهمة وحدها مرة (R3-F5)
                 Err(e) if !*rx.borrow() && !healed && heals(e.code) => {
                     healed = true;
@@ -179,6 +212,9 @@ pub async fn start_download(
             }
             forget_jump(id);
         };
+        if impersonate && matches!(result, Ok(Some(_))) {
+            remember_browser(&history_url);
+        }
         if throttled {
             app2.state::<DownloadQueue>().throttle(false, user_parallel(&app2));
         }
@@ -241,6 +277,22 @@ pub(super) const RETRY_AFTER: [u64; 3] = [30, 120, 600];
 /// أخطاء تزول وحدها غالبًا: انقطاع الاتصال، مهلة، حظر مؤقت لكثرة الطلبات، تنزيل وصل ناقصًا
 pub(super) fn transient(code: &str) -> bool {
     matches!(code, "network" | "timeout" | "rateLimited" | "incomplete")
+}
+
+/// مواقع احتاجت تقمّص Chrome في هذه الجلسة (R3-F6): معاينتها وتنزيلاتها التالية تبدأ به بدل 403 أولًا
+static AS_BROWSER: Mutex<Option<std::collections::HashSet<String>>> = Mutex::new(None);
+
+pub(super) fn remember_browser(url: &str) {
+    if let Some((host, _)) = host_port(url) {
+        AS_BROWSER
+            .lock_ok()
+            .get_or_insert_with(Default::default)
+            .insert(host.to_ascii_lowercase());
+    }
+}
+
+pub(super) fn wants_browser(url: &str) -> bool {
+    host_port(url).is_some_and(|(h, _)| AS_BROWSER.lock_ok().as_ref().is_some_and(|s| s.contains(&h.to_ascii_lowercase())))
 }
 
 /// أخطاء يصلحها تحديث yt-dlp غالبًا (R3-F5): الموقع تغيّر، أو صار يرفض النسخة القديمة (403)
@@ -521,14 +573,29 @@ pub async fn probe(app: AppHandle, settings: State<'_, SettingsState>, url: Stri
     if let Some(embed) = playlist::spotify_embed_url(&url) {
         return probe_spotify(&tools, embed).await;
     }
-    let mut args = tools::ytdlp_base_args(&tools);
-    let cookies = cookie_args(&app, &s);
-    args.extend(cookies.iter().cloned());
-    // --flat-playlist: عناصر القائمة دون فتح كل واحد منها (لا يؤثّر على رابط فيديو واحد)
-    args.extend(["-J".to_string(), "--flat-playlist".to_string(), "--".to_string(), url]);
+    let site = url.clone();
+    let probe_args = |browser: bool| {
+        let mut args = tools::ytdlp_base_args(&tools);
+        let cookies = cookie_args(&app, &s).impersonating(browser);
+        args.extend(cookies.iter().cloned());
+        // --flat-playlist: عناصر القائمة دون فتح كل واحد منها (لا يؤثّر على رابط فيديو واحد)
+        args.extend(["-J".to_string(), "--flat-playlist".to_string(), "--".to_string(), url.clone()]);
+        args
+    };
+    let browser = wants_browser(&site);
+    let args = probe_args(browser);
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
 
-    let (ok, out, err) = run_probe(&tools, &args, replace.unwrap_or(false)).await?;
+    let (mut ok, mut out, mut err) = run_probe(&tools, &args, replace.unwrap_or(false)).await?;
+    // 403 أو Cloudflare: مرة بتقمّص Chrome، ويتذكّر الموقع لتنزيله (R3-F6)
+    if !ok && !browser && friendly_ytdlp_error(&err).code == "forbidden" && tools::can_impersonate(&tools).await {
+        let again = probe_args(true);
+        let again: Vec<&str> = again.iter().map(String::as_str).collect();
+        (ok, out, err) = run_probe(&tools, &again, replace.unwrap_or(false)).await?;
+        if ok {
+            remember_browser(&site);
+        }
+    }
     if !ok {
         return Err(friendly_ytdlp_error(&err));
     }

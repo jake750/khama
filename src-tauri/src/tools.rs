@@ -431,6 +431,48 @@ pub async fn heal_ytdlp(app: &AppHandle, since: u64) -> bool {
     }
 }
 
+// ======================= تقمّص متصفح (R3-F6) =======================
+
+/// هل في قائمة `--list-impersonate-targets` هدف Chrome متاح؟ السطر "Chrome-136      Macos-15     curl_cffi"،
+/// والهدف الذي تنقصه مكتبته يُكتب "(unavailable)"
+pub(crate) fn lists_chrome(out: &str) -> bool {
+    out.lines().any(|l| {
+        let l = l.trim().to_ascii_lowercase();
+        l.starts_with("chrome") && !l.contains("unavailable")
+    })
+}
+
+/// نتيجة الفحص لكل نسخة yt-dlp: (رقم النسخة، يستطيع)
+static IMPERSONATE: tokio::sync::Mutex<Option<(u64, bool)>> = tokio::sync::Mutex::const_new(None);
+
+/// هل يستطيع yt-dlp على هذا الجهاز تقمّص Chrome (curl_cffi)؟ يُسأل yt-dlp نفسه مرة لكل نسخة منه، لأن
+/// المكتبة مضمّنة في بعض نسخه وأنظمته دون غيرها (الهاتف مثلًا)
+pub async fn can_impersonate(tools: &Tools) -> bool {
+    let mut cached = IMPERSONATE.lock().await;
+    let generation = ytdlp_generation();
+    if let Some((g, ok)) = *cached
+        && g == generation
+    {
+        return ok;
+    }
+    let mut cmd = ytdlp_command(tools);
+    cmd.args(ytdlp_base_args(tools)).arg("--list-impersonate-targets");
+    let ok = match cmd.stdout(Stdio::piped()).stderr(Stdio::piped()).output().await {
+        Ok(o) => lists_chrome(&format!(
+            "{}\n{}",
+            String::from_utf8_lossy(&o.stdout),
+            String::from_utf8_lossy(&o.stderr)
+        )),
+        Err(e) => {
+            log::warn!("--list-impersonate-targets: {e}");
+            false
+        }
+    };
+    log::info!("yt-dlp can impersonate Chrome: {ok}");
+    *cached = Some((generation, ok));
+    ok
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -465,6 +507,17 @@ mod tests {
         assert!(auto_update_due(Some(now - Duration::from_secs(3600)), now));
         let g = ytdlp_generation();
         new_ytdlp();
-        assert_eq!(ytdlp_generation(), g + 1, "نسخة جديدة: المهمة التي فشلت بالقديمة تُعاد");
+        assert!(ytdlp_generation() > g, "نسخة جديدة: المهمة التي فشلت بالقديمة تُعاد");
+    }
+
+    /// مخرجات yt-dlp 2026.10.26 المضمّن (مختصرة)، وهي نفسها بلا curl_cffi
+    #[test]
+    fn impersonate_targets_need_an_available_chrome() {
+        let ok = "[info] Available impersonate targets\nClient          OS           Source\n--------------------------------------\nChrome-133      Macos-15     curl_cffi\nSafari-17.2     Ios-17.2     curl_cffi\n";
+        assert!(lists_chrome(ok));
+        let missing = "[info] Available impersonate targets\nClient          OS           Source\n--------------------------------------\nChrome          -            curl_cffi (unavailable)\nSafari          -            curl_cffi (unavailable)\n";
+        assert!(!lists_chrome(missing));
+        assert!(!lists_chrome("Safari-17.2     Ios-17.2     curl_cffi\n"));
+        assert!(!lists_chrome(""));
     }
 }

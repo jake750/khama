@@ -29,6 +29,17 @@ impl std::ops::Deref for Cookies {
     }
 }
 
+impl Cookies {
+    /// إعادة بتقمّص Chrome بعد 403 (R3-F6): مع الكوكيز لأنها تصل كل أوامر yt-dlp في المهمة (الصفحة، والترجمة،
+    /// والصورة، والتنزيل)
+    pub(super) fn impersonating(mut self, on: bool) -> Self {
+        if on {
+            self.args.extend(["--impersonate".into(), "chrome".into()]);
+        }
+        self
+    }
+}
+
 impl Drop for Cookies {
     fn drop(&mut self) {
         if let Some(p) = &self.copy {
