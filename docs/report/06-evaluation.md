@@ -103,13 +103,7 @@ H1: «تنزيل H.264 في MP4 من البداية أسرع وأضمن من ت�
 
 **المقاييس**: خطأ التقدير = (التقدير − الفعلي) ÷ الفعلي، حيث التقدير ما يعرضه التطبيق قبل التحويل (`estimateSize`). والجودة بـ SSIM [24] بين الناتج والأصل بعد إرجاعهما إلى الدقة نفسها (1 = مطابق). والسرعة = مدة المقطع ÷ زمن التحويل.
 
-```bash
-KHAMA_EVAL_DIR=<مجلد المقاطع> KHAMA_EVAL_OUT=eval.jsonl KHAMA_REPEAT=3 cargo test --release --manifest-path src-tauri/Cargo.toml presets_eval -- --ignored --nocapture
-```
-
-```bash
-KHAMA_EVAL_OUT=eval.jsonl npx vitest run src/estimate.eval.test.ts --silent=false
-```
+يشغّل القياس اختبار Rust ‏`presets_eval` بكود التحويل نفسه الذي في التطبيق، ثم يحسب `src/estimate.eval.test.ts` تقدير الواجهة لكل تحويل؛ الأمران ونسخ الأدوات في الملحق ط.
 
 **الجدول 6.5: الصيغ على 8 مقاطع** (المتوسط ± sd؛ وبين قوسين فترة ثقة 95% لمتوسط الخطأ المطلق بإعادة المعاينة على المقاطع، `stats_estimate.csv`)
 
@@ -138,9 +132,7 @@ KHAMA_EVAL_OUT=eval.jsonl npx vitest run src/estimate.eval.test.ts --silent=fals
 
 **أثرها على المستخدم**: التقدير الزائد آمن (تحذير المساحة الحرة يحتاط أكثر من اللازم، ولا ينفد القرص)، لكنه يضلّل من يختار صيغة بحجمها. **الإصلاح** (0.3.18): للملف الواحد بصيغة فيديو، يحوّل التطبيق بعد اختيار الصيغة ثلاث شرائح بطول 1.5 ث (عند 20% و50% و80% من المقطع) بالإعدادات نفسها، ويضرب حجمها في المدة كلها (`sample_estimate`). يظهر تقدير المعادلة فورًا، ثم يحلّ محلّه الرقم المقيس بعد ثوانٍ. على العيّنة نفسها:
 
-```bash
-KHAMA_EVAL_DIR=<المجلد> KHAMA_EVAL_OUT=eval.jsonl cargo test --release --manifest-path src-tauri/Cargo.toml sampled_estimate_eval -- --ignored --nocapture
-```
+القياس باختبار Rust ‏`sampled_estimate_eval` (الأمر في الملحق ط).
 
 **الجدول 6.6: متوسط الخطأ المطلق قبل الإصلاح وبعده**
 
