@@ -549,10 +549,10 @@ mod real {
             assert!(r.status.success(), "{id}: {}", String::from_utf8_lossy(&r.stderr));
             let got = probe(&file);
             assert_eq!(got.audio.len(), n, "{id}: كل المسارات");
-            for i in 0..n {
+            for (i, a) in info.audio.iter().enumerate().take(n) {
                 let (lufs, ch) = track(&file, i);
                 println!("{id} track {i}: {lufs} LUFS, {ch} ch");
-                assert_eq!(ch, info.audio[i].channels, "{id}: عدد القنوات كما هو");
+                assert_eq!(ch, a.channels, "{id}: عدد القنوات كما هو");
                 assert!((lufs + 16.0).abs() < 1.5, "{id} track {i}: {lufs} LUFS");
             }
         }

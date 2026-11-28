@@ -7,7 +7,7 @@ export type ReleaseNotes = { version: string; en: string[]; ar: string[] };
 
 export const CHANGELOG: ReleaseNotes[] = [
   {
-    version: "0.3.47",
+    version: "0.3.48",
     en: [
       "Export a timeline or markers for Premiere and DaVinci Resolve from silence removal, topics and scene detection, with no conversion.",
       "Watch and adjust topics before exporting: ▶ on each topic, nudge its start and end, and a title that becomes the file name.",
