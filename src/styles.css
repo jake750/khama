@@ -4909,3 +4909,20 @@ textarea {
   transform: scale(1.015);
   box-shadow: 0 14px 28px -14px rgb(2 8 9 / 0.65);
 }
+
+/* R3-V42: صفوف السجل أهدأ: الأزرار النصية شبحية بلا إطار حتى المرور أو التركيز (وعلى اللمس تبقى
+   كما هي)، وعنوان اليوم لاصق بزجاج أثناء التمرير فيُعرف اليوم دائمًا */
+@media (hover: hover) {
+  .history-item .job-actions .btn:not(:hover):not(:focus-visible) {
+    background: transparent;
+    border-color: transparent;
+  }
+}
+.history-day {
+  position: sticky;
+  top: calc(var(--gutter) * -1);
+  z-index: 2;
+  padding-top: var(--s-2);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  backdrop-filter: blur(12px);
+}
