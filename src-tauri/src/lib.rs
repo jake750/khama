@@ -176,7 +176,8 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         background::set_compact,
         background::hide_main,
         background::take_deep_link,
-        timeline::export_timeline
+        timeline::export_timeline,
+        timeline::rename_export
     ]
 }
 

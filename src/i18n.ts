@@ -802,6 +802,11 @@ const en = {
   markerSilence: (n: number) => `Silence ${n}`,
   markerBlack: (n: number) => `Black ${n}`,
   markerScene: (n: number) => `Scene ${n}`,
+  nudgeStart: (later: boolean): string => (later ? "Start half a second later" : "Start half a second earlier"),
+  nudgeEnd: (later: boolean): string => (later ? "End half a second later" : "End half a second earlier"),
+  topicTitleLabel: "Title",
+  topicTitleHint: "The title becomes the file name when you export this topic or its parts.",
+  playerClose: "Close the player",
   silenceAuto: "Auto",
   silenceHint:
     "Auto measures each file's own background noise, so pauses are found in noisy rooms and quiet studios alike. Pick a level only if it misses pauses (raise it, e.g. −25 dB) or cuts quiet words (lower it). \"Keep at each edge\" leaves a little of every pause so words don't run into each other.",
@@ -1690,6 +1695,11 @@ const ar: Dict = {
   markerSilence: (n) => `صمت ${n}`,
   markerBlack: (n) => `سواد ${n}`,
   markerScene: (n) => `مشهد ${n}`,
+  nudgeStart: (later) => (later ? "ابدأ بعد نصف ثانية" : "ابدأ قبل نصف ثانية"),
+  nudgeEnd: (later) => (later ? "انتهِ بعد نصف ثانية" : "انتهِ قبل نصف ثانية"),
+  topicTitleLabel: "العنوان",
+  topicTitleHint: "يصير العنوان اسم الملف عند تصدير هذا الموضوع أو أجزائه.",
+  playerClose: "أغلق المشغّل",
   silenceAuto: "تلقائي",
   silenceHint:
     "«تلقائي» يقيس ضجيج الخلفية في كل ملف، فيجد الوقفات في الغرفة المزعجة والاستوديو الهادئ معًا. اختر مستوى بنفسك فقط إن فاتته وقفات (ارفعه، مثل −25 dB) أو قطع كلامًا هادئًا (اخفضه). «اترك من كل طرف» يبقي جزءًا صغيرًا من كل وقفة حتى لا يلتصق الكلام ببعضه.",

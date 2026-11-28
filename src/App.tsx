@@ -1060,7 +1060,7 @@ export default function App() {
         input,
         pieces: keptSource(sections, silence),
         cues: cuesFor(sections),
-        name: `${fileStem(input)} timeline`,
+        name: `${exportName(o, 0) || fileStem(input)} timeline`,
         keepCuts: false,
         markers: o.marks ?? [],
         markersOnly: false,
@@ -1092,26 +1092,48 @@ export default function App() {
         .filter(([a, b]) => b - a > 0.01);
       const cut = [...gaps, ...silence.map(([a, b]) => [Math.max(a, start), Math.min(b, end)] as Range).filter(([a, b]) => b - a > 0.01)];
       const label = `${o.tight ? t.topicClipTight : t.topicClip} ${o.join ? "" : n + 1}`.trim();
-      startConvert(
-        {
-          inputs: [input],
-          preset,
-          options: {
-            ...defaultOptions(),
-            quality: "high",
-            hw: settings.convertHw,
-            start,
-            end,
-            cut: cut.sort((a, b) => a[0] - b[0]),
-            sidecarSrt: srt(secs),
-          },
+      const convert: ConvertRequest = {
+        inputs: [input],
+        preset,
+        options: {
+          ...defaultOptions(),
+          quality: "high",
+          hw: settings.convertHw,
+          start,
+          end,
+          cut: cut.sort((a, b) => a[0] - b[0]),
+          sidecarSrt: srt(secs),
         },
-        `${baseName(input)} · ${formatTimecode(start)}`,
-        `${label} · ${presetById(preset)?.name[lang] ?? preset}`,
-        undefined,
-        j.inDownloads,
-      ).catch(logError("exportTopics"));
+      };
+      const name = exportName(o, n);
+      const title = name || `${baseName(input)} · ${formatTimecode(start)}`;
+      const meta = `${label} · ${presetById(preset)?.name[lang] ?? preset}`;
+      if (!name || isMobile) {
+        startConvert(convert, title, meta, undefined, j.inDownloads).catch(logError("exportTopics"));
+        return;
+      }
+      // عنوان الموضوع اسمًا للملف (R3-U5): يُعاد تسمية الناتج حين يكتمل، ومعه ترجمته وسطره في السجلّ
+      launch({ type: "convert", convert, title, meta, inDownloads: j.inDownloads }, (id) => {
+        afterDownload.current.set(id, (file) =>
+          api
+            .renameExport(file, name)
+            .then((renamed) => setJobs((prev) => prev.map((x) => (x.id === id ? { ...x, file: renamed } : x))))
+            .catch(logError("renameExport")),
+        );
+        return api.startConvert(convert, id).catch((e) => {
+          afterDownload.current.delete(id);
+          throw e;
+        });
+      }).catch(logError("exportTopics"));
     });
+  };
+
+  /** اسم ملف المقطع n من عناوين المواضيع (R3-U5). المدمج يأخذ العنوان إن كان واحدًا. فارغ = الاسم المعتاد */
+  const exportName = (o: ExportOptions, n: number): string => {
+    const names = (o.names ?? []).map((x) => x.trim());
+    if (!o.join) return names[n] ?? "";
+    const one = [...new Set(names)];
+    return one.length === 1 ? one[0] : "";
   };
 
   /** من حقل الرابط: تحليل المواضيع قبل التنزيل (Rust يأخذ ترجمة الموقع أو الصوت وحده) */

@@ -1,5 +1,6 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { api, asAppError, type SilenceLevels, type TimelineMarker, type TimelineRequest } from "../api";
 import { formatDuration, formatTimecode } from "../format";
 import { errorText, useI18n } from "../i18n";
@@ -114,6 +115,114 @@ export function SceneExport(props: { path: string; changes: Range[]; range: Rang
       ]
     : [];
   return <EditorExport actions={actions} />;
+}
+
+/** مقطع يُشغَّل: مداه، وهل يقفز فوق الصمت المحذوف */
+interface RangeClip {
+  range: Range;
+  skip: boolean;
+}
+
+/**
+ * مشغّل مدًى من الملف (R3-U5)، بطريقة مشغّل الصمت نفسها: يُحمَّل الملف عند أول تشغيل فقط، ويقفز فوق
+ * `cuts` كل إطار (إن طُلب)، ويقف عند نهاية المدى. الصورة في مشغّل صغير ثابت أسفل النافذة، والصوت وحده بلا عنصر ظاهر
+ */
+export function useRangePlayer(path: string | null | undefined, cuts: Range[]) {
+  const { t } = useI18n();
+  const media = useRef<HTMLVideoElement>(null);
+  const raf = useRef(0);
+  const want = useRef<RangeClip | null>(null);
+  const cur = useRef<RangeClip | null>(null);
+  const cutsRef = useRef(cuts);
+  useEffect(() => {
+    cutsRef.current = cuts;
+  }, [cuts]);
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [key, setKey] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [hasVideo, setHasVideo] = useState(false);
+
+  const begin = (el: HTMLMediaElement, c: RangeClip) => {
+    el.currentTime = c.range[0];
+    el.play().catch(() => {});
+  };
+  const tick = () => {
+    const el = media.current;
+    const c = cur.current;
+    if (!el || !c) return;
+    if (c.skip) {
+      const cut = cutsRef.current.find(([s, e]) => el.currentTime >= s - 0.01 && el.currentTime < e - 0.02);
+      if (cut) el.currentTime = cut[1];
+    }
+    if (el.currentTime >= c.range[1] - 0.01) {
+      el.pause();
+      return;
+    }
+    raf.current = requestAnimationFrame(tick);
+  };
+  /** يشغّل المدى، أو يوقفه إن كان هو ما يُشغَّل الآن */
+  const toggle = (k: string, range: Range, skip: boolean) => {
+    const el = media.current;
+    if (k === key && el && !el.paused) {
+      el.pause();
+      return;
+    }
+    const c = { range, skip };
+    cur.current = c;
+    setKey(k);
+    if (el && el.readyState > 0) return begin(el, c);
+    want.current = c;
+    if (!src && path)
+      api
+        .allowMedia(path)
+        .then(() => setSrc(convertFileSrc(path)))
+        .catch(() => setFailed(true));
+  };
+  const stopped = () => {
+    setPlaying(false);
+    cancelAnimationFrame(raf.current);
+  };
+  const element =
+    src && !failed
+      ? createPortal(
+          <div className={`range-player${hasVideo && key ? " show" : ""}`}>
+            <video
+              ref={media}
+              src={src}
+              preload="metadata"
+              playsInline
+              onLoadedMetadata={(e) => {
+                setHasVideo(e.currentTarget.videoWidth > 0);
+                const c = want.current;
+                want.current = null;
+                if (c) begin(e.currentTarget, c);
+              }}
+              onPlay={() => {
+                setPlaying(true);
+                cancelAnimationFrame(raf.current);
+                raf.current = requestAnimationFrame(tick);
+              }}
+              onPause={stopped}
+              onEnded={stopped}
+              onError={() => setFailed(true)}
+            />
+            <button
+              className="btn btn-sm btn-ghost range-player-close"
+              aria-label={t.playerClose}
+              onClick={() => {
+                media.current?.pause();
+                setKey(null);
+              }}
+            >
+              <Icon name="x" size={16} />
+            </button>
+          </div>,
+          document.body,
+        )
+      : null;
+  return { toggle, element, playing: playing ? key : null, available: !!path && !failed };
 }
 
 /** مجموع أطوال الفترات (ث) */

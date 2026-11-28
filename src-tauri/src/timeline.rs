@@ -810,6 +810,78 @@ pub async fn export_timeline(app: tauri::AppHandle, request: TimelineRequest) ->
     Ok(written)
 }
 
+// ======================= تسمية الناتج بعنوان الموضوع (R3-U5) =======================
+
+/// يعيد تسمية `from` إلى «name.امتداده» في مجلده نفسه، بأول اسم غير موجود، ومعه ترجمته بجانبه
+/// («نفس الاسم.srt») إن كانت. يعيد المسار الجديد
+pub fn rename_with_sidecar(from: &Path, name: &str) -> std::io::Result<PathBuf> {
+    let want = safe_name(name);
+    if from.file_stem().is_some_and(|s| s.to_string_lossy() == want) {
+        return Ok(from.to_path_buf());
+    }
+    let dir = from.parent().map(Path::to_path_buf).unwrap_or_default();
+    let ext = from.extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default();
+    let srt = from.with_extension("srt");
+    let has_srt = !ext.eq_ignore_ascii_case(".srt") && srt.is_file();
+    let mut tails = vec![ext.as_str()];
+    if has_srt {
+        tails.push(".srt");
+    }
+    let base = free_base(&dir, &want, &tails);
+    let to = dir.join(format!("{base}{ext}"));
+    // rename في Windows يكتب فوق الموجود: ملف ظهر بين الفحص والنقل لا يُمحى
+    if to.exists() {
+        return Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, to.display().to_string()));
+    }
+    std::fs::rename(from, &to)?;
+    if has_srt && let Err(e) = std::fs::rename(&srt, to.with_extension("srt")) {
+        log::warn!("rename_export: srt: {e}");
+    }
+    Ok(to)
+}
+
+/// سطر السجلّ يتبع الملف إلى اسمه الجديد (بمعرّفه الجديد، في أول القائمة كما كان)، وعنوانه اسم الملف
+async fn retarget_history(app: &tauri::AppHandle, old: &str, new: &str) {
+    use tauri::Manager;
+    let file_name = |p: &str| {
+        Path::new(p)
+            .file_name()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    };
+    let Ok(list) = crate::history::get_history(app.clone(), app.state()).await else {
+        return;
+    };
+    let Some(mut entry) = list.into_iter().find(|e| e.file == old) else {
+        return;
+    };
+    if crate::history::remove_history(app.clone(), app.state(), entry.id).is_ok() {
+        if entry.title == file_name(old) {
+            entry.title = file_name(new);
+        }
+        entry.file = new.to_string();
+        if let Err(e) = crate::history::add_entry(app, entry).await {
+            log::warn!("rename_export: history: {e:?}");
+        }
+    }
+}
+
+/// ناتج تصدير موضوع باسم عنوانه: «عنوان الموضوع.mp4» بدل «اسم الأصل [قص].mp4». لا يقبل إلا ملفًا
+/// كتبه التطبيق (في السجلّ)، ولا يكتب فوق ملف موجود
+#[tauri::command]
+pub async fn rename_export(app: tauri::AppHandle, path: String, name: String) -> Result<String, AppError> {
+    let from = PathBuf::from(&path);
+    if name.trim().is_empty() || !from.is_file() || !crate::history::contains_file(&app, &path) {
+        return Err(AppError::new("badInput"));
+    }
+    let to = rename_with_sidecar(&from, &name).map_err(|e| AppError::with_detail("moveFailed", e.to_string()))?;
+    let new = to.to_string_lossy().into_owned();
+    if new != path {
+        retarget_history(&app, &path, &new).await;
+    }
+    Ok(new)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1217,6 +1289,27 @@ mod tests {
             ..req
         };
         assert_eq!(render(&none, &m).unwrap_err().code, "markersEmpty");
+    }
+
+    #[test]
+    fn exports_take_the_topic_title() {
+        let dir = std::env::temp_dir().join(format!("khama-rename-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let clip = dir.join("درس [قص].mp4");
+        std::fs::write(&clip, "v").unwrap();
+        std::fs::write(dir.join("درس [قص].srt"), "s").unwrap();
+        // اسم موجود: يأخذ التالي، والترجمة تتبعه
+        std::fs::write(dir.join("الصبر.mp4"), "old").unwrap();
+        let to = rename_with_sidecar(&clip, "الصبر: عند الصدمة الأولى?").unwrap();
+        assert_eq!(to, dir.join("الصبر عند الصدمة الأولى.mp4"));
+        assert!(to.with_extension("srt").is_file() && !clip.exists() && !dir.join("درس [قص].srt").exists());
+        let again = rename_with_sidecar(&dir.join("الصبر.mp4"), "الصبر عند الصدمة الأولى").unwrap();
+        assert_eq!(again, dir.join("الصبر عند الصدمة الأولى (1).mp4"));
+        assert_eq!(std::fs::read_to_string(&again).unwrap(), "old");
+        // الاسم نفسه: لا شيء يتغيّر
+        assert_eq!(rename_with_sidecar(&again, "الصبر عند الصدمة الأولى (1)").unwrap(), again);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

@@ -3,6 +3,7 @@ import type { AppError, ConvertRequest, Cue, DownloadRequest, Word, JobState, Jo
 import type { Range, TopicPlan } from "../reels";
 import { LevelsLine, TopicPanel, type ExportOptions } from "./TopicPanel";
 import { SceneExport, SilenceView } from "./SilenceView";
+import { removedSilences } from "../topics";
 import { formatDuration, formatEta, formatSpeed, formatTimecode } from "../format";
 import { errorText, numLocale, useI18n, type Dict } from "../i18n";
 import { ErrorBox, type ErrorFix } from "./ErrorBox";
@@ -311,6 +312,8 @@ export function JobCard(props: {
             cues={j.cues}
             onExport={props.onExportTopics}
             onCopyTopics={props.onCopyTopics}
+            path={j.convert?.inputs[0] && !/^https?:\/\//.test(j.convert.inputs[0]) ? j.convert.inputs[0] : null}
+            cuts={removedSilences(j.markers, j.convert?.options)}
           />
         )}
 
