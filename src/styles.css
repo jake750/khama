@@ -4887,3 +4887,25 @@ textarea {
   margin-top: var(--s-1);
   font-size: var(--fs-cap);
 }
+
+/* R3-V40: تسمية القسم مرتبطة بمحتواها: خط يكمل السطر بعدها، و8px إلى المحتوى و24px عمّا قبلها */
+.form-section {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: var(--s-6) 0 var(--s-2);
+  font-size: var(--fs-cap);
+  letter-spacing: 0;
+}
+.form-section::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* R3-V36: البطاقة تُرفع تحت المؤشر لحظة الإمساك بها قبل سحبها إلى برنامج المونتاج */
+.job.draggable:active {
+  transform: scale(1.015);
+  box-shadow: 0 14px 28px -14px rgb(2 8 9 / 0.65);
+}
