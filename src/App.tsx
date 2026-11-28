@@ -297,6 +297,9 @@ export default function App() {
   }, [tab, hw]);
 
   const dragTip = useRef(() => {});
+  // R3-U38: دفعة من 40 ملفًا إشعار ملخّص واحد في آخرها («جاهزة: 12 · فشلت: 1») لا 40 إشعارًا
+  const finishedIds = useRef(new Set<number>());
+  const pendingNote = useRef({ done: 0, failed: 0, last: "", title: "", timer: 0, ended: new Set<number>() });
   /** عند انتهاء عملية: إشعار (إن كانت النافذة في الخلفية) + إضافتها للسجلّ */
   const onFinished = useCallback((job: Job, u: JobUpdate) => {
     const tt = tRef.current;
@@ -304,9 +307,28 @@ export default function App() {
     const name = u.file ? baseName(u.file) : job.title;
     // لا يراها إن كانت النافذة في الخلفية، أو كان في تبويب آخر لا تظهر فيه بطاقتها (U-86)
     const cardShown = tabNowRef.current === (job.type === "convert" ? "convert" : "download");
+    const p = pendingNote.current;
+    // jobsRef يتحدّث بعد الرسم: عمليتان تنتهيان في اللحظة نفسها لا ترى إحداهما الأخرى منتهية
+    p.ended.add(job.id);
     if (s?.notify && (document.hidden || !document.hasFocus() || !cardShown)) {
-      const title = u.state === "error" ? tt.notifyFailed : job.type === "convert" ? tt.notifyConvertDone : tt.notifyDone;
-      notify(title, name);
+      p.title = u.state === "error" ? tt.notifyFailed : job.type === "convert" ? tt.notifyConvertDone : tt.notifyDone;
+      p.last = name;
+      if (u.state === "error") p.failed++;
+      else p.done++;
+    }
+    window.clearTimeout(p.timer);
+    if (p.done + p.failed > 0) {
+      // ننتظر لحظة تجمع ما ينتهي معًا؛ وإن بقيت عمليات تعمل ننتظر آخرها (أو دقيقة بلا جديد: أُلغيت مثلًا)
+      const othersActive = jobsRef.current.some((j) => !p.ended.has(j.id) && isActive(j));
+      p.timer = window.setTimeout(
+        () => {
+          const { done, failed, last, title } = pendingNote.current;
+          pendingNote.current = { done: 0, failed: 0, last: "", title: "", timer: 0, ended: new Set() };
+          if (done + failed === 1) notify(title, last);
+          else notify(tRef.current.notifyBatchTitle, tRef.current.notifyBatch(done, failed));
+        },
+        othersActive ? 60_000 : 1200,
+      );
     }
     // عنصر السجلّ كتبه Rust قبل إرسال "done" (T-19)؛ نعيد قراءة السجلّ فقط
     if (u.state === "done") setHistoryVersion((v) => v + 1);
@@ -330,7 +352,11 @@ export default function App() {
   useEffect(() => {
     const unlisten = api.onJobUpdate((u) => {
       const job = jobsRef.current.find((j) => j.id === u.id);
-      if (job && (u.state === "done" || u.state === "error") && job.state !== u.state) onFinished(job, u);
+      // تحديثا «done» متتاليان قبل الرسم التالي يريان الحالة القديمة نفسها: مرة واحدة لكل عملية
+      if (job && (u.state === "done" || u.state === "error") && job.state !== u.state && !finishedIds.current.has(u.id)) {
+        finishedIds.current.add(u.id);
+        onFinished(job, u);
+      }
       // تصدير من تحليل رابط: ينتظر تنزيل المدى المطلوب، ثم يقص الملف المنزَّل
       const then = afterDownload.current.get(u.id);
       if (then && ["done", "error", "canceled"].includes(u.state)) {

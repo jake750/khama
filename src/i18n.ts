@@ -601,6 +601,9 @@ const en = {
   notifyDone: "Download finished",
   notifyConvertDone: "Conversion finished",
   notifyFailed: "Something went wrong",
+  notifyBatchTitle: "Batch finished",
+  notifyBatch: (done: number, failed: number) =>
+    [done > 0 && `${done} ready`, failed > 0 && `${failed} failed`].filter(Boolean).join(" · "),
   compactOn: "A small window that stays on top of your editor, so you can paste links and drag files in without switching apps",
   compactOff: "Back to the full window",
   compactShort: "Mini",
@@ -1529,6 +1532,9 @@ const ar: Dict = {
   notifyDone: "اكتمل التنزيل",
   notifyConvertDone: "اكتمل التحويل",
   notifyFailed: "حدثت مشكلة",
+  notifyBatchTitle: "انتهت الدفعة",
+  notifyBatch: (done: number, failed: number) =>
+    [done > 0 && `جاهزة: ${done}`, failed > 0 && `فشلت: ${failed}`].filter(Boolean).join(" · "),
   compactOn: "نافذة صغيرة تبقى فوق برنامج المونتاج، فتلصق الروابط وتسحب الملفات دون التنقّل بين البرامج",
   compactOff: "العودة للنافذة الكاملة",
   compactShort: "مصغّر",
