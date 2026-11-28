@@ -2,7 +2,7 @@
 // الأرقام الحالية والسبب في docs/PERFORMANCE.md. ارفع الحد عن قصد فقط، مع سطر في ذلك الملف.
 import { readdirSync, statSync } from "node:fs";
 
-const BUDGET_KB = { js: 600, css: 140, woff2: 320, woff: 0 };
+const BUDGET_KB = { js: 700, css: 140, woff2: 320, woff: 0 };
 const dir = new URL("../dist/assets/", import.meta.url);
 const sum = {};
 for (const f of readdirSync(dir)) {

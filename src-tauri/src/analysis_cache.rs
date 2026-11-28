@@ -150,7 +150,7 @@ impl Cache {
                 Some((m.modified().unwrap_or(UNIX_EPOCH), m.len(), e.path()))
             })
             .collect();
-        files.sort_by(|a, b| b.0.cmp(&a.0));
+        files.sort_by_key(|a| std::cmp::Reverse(a.0));
         let mut total = 0u64;
         for (i, (_, len, path)) in files.iter().enumerate() {
             total += len;

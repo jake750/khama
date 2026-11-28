@@ -17,12 +17,10 @@ import {
 } from "./api";
 import { ConvertView, defaultOptions, MEDIA_FILTER, newConvertSession, type SourceFile } from "./components/ConvertView";
 import { DownloadView, newDownloadSession, type StartMeta } from "./components/DownloadView";
-import { HistoryView } from "./components/HistoryView";
 import { Icon, type IconName } from "./components/Icon";
 import { Dialog, useConfirm } from "./components/Dialog";
 import type { ErrorFix } from "./components/ErrorBox";
 import { isActive, JobCard, mergeUpdate, overallPercent, type Job } from "./components/JobCard";
-import { SettingsView } from "./components/SettingsView";
 import { Tour, Welcome, type TourStep } from "./components/Tour";
 import { UpdateDialog } from "./components/UpdateDialog";
 import { CHAPTER_MIN_COUNT, chapterStarts, extractUrls, formatTimecode, youtubeChapters } from "./format";
@@ -45,6 +43,9 @@ import { optionsFromMeta } from "./downloadPlan";
 const analyzeTurn = limiter(4);
 // الدليل (~35KB نصوص) لا يلزم عند الإقلاع: يُحمَّل أول مرة يُفتح تبويبه (FE25)
 const GuideView = lazy(() => import("./components/GuideView").then((m) => ({ default: m.GuideView })));
+// السجلّ والإعدادات خارج حزمة الإقلاع أيضًا (ميزانية الحجم 600 KB)، وتُحمَّل مسبقًا بعد الإقلاع بقليل
+const HistoryView = lazy(() => import("./components/HistoryView").then((m) => ({ default: m.HistoryView })));
+const SettingsView = lazy(() => import("./components/SettingsView").then((m) => ({ default: m.SettingsView })));
 
 type Tab = "download" | "convert" | "history" | "settings" | "guide";
 
@@ -478,7 +479,11 @@ export default function App() {
   const fileFailed = (e: unknown) => toast(errorText(t, asAppError(e)));
   // تحميل الدليل مسبقًا بعد الإقلاع بقليل: فتحه لاحقًا فوري بلا فراغ
   useEffect(() => {
-    const id = window.setTimeout(() => void import("./components/GuideView"), 4000);
+    const id = window.setTimeout(() => {
+      void import("./components/HistoryView");
+      void import("./components/SettingsView");
+      void import("./components/GuideView");
+    }, 1500);
     return () => window.clearTimeout(id);
   }, []);
 
@@ -1471,33 +1476,37 @@ ${navigator.userAgent}`).catch(() => {})
                   />
                 )}
                 {tab === "history" && (
-                  <HistoryView
-                    version={historyVersion}
-                    onDownloadAgain={(e) => {
-                      // نفس النوع والصيغة والجودة لا الرابط وحده (U-40)
-                      if (e.kind !== "convert") update(optionsFromMeta(e.kind, e.meta));
-                      setInject({ url: e.url, n: Date.now() });
-                      setTab("download");
-                    }}
-                    onDragOut={isMobile ? undefined : (file, thumb) => dragOut(file, thumb)}
-                    onConvert={(file) => addFiles([file])}
-                    toast={toast}
-                  />
+                  <Suspense fallback={null}>
+                    <HistoryView
+                      version={historyVersion}
+                      onDownloadAgain={(e) => {
+                        // نفس النوع والصيغة والجودة لا الرابط وحده (U-40)
+                        if (e.kind !== "convert") update(optionsFromMeta(e.kind, e.meta));
+                        setInject({ url: e.url, n: Date.now() });
+                        setTab("download");
+                      }}
+                      onDragOut={isMobile ? undefined : (file, thumb) => dragOut(file, thumb)}
+                      onConvert={(file) => addFiles([file])}
+                      toast={toast}
+                    />
+                  </Suspense>
                 )}
                 {tab === "settings" && (
-                  <SettingsView
-                    settings={settings}
-                    update={update}
-                    outputDir={outputDir}
-                    onChooseDir={chooseDir}
-                    onOpenDir={() => api.openOutputDir().catch(logError("openOutputDir"))}
-                    toast={toast}
-                    section={settingsSection}
-                    updateVersion={updateVersion}
-                    onInstallUpdate={() => setUpdateRequest((n) => n + 1)}
-                    onOpenGuide={() => setTab("guide")}
-                    onTour={startTour}
-                  />
+                  <Suspense fallback={null}>
+                    <SettingsView
+                      settings={settings}
+                      update={update}
+                      outputDir={outputDir}
+                      onChooseDir={chooseDir}
+                      onOpenDir={() => api.openOutputDir().catch(logError("openOutputDir"))}
+                      toast={toast}
+                      section={settingsSection}
+                      updateVersion={updateVersion}
+                      onInstallUpdate={() => setUpdateRequest((n) => n + 1)}
+                      onOpenGuide={() => setTab("guide")}
+                      onTour={startTour}
+                    />
+                  </Suspense>
                 )}
                 {tab === "guide" && (
                   <Suspense fallback={null}>
