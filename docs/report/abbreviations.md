@@ -28,6 +28,7 @@
 | MAE | Mean Absolute Error | متوسط الخطأ المطلق |
 | MDX-Net | Multi-Dilated eXtended network | معمارية نموذج فصل الصوت المستعمل |
 | MUSDB18 | Music Source Separation DB (2018) | مجموعة بيانات فصل الموسيقى |
+| MUSHRA | MUltiple Stimuli with Hidden Reference and Anchor | اختبار استماع بمرجع مخفي ومرساة (ITU-R BS.1534) |
 | NVENC | NVIDIA Encoder | مرمِّز الفيديو بعتاد NVIDIA |
 | O1–O8 | Objectives | الأهداف القابلة للقياس (§1.4) |
 | ONNX | Open Neural Network Exchange | صيغة مفتوحة لتبادل النماذج العصبية |
