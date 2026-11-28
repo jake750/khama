@@ -187,3 +187,108 @@ pub fn spawn_watcher(app: AppHandle) {
         }
     });
 }
+
+// ======================= إفلات مجلد في المحوّل (R3-U13) =======================
+
+/// أقصى عمق للمجلدات الفرعية، وأقصى عدد ملفات من إفلات واحد (مجلد ضخم لا يُغرق القائمة)
+#[cfg(desktop)]
+const EXPAND_DEPTH: usize = 4;
+#[cfg(desktop)]
+const EXPAND_MAX: usize = 2000;
+
+/// المسارات كما هي، والمجلد يُستبدل بما فيه من وسائط (ومجلداته الفرعية حتى عمق 4) مرتبةً بالاسم.
+/// المخفي (يبدأ بنقطة) لا يُدخل، ولا مجلد ناتج المراقبة «Converted».
+#[cfg(desktop)]
+pub(super) fn expand_media(paths: Vec<String>) -> Vec<String> {
+    fn walk(dir: &Path, depth: usize, out: &mut Vec<String>) {
+        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        let mut files = Vec::new();
+        let mut dirs = Vec::new();
+        for e in entries.flatten() {
+            let name = e.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') {
+                continue;
+            }
+            let path = e.path();
+            match e.file_type() {
+                Ok(t) if t.is_dir() => {
+                    if depth < EXPAND_DEPTH && name != WATCH_OUT {
+                        dirs.push(path);
+                    }
+                }
+                Ok(t) if t.is_file() => {
+                    let media = path
+                        .extension()
+                        .and_then(|x| x.to_str())
+                        .is_some_and(|x| MEDIA_EXT.contains(&x.to_lowercase().as_str()));
+                    if media {
+                        files.push(path);
+                    }
+                }
+                _ => {}
+            }
+        }
+        files.sort();
+        dirs.sort();
+        for f in files {
+            if out.len() >= EXPAND_MAX {
+                return;
+            }
+            out.push(f.to_string_lossy().to_string());
+        }
+        for d in dirs {
+            walk(&d, depth + 1, out);
+        }
+    }
+    let mut out = Vec::new();
+    for p in paths {
+        if out.len() >= EXPAND_MAX {
+            break;
+        }
+        let path = PathBuf::from(&p);
+        if path.is_dir() {
+            walk(&path, 0, &mut out);
+        } else {
+            out.push(p);
+        }
+    }
+    out
+}
+
+/// يوسّع المجلدات المُفلتة أو المختارة إلى ملفاتها، خارج خيوط tokio (قد يكون قرصًا شبكيًا بطيئًا)
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn expand_media_paths(paths: Vec<String>) -> Vec<String> {
+    tauri::async_runtime::spawn_blocking(move || expand_media(paths))
+        .await
+        .unwrap_or_default()
+}
+
+#[cfg(all(test, desktop))]
+mod expand_tests {
+    use super::*;
+
+    #[test]
+    fn folder_becomes_its_media_files_sorted_and_files_pass_through() {
+        let root = std::env::temp_dir().join(format!("khama-expand-{}", std::process::id()));
+        let sub = root.join("B-roll");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(sub.join(".hidden")).unwrap();
+        std::fs::create_dir_all(root.join(WATCH_OUT)).unwrap();
+        for f in ["b.MP4", "a.wav", "notes.txt", ".x.mov"] {
+            std::fs::write(root.join(f), b"x").unwrap();
+        }
+        std::fs::write(sub.join("c.mov"), b"x").unwrap();
+        std::fs::write(sub.join(".hidden").join("d.mov"), b"x").unwrap();
+        std::fs::write(root.join(WATCH_OUT).join("e.mp4"), b"x").unwrap();
+        let loose = "C:/elsewhere/clip.mkv".to_string();
+        let got = expand_media(vec![root.to_string_lossy().to_string(), loose.clone()]);
+        let names: Vec<String> = got
+            .iter()
+            .map(|p| Path::new(p).file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(names, ["a.wav", "b.MP4", "c.mov", "clip.mkv"]);
+        assert_eq!(got.last().unwrap(), &loose);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}

@@ -642,9 +642,7 @@ button.menu-item:hover {
   cursor: grab;
 }
 
-.history-item.missing {
-  opacity: 0.6;
-}
+/* R3-D13: العنصر المفقود لا يُعتَّم كله (فيه زر فعّال ونص معلوماتي): الصورة وحدها تبهت */
 
 .history-thumb {
   display: grid;
@@ -737,7 +735,7 @@ button.menu-item:hover {
 }
 
 .code {
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: var(--fs-cap);
   color: var(--text);
 }
@@ -783,6 +781,12 @@ button.menu-item:hover {
 
 .app.compact .main {
   padding: 12px;
+}
+/* R3-D2: في المصغّرة الضيقة التبويبات سفلية ثابتة: آخر عنصر لا يختفي تحتها */
+@media (max-width: 560px) {
+  .app.compact .main {
+    padding-bottom: calc(64px + 12px + env(safe-area-inset-bottom));
+  }
 }
 
 .app.compact .card {
@@ -1137,9 +1141,6 @@ button.menu-item:hover {
 }
 
 /* ---------- الحالات الماضية: شفافية لا لون ---------- */
-.history-item.missing {
-  opacity: 0.5;
-}
 
 /* ---------- الهاتف: حافة 16، وتبويبات سفلية زجاجية ---------- */
 @media (max-width: 560px) {
@@ -1217,7 +1218,7 @@ button.menu-item:hover {
 @media (hover: hover) {
   .history-item .job-actions .icon-btn {
     opacity: 0;
-    transition: opacity var(--t-ui, 0.2s) var(--ease-out);
+    transition: opacity var(--d-press) var(--ease-out);
   }
   .history-item:hover .job-actions .icon-btn,
   .history-item:focus-within .job-actions .icon-btn {

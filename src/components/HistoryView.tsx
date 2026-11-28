@@ -8,6 +8,7 @@ import { ErrorBox } from "./ErrorBox";
 import { isMobile } from "../platform";
 import { useConfirm } from "./Dialog";
 import { Icon } from "./Icon";
+import { MoreMenu } from "./MoreMenu";
 import { Segmented } from "./Segmented";
 import { presetById } from "../presets";
 import { logError } from "../log";
@@ -47,6 +48,8 @@ export function HistoryView(props: {
   version: number;
   onDownloadAgain: (e: HistoryEntry) => void;
   onDragOut?: (file: string, thumbnail?: string | null) => void;
+  /** R3-U12: الملف إلى المحوّل (تحويل، تحليل، مواضيع) بدل طريق مسدود */
+  onConvert?: (file: string) => void;
   toast: Toast;
 }) {
   const { t, lang } = useI18n();
@@ -176,11 +179,8 @@ export function HistoryView(props: {
           <h2>{t.historyTitle}</h2>
           {list && list.length > 0 && <p className="faint">{t.historyCount(list.length - hidden.size)}</p>}
         </div>
-        {list && list.length > 0 && (
-          <button className="btn btn-sm btn-danger" onClick={clear}>
-            <Icon name="trash" size={16} /> {t.historyClear}
-          </button>
-        )}
+        {/* R3-D48: الفعل الجماعي الخطِر داخل ⋯ لا زرًا أحمر بجانب العنوان (والتأكيد باقٍ) */}
+        {list && list.length > 0 && <MoreMenu label={t.moreActions} items={[{ label: t.historyClear, icon: "trash", onClick: clear }]} />}
       </div>
 
       {list && list.length > 0 && (
@@ -352,6 +352,16 @@ export function HistoryView(props: {
                   {e.exists && !isMobile && (
                     <button className="btn btn-sm" onClick={() => api.revealFile(e.file).catch(fail)}>
                       <Icon name="folder" size={16} /> {t.showInFolder}
+                    </button>
+                  )}
+                  {e.exists && props.onConvert && (
+                    <button
+                      className="icon-btn sm"
+                      title={t.sendToConvert}
+                      aria-label={t.sendToConvert}
+                      onClick={() => props.onConvert!(e.file)}
+                    >
+                      <Icon name="convert" size={16} />
                     </button>
                   )}
                   {e.kind !== "convert" && (

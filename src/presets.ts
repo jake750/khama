@@ -120,7 +120,7 @@ export const PRESETS: PresetDef[] = [
     quality: false,
     hw: false,
     name: { en: "DNxHR HQ", ar: "DNxHR HQ" },
-    desc: { en: "Higher-quality DNxHR (8-bit).", ar: "DNxHR بجودة أعلى (8-bit)." },
+    desc: { en: "Higher-quality DNxHR (8-bit).", ar: "DNxHR بجودة أعلى (\u20668-bit\u2069)." },
     mbps1080: 220,
   }),
   P({
@@ -130,10 +130,10 @@ export const PRESETS: PresetDef[] = [
     ext: "mov",
     quality: false,
     hw: false,
-    name: { en: "DNxHR HQX 10-bit", ar: "DNxHR HQX ‏10-bit" },
+    name: { en: "DNxHR HQX 10-bit", ar: "DNxHR HQX 10-bit" },
     desc: {
       en: "Keeps 10-bit color for HDR and log footage. From an ordinary 8-bit source it only makes a bigger file: use HQ instead.",
-      ar: "يحافظ على ألوان 10-bit للقطات HDR وLog. من مصدر 8-bit عادي لا يعطي إلا ملفًا أكبر: استعمل HQ بدله.",
+      ar: "يحافظ على ألوان \u206610-bit\u2069 للقطات HDR وLog. من مصدر \u20668-bit\u2069 عادي لا يعطي إلا ملفًا أكبر: استعمل HQ بدله.",
     },
     mbps1080: 220,
   }),

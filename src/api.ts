@@ -45,6 +45,7 @@ export interface Settings {
   notify: boolean;
   closeToTray: boolean;
   watchClipboard: boolean;
+  clipboardOnFocus: boolean;
   checkUpdates: boolean;
   /** نسخة بنية settings.json (M-36)، يديرها Rust */
   schemaVersion?: number;
@@ -413,6 +414,8 @@ export const api = {
   cancelProbe: () => invoke<void>("cancel_probe"),
   startNow: (id: number) => invoke<void>("start_now", { id }),
   readLinksFile: (path: string) => invoke<string>("read_links_file", { path }),
+  /** R3-U13: المجلدات تُستبدل بما فيها من وسائط (الكمبيوتر فقط) */
+  expandMediaPaths: (paths: string[]) => invoke<string[]>("expand_media_paths", { paths }),
   openOutputDir: () => invoke<void>("open_output_dir"),
   onJobUpdate: (cb: (u: JobUpdate) => void): Promise<UnlistenFn> => listen<JobUpdate>("job-update", (e) => cb(e.payload)),
   analyzeFile: (path: string) => invoke<MediaInfo>("analyze_file", { path }),

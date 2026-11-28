@@ -36,6 +36,7 @@ const settings = {
   notify: true,
   closeToTray: false,
   watchClipboard: false,
+  clipboardOnFocus: true,
   checkUpdates: true,
   recentDirs: ["C:\\Users\\me\\Videos\\Khama", "D:\\Projects\\Reel-14\\footage"],
   wantSubs: false,

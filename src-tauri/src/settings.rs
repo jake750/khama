@@ -73,6 +73,8 @@ pub struct Settings {
     pub close_to_tray: bool,
     /// اقتراح تنزيل أي رابط يُنسخ (حتى والتطبيق في الخلفية)
     pub watch_clipboard: bool,
+    /// نظرة واحدة في الحافظة عند فتح خامة أو الرجوع إليها والحقل فارغ (R3-U31)
+    pub clipboard_on_focus: bool,
     /// البحث عن تحديث لخامة عند الفتح (يتصل بـ GitHub). يمكن إطفاؤه (F-51)
     pub check_updates: bool,
     /// آخر مجلدات حفظ استُخدمت (الأحدث أولًا)
@@ -156,6 +158,7 @@ impl Default for Settings {
             notify: true,
             close_to_tray: true,
             watch_clipboard: false,
+            clipboard_on_focus: true,
             check_updates: true,
             recent_dirs: Vec::new(),
             want_subs: false,

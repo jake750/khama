@@ -101,6 +101,10 @@ closeToTray: boolean,
  */
 watchClipboard: boolean, 
 /**
+ * نظرة واحدة في الحافظة عند فتح خامة أو الرجوع إليها والحقل فارغ (R3-U31)
+ */
+clipboardOnFocus: boolean, 
+/**
  * البحث عن تحديث لخامة عند الفتح (يتصل بـ GitHub). يمكن إطفاؤه (F-51)
  */
 checkUpdates: boolean, 

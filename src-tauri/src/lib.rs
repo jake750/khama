@@ -172,7 +172,8 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         background::quit_app,
         background::set_compact,
         background::hide_main,
-        background::take_deep_link
+        background::take_deep_link,
+        convert::expand_media_paths
     ]
 }
 

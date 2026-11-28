@@ -4,6 +4,10 @@
    لونان وظيفيان فقط: --accent للتفاعل، و--spark للتمييز. لا يتبادلان الأدوار.
    ===================================================================== */
 :root {
+  /* R3-V8: المواصفات التقنية والكود الزمني والسجلات. العربي داخلها يرجع لخط الواجهة */
+  /* R3-D41: حلقة تركيز واحدة لكل العناصر */
+  --focus-ring: 2px solid var(--accent);
+  --font-mono: "IBM Plex Mono", "IBM Plex Sans Arabic", ui-monospace, Consolas, monospace;
   /* المسافات: شبكة 4px */
   --s-1: 4px;
   --s-2: 8px;
@@ -131,6 +135,11 @@ button {
   cursor: pointer;
 }
 
+/* R3-V17: الصور لا تُسحب كصور ويب */
+img {
+  -webkit-user-drag: none;
+}
+
 button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
@@ -166,7 +175,7 @@ button:disabled {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -258,6 +267,8 @@ button:disabled {
 
 .main {
   overflow-y: auto;
+  /* R3-D41 (WCAG 2.4.11): العنصر المركَّز بلوحة المفاتيح لا يختفي تحت شريط الزر اللاصق */
+  scroll-padding-block: var(--s-6) 112px;
 }
 
 .container {
@@ -732,7 +743,7 @@ details.tech pre {
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   background: var(--bg);
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: var(--fs-cap);
   direction: ltr;
   user-select: text;
@@ -1205,6 +1216,16 @@ details.tech pre {
 
 /* ============ المحوّل ============ */
 .ltr-num {
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: plaintext;
+}
+/* R3-V8: قيمة تقنية واحدة (دقة، fps، ترميز، حجم، سرعة) معزولة عن اتجاه الجملة */
+.spec,
+.specs dd,
+.job-meta > .ltr,
+.meta-trim {
+  font-family: var(--font-mono);
+  font-size: 0.94em;
   font-variant-numeric: tabular-nums;
   unicode-bidi: plaintext;
 }
@@ -2880,7 +2901,7 @@ button.menu-item:hover {
 }
 
 .code {
-  font-family: ui-monospace, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: var(--fs-cap);
   color: var(--text);
 }
@@ -3208,6 +3229,8 @@ button.menu-item:hover {
   .main {
     padding: var(--gutter);
     padding-bottom: calc(64px + var(--s-6) + env(safe-area-inset-bottom));
+    /* والتبويبات السفلية الثابتة فوقه */
+    scroll-padding-bottom: calc(64px + 112px + env(safe-area-inset-bottom));
   }
   .card {
     padding: var(--s-4);
@@ -3273,7 +3296,7 @@ button.menu-item:hover {
 @media (hover: hover) {
   .history-item .job-actions .icon-btn {
     opacity: 0;
-    transition: opacity var(--t-ui, 0.2s) var(--ease-out);
+    transition: opacity var(--d-press) var(--ease-out);
   }
   .history-item:hover .job-actions .icon-btn,
   .history-item:focus-within .job-actions .icon-btn {
@@ -3504,12 +3527,12 @@ button.menu-item:hover {
 /* مؤشر تركيز على كل ما يُنقر، حتى ما ألغى outline (D-10) */
 .url-field:focus-within,
 .search:focus-within {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
+/* الحقل المركَّز يكفيه إطاره الملوّن وهالته: لا حلقة ثانية فوقهما (R3-D41) */
 .input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: none;
 }
 
 /* أهداف لمس 44px على الشاشات اللمسية (D-13) */
@@ -3790,9 +3813,13 @@ button.menu-item:hover {
   align-items: center;
   gap: var(--s-1);
 }
-.history-item.missing .history-thumb,
+.history-item.missing .history-thumb {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+/* نص بتباين كامل (4.5 على الأقل) بلون أهدأ بدل الشفافية */
 .history-item.missing .job-title {
-  opacity: 0.6;
+  color: var(--text-dim);
 }
 
 /* «الخروج» آخر الإعدادات (D-15) */
@@ -3952,12 +3979,12 @@ kbd {
   border-bottom-width: 2px;
   border-radius: var(--r-xs);
   background: var(--surface-2);
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: var(--fs-meta);
 }
 /* تفاصيل الخطأ بخط ثابت العرض (U-74، D-96) */
 .tech pre {
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: var(--fs-cap);
   white-space: pre-wrap;
   word-break: break-word;
@@ -4178,7 +4205,7 @@ kbd {
   padding: 0 6px;
   border-radius: 999px;
   background: var(--accent);
-  color: var(--on-accent, #fff);
+  color: var(--accent-ink);
   font-size: 12px;
   line-height: 20px;
   text-align: center;
@@ -4664,4 +4691,85 @@ kbd {
     outline: 2px solid Highlight !important;
     outline-offset: 2px;
   }
+}
+
+/* ============ R3: لمسات الطباعة والحالات ============ */
+
+/* R3-V9: العربية في Plex تبدو أصغر من اللاتينية بالمقاس نفسه: المقاسات الصغيرة أكبر بنقطة
+   والفقرات أوسع سطرًا. ولا تتبّع (letter-spacing) للعربية أبدًا */
+:root:lang(ar) {
+  --fs-cap: 13px;
+  --fs-meta: 14px;
+}
+:root:lang(ar) p {
+  line-height: 1.75;
+}
+:root:lang(en) body {
+  line-height: 1.5;
+}
+:root:lang(en) h1,
+:root:lang(en) h2 {
+  letter-spacing: -0.01em;
+}
+
+/* R3-V38: لا كلمة يتيمة في سطر العنوان الأخير، والفقرات تتوزع أسطرها */
+h1,
+h2,
+h3,
+.card-head h2,
+.empty-state b {
+  text-wrap: balance;
+}
+p,
+.hint-text,
+.faint,
+.alert > div {
+  text-wrap: pretty;
+}
+
+/* R3-V47: التحديد والمؤشر بلون خامة لا بأزرق النظام */
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--text);
+}
+input,
+textarea {
+  caret-color: var(--accent);
+}
+
+/* R3-V50: الخطأ يُقرأ: النص بلون عادي، والأحمر للأيقونة وخط على جانب البداية */
+.alert:not(.info):not(.inline):not(.warn) {
+  color: var(--text);
+  border-inline-start: 3px solid var(--danger);
+}
+.alert:not(.info):not(.inline):not(.warn) > svg {
+  color: var(--danger);
+}
+.alert.warn {
+  color: var(--text);
+  border-inline-start: 3px solid var(--warn);
+}
+.alert.warn > svg {
+  color: var(--warn);
+}
+
+/* R3-V27: فلاتر السجل تصفية لا اختيار يغيّر الناتج: حبّة محايدة مرفوعة، والفيروزي المصمت
+   يبقى للخيار الذي يغيّر الناتج وللزر الأساسي (تعديل على D-5 في التصفية وحدها) */
+.history .segmented .seg-pill {
+  background: var(--pill);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 1px 3px rgb(2 8 9 / 0.2);
+}
+.history .segmented button[aria-pressed="true"] {
+  color: var(--text);
+}
+
+/* R3-V30: الزر الأساسي قبل أن يصير جاهزًا «ينتظر» ولا يبدو معطوبًا: إطار بلون الهوية بلا تعبئة،
+   ويمتلئ باللون حين يجهز (الانتقال من bubbly.css) */
+.btn-primary:disabled {
+  opacity: 1;
+  background: transparent;
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--text-dim);
 }

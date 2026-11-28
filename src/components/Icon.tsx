@@ -75,7 +75,8 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.8}
+      // R3-V20: سماكة مرئية ثابتة 1.5px في كل المقاسات (كانت بين 1.05 و2.4px)
+      strokeWidth={(1.5 * 24) / size}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"

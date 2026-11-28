@@ -3,6 +3,8 @@ import { useI18n } from "../i18n";
 import { EASE_OUT, reducedMotion } from "../motion";
 import { GuideArt, type ArtName } from "./GuideArt";
 import { Icon } from "./Icon";
+import { Segmented } from "./Segmented";
+import type { Lang } from "../i18n";
 
 export type TourStep<Tab extends string> = {
   /** محدِّد CSS للعنصر الذي نضيئه. إن لم يوجد تظهر البطاقة في الوسط */
@@ -192,8 +194,8 @@ export function Tour<Tab extends string>(props: { steps: TourStep<Tab>[]; onTab:
 }
 
 /** ترحيب عند أول فتح: يعرض الجولة، أو يذكّر بمكان الدليل */
-export function Welcome(props: { onTour: () => void; onLater: () => void }) {
-  const { t } = useI18n();
+export function Welcome(props: { onTour: () => void; onLater: () => void; onLang: (l: Lang) => void }) {
+  const { t, lang } = useI18n();
   const primary = useRef<HTMLButtonElement>(null);
   useEffect(() => primary.current?.focus(), []);
   useEffect(() => {
@@ -217,6 +219,17 @@ export function Welcome(props: { onTour: () => void; onLater: () => void }) {
             {t.welcomeBody}
           </p>
         </div>
+        {/* R3-U7: الإنجليزية افتراضيًا (قرار 19 نوفمبر)، والعربية بنقرة هنا قبل أي شيء آخر.
+            اسم كل لغة بلغتها، فيجدها من لا يقرأ لغة الواجهة الحالية */}
+        <Segmented<Lang>
+          label={t.language}
+          value={lang}
+          onChange={props.onLang}
+          options={[
+            { value: "en", label: "English" },
+            { value: "ar", label: "العربية" },
+          ]}
+        />
         <div className="update-actions">
           <button className="btn btn-ghost" onClick={props.onLater}>
             {t.welcomeLater}

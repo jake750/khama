@@ -352,6 +352,18 @@ const isFormat = (p: PresetDef) => ["video", "gif", "audio", "copy"].includes(p.
 const isAi = (p: PresetDef) => p.kind === "stems";
 const isAnalysis = (p: PresetDef) => ["detect", "frame", "sequence"].includes(p.kind);
 
+/** R3-U2: ضبط المحوّل (الوصفة، والقسم المفتوح، وخيارات كل ملف) يبقى بين التبويبات حتى إغلاق
+ * التطبيق. كائن يملكه App مثل جلسة التنزيل، وكل حالة هنا تُقرأ منه وتُكتب فيه. */
+export type ConvertSession = Map<string, unknown>;
+export const newConvertSession = (): ConvertSession => new Map();
+function useKept<T>(store: ConvertSession, key: string, init: () => T) {
+  const [v, setV] = useState<T>(() => (store.has(key) ? (store.get(key) as T) : init()));
+  useEffect(() => {
+    store.set(key, v);
+  }, [store, key, v]);
+  return [v, setV] as const;
+}
+
 /** صيغة من عائلة المصدر حين تُطلب أدوات دون صيغة: ProRes يبقى ProRes، والصوت يبقى صوتًا */
 function familyPreset(f: SourceFile): string {
   const v = f.info?.video;
@@ -372,6 +384,7 @@ interface Step {
 
 export function ConvertView(props: {
   settings: Settings;
+  session: ConvertSession;
   update: (patch: Partial<Settings>) => void;
   files: SourceFile[];
   addFiles: (paths: string[]) => void;
@@ -391,22 +404,25 @@ export function ConvertView(props: {
   ) => Promise<void>;
 }) {
   const { t, lang } = useI18n();
-  const { settings: s, update, files } = props;
-  const [shared, setShared] = useState<Scoped>(() => ({ opts: defaultOptions(), trimOn: false }));
+  const { settings: s, update, files, session } = props;
+  const [shared, setShared] = useKept<Scoped>(session, "shared", () => ({ opts: defaultOptions(), trimOn: false }));
   // خيارات خاصة بملف واحد تتقدّم على المشتركة (U-22)
-  const [overrides, setOverrides] = useState<Record<string, Scoped>>({});
-  const [editPath, setEditPath] = useState<string | null>(null);
+  const [overrides, setOverrides] = useKept<Record<string, Scoped>>(session, "overrides", () => ({}));
+  const [editPath, setEditPath] = useKept<string | null>(session, "editPath", () => null);
   const [error, setError] = useState<AppError | null>(null);
   const [busy, setBusy] = useState(false);
   // الصيغة المحفوظة قد تكون أداة (من نسخة سابقة): تنتقل لقسمها
   const saved = presetById(s.convertPreset) ?? PRESETS[0];
   const fmt = isFormat(saved) ? saved : PRESETS[0];
-  const [formatOn, setFormatOn] = useState(isFormat(saved));
-  const [ai, setAi] = useState<string[]>(isAi(saved) ? [saved.id] : []);
-  const [analysis, setAnalysis] = useState<string[]>(isAnalysis(saved) ? [saved.id] : []);
-  const [oneFile, setOneFile] = useState(true);
-  const [cat, setCat] = useState<Cat>(isAi(saved) ? "audio" : isAnalysis(saved) ? "analysis" : "format");
-  const [fmtGroup, setFmtGroup] = useState<FmtGroup>(fmt.group);
+  const [formatOn, setFormatOn] = useKept(session, "formatOn", () => isFormat(saved));
+  // R3-U1: هل اختار المستخدم صيغة بنفسه في هذه الجلسة؟ إن لم يفعل فاختيار تحليل أو أداة ذكاء
+  // يطفئ الصيغة المحفوظة، فلا يُحوَّل الملف الطويل كله دون طلب
+  const [formatPicked, setFormatPicked] = useKept(session, "formatPicked", () => false);
+  const [ai, setAi] = useKept<string[]>(session, "ai", () => (isAi(saved) ? [saved.id] : []));
+  const [analysis, setAnalysis] = useKept<string[]>(session, "analysis", () => (isAnalysis(saved) ? [saved.id] : []));
+  const [oneFile, setOneFile] = useKept(session, "oneFile", () => true);
+  const [cat, setCat] = useKept<Cat>(session, "cat", () => (isAi(saved) ? "audio" : isAnalysis(saved) ? "analysis" : "format"));
+  const [fmtGroup, setFmtGroup] = useKept<FmtGroup>(session, "fmtGroup", () => fmt.group);
 
   const ready = files.filter((f) => f.info);
   const editFile = (editPath && ready.find((f) => f.path === editPath)) || null;
@@ -627,6 +643,20 @@ export function ConvertView(props: {
   const canMerge =
     ready.length > 1 && convNeeded && ai.length === 0 && analysis.length === 0 && ["video", "audio", "gif"].includes(convPreset.kind);
 
+  // R3-U1: نص الزر يتبع الوصفة: «حلّل»، «استخرج المواضيع»، «حوّل وحلّل»، «ابدأ»
+  const detectOnly = analysis.length > 0 && analysis.every((id) => presetById(id)?.kind === "detect");
+  const startLabel = convNeeded
+    ? analysis.length + ai.length > 0
+      ? t.convertAndRun
+      : t.convertBtn(ready.length)
+    : ai.length === 0 && analysis.length === 1 && analysis[0] === "topics"
+      ? t.findTopics
+      : ai.length === 0 && detectOnly
+        ? t.analyzeBtn(ready.length)
+        : analysis.length + ai.length > 0
+          ? t.startBtn(ready.length)
+          : t.convertBtn(ready.length);
+
   async function start(merge: boolean) {
     setError(null);
     setBusy(true);
@@ -677,16 +707,43 @@ export function ConvertView(props: {
       setImporting(false);
     }
   };
+  /** R3-U13: مجلد لقطات كامل (ومجلداته الفرعية) */
+  const chooseFolder = async () => {
+    setImportError(null);
+    try {
+      const picked = await open({ directory: true, multiple: true });
+      const dirs = picked == null ? [] : Array.isArray(picked) ? picked : [picked];
+      if (!dirs.length) return;
+      setImporting(true);
+      const paths = await api.expandMediaPaths(dirs);
+      if (paths.length) props.addFiles(paths);
+      else setImportError({ code: "noMediaInFolder" });
+    } catch (e) {
+      setImportError(asAppError(e));
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const hwNames = (props.hw ?? []).map((e) => e.split("_").pop()!.toUpperCase());
   const hwLabel = [...new Set(hwNames)].join(" / ");
 
-  const toggleAi = (id: string) =>
+  /** R3-U1: أول أداة تُختار تطفئ الصيغة المحفوظة ما لم يخترها المستخدم في هذه الجلسة */
+  const toolPicked = () => {
+    if (formatOn && !formatPicked) setFormatOn(false);
+  };
+  const toggleAi = (id: string) => {
+    if (!ai.includes(id)) toolPicked();
     setAi((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : oneFile && convNeeded ? [id] : [...cur, id]));
-  const toggleAnalysis = (id: string) => setAnalysis((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  };
+  const toggleAnalysis = (id: string) => {
+    if (!analysis.includes(id)) toolPicked();
+    setAnalysis((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  };
   const pickFormat = (id: string) => {
     update({ convertPreset: id });
     setFormatOn(true);
+    setFormatPicked(true);
   };
 
   /** بطاقة صيغة أو أداة (نفس الشكل في كل الأقسام) */
@@ -727,9 +784,16 @@ export function ConvertView(props: {
         </div>
         <h2>{props.dragging ? t.dropHere : isMobile ? t.pickTitleMobile : t.dropTitle}</h2>
         <p className="faint">{t.dropSub}</p>
-        <button className="btn btn-primary btn-lg" onClick={chooseFiles} disabled={importing}>
-          <Icon name="plus" /> {importing ? t.importing : t.chooseFiles}
-        </button>
+        <div className="crash-actions">
+          <button className="btn btn-primary btn-lg" onClick={chooseFiles} disabled={importing}>
+            <Icon name="plus" /> {importing ? t.importing : t.chooseFiles}
+          </button>
+          {!isMobile && (
+            <button className="btn btn-lg" onClick={chooseFolder} disabled={importing}>
+              <Icon name="folder" /> {t.chooseFolder}
+            </button>
+          )}
+        </div>
         {importError && <ErrorBox error={importError} />}
       </div>
     );
@@ -803,6 +867,11 @@ export function ConvertView(props: {
             <button className="btn btn-sm" onClick={chooseFiles}>
               <Icon name="plus" size={16} /> {t.addFiles}
             </button>
+            {!isMobile && (
+              <button className="btn btn-sm btn-ghost" onClick={chooseFolder} title={t.chooseFolder}>
+                <Icon name="folder" size={16} /> {t.addFolder}
+              </button>
+            )}
             {failedFiles.length > 0 && failedFiles.length < files.length && (
               <button className="btn btn-sm btn-ghost" onClick={() => props.onRemoveFiles(failedFiles.map((f) => f.path))}>
                 {t.removeFailedFiles(failedFiles.length)}
@@ -1395,7 +1464,7 @@ export function ConvertView(props: {
               title={stepCount === 0 ? t.recipeEmpty : undefined}
               onClick={() => start(false)}
             >
-              <Icon name="convert" /> {t.convertBtn(ready.length)}
+              <Icon name={convNeeded || (!analysis.length && !ai.length) ? "convert" : "search"} /> {startLabel}
             </button>
           </div>
         </div>

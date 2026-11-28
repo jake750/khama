@@ -544,6 +544,14 @@ function BackgroundSection(props: { settings: Settings; update: (p: Partial<Sett
       )}
       <div className="setting-row">
         <Toggle
+          checked={s.clipboardOnFocus}
+          onChange={(clipboardOnFocus) => update({ clipboardOnFocus })}
+          title={t.clipboardOnFocus}
+          hint={t.clipboardOnFocusHint}
+        />
+      </div>
+      <div className="setting-row">
+        <Toggle
           checked={s.checkUpdates}
           onChange={(checkUpdates) => update({ checkUpdates })}
           title={t.checkUpdates}

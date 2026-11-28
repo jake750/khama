@@ -13,6 +13,7 @@
   "permissions": [
     "updater:default",
     "process:allow-restart",
+    "core:window:allow-set-theme",
     {
       "identifier": "opener:allow-open-url",
       "allow": [

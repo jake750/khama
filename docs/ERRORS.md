@@ -93,6 +93,7 @@ Failed job cards show the same fix button (cookies, update yt-dlp) as the main e
 | `cookiesInvalid` | That isn't a valid cookies file. Khama needs the Netscape cookies.txt format (e.g. from “Get cookies.txt LOCALLY”). | — |
 | `cookiesExpired` | All the cookies in this file have expired. Sign in to the site again in your browser, then export fresh cookies. | — |
 | `clipboard` | Couldn't access the clipboard. Paste with Ctrl+V inside the field. | — |
+| `noMediaInFolder` | No video or audio files in this folder (or its subfolders). | — |
 | `noThumbnail` | This link has no thumbnail. | — |
 | `stillsFailed` | The download worked, but grabbing stills from it failed. | — |
 | `window` | Couldn't resize the window. | — |

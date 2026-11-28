@@ -6,7 +6,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { isPermissionGranted, sendNotification } from "@tauri-apps/plugin-notification";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, asAppError, type AppError, type ConvertRequest, type DownloadRequest, type JobUpdate, type Settings } from "./api";
-import { ConvertView, defaultOptions, MEDIA_FILTER, type SourceFile } from "./components/ConvertView";
+import { ConvertView, defaultOptions, MEDIA_FILTER, newConvertSession, type SourceFile } from "./components/ConvertView";
 import { DownloadView, newDownloadSession, type StartMeta } from "./components/DownloadView";
 import { HistoryView } from "./components/HistoryView";
 import { Icon, type IconName } from "./components/Icon";
@@ -39,8 +39,21 @@ const GuideView = lazy(() => import("./components/GuideView").then((m) => ({ def
 
 type Tab = "download" | "convert" | "history" | "settings" | "guide";
 
+/** R3-V3: الثيم واللغة والاتجاه المطبَّقة الآن، لبداية التشغيل القادم قبل React (public/boot.js) */
+function saveBoot() {
+  const r = document.documentElement;
+  try {
+    localStorage.setItem(
+      "khama-boot",
+      JSON.stringify({ lang: r.lang, dir: r.dir, theme: r.getAttribute("data-theme"), mixed: r.hasAttribute("data-mixed-dir") }),
+    );
+  } catch {
+    /* التخزين معطّل: يبقى الإقلاع على القيم الافتراضية في index.html */
+  }
+}
+
 /** يطبّق الثيم ويعيد الثيم الفعلي. "system" يتبع إعداد النظام ويتغيّر معه */
-function useTheme(theme: Settings["theme"] | undefined): "dark" | "light" {
+function useTheme(theme: Settings["theme"] | undefined, loaded: boolean): "dark" | "light" {
   const media = useMemo(() => window.matchMedia("(prefers-color-scheme: light)"), []);
   const [systemLight, setSystemLight] = useState(media.matches);
   useEffect(() => {
@@ -58,11 +71,29 @@ function useTheme(theme: Settings["theme"] | undefined): "dark" | "light" {
     return () => window.removeEventListener("pointerdown", onDown, true);
   }, []);
   const switching = useRef(0);
+  const firstApply = useRef(true);
   useEffect(() => {
+    // R3-V3: قبل قراءة الإعدادات يبقى ثيم boot.js (آخر ثيم)، وأول تطبيق بعدها فوري بلا انتقال
+    if (!loaded) return;
     const root = document.documentElement;
-    const apply = () => root.setAttribute("data-theme", resolved);
+    const apply = () => {
+      root.setAttribute("data-theme", resolved);
+      saveBoot();
+    };
+    // R3-V16: شريط عنوان Windows وmacOS يتبع ثيم خامة لا ثيم النظام
+    if (!isMobile) {
+      try {
+        getCurrentWindow()
+          .setTheme(resolved)
+          .catch(() => {});
+      } catch {
+        /* خارج Tauri (معاينة المتصفح) */
+      }
+    }
     const from = root.getAttribute("data-theme");
-    if (!from || from === resolved || reducedMotion() || !document.startViewTransition) return apply();
+    const first = firstApply.current;
+    firstApply.current = false;
+    if (first || !from || from === resolved || reducedMotion() || !document.startViewTransition) return apply();
     // من مكان آخر ضغطة إن كانت للتوّ، وإلا من وسط الشاشة (اختصار، أو تغيّر ثيم النظام)
     const p = lastPress.current;
     const recent = p && performance.now() - p.at < 1500;
@@ -82,7 +113,7 @@ function useTheme(theme: Settings["theme"] | undefined): "dark" | "light" {
       .then(() => {
         if (switching.current === id) delete root.dataset.themeSwitch;
       });
-  }, [resolved]);
+  }, [resolved, loaded]);
   return resolved;
 }
 
@@ -179,6 +210,7 @@ export default function App() {
   const nextLocalId = useRef(-1);
   // حالة شاشة التنزيل التي تبقى بين التبويبات (الرابط والمعاينة)
   const [downloadSession] = useState(newDownloadSession);
+  const [convertSession] = useState(newConvertSession);
   const [scheduledLoaded, setScheduledLoaded] = useState(false);
 
   const lang = settings?.language ?? "en";
@@ -187,7 +219,7 @@ export default function App() {
   const tRef = useRef(t);
   const [confirmNode, confirm] = useConfirm();
 
-  const resolvedTheme = useTheme(settings?.theme);
+  const resolvedTheme = useTheme(settings?.theme, settings != null);
   const [toastShown, toastLeaving] = usePresence(toastMsg, 260);
   const tabsRef = useRef<HTMLElement>(null);
   const tabPill = useSlidingIndicator(tabsRef, '.tab[aria-current="page"]', `${tab}|${lang}|${compact}`);
@@ -207,9 +239,13 @@ export default function App() {
       const w = wantDir.current;
       root.lang = w.lang;
       root.dir = w.dir!;
-      if (isMixed(w.layout, w.lang)) root.dataset.mixedDir = "";
+      const mixed = isMixed(w.layout, w.lang);
+      if (mixed) root.dataset.mixedDir = "";
       else delete root.dataset.mixedDir;
+      saveBoot();
     };
+    // R3-V3: قبل قراءة الإعدادات يبقى اتجاه boot.js ولغته
+    if (!loaded) return;
     // انقلاب التخطيط بيد المستخدم: تلاشٍ قصير بين الصورتين بدل قفزة، بلا دوران.
     // أول تطبيق بعد قراءة الإعدادات فوري (لا انتقال عند فتح البرنامج)
     if (!prev.loaded || prev.dir === dir || reducedMotion() || !document.startViewTransition) return apply();
@@ -478,7 +514,14 @@ export default function App() {
         setJobs((prev) => [{ id: localId, state: "scheduled", at, ...base } as Job, ...prev]);
         return;
       }
-      return await launch(base, (id) => api.startDownload(withHistory(request, base), id));
+      const id = await launch(base, (id) => api.startDownload(withHistory(request, base), id));
+      // R3-U19: البطاقة الجديدة تحت حافة النافذة غالبًا: نمرّر إليها بقدر ما يلزم لتظهر
+      setTimeout(() => {
+        document
+          .querySelector(`[data-job-id="${id}"]`)
+          ?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+      }, 120);
+      return id;
     },
     [launch],
   );
@@ -676,10 +719,17 @@ export default function App() {
             })
             .catch(logError("readLinksFile"));
         }
-        addFiles(p.paths);
-        // صور أو PDF أو ملفات لا يقرؤها المحوّل: رسالة بأسمائها بدل لا شيء (R2-10)
-        const skipped = p.paths.filter((x) => !isMedia(x) && !x.toLowerCase().endsWith(".txt"));
-        if (skipped.length) toast(tRef.current.dropSkipped(skipped.length, baseName(skipped[0])));
+        // R3-U13: المجلد المُفلت يُستبدل بما فيه من وسائط
+        api
+          .expandMediaPaths(p.paths.filter((x) => !x.toLowerCase().endsWith(".txt")))
+          .catch(() => p.paths)
+          .then((paths) => {
+            addFiles(paths);
+            // صور أو PDF أو ملفات لا يقرؤها المحوّل: رسالة بأسمائها بدل لا شيء (R2-10)
+            const skipped = paths.filter((x) => !isMedia(x));
+            if (skipped.length) toast(tRef.current.dropSkipped(skipped.length, baseName(skipped[0])));
+            else if (!paths.length && !texts.length) toast(tRef.current.errors.noMediaInFolder);
+          });
       }
     });
     return () => {
@@ -794,6 +844,22 @@ export default function App() {
       <div className="boot-error" role="alert" dir="auto">
         <p>تعذّر تحميل الإعدادات — Could not load settings</p>
         <code className="ltr">{bootError.code + (bootError.detail ? `: ${bootError.detail}` : "")}</code>
+        {/* R3-U35: طريق للخروج بدل رمز خطأ وحده. اللغة غير معروفة بعد، فالأزرار باللغتين */}
+        <div className="crash-actions">
+          <button className="btn btn-primary" onClick={() => window.location.reload()}>
+            أعد المحاولة — Try again
+          </button>
+          <button
+            className="btn"
+            onClick={() =>
+              writeText(`Khama: settings failed to load
+${bootError.code}${bootError.detail ? `: ${bootError.detail}` : ""}
+${navigator.userAgent}`).catch(() => {})
+            }
+          >
+            انسخ للتقرير — Copy for a report
+          </button>
+        </div>
       </div>
     );
 
@@ -1227,6 +1293,7 @@ export default function App() {
                 {tab === "convert" && (
                   <ConvertView
                     settings={settings}
+                    session={convertSession}
                     update={update}
                     files={files}
                     addFiles={addFiles}
@@ -1267,6 +1334,7 @@ export default function App() {
                       setTab("download");
                     }}
                     onDragOut={isMobile ? undefined : (file, thumb) => dragOut(file, thumb)}
+                    onConvert={(file) => addFiles([file])}
                     toast={toast}
                   />
                 )}
@@ -1516,7 +1584,7 @@ export default function App() {
 
         {/* أول فتح: ترحيب يعرض جولة سريعة على الخصائص */}
         <Presence show={!settings.seenTour && !touring && !compact}>
-          <Welcome onTour={startTour} onLater={() => update({ seenTour: true })} />
+          <Welcome onTour={startTour} onLater={() => update({ seenTour: true })} onLang={(language) => update({ language })} />
         </Presence>
         <Presence show={touring}>
           <Tour steps={tourSteps} onTab={tourTab} onClose={() => setTouring(false)} />

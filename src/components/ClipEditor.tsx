@@ -39,6 +39,12 @@ export function ClipEditor(props: {
         seek: (v) => {
           if (video.current) video.current.currentTime = v;
         },
+        toggle: () => {
+          const v = video.current;
+          if (!v) return;
+          if (v.paused) void v.play().catch(() => {});
+          else v.pause();
+        },
       }
     : null;
 

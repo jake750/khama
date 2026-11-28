@@ -4,6 +4,9 @@ import ReactDOM from "react-dom/client";
 import "@fontsource/ibm-plex-sans-arabic/400.css";
 import "@fontsource/ibm-plex-sans-arabic/600.css";
 import "@fontsource/ibm-plex-sans-arabic/700.css";
+// R3-V8: خط ثابت العرض للمواصفات والكود الزمني (اللاتينية فقط، وزنان)
+import "@fontsource/ibm-plex-mono/latin-400.css";
+import "@fontsource/ibm-plex-mono/latin-500.css";
 import "./styles.css";
 import "./redesign.css";
 import "./guide.css";
@@ -13,10 +16,12 @@ import { followSystemMotion } from "./motion";
 import { installFocusTrap } from "./focusTrap";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { installGlobalErrorLog } from "./log";
+import { installNativeFeel } from "./nativeFeel";
 
 followSystemMotion();
 installFocusTrap();
 installGlobalErrorLog();
+installNativeFeel();
 
 // في المتصفح فقط (npm run dev): بيانات تجريبية بدل Rust لمعاينة التصميم. لا تدخل في نسخة التطبيق.
 const ready = import.meta.env.DEV ? import("./dev-mock") : Promise.resolve();

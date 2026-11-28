@@ -34,9 +34,9 @@ Format: **Decision** · Why · Instead of · Revisit when
 - **Downloaded on first use**, not bundled: most people never use it, and it would double the installer. Checked by SHA-256, with mirrors.
 - **Revisit when**: a smaller model of the same quality exists in ONNX.
 
-### D6. The interface follows the system language on first run; English otherwise
-- **Why**: the brief asked for a fully Arabic interface, and Khama is fully Arabic. But it is open source and also used by people who don't read Arabic, so the language is a setting, not a fork. On first run Khama picks Arabic when the system language is Arabic; otherwise English. Changing it later takes one click in Settings.
-- **Instead of**: Arabic always (confusing for non-Arabic users who find it on GitHub), English always (wrong first impression for the main audience; the original default until 0.3.16).
+### D6. English on first run, Arabic one click away
+- **Why**: the brief asked for a fully Arabic interface, and Khama is fully Arabic. But it is open source and also used by people who don't read Arabic, so the language is a setting, not a fork. Since 2026-11-19 (ff6a117) the first run is always English whatever the system language, by the author's choice; the welcome card has an English / العربية switch (each name in its own language) so Arabic is one click away before anything else, and Settings keeps it. The layout direction is a separate setting (right-to-left by default).
+- **Instead of**: following the system language (0.3.16 to 0.3.2x: unpredictable on machines set to English by Arabic speakers), Arabic always (confusing for non-Arabic users who find it on GitHub).
 
 ### D7. Code comments in Arabic, public documents in both languages
 - **Why**: the project is also a learning project, and the author reads Arabic first. Comments explain *why* in the language the maintainer thinks in.

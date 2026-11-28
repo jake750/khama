@@ -229,7 +229,10 @@ export function DownloadView(props: {
   // اقتراح من الحافظة: عند فتح خامة أو الرجوع إليها، إن كان الحقل فارغًا وفي الحافظة رابط جديد
   const urlRef = useRef(url);
   urlRef.current = url;
+  const focusCheck = s.clipboardOnFocus;
   useEffect(() => {
+    // R3-U31: لا تُقرأ الحافظة إلا إن سمح المستخدم بذلك
+    if (!focusCheck) return;
     const check = async () => {
       if (urlRef.current.trim()) return;
       const found = await clipboardUrl();
@@ -241,7 +244,7 @@ export function DownloadView(props: {
     check();
     window.addEventListener("focus", check);
     return () => window.removeEventListener("focus", check);
-  }, [session]);
+  }, [session, focusCheck]);
 
   // Ctrl+V في أي مكان من النافذة (خارج حقول الكتابة) يلصق في حقل الرابط
   useEffect(() => {

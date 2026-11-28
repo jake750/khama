@@ -220,6 +220,7 @@ export function JobCard(props: {
   return (
     <div
       className={`card job state-${j.state} ${draggable ? "draggable" : ""}`}
+      data-job-id={j.id}
       style={{ "--fill": `${fill}%` } as CSSProperties}
       draggable={draggable || undefined}
       onDragStart={

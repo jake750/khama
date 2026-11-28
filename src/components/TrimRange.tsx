@@ -12,6 +12,41 @@ export interface Range {
 export interface PreviewLink {
   now: () => number | null;
   seek: (t: number) => void;
+  /** تشغيل/إيقاف (للمسافة وK) */
+  toggle?: () => void;
+}
+
+/** R3-U24: اختصارات المونتاج المعتادة ما دام شريط القص بمعاينته ظاهرًا. لا تعمل داخل حقل كتابة
+ * ولا على زر مركَّز (المسافة تضغطه)، وe.code لا e.key فتعمل مع لوحة المفاتيح العربية */
+function useTrimKeys(link: PreviewLink | null | undefined, frame: number, d: number, mark: (which: "start" | "end") => void) {
+  useEffect(() => {
+    if (!link) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector('[aria-modal="true"]')) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, button, a, [contenteditable], [role='button']")) return;
+      const now = link.now();
+      if (now == null) return;
+      const jump = (by: number) => link.seek(Math.max(0, Math.min(d, now + by)));
+      const acts: Record<string, () => void> = {
+        Space: () => link.toggle?.(),
+        KeyK: () => link.toggle?.(),
+        KeyI: () => mark("start"),
+        KeyO: () => mark("end"),
+        KeyJ: () => jump(-1),
+        KeyL: () => jump(1),
+        // خط الزمن من اليسار لليمين دائمًا، حتى في الواجهة العربية
+        ArrowLeft: () => jump(e.shiftKey ? -1 : -frame),
+        ArrowRight: () => jump(e.shiftKey ? 1 : frame),
+      };
+      const act = acts[e.code];
+      if (!act) return;
+      e.preventDefault();
+      act();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [link, frame, d, mark]);
 }
 
 /** حقل وقت: يقبل الكتابة الحرة ويطبّق القيمة عند الخروج أو Enter */
@@ -100,6 +135,7 @@ export function TrimRange(props: {
     v = Math.max(minGap, Math.min(v, d));
     set(v - minGap < r.start ? Math.max(v - len, 0) : r.start, v);
   };
+  useTrimKeys(props.preview, props.fps ? 1 / props.fps : 0.1, d, here);
 
   return (
     <div className="trim">
