@@ -16,6 +16,9 @@ async function lowBattery(): Promise<number | null> {
   }
 }
 
+/** «الاثنان» (R3-F21) يمرّ إلى الطلب كما هو. Stems في downloadPlan.ts لم يضمّه بعد، فالاختيار أوسع منه هنا */
+type StemsChoice = Stems | "both";
+
 /** إزالة الموسيقى أو الصوت، ولقائمة التشغيل: على كل العناصر أو المختار منها */
 export function StemsRow(props: {
   stems: Stems;
@@ -32,7 +35,7 @@ export function StemsRow(props: {
   const { stems, scope } = props;
   const [confirmNode, confirm] = useConfirm();
   // أول استعمال يُنزّل ~140MB: نسأل قبلها، فلا تكون مفاجأة على بيانات الهاتف (U-29)
-  const choose = async (v: Stems) => {
+  const choose = async (v: StemsChoice) => {
     if (v !== "off" && stems === "off") {
       const ready = await api.aiReady().catch(() => true);
       if (!ready && !(await confirm(t.aiDownloadTitle, isMobile ? t.aiDownloadBodyMobile : t.aiDownloadBody, t.aiDownloadOk))) return;
@@ -40,21 +43,23 @@ export function StemsRow(props: {
       const pct = isMobile ? await lowBattery() : null;
       if (pct != null && !(await confirm(t.lowBatteryTitle, t.lowBatteryBody(pct), t.lowBatteryOk))) return;
     }
-    props.onStems(v);
+    props.onStems(v as Stems);
   };
-  const label = stems === "music" ? t.stemsMusic : t.stemsVoice;
+  const choice = stems as StemsChoice;
+  const label = choice === "music" ? t.stemsMusic : choice === "both" ? t.stemsBoth : t.stemsVoice;
   return (
     <div className="stems-row">
       {confirmNode}
       <span className="field-label">{t.stemsLabel}</span>
-      <Segmented<Stems>
+      <Segmented<StemsChoice>
         label={t.stemsLabel}
-        value={stems}
+        value={choice}
         onChange={(v) => void choose(v)}
         options={[
           { value: "off", label: t.stemsOff },
           { value: "voice", label: t.stemsVoice },
           { value: "music", label: t.stemsMusic },
+          { value: "both", label: t.stemsBoth },
         ]}
       />
       <div className="collapse" data-open={stems !== "off"} inert={!(stems !== "off") || undefined}>
@@ -76,6 +81,7 @@ export function StemsRow(props: {
               </div>
             </div>
           )}
+          {choice === "both" && <div className="faint mt-2">{t.stemsBothHint}</div>}
           <div className="faint mt-2">{isMobile ? t.stemsHintMobile : t.stemsHint}</div>
         </div>
       </div>

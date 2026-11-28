@@ -250,8 +250,9 @@ export interface DownloadRequest {
   /** تحميل جزء فقط (بالثواني) */
   start?: number | null;
   end?: number | null;
-  /** إزالة بالذكاء الاصطناعي: "voice" = أبقِ الصوت البشري (احذف الموسيقى) | "music" = أبقِ الموسيقى */
-  stems?: "voice" | "music" | null;
+  /** إزالة بالذكاء الاصطناعي: "voice" = أبقِ الصوت البشري (احذف الموسيقى) | "music" = أبقِ الموسيقى
+   * | "both" = الاثنان من مرور واحد (R3-F21) */
+  stems?: "voice" | "music" | "both" | null;
   /** عدة مقاطع [بداية، نهاية] بالثواني (تتقدّم على start/end) */
   clips?: [number, number][];
   /** مع عدة مقاطع: true = فيديو واحد، false = ملف لكل مقطع */

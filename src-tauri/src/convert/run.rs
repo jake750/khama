@@ -659,11 +659,13 @@ async fn run_stems(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOptions
     };
     // الصوت الأساسي وحده (KARA_2)، وإلا إزالة الموسيقى (Voc_FT)
     let model = separate::sep_model(if p.id == "stem_lead" { "lead" } else { "voice" });
-    let keep = if p.id == "stem_music" {
-        separate::Keep::Music
-    } else {
-        separate::Keep::Voice
+    let keep = match p.id {
+        "stem_music" => separate::Keep::Music,
+        "stem_both" => separate::Keep::Both,
+        _ => separate::Keep::Voice,
     };
+    // «الاثنان» لملف صوتي (R3-F21): ملفان بجانب بعضهما، الحوار والموسيقى. والفيديو: ملف واحد بمسارين
+    let two_files = keep == separate::Keep::Both && info.video.is_none();
     let dir = output_dir_for(c.app, o, &first_path)?;
     std::fs::create_dir_all(&dir).map_err(|e| AppError::with_detail("outputDirCreate", e.to_string()))?;
     let stem = first_path
@@ -688,22 +690,33 @@ async fn run_stems(c: &Ctx<'_>, p: &Preset, info: &MediaInfo, o: &ConvertOptions
         cancel,
     )
     .await;
+    let music_temp = separate::music_companion(&temp);
     match ok {
         Ok(true) => {}
         Ok(false) => {
             let _ = std::fs::remove_file(&temp);
+            let _ = std::fs::remove_file(&music_temp);
             return Ok(None);
         }
         Err(e) => {
             let _ = std::fs::remove_file(&temp);
+            let _ = std::fs::remove_file(&music_temp);
             return Err(e);
         }
     }
-    let dest = unique_path(&dir, &format!("{stem} [{}].{ext}", p.suffix));
+    let suffix = if two_files { "no music" } else { p.suffix };
+    let dest = unique_path(&dir, &format!("{stem} [{suffix}].{ext}"));
     std::fs::rename(&temp, &dest).map_err(|e| {
         let _ = std::fs::remove_file(&dest);
         AppError::with_detail("moveFailed", e.to_string())
     })?;
+    if two_files {
+        let music = unique_path(&dir, &format!("{stem} [music only].{ext}"));
+        std::fs::rename(&music_temp, &music).map_err(|e| AppError::with_detail("moveFailed", e.to_string()))?;
+        if let Err(e) = deliver(c.app, music).await {
+            log::warn!("convert {}: music file: {e:?}", c.id);
+        }
+    }
     Ok(Some((deliver(c.app, dest).await?, None)))
 }
 

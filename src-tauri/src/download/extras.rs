@@ -143,6 +143,13 @@ pub(super) async fn deliver_with_extras(
     let stem = stem_of(&done);
     let extra_dir = work.join("extras");
     std::fs::create_dir_all(&extra_dir)?;
+    if let Ok(entries) = std::fs::read_dir(work.join(COMPANIONS)) {
+        for e in entries.flatten() {
+            if let Err(e) = deliver(app, &e.path(), final_dir).await {
+                log::warn!("deliver companion: {e:?}");
+            }
+        }
+    }
 
     for (src, suffix) in &side.files {
         let target = extra_dir.join(format!("{stem}{suffix}"));
@@ -517,7 +524,14 @@ pub(super) async fn finish(
             .extension()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| "mp4".into());
-        let tag = if keep == separate::Keep::Voice { "no music" } else { "music only" };
+        let audio = separate::audio_ext(&file);
+        let tag = match keep {
+            separate::Keep::Voice => "no music",
+            separate::Keep::Music => "music only",
+            // «الاثنان» (R3-F21): فيديو بمسارين، أو ملف الحوار والموسيقى بجانبه
+            separate::Keep::Both if audio => "no music",
+            separate::Keep::Both => "voice + music",
+        };
         let out = sep_dir.join(format!("{stem} [{tag}].{ext}"));
         // الفصل واحد في كل مرة: إن كان غيره يفصل الآن تقول البطاقة «تنتظر دور الذكاء الاصطناعي»
         // لا «جارٍ الفصل» (U-71)، ثم تتحوّل حين يأتي دورها
@@ -559,10 +573,22 @@ pub(super) async fn finish(
         {
             return Ok(None);
         }
+        if keep == separate::Keep::Both && audio {
+            // يُسلَّم مع الملف (deliver_with_extras يأخذ كل ما في companions)
+            let companions = dir.join(COMPANIONS);
+            std::fs::create_dir_all(&companions)?;
+            std::fs::rename(
+                separate::music_companion(&out),
+                companions.join(format!("{stem} [music only].{ext}")),
+            )?;
+        }
         file = out;
     }
     Ok(Some(file))
 }
+
+/// ملفات تُسلَّم بجانب الملف الأساسي بأسمائها (الموسيقى مع الحوار في «الاثنان»، R3-F21)
+pub(super) const COMPANIONS: &str = "companions";
 
 /// يشغّل عملية ملفات طويلة على خيط مخصّص بدل خيوط tokio
 pub(super) async fn blocking(f: impl FnOnce() -> std::io::Result<()> + Send + 'static) -> Result<(), AppError> {
