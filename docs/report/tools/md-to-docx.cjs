@@ -463,6 +463,44 @@ if (problems.length) {
   process.exit(1);
 }
 
+// Every entry of references.md is cited in the text ([7], [48]، [49], [3]–[6]), and every citation has an entry (A-43).
+// A reference cited nowhere is a warning in a draft and an error with --submit; a citation without an entry is always an error.
+function checkCitations() {
+  const refFile = ALL.find((f) => f === "references.md");
+  if (!refFile) return;
+  const entries = new Set();
+  for (const l of fs.readFileSync(path.join(dir, refFile), "utf8").split("\n")) {
+    const m = /^\[(\d+)\]/.exec(l);
+    if (m) entries.add(+m[1]);
+  }
+  const cited = new Set();
+  const unknown = [];
+  for (const f of ALL.filter((x) => x !== refFile)) {
+    let fence = false;
+    fs.readFileSync(path.join(dir, f), "utf8").split("\n").forEach((l, i) => {
+      if (/^\s*```/.test(l)) fence = !fence;
+      if (fence) return;
+      for (const m of l.replace(/`[^`]*`/g, "").matchAll(/\[(\d+)\](?:\s*[–-]\s*\[(\d+)\])?/g)) {
+        for (let n = +m[1]; n <= +(m[2] || m[1]); n++) {
+          cited.add(n);
+          if (!entries.has(n)) unknown.push(`${f}:${i + 1}: [${n}]`);
+        }
+      }
+    });
+  }
+  const uncited = [...entries].filter((n) => !cited.has(n));
+  if (unknown.length) {
+    console.error("Citations without a reference:\n  " + unknown.join("\n  "));
+    process.exit(1);
+  }
+  if (uncited.length) {
+    const msg = `References cited nowhere in the text: ${uncited.map((n) => `[${n}]`).join(" ")}`;
+    if (SUBMIT) { console.error(msg); process.exit(1); }
+    console.warn(msg);
+  }
+}
+checkCitations();
+
 // Review codes (A-41, T-1, M-42, D-84) are for the author, not the jury. In a parenthesis they are removed with
 // their separator, and the parenthesis goes when nothing else is left: "(A-9، O4، H2)" → "(O4، H2)",
 // "بصراحة (A-45):" → "بصراحة:". "[يكتبه الطالب، A-63]" → "[يكتبه الطالب]". Code blocks are left alone.

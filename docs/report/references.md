@@ -1,42 +1,42 @@
 # المراجع
 
-بأسلوب IEEE (A-47). الروابط تُراجَع وتُضاف تواريخ الاطلاع قبل التسليم.
+بأسلوب IEEE (A-47، A-43). «Accessed» للروابط التي فُتحت فعلًا في 2026-11-28؛ الروابط الباقية بلا تاريخ لأنها لم تُفتح آليًا في ذلك اليوم ([5] و[17] و[28] و[37] رفضت الطلب الآلي)، **[يكتبه الطالب]** فتحها يدويًا وإضافة التاريخ قبل التسليم. المحوّل يرفض في نسخة التسليم أي مرجع لا يُستشهد به في المتن.
 
-[1] yt-dlp contributors, "yt-dlp: A feature-rich command-line audio/video downloader." [Online]. Available: https://github.com/yt-dlp/yt-dlp
+[1] yt-dlp contributors, "yt-dlp: A feature-rich command-line audio/video downloader." Accessed: Nov. 28, 2026. [Online]. Available: https://github.com/yt-dlp/yt-dlp
 
-[2] FFmpeg Developers, "FFmpeg." [Online]. Available: https://ffmpeg.org
+[2] FFmpeg Developers, "FFmpeg." Accessed: Nov. 28, 2026. [Online]. Available: https://ffmpeg.org
 
-[3] Tauri Contributors, "Tauri 2.0." [Online]. Available: https://v2.tauri.app
+[3] Tauri Contributors, "Tauri 2.0." Accessed: Nov. 28, 2026. [Online]. Available: https://v2.tauri.app
 
-[4] Microsoft, "ONNX Runtime." [Online]. Available: https://onnxruntime.ai
+[4] Microsoft, "ONNX Runtime." Accessed: Nov. 28, 2026. [Online]. Available: https://onnxruntime.ai
 
 [5] Meta Open Source, "React." [Online]. Available: https://react.dev
 
-[6] The Rust Project Developers, "The Rust Programming Language." [Online]. Available: https://www.rust-lang.org
+[6] The Rust Project Developers, "The Rust Programming Language." Accessed: Nov. 28, 2026. [Online]. Available: https://www.rust-lang.org
 
 [7] M. Kim, W. Choi, J. Chung, D. Lee, and S. Jung, "KUIELab-MDX-Net: A two-stream neural network for music demixing," in *Proc. ISMIR Workshop on Music Source Separation (MDX21)*, 2021. arXiv:2111.12203.
 
-[8] Anjok07 and aufr33, "Ultimate Vocal Remover GUI" and its model data (UVR-MDX-NET-Voc_FT parameters). [Online]. Available: https://github.com/Anjok07/ultimatevocalremovergui
+[8] Anjok07 and aufr33, "Ultimate Vocal Remover GUI" and its model data (UVR-MDX-NET-Voc_FT parameters). Accessed: Nov. 28, 2026. [Online]. Available: https://github.com/Anjok07/ultimatevocalremovergui
 
 [9] S. Rouard, F. Massa, and A. Défossez, "Hybrid transformers for music source separation," in *Proc. IEEE ICASSP*, 2023.
 
 [10] R. Hennequin, A. Khlif, F. Voituret, and M. Moussallam, "Spleeter: A fast and efficient music source separation tool with pre-trained models," *Journal of Open Source Software*, vol. 5, no. 50, p. 2154, 2020.
 
-[11] GitHub, "Standing up for developers: youtube-dl is back," *The GitHub Blog*, Nov. 2020. [Online]. Available: https://github.blog/news-insights/policy-news-and-insights/standing-up-for-developers-youtube-dl-is-back/
+[11] GitHub, "Standing up for developers: youtube-dl is back," *The GitHub Blog*, Nov. 2020. Accessed: Nov. 28, 2026. [Online]. Available: https://github.blog/news-insights/policy-news-and-insights/standing-up-for-developers-youtube-dl-is-back/
 
-[12] Electronic Frontier Foundation, letter to GitHub regarding youtube-dl, Nov. 2020. [Online]. Available: https://www.eff.org
+[12] Electronic Frontier Foundation, "EFF letter to GitHub on youtube-dl takedown," Nov. 15, 2020. Accessed: Nov. 28, 2026. [Online]. Available: https://www.eff.org/document/eff-letter-github-youtube-dl-takedown
 
 [13] European Broadcasting Union, "EBU R 128: Loudness normalisation and permitted maximum level of audio signals," 2020.
 
 [14] Audio Engineering Society, "AES TD1004.1.15-10: Recommendation for loudness of audio streaming and network file playback," 2015.
 
-[15] Apple Inc., "Apple ProRes White Paper," 2022. [Online]. Available: https://www.apple.com/final-cut-pro/docs/Apple_ProRes.pdf
+[15] Apple Inc., "Apple ProRes White Paper," Apr. 2022. Accessed: Nov. 28, 2026. [Online]. Available: https://www.apple.com/final-cut-pro/docs/Apple_ProRes.pdf
 
-[16] Avid Technology, "Avid DNxHR codec bandwidth specifications." [Online]. Available: https://avid.secure.force.com/pkb/articles/en_US/White_Paper/DNxHR-Codec-Bandwidth-Specifications
+[16] Avid Technology, "Avid DNxHR codec bandwidth specifications." Accessed: Nov. 28, 2026. [Online]. Available: https://kb.avid.com/pkb/articles/en_US/White_Paper/DNxHR-Codec-Bandwidth-Specifications
 
 [17] Adobe, "Variable frame rate media in Premiere Pro," Premiere Pro User Guide. [Online]. Available: https://helpx.adobe.com/premiere-pro
 
-[18] Blackmagic Design, *DaVinci Resolve Reference Manual* (supported codecs, Linux limitations). [Online]. Available: https://www.blackmagicdesign.com/support
+[18] Blackmagic Design, *DaVinci Resolve Reference Manual* (supported codecs, Linux limitations). Accessed: Nov. 28, 2026. [Online]. Available: https://www.blackmagicdesign.com/support
 
 [19] W3C, "Web Content Accessibility Guidelines (WCAG) 2.2," W3C Recommendation, 2023.
 
@@ -58,7 +58,7 @@
 
 [28] Free Software Foundation, "GNU General Public License v3," §5 (aggregates). [Online]. Available: https://www.gnu.org/licenses/gpl-3.0.html
 
-[29] SIL International, "SIL Open Font License 1.1." [Online]. Available: https://openfontlicense.org
+[29] SIL International, "SIL Open Font License 1.1." Accessed: Nov. 28, 2026. [Online]. Available: https://openfontlicense.org
 
 [30] H. Zhang, A. Kankanhalli, and S. W. Smoliar, "Automatic partitioning of full-motion video," *Multimedia Systems*, vol. 1, no. 1, pp. 10–28, 1993.
 
@@ -72,7 +72,7 @@
 
 [35] F.-R. Stöter, A. Liutkus, and N. Ito, "The 2018 signal separation evaluation campaign," in *Proc. LVA/ICA*, 2018, pp. 293–305.
 
-[36] Xiph.org Foundation, "Xiph.org Video Test Media (derf's collection)." [Online]. Available: https://media.xiph.org/video/derf/
+[36] Xiph.org Foundation, "Xiph.org Video Test Media (derf's collection)." Accessed: Nov. 28, 2026. [Online]. Available: https://media.xiph.org/video/derf/
 
 [37] Blender Foundation, "Sintel" (trailer), CC BY 3.0. [Online]. Available: https://durian.blender.org
 
@@ -86,13 +86,13 @@
 
 [42] X. Wang, L. Xie, C. Dong, and Y. Shan, "Real-ESRGAN: Training real-world blind super-resolution with pure synthetic data," in *Proc. IEEE/CVF ICCV Workshops*, 2021, pp. 1905–1914.
 
-[43] Silero Team, "Silero VAD: pre-trained enterprise-grade voice activity detector." [Online]. Available: https://github.com/snakers4/silero-vad
+[43] Silero Team, "Silero VAD: pre-trained enterprise-grade voice activity detector." Accessed: Nov. 28, 2026. [Online]. Available: https://github.com/snakers4/silero-vad
 
 [44] L. Wang, N. Yang, X. Huang, L. Yang, R. Majumder, and F. Wei, "Multilingual E5 text embeddings: A technical report," arXiv:2402.05672, 2024.
 
-[45] G. Gerganov, "whisper.cpp: Port of OpenAI's Whisper model in C/C++." [Online]. Available: https://github.com/ggerganov/whisper.cpp
+[45] G. Gerganov, "whisper.cpp: Port of OpenAI's Whisper model in C/C++." Accessed: Nov. 28, 2026. [Online]. Available: https://github.com/ggerganov/whisper.cpp
 
-[46] jianfch, "stable-ts: Transcription, forced alignment, and audio indexing with OpenAI's Whisper." [Online]. Available: https://github.com/jianfch/stable-ts
+[46] jianfch, "stable-ts: Transcription, forced alignment, and audio indexing with OpenAI's Whisper." Accessed: Nov. 28, 2026. [Online]. Available: https://github.com/jianfch/stable-ts
 
 [47] C. Wohlin, P. Runeson, M. Höst, M. C. Ohlsson, B. Regnell, and A. Wesslén, *Experimentation in Software Engineering*. Berlin, Germany: Springer, 2012.
 
