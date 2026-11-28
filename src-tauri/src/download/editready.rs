@@ -24,11 +24,20 @@ pub(super) fn editready_args(input: &Path, output: &Path, check: &MediaCheck, hw
     if check.video_ok {
         a.extend(s(&["-c:v", "copy"]));
     } else {
+        // HDR (PQ/HLG) إلى SDR بـ tonemap المحوّل نفسه (R3-F8): بدونه يصل الفيديو باهتًا رماديًّا في المونتاج
+        let hdr = check.video.as_ref().is_some_and(|v| v.hdr);
+        if hdr {
+            a.extend(["-vf".into(), format!("{},format=yuv420p", crate::convert::TONEMAP)]);
+        }
         match hw {
             // نفس مشفّر «H.264 للمونتاج» في المحوّل وجودته (R3-F7)
             Some(enc) => a.extend(crate::convert::edit_video_args(enc, check.video.as_ref())),
             // crf 18 = جودة شبه مطابقة للأصل. veryfast = توازن جيد بين السرعة والحجم.
             None => a.extend(s(&["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p"])),
+        }
+        if hdr {
+            // وسم BT.709 صريح: وإلا قد يبقى وسم bt2020/PQ من المصدر فيُعرض الناتج خطأً
+            a.extend(s(&["-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709"]));
         }
         a.extend(s(&["-fps_mode", "cfr"]));
     }
@@ -49,7 +58,7 @@ pub(crate) fn fraction(s: &str) -> Option<f64> {
 }
 
 /// هل الملف صالح كما هو لبرامج المونتاج؟
-/// فيديو: H.264 بـ 8-bit 4:2:0 ومعدل إطارات ثابت. صوت: AAC أو MP3.
+/// فيديو: H.264 بـ 8-bit 4:2:0 ومعدل إطارات ثابت وSDR. صوت: AAC أو MP3.
 pub(super) async fn check_media(tools: &Tools, file: &Path) -> Result<MediaCheck, AppError> {
     let f = file.to_string_lossy();
     let (ok, out, err) = tools::run_capture(
@@ -58,7 +67,7 @@ pub(super) async fn check_media(tools: &Tools, file: &Path) -> Result<MediaCheck
             "-v",
             "error",
             "-show_entries",
-            "stream=codec_type,codec_name,pix_fmt,r_frame_rate,avg_frame_rate,width,height:format=duration",
+            "stream=codec_type,codec_name,pix_fmt,r_frame_rate,avg_frame_rate,width,height,color_transfer:format=duration",
             "-of",
             "json",
             &f,
@@ -85,7 +94,9 @@ pub(super) async fn check_media(tools: &Tools, file: &Path) -> Result<MediaCheck
                     (Some(r), Some(avg)) if r > 0.0 => ((r - avg) / r).abs() < 0.02,
                     _ => true,
                 };
-                video_ok = codec == "h264" && (pix == "yuv420p" || pix == "yuvj420p") && cfr;
+                // PQ (HDR10) أو HLG: يحتاج tonemap حتى لو كان H.264 (R3-F8)
+                let hdr = matches!(s["color_transfer"].as_str(), Some("smpte2084" | "arib-std-b67"));
+                video_ok = codec == "h264" && (pix == "yuv420p" || pix == "yuvj420p") && cfr && !hdr;
                 video.get_or_insert(crate::convert::VideoInfo {
                     codec: codec.to_string(),
                     profile: None,
@@ -95,7 +106,7 @@ pub(super) async fn check_media(tools: &Tools, file: &Path) -> Result<MediaCheck
                     vfr: !cfr,
                     pix_fmt: pix.to_string(),
                     bit_depth: if pix.contains("10") { 10 } else { 8 },
-                    hdr: false,
+                    hdr,
                     interlaced: false,
                 });
             }

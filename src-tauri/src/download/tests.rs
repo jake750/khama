@@ -115,7 +115,7 @@ fn sections() {
 fn video_1080_editor_ready_prefers_h264() {
     let a = format_args(&req("video", "mp4", "1080", true));
     let i = a.iter().position(|x| x == "-S").unwrap();
-    assert_eq!(a[i + 1], "res:1080,vcodec:h264,acodec:aac");
+    assert_eq!(a[i + 1], "res:1080,hdr:SDR,vcodec:h264,acodec:aac");
     assert!(a.contains(&"mp4".to_string()));
 }
 
@@ -707,6 +707,72 @@ fn editready_uses_the_gpu_encoder_like_the_converter() {
     // الفيديو صالح: نسخ بلا مشفّر، حتى مع كرت الشاشة
     let copy = j(editready_args(i, o, &media_check("h264", true, false), Some("h264_nvenc")));
     assert!(copy.contains("-c:v copy") && !copy.contains("nvenc"));
+}
+
+/// HDR يُحوَّل إلى SDR بـ tonemap المحوّل ويوسم BT.709 (R3-F8)، وSDR بلا فلتر
+#[test]
+fn editready_tonemaps_hdr() {
+    let (i, o) = (Path::new("in.mp4"), Path::new("out/in.mp4"));
+    let mut hdr = media_check("hevc", false, true);
+    hdr.video.as_mut().unwrap().hdr = true;
+    for enc in [None, Some("h264_qsv")] {
+        let a = editready_args(i, o, &hdr, enc).join(" ");
+        assert!(a.contains(&format!("-vf {},format=yuv420p", crate::convert::TONEMAP)), "{a}");
+        assert!(a.contains("-color_primaries bt709 -color_trc bt709 -colorspace bt709"), "{a}");
+    }
+    let sdr = editready_args(i, o, &media_check("hevc", false, true), None).join(" ");
+    assert!(!sdr.contains("-vf") && !sdr.contains("bt709"), "{sdr}");
+}
+
+/// على ملف HDR10 حقيقي: check_media يكشفه، والناتج H.264 SDR موسوم BT.709 يقبله check_media كما هو.
+/// KHAMA_FFMPEG=<مجلد bin> KHAMA_HDR_FILE=<ملف HDR> cargo test -- --ignored editready_real_hdr --nocapture
+#[test]
+#[ignore]
+fn editready_real_hdr_is_tonemapped() {
+    let bin = PathBuf::from(std::env::var("KHAMA_FFMPEG").expect("KHAMA_FFMPEG"));
+    let src = PathBuf::from(std::env::var("KHAMA_HDR_FILE").expect("KHAMA_HDR_FILE"));
+    let tools = Tools {
+        ytdlp: PathBuf::new(),
+        ytdlp_prefix: vec![],
+        env: vec![],
+        js_runtime: String::new(),
+        ffmpeg: bin.join(format!("ffmpeg{}", tools::EXE)),
+        ffprobe: bin.join(format!("ffprobe{}", tools::EXE)),
+        ffmpeg_dir: bin.clone(),
+    };
+    let out = src.with_file_name("editready-out.mp4");
+    tauri::async_runtime::block_on(async {
+        let check = check_media(&tools, &src).await.unwrap();
+        assert!(check.video.as_ref().unwrap().hdr && !check.video_ok);
+        let args = editready_args(&src, &out, &check, None);
+        println!("ffmpeg {}", args.join(" "));
+        let ok = std::process::Command::new(&tools.ffmpeg)
+            .args(&args)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(ok.success());
+        let after = check_media(&tools, &out).await.unwrap();
+        assert!(after.video_ok && !after.video.unwrap().hdr, "SDR H.264 صالح للمونتاج كما هو");
+    });
+    let (_, tags, _) = tauri::async_runtime::block_on(tools::run_capture(
+        &tools.ffprobe,
+        &[
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=pix_fmt,color_transfer,color_primaries,color_space",
+            "-of",
+            "csv=p=0",
+            &out.to_string_lossy(),
+        ],
+    ))
+    .unwrap();
+    println!("out: {}", tags.trim());
+    assert_eq!(tags.trim(), "yuv420p,bt709,bt709,bt709");
 }
 
 /// الأمر نفسه على FFmpeg الحقيقي: مشفّر غير موجود يفشل، والمعالج بعده ينجح (الرجوع في convert_for_editing).

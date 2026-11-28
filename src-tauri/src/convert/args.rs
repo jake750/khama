@@ -358,6 +358,10 @@ pub(super) fn codec_args(p: &Preset, o: &ConvertOptions, hw: &[String], src: Opt
     a
 }
 
+/// HDR (PQ أو HLG) إلى SDR بـ BT.709: للمحوّل ولـ«جاهز للمونتاج» بعد التنزيل (R3-F8)
+pub(crate) const TONEMAP: &str =
+    "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv";
+
 /// مشفّر الفيديو لـ«جاهز للمونتاج» بعد التنزيل (R3-F7): نفس وسائط صيغة «H.264 للمونتاج» في المحوّل
 /// (الجودة المتوازنة) على مشفّر كرت الشاشة `enc`، بلا وسائط الصوت والحاوية
 pub(crate) fn edit_video_args(enc: &str, src: Option<&VideoInfo>) -> Vec<String> {
@@ -391,7 +395,7 @@ pub(super) fn video_filters(p: &Preset, o: &ConvertOptions, v: &VideoInfo, keep_
         f.push("bwdif=mode=send_frame:deint=interlaced".to_string());
     }
     if o.tonemap && v.hdr {
-        f.push("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv".to_string());
+        f.push(TONEMAP.to_string());
     }
     if o.lut.is_some() {
         // نسخنا ملف LUT إلى مجلد العمل باسم بسيط، فلا نحتاج تهريب المسار

@@ -91,13 +91,14 @@ pub fn format_args(req: &DownloadRequest) -> Vec<String> {
     } else {
         let container = if req.video_format == "mov" { "mov" } else { "mp4" };
         // -S = ترتيب الأفضلية: أولًا الدقة (لا تتجاوز المطلوبة)،
-        // ثم - إن كان "جاهز للمونتاج" مفعّلًا - نفضّل H.264 و AAC حتى لا نحتاج تحويلًا.
+        // ثم - إن كان "جاهز للمونتاج" مفعّلًا - نفضّل SDR ثم H.264 و AAC حتى لا نحتاج تحويلًا.
+        // hdr:SDR بعد الدقة (R3-F8): نسخة SDR بنفس الدقة إن وُجدت، وإلا فـ HDR يُحوَّل بـ tonemap في editready
         let mut sort = match req.quality.as_str() {
             q @ ("2160" | "1440" | "1080" | "720" | "480" | "360") => format!("res:{q}"),
             _ => "res".to_string(),
         };
         if req.editor_ready || container == "mov" {
-            sort.push_str(",vcodec:h264,acodec:aac");
+            sort.push_str(",hdr:SDR,vcodec:h264,acodec:aac");
         }
         a.extend([
             "-f".into(),
