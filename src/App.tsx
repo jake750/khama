@@ -1159,7 +1159,7 @@ ${navigator.userAgent}`).catch(() => {})
     api
       .exportTimeline(request)
       .then((paths) => {
-        const [name, kinds] = savedSummary(paths);
+        const [name, kinds] = savedSummary(paths, t.listSep);
         toast(t.timelineSaved(name, kinds), { label: t.showInFolder, run: () => api.revealFile(paths[0]).catch(fileFailed), ms: 6000 });
       })
       .catch((e) => toast(errorText(t, asAppError(e))));
