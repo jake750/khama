@@ -6,7 +6,6 @@ import { api, asAppError, type AppError, type HistoryEntry } from "../api";
 import { errorText, numLocale, useI18n } from "../i18n";
 import { ErrorBox } from "./ErrorBox";
 import { isMobile } from "../platform";
-import { useConfirm } from "./Dialog";
 import { Icon } from "./Icon";
 import { MoreMenu } from "./MoreMenu";
 import { Segmented } from "./Segmented";
@@ -53,7 +52,6 @@ export function HistoryView(props: {
   toast: Toast;
 }) {
   const { t, lang } = useI18n();
-  const [confirmNode, confirm] = useConfirm();
   const [list, setList] = useState<HistoryEntry[] | null>(null);
   const [q, setQ] = useState("");
   // تصفية بالنوع والتاريخ، ورسم أول 100 فقط حتى يطلب المستخدم المزيد (U-63، T-87)
@@ -163,17 +161,13 @@ export function HistoryView(props: {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  const clear = async () => {
-    if (!(await confirm(t.historyClear, t.historyConfirmClear))) return;
-    await api
-      .clearHistory()
-      .then(() => setList([]))
-      .catch(fail);
+  // R3-U37: مسح السجل كله بمهلة «تراجع» كالحذف الفردي، بدل حذف فوري لا رجعة فيه
+  const clear = () => {
+    if (list?.length) remove(list);
   };
 
   return (
     <div className="card history">
-      {confirmNode}
       <div className="history-head">
         <div>
           <h2>{t.historyTitle}</h2>
