@@ -19,8 +19,11 @@ pub mod topics_bench {
     pub use crate::convert::{ConvertOptions, SegParams, Topic, clean_cues, detect_args, gaps_as_silences, parse_markers, topics_from};
     pub use crate::srt::parse as parse_subs;
 }
+mod analysis_cache;
 mod settings;
 mod srt;
+#[cfg(desktop)]
+mod timeline;
 mod tools;
 
 use std::sync::Mutex;
@@ -174,7 +177,9 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         background::set_compact,
         background::hide_main,
         background::take_deep_link,
-        convert::expand_media_paths
+        convert::expand_media_paths,
+        timeline::export_timeline,
+        timeline::rename_export
     ]
 }
 

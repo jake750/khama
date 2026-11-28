@@ -806,6 +806,28 @@ const en = {
   noLimit: "No limit",
   exportSelected: (n: number) => (n === 1 ? "Export 1 clip" : `Export ${n} clips`),
   exportHint: "Each clip gets an SRT file next to it, timed from the clip's start, with the silences taken out if you removed them.",
+  timelineExport: "Export a timeline",
+  timelineExportHint:
+    "Writes an XML (Premiere, DaVinci Resolve) and an EDL that point to the original file, one clip for each part kept, plus the subtitles as SRT on the same timeline. Nothing is converted, so it takes seconds and every cut stays editable.",
+  timelineSaved: (name: string, kinds: string) => `Saved ${name} · ${kinds}`,
+  sceneTimelineHint:
+    "Writes an XML (Premiere, DaVinci Resolve) and an EDL on the original file, cut at every scene change so each scene is its own clip. Nothing is converted.",
+  markersExport: "Export markers",
+  topicMarkersHint:
+    "Writes every topic as a marker on the whole original file, named after the topic: an XML for Premiere, an EDL of markers for DaVinci Resolve (Timeline › Import › Timeline Markers from EDL) and a CSV list. Green fits a Reel (so do the suggested parts), yellow fits once split, red doesn't.",
+  silenceMarkersHint:
+    "Writes every stretch found as a marker on the whole original file: an XML for Premiere, an EDL of markers for DaVinci Resolve (Timeline › Import › Timeline Markers from EDL) and a CSV list. Nothing is cut.",
+  sceneMarkersHint:
+    "Writes every scene change as a marker on the whole original file: an XML for Premiere, an EDL of markers for DaVinci Resolve (Timeline › Import › Timeline Markers from EDL) and a CSV list.",
+  markerTopic: (n: number) => `Topic ${n}`,
+  markerSilence: (n: number) => `Silence ${n}`,
+  markerBlack: (n: number) => `Black ${n}`,
+  markerScene: (n: number) => `Scene ${n}`,
+  nudgeStart: (later: boolean): string => (later ? "Start half a second later" : "Start half a second earlier"),
+  nudgeEnd: (later: boolean): string => (later ? "End half a second later" : "End half a second earlier"),
+  topicTitleLabel: "Title",
+  topicTitleHint: "The title becomes the file name when you export this topic or its parts.",
+  playerClose: "Close the player",
   silenceAuto: "Auto",
   silenceHint:
     'Auto measures each file\'s own background noise, so pauses are found in noisy rooms and quiet studios alike. Pick a level only if it misses pauses (raise it, e.g. −25 dB) or cuts quiet words (lower it). "Keep before speech" and "Keep after speech" leave a little of every pause so words don\'t run into each other.',
@@ -869,6 +891,8 @@ const en = {
       "The AI model failed while processing this file. Try again; if it keeps failing, convert the file to WAV first, then run AI clean-up on that.",
     badInput: "This file couldn't be read. It may be damaged or not a media file.",
     noVideoStream: "This file has no video, so this option can't be used. Pick an audio option.",
+    timelineEmpty: "Nothing is left to put on the timeline: the parts are outside the file. Check the times and try again.",
+    markersEmpty: "None of the markers falls inside the file, so there is nothing to export.",
     noAudioStream: "This file has no audio track. Pick a video-only option, or add sound with “Replace audio”.",
     fileCorrupt: "The file is damaged or incomplete (maybe it was still being copied). Copy it again, or try another copy.",
     hwEncoder: "The graphics card encoder failed. Turn off the graphics card option and try again.",
@@ -1695,6 +1719,28 @@ const ar: Dict = {
   noLimit: "بلا حد",
   exportSelected: (n) => (n === 1 ? "صدّر مقطعًا واحدًا" : n === 2 ? "صدّر مقطعين" : `صدّر ${n} مقاطع`),
   exportHint: "بجانب كل مقطع ملف SRT توقيته يبدأ من أوله، وبعد حذف الصمت إن حذفته.",
+  timelineExport: "صدّر تايم لاين",
+  timelineExportHint:
+    "يكتب ملف XML (لـ Premiere وDaVinci Resolve) وملف EDL يشيران إلى الملف الأصلي، بمقطع لكل جزء يبقى، والترجمة SRT على التايم لاين نفسه. لا يُحوَّل الفيديو، فيأخذ ثوانيَ ويبقى كل قطع قابلًا للتعديل.",
+  timelineSaved: (name, kinds) => `حُفظ ${name} · ${kinds}`,
+  sceneTimelineHint:
+    "يكتب ملف XML (لـ Premiere وDaVinci Resolve) وملف EDL على الملف الأصلي، مقطوعًا عند كل تغيّر مشهد فيصير كل مشهد مقطعًا وحده. لا يُحوَّل الفيديو.",
+  markersExport: "صدّر العلامات",
+  topicMarkersHint:
+    "يكتب كل موضوع علامةً باسمه على الملف الأصلي كله: ملف XML لـ Premiere، وملف EDL علامات لـ DaVinci Resolve (Timeline › Import › Timeline Markers from EDL)، وجدول CSV. الأخضر يصلح ريلًا (وكذلك الأجزاء المقترحة)، والأصفر يصلح بعد تقسيمه، والأحمر لا يصلح.",
+  silenceMarkersHint:
+    "يكتب كل فترة مكتشفة علامةً على الملف الأصلي كله: ملف XML لـ Premiere، وملف EDL علامات لـ DaVinci Resolve (Timeline › Import › Timeline Markers from EDL)، وجدول CSV. لا يُقطع شيء.",
+  sceneMarkersHint:
+    "يكتب كل تغيّر مشهد علامةً على الملف الأصلي كله: ملف XML لـ Premiere، وملف EDL علامات لـ DaVinci Resolve (Timeline › Import › Timeline Markers from EDL)، وجدول CSV.",
+  markerTopic: (n) => `موضوع ${n}`,
+  markerSilence: (n) => `صمت ${n}`,
+  markerBlack: (n) => `سواد ${n}`,
+  markerScene: (n) => `مشهد ${n}`,
+  nudgeStart: (later) => (later ? "ابدأ بعد نصف ثانية" : "ابدأ قبل نصف ثانية"),
+  nudgeEnd: (later) => (later ? "انتهِ بعد نصف ثانية" : "انتهِ قبل نصف ثانية"),
+  topicTitleLabel: "العنوان",
+  topicTitleHint: "يصير العنوان اسم الملف عند تصدير هذا الموضوع أو أجزائه.",
+  playerClose: "أغلق المشغّل",
   silenceAuto: "تلقائي",
   silenceHint:
     "«تلقائي» يقيس ضجيج الخلفية في كل ملف، فيجد الوقفات في الغرفة المزعجة والاستوديو الهادئ معًا. اختر مستوى بنفسك فقط إن فاتته وقفات (ارفعه، مثل −25 dB) أو قطع كلامًا هادئًا (اخفضه). «اترك قبل الكلام» و«اترك بعد الكلام» يبقيان جزءًا صغيرًا من كل وقفة حتى لا يلتصق الكلام ببعضه.",
@@ -1754,6 +1800,8 @@ const ar: Dict = {
     aiRun: "فشل نموذج الذكاء الاصطناعي أثناء معالجة هذا الملف. أعد المحاولة، وإن تكرّر فحوّل الملف إلى WAV أولًا ثم نظّفه.",
     badInput: "تعذّرت قراءة هذا الملف. قد يكون تالفًا أو ليس ملف وسائط.",
     noVideoStream: "هذا الملف بلا فيديو، فلا يصلح معه هذا الخيار. اختر أحد خيارات الصوت.",
+    timelineEmpty: "لا يبقى شيء يوضع على التايم لاين: الأجزاء خارج الملف. راجع الأوقات وأعد المحاولة.",
+    markersEmpty: "لا تقع أي علامة داخل الملف، فلا شيء يُصدَّر.",
     noAudioStream: "هذا الملف بلا مسار صوت. اختر خيارًا للصورة فقط، أو أضف صوتًا بـ«استبدال الصوت».",
     fileCorrupt: "الملف تالف أو ناقص (ربما لم يكتمل نسخه بعد). انسخه من جديد أو جرّب نسخة أخرى.",
     hwEncoder: "فشل الترميز بكرت الشاشة. أوقف خيار كرت الشاشة ثم أعد المحاولة.",

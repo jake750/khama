@@ -12,6 +12,8 @@ export type Theme = "dark" | "light" | "system";
 export type Language = "en" | "ar";
 export type { LayoutDir } from "./layoutDir";
 import type { LayoutDir } from "./layoutDir";
+import type { TimelineMarker, TimelineRequest } from "./bindings";
+export type { TimelineMarker, TimelineRequest };
 export type CookiesMode = "none" | "browser" | "file";
 
 export interface Settings {
@@ -449,4 +451,8 @@ export const api = {
   /** ملف جديد في مجلد مراقَب: Rust بدأ تحويله برقم id */
   onWatchFile: (cb: (hit: { id: number; path: string; preset: string }) => void): Promise<UnlistenFn> =>
     listen<{ id: number; path: string; preset: string }>("watch-file", (e) => cb(e.payload)),
+  /** «تايم لاين للمونتاج» (R3-F10): XML وEDL (وSRT) تشير إلى الأصل بلا ترميز. يعيد مسارات الملفات (الكمبيوتر فقط) */
+  exportTimeline: (request: TimelineRequest) => invoke<string[]>("export_timeline", { request }),
+  /** يسمّي ناتج تصدير باسم عنوانه (R3-U5)، ومعه ترجمته وسطره في السجلّ. يعيد المسار الجديد (الكمبيوتر فقط) */
+  renameExport: (path: string, name: string) => invoke<string>("rename_export", { path, name }),
 };

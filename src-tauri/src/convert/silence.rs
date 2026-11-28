@@ -68,7 +68,8 @@ pub fn auto_threshold(db: &[f32]) -> Option<f64> {
 }
 
 /// ما قيس في الملف، لتعرضه الواجهة فيعرف المستخدم أين يضع المستوى اليدوي
-#[derive(Debug, Clone, Serialize, PartialEq)]
+// Deserialize: يُحفظ مع الصمت في ذاكرة التحليل (R3-F19)
+#[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq)]
 #[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "camelCase")]
 pub struct SilenceLevels {

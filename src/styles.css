@@ -4955,3 +4955,80 @@ textarea {
   background: color-mix(in srgb, var(--surface) 86%, transparent);
   backdrop-filter: blur(12px);
 }
+
+/* تايم لاين للمونتاج (R3-F10): الزر وما حُفظ بجانبه، يلتفّان على الشاشة الضيقة */
+.topic-export-actions,
+.sv-export {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+.sv-export {
+  margin-top: var(--s-2);
+}
+
+/* المواضيع (R3-U5): تشغيل كل موضوع وجزء، وتقديم حدّيه وتأخيرهما، وعنوانه اسمًا للملف */
+.topic-title-input {
+  inline-size: 100%;
+  margin-top: var(--s-1);
+  font-weight: 600;
+}
+.topic-parts li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+.topic-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.topic-nudge {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.2;
+  padding: 0 4px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  opacity: 0.6;
+}
+.topic-nudge:hover,
+.topic-nudge:focus-visible {
+  opacity: 1;
+  background: var(--line);
+}
+.topic-play {
+  padding-inline: var(--s-1);
+}
+/* مشغّل صغير ثابت أسفل النافذة: الصورة تبقى ظاهرة أينما كان الموضوع في القائمة. الصوت وحده بلا مشغّل ظاهر */
+.range-player {
+  display: none;
+  position: fixed;
+  /* فوق مكان الإشعارات (أسفل الوسط) فلا يغطيها */
+  inset-block-end: 80px;
+  inset-inline-end: var(--s-4);
+  z-index: 40;
+  inline-size: min(360px, calc(100vw - 2 * var(--s-4)));
+}
+.range-player.show {
+  display: block;
+  animation: pop-in var(--d-bounce) var(--m-bounce);
+}
+.range-player video {
+  display: block;
+  inline-size: 100%;
+  border-radius: var(--r-sm);
+  background: #000;
+  box-shadow: var(--shadow-2);
+}
+.range-player-close {
+  position: absolute;
+  inset-block-start: var(--s-1);
+  inset-inline-end: var(--s-1);
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+}

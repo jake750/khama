@@ -260,69 +260,39 @@ pub(super) async fn write_timeline(tools: &Tools, clips: &[(PathBuf, (f64, f64))
     Ok(())
 }
 
-#[cfg(desktop)]
-pub(super) fn xml_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
-
-/// مسار ملف بصيغة file:// (المسافات والرموز مرمّزة)
-#[cfg(desktop)]
-pub(super) fn file_url(p: &Path) -> String {
-    let s = p.to_string_lossy().replace('\\', "/");
-    let mut out = String::from(if s.starts_with('/') {
-        "file://localhost"
-    } else {
-        "file://localhost/"
-    });
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' | b':' => out.push(b as char),
-            _ => out.push_str(&format!("%{b:02X}")),
-        }
-    }
-    out
-}
-
+/// المقاطع ملفات منفصلة، كل منها كاملًا على التايم لاين بالترتيب (الكتابة نفسها في timeline.rs)
 #[cfg(desktop)]
 pub fn timeline_xml(clips: &[(PathBuf, (f64, f64))], durations: &[f64], fps: f64, width: u64, height: u64) -> String {
-    // timebase عدد صحيح؛ 29.97 و 23.976 تُكتب 30 و 24 مع ntsc=TRUE
-    let ntsc = (fps.round() - fps).abs() > 0.01;
-    let tb = fps.round().max(1.0) as u64;
-    let rate = format!(
-        "<rate><timebase>{tb}</timebase><ntsc>{}</ntsc></rate>",
-        if ntsc { "TRUE" } else { "FALSE" }
-    );
-    let frames = |sec: f64| (sec * fps).round() as u64;
-    let mut video = String::new();
-    let mut audio = String::new();
-    let mut at = 0u64;
-    for (i, ((p, _), d)) in clips.iter().zip(durations).enumerate() {
-        let len = frames(*d).max(1);
-        let name = xml_escape(&p.file_name().unwrap_or_default().to_string_lossy());
-        let file = format!(
-            "<file id=\"file-{i}\"><name>{name}</name><pathurl>{}</pathurl>{rate}<duration>{len}</duration>\
-             <media><video><samplecharacteristics><width>{width}</width><height>{height}</height></samplecharacteristics></video>\
-             <audio><channelcount>2</channelcount></audio></media></file>",
-            xml_escape(&file_url(p))
-        );
-        video.push_str(&format!(
-            "<clipitem id=\"v-{i}\"><name>{name}</name><duration>{len}</duration>{rate}<start>{at}</start><end>{}</end><in>0</in><out>{len}</out>{file}</clipitem>",
-            at + len
-        ));
-        audio.push_str(&format!(
-            "<clipitem id=\"a-{i}\"><name>{name}</name><duration>{len}</duration>{rate}<start>{at}</start><end>{}</end><in>0</in><out>{len}</out><file id=\"file-{i}\"/><sourcetrack><mediatype>audio</mediatype><trackindex>1</trackindex></sourcetrack></clipitem>",
-            at + len
-        ));
-        at += len;
-    }
-    format!(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE xmeml>\n<xmeml version=\"4\"><sequence id=\"khama\"><name>Khama clips</name><duration>{at}</duration>{rate}\
-         <media><video><format><samplecharacteristics>{rate}<width>{width}</width><height>{height}</height></samplecharacteristics></format>\
-         <track>{video}</track></video><audio><track>{audio}</track></audio></media></sequence></xmeml>\n"
-    )
+    use crate::timeline::{Clip, Media, Rate, xmeml};
+    let rate = Rate::new(fps, false);
+    let files: Vec<Media> = clips
+        .iter()
+        .zip(durations)
+        .map(|((p, _), d)| Media {
+            path: p.clone(),
+            rate,
+            video: Some((width, height)),
+            audio: Some((2, 48_000)),
+            frames: rate.frames(*d).max(1),
+            tc_start: 0,
+        })
+        .collect();
+    let mut at = 0;
+    let items: Vec<Clip> = files
+        .iter()
+        .enumerate()
+        .map(|(file, m)| {
+            let c = Clip {
+                file,
+                src_in: 0,
+                src_out: m.frames,
+                at,
+            };
+            at += m.frames;
+            c
+        })
+        .collect();
+    xmeml(&files, &items, "Khama clips")
 }
 
 /// تنزيل مقطع واحد (أو الملف كاملًا) بـ yt-dlp إلى dir/out.

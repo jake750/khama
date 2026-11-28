@@ -351,6 +351,19 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       };
     case "ai_ready":
       return false;
+    // تايم لاين للمونتاج (R3-F10): الملفات التي كان Rust سيكتبها بجانب الإعدادات
+    case "export_timeline": {
+      const req = (args.request ?? {}) as { name?: string; cues?: unknown[]; markers?: unknown[]; markersOnly?: boolean };
+      const base = `C:\\Users\\me\\Downloads\\Khama\\${req.name ?? "timeline"}`;
+      const marks = req.markersOnly ? [".csv"] : req.markers?.length ? [" markers.edl"] : [];
+      return [".xml", ".edl", ...marks, ...(req.cues?.length ? [".srt"] : [])].map((e) => `${base}${e}`);
+    }
+    // تصدير موضوع باسم عنوانه (R3-U5): المجلد نفسه والامتداد نفسه
+    case "rename_export": {
+      const p = String(args.path ?? "");
+      const ext = p.includes(".") ? p.slice(p.lastIndexOf(".")) : "";
+      return `${p.slice(0, Math.max(p.lastIndexOf("\\"), p.lastIndexOf("/")) + 1)}${String(args.name ?? "clip")}${ext}`;
+    }
     case "counter_next":
       return 4;
     case "reset_counter":

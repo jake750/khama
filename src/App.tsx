@@ -5,7 +5,16 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { isPermissionGranted, sendNotification } from "@tauri-apps/plugin-notification";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { api, asAppError, type AppError, type ConvertRequest, type DownloadRequest, type JobUpdate, type Settings } from "./api";
+import {
+  api,
+  asAppError,
+  type AppError,
+  type ConvertRequest,
+  type DownloadRequest,
+  type JobUpdate,
+  type Settings,
+  type TimelineRequest,
+} from "./api";
 import { ConvertView, defaultOptions, MEDIA_FILTER, newConvertSession, type SourceFile } from "./components/ConvertView";
 import { DownloadView, newDownloadSession, type StartMeta } from "./components/DownloadView";
 import { HistoryView } from "./components/HistoryView";
@@ -28,7 +37,7 @@ import { nextTheme } from "./theme";
 import { limiter } from "./limit";
 import { announceUpdate } from "./whatsNew";
 import { REEL_MAX, REEL_MIN, silenceCuts, topicRows, topicsText } from "./topics";
-import { exportCues, keptLength, planTopic, toSrt, type Range } from "./reels";
+import { exportCues, fileStem, keptLength, keptSource, planTopic, savedSummary, toSrt, type Range } from "./reels";
 import type { ExportOptions } from "./components/TopicPanel";
 import { optionsFromMeta } from "./downloadPlan";
 
@@ -1137,18 +1146,57 @@ ${navigator.userAgent}`).catch(() => {})
       };
       startDownload(request, { title: `${j.title} · ${formatTimecode(from)}`, thumbnail: j.thumbnail })
         .then((id) => {
-          if (id != null) afterDownload.current.set(id, (file) => exportFromFile(moved, file, secs.map(shift), o));
+          // العلامات بأوقات ما نُزّل أيضًا (R3-F11)
+          const shifted = o.marks && { ...o, marks: o.marks.map((m) => ({ ...m, start: m.start - from, end: m.end - from })) };
+          if (id != null) afterDownload.current.set(id, (file) => exportFromFile(moved, file, secs.map(shift), shifted || o));
         })
         .catch(logError("exportFromUrl"));
     }
   };
 
+  /** يكتب ملفات التايم لاين (XML وEDL وSRT) بجانب التحويلات، ويقول أين (R3-F10) */
+  const saveTimeline = (request: TimelineRequest) =>
+    api
+      .exportTimeline(request)
+      .then((paths) => {
+        const [name, kinds] = savedSummary(paths);
+        toast(t.timelineSaved(name, kinds), { label: t.showInFolder, run: () => api.revealFile(paths[0]).catch(fileFailed), ms: 6000 });
+      })
+      .catch((e) => toast(errorText(t, asAppError(e))));
+
   const exportFromFile = (j: Job, input: string, sections: Range[], o: ExportOptions) => {
     const preset = sameFamily(input);
     const silence = o.tight ? allCuts(j) : [];
     const lines = { maxWords: o.maxWords, maxSecs: o.maxSecs };
-    const srt = (secs: Range[]) =>
-      o.subs && j.cues?.length ? toSrt(exportCues(j.cues, secs, silence, lines, j.words, j.markers ?? [])) : null;
+    const cuesFor = (secs: Range[]) => (o.subs && j.cues?.length ? exportCues(j.cues, secs, silence, lines, j.words, j.markers ?? []) : []);
+    const srt = (secs: Range[]) => (o.subs && j.cues?.length ? toSrt(cuesFor(secs)) : null);
+    // تايم لاين: المقاطع كلها متتالية بقطعها على الأصل، بلا تحويل
+    if (o.as === "timeline") {
+      saveTimeline({
+        input,
+        pieces: keptSource(sections, silence),
+        cues: cuesFor(sections),
+        name: `${exportName(o, 0) || fileStem(input)} timeline`,
+        keepCuts: false,
+        markers: o.marks ?? [],
+        markersOnly: false,
+      });
+      return;
+    }
+    // علامات المواضيع على الملف كله، والترجمة كلها بأوقاتها كما هي (R3-F11)
+    if (o.as === "markers") {
+      const whole: Range[] = [[0, 1e9]];
+      saveTimeline({
+        input,
+        pieces: [],
+        cues: o.subs && j.cues?.length ? exportCues(j.cues, whole, [], lines, j.words, j.markers ?? []) : [],
+        name: `${fileStem(input)} markers`,
+        keepCuts: false,
+        markers: o.marks ?? [],
+        markersOnly: true,
+      });
+      return;
+    }
     const groups: Range[][] = o.join ? [sections] : sections.map((s) => [s]);
     groups.forEach((secs, n) => {
       const start = secs[0][0];
@@ -1160,26 +1208,48 @@ ${navigator.userAgent}`).catch(() => {})
         .filter(([a, b]) => b - a > 0.01);
       const cut = [...gaps, ...silence.map(([a, b]) => [Math.max(a, start), Math.min(b, end)] as Range).filter(([a, b]) => b - a > 0.01)];
       const label = `${o.tight ? t.topicClipTight : t.topicClip} ${o.join ? "" : n + 1}`.trim();
-      startConvert(
-        {
-          inputs: [input],
-          preset,
-          options: {
-            ...defaultOptions(),
-            quality: "high",
-            hw: settings.convertHw,
-            start,
-            end,
-            cut: cut.sort((a, b) => a[0] - b[0]),
-            sidecarSrt: srt(secs),
-          },
+      const convert: ConvertRequest = {
+        inputs: [input],
+        preset,
+        options: {
+          ...defaultOptions(),
+          quality: "high",
+          hw: settings.convertHw,
+          start,
+          end,
+          cut: cut.sort((a, b) => a[0] - b[0]),
+          sidecarSrt: srt(secs),
         },
-        `${baseName(input)} · ${formatTimecode(start)}`,
-        `${label} · ${presetById(preset)?.name[lang] ?? preset}`,
-        undefined,
-        j.inDownloads,
-      ).catch(logError("exportTopics"));
+      };
+      const name = exportName(o, n);
+      const title = name || `${baseName(input)} · ${formatTimecode(start)}`;
+      const meta = `${label} · ${presetById(preset)?.name[lang] ?? preset}`;
+      if (!name || isMobile) {
+        startConvert(convert, title, meta, undefined, j.inDownloads).catch(logError("exportTopics"));
+        return;
+      }
+      // عنوان الموضوع اسمًا للملف (R3-U5): يُعاد تسمية الناتج حين يكتمل، ومعه ترجمته وسطره في السجلّ
+      launch({ type: "convert", convert, title, meta, inDownloads: j.inDownloads }, (id) => {
+        afterDownload.current.set(id, (file) =>
+          api
+            .renameExport(file, name)
+            .then((renamed) => setJobs((prev) => prev.map((x) => (x.id === id ? { ...x, file: renamed } : x))))
+            .catch(logError("renameExport")),
+        );
+        return api.startConvert(convert, id).catch((e) => {
+          afterDownload.current.delete(id);
+          throw e;
+        });
+      }).catch(logError("exportTopics"));
     });
+  };
+
+  /** اسم ملف المقطع n من عناوين المواضيع (R3-U5). المدمج يأخذ العنوان إن كان واحدًا. فارغ = الاسم المعتاد */
+  const exportName = (o: ExportOptions, n: number): string => {
+    const names = (o.names ?? []).map((x) => x.trim());
+    if (!o.join) return names[n] ?? "";
+    const one = [...new Set(names)];
+    return one.length === 1 ? one[0] : "";
   };
 
   /** من حقل الرابط: تحليل المواضيع قبل التنزيل (Rust يأخذ ترجمة الموقع أو الصوت وحده) */

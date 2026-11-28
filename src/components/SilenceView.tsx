@@ -1,12 +1,229 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type SilenceLevels } from "../api";
+import { createPortal } from "react-dom";
+import { api, asAppError, type SilenceLevels, type TimelineMarker, type TimelineRequest } from "../api";
 import { formatDuration, formatTimecode } from "../format";
-import { useI18n } from "../i18n";
-import { Icon } from "./Icon";
+import { errorText, useI18n } from "../i18n";
+import { isMobile } from "../platform";
+import { fileStem, keptPieces, savedSummary, scenePieces } from "../reels";
+import { Icon, type IconName } from "./Icon";
 import { Segmented } from "./Segmented";
 
 type Range = [number, number];
+
+/** ملف على الجهاز (لا رابط): التايم لاين يشير إليه */
+const isLocal = (p: string) => !/^https?:\/\//.test(p);
+
+/** طلب تايم لاين بلا ترجمة ولا علامات */
+const timelineRequest = (input: string, pieces: Range[], name: string, keepCuts = false): TimelineRequest => ({
+  input,
+  pieces,
+  cues: [],
+  name,
+  keepCuts,
+  markers: [],
+  markersOnly: false,
+});
+
+/** علامات وحدها على الملف كله (R3-F11): XML لـ Premiere، وEDL علامات لـ Resolve، وجدول CSV */
+const markersRequest = (input: string, markers: TimelineMarker[], name: string): TimelineRequest => ({
+  ...timelineRequest(input, [], name),
+  markers,
+  markersOnly: true,
+});
+
+/** الفترات علاماتٍ مرقّمة بلون واحد، ومدة كل منها في تعليقها */
+export function rangeMarkers(ranges: Range[], name: (n: number) => string, color: string): TimelineMarker[] {
+  return ranges.map(([s, e], i) => ({ start: s, end: e, name: name(i + 1), note: e > s ? formatDuration(e - s) : "", color }));
+}
+
+export interface EditorAction {
+  label: string;
+  hint: string;
+  icon: IconName;
+  request: () => TimelineRequest;
+}
+
+/**
+ * أزرار التصدير لبرامج المونتاج (R3-F10): تكتب الملفات بجانب التحويلات بلا تحويل، ثم تقول أين.
+ * لا تظهر على الهاتف (لا برنامج مونتاج يفتحها هناك)
+ */
+export function EditorExport({ actions }: { actions: EditorAction[] }) {
+  const { t } = useI18n();
+  const [saved, setSaved] = useState<{ paths: string[] } | { error: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (isMobile || !actions.length) return null;
+  const run = (a: EditorAction) => {
+    setBusy(true);
+    api
+      .exportTimeline(a.request())
+      .then((paths) => setSaved({ paths }))
+      .catch((e) => setSaved({ error: errorText(t, asAppError(e)) }))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <div className="sv-export">
+      {actions.map((a) => (
+        <button key={a.label} className="btn btn-sm" disabled={busy} title={a.hint} onClick={() => run(a)}>
+          <Icon name={a.icon} size={16} /> {a.label}
+        </button>
+      ))}
+      {saved && "paths" in saved && (
+        <span className="faint" dir="auto">
+          {t.timelineSaved(...savedSummary(saved.paths))}{" "}
+          <button className="btn btn-sm btn-ghost" onClick={() => api.revealFile(saved.paths[0]).catch(() => {})}>
+            {t.showInFolder}
+          </button>
+        </span>
+      )}
+      {saved && "error" in saved && (
+        <span className="faint" role="alert">
+          {saved.error}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * نتيجة كشف المشاهد: تايم لاين على الأصل مقطوع عند كل تغيّر مشهد، فيصير كل مشهد قطعة (R3-F10)،
+ * أو علامة عند كل تغيّر (R3-F11؛ الانتقال التدريجي علامة بمداه)
+ */
+export function SceneExport(props: { path: string; changes: Range[]; range: Range }) {
+  const { t } = useI18n();
+  const stem = fileStem(props.path);
+  const actions: EditorAction[] = isLocal(props.path)
+    ? [
+        {
+          label: t.timelineExport,
+          hint: t.sceneTimelineHint,
+          icon: "timeline",
+          request: () => timelineRequest(props.path, scenePieces(props.changes, ...props.range), `${stem} scenes`, true),
+        },
+        {
+          label: t.markersExport,
+          hint: t.sceneMarkersHint,
+          icon: "list",
+          // المشهد الأول يبدأ من أول الملف: أول تغيّر بداية المشهد الثاني
+          request: () =>
+            markersRequest(
+              props.path,
+              rangeMarkers(props.changes, (n) => t.markerScene(n + 1), "Cyan"),
+              `${stem} scene markers`,
+            ),
+        },
+      ]
+    : [];
+  return <EditorExport actions={actions} />;
+}
+
+/** مقطع يُشغَّل: مداه، وهل يقفز فوق الصمت المحذوف */
+interface RangeClip {
+  range: Range;
+  skip: boolean;
+}
+
+/**
+ * مشغّل مدًى من الملف (R3-U5)، بطريقة مشغّل الصمت نفسها: يُحمَّل الملف عند أول تشغيل فقط، ويقفز فوق
+ * `cuts` كل إطار (إن طُلب)، ويقف عند نهاية المدى. الصورة في مشغّل صغير ثابت أسفل النافذة، والصوت وحده بلا عنصر ظاهر
+ */
+export function useRangePlayer(path: string | null | undefined, cuts: Range[]) {
+  const { t } = useI18n();
+  const media = useRef<HTMLVideoElement>(null);
+  const raf = useRef(0);
+  const want = useRef<RangeClip | null>(null);
+  const cur = useRef<RangeClip | null>(null);
+  const cutsRef = useRef(cuts);
+  useEffect(() => {
+    cutsRef.current = cuts;
+  }, [cuts]);
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [key, setKey] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [hasVideo, setHasVideo] = useState(false);
+
+  const begin = (el: HTMLMediaElement, c: RangeClip) => {
+    el.currentTime = c.range[0];
+    el.play().catch(() => {});
+  };
+  const tick = () => {
+    const el = media.current;
+    const c = cur.current;
+    if (!el || !c) return;
+    if (c.skip) {
+      const cut = cutsRef.current.find(([s, e]) => el.currentTime >= s - 0.01 && el.currentTime < e - 0.02);
+      if (cut) el.currentTime = cut[1];
+    }
+    if (el.currentTime >= c.range[1] - 0.01) {
+      el.pause();
+      return;
+    }
+    raf.current = requestAnimationFrame(tick);
+  };
+  /** يشغّل المدى، أو يوقفه إن كان هو ما يُشغَّل الآن */
+  const toggle = (k: string, range: Range, skip: boolean) => {
+    const el = media.current;
+    if (k === key && el && !el.paused) {
+      el.pause();
+      return;
+    }
+    const c = { range, skip };
+    cur.current = c;
+    setKey(k);
+    if (el && el.readyState > 0) return begin(el, c);
+    want.current = c;
+    if (!src && path)
+      api
+        .allowMedia(path)
+        .then(() => setSrc(convertFileSrc(path)))
+        .catch(() => setFailed(true));
+  };
+  const stopped = () => {
+    setPlaying(false);
+    cancelAnimationFrame(raf.current);
+  };
+  const element =
+    src && !failed
+      ? createPortal(
+          <div className={`range-player${hasVideo && key ? " show" : ""}`}>
+            <video
+              ref={media}
+              src={src}
+              preload="metadata"
+              playsInline
+              onLoadedMetadata={(e) => {
+                setHasVideo(e.currentTarget.videoWidth > 0);
+                const c = want.current;
+                want.current = null;
+                if (c) begin(e.currentTarget, c);
+              }}
+              onPlay={() => {
+                setPlaying(true);
+                cancelAnimationFrame(raf.current);
+                raf.current = requestAnimationFrame(tick);
+              }}
+              onPause={stopped}
+              onEnded={stopped}
+              onError={() => setFailed(true)}
+            />
+            <button
+              className="btn btn-sm btn-ghost range-player-close"
+              aria-label={t.playerClose}
+              onClick={() => {
+                media.current?.pause();
+                setKey(null);
+              }}
+            >
+              <Icon name="x" size={16} />
+            </button>
+          </div>,
+          document.body,
+        )
+      : null;
+  return { toggle, element, playing: playing ? key : null, available: !!path && !failed };
+}
 
 /** مجموع أطوال الفترات (ث) */
 const total = (rs: Range[]) => rs.reduce((n, [s, e]) => n + Math.max(0, e - s), 0);
@@ -112,6 +329,30 @@ export function SilenceView(props: {
   const silent = total(props.found);
   const kept = Math.max(0, silent - removed);
   const [showList, setShowList] = useState(false);
+
+  // ===== تايم لاين للمونتاج (R3-F10): ما يبقى بعد الحذف قطعًا على الأصل، بلا تحويل =====
+  const path = props.path && isLocal(props.path) ? props.path : null;
+  const actions: EditorAction[] = [];
+  if (path && props.cuts.length > 0)
+    actions.push({
+      label: t.timelineExport,
+      hint: t.timelineExportHint,
+      icon: "timeline",
+      request: () => timelineRequest(path, keptPieces(lo, hi, props.cuts), `${fileStem(path)} timeline`),
+    });
+  // العلامات (R3-F11): كل صمت (أو سواد) علامة بمداه على الملف كله، بلا قطع
+  if (path && props.found.length > 0)
+    actions.push({
+      label: t.markersExport,
+      hint: t.silenceMarkersHint,
+      icon: "list",
+      request: () =>
+        markersRequest(
+          path,
+          rangeMarkers(props.found, props.black ? t.markerBlack : t.markerSilence, props.black ? "Purple" : "Red"),
+          `${fileStem(path)} ${props.black ? "black" : "silence"} markers`,
+        ),
+    });
 
   return (
     <div className="silence-view">
@@ -248,6 +489,8 @@ export function SilenceView(props: {
           </div>
         </div>
       )}
+
+      <EditorExport actions={actions} />
 
       {/* كل فترة: نقرة تشغّل من قبلها بثانيتين لتسمع ما حولها */}
       {props.found.length > 0 && (
