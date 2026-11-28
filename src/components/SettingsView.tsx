@@ -196,16 +196,7 @@ export function SettingsView(props: {
           </div>
           <div className="setting-row">
             <span>{t.theme}</span>
-            <Segmented<Theme>
-              label={t.theme}
-              value={s.theme}
-              onChange={(theme) => update({ theme })}
-              options={[
-                { value: "dark", label: t.dark },
-                { value: "light", label: t.light },
-                { value: "system", label: t.system },
-              ]}
-            />
+            <ThemeCards value={s.theme} onChange={(theme) => update({ theme })} />
           </div>
           {isMobile ? (
             <MobileSaveFolder settings={s} update={update} />
@@ -939,5 +930,40 @@ function WatchSection(props: { settings: Settings; update: (p: Partial<Settings>
         <Icon name="plus" size={16} /> {t.addWatch}
       </button>
     </Section>
+  );
+}
+
+/** R3-V46: المظهر بثلاث بطاقات معاينة صغيرة لا أزرار نصية. الضغط يطلق دائرة الكشف من البطاقة نفسها
+ * (useTheme في App يبدأ الدائرة من مكان آخر ضغطة) */
+function ThemeCards(props: { value: Theme; onChange: (theme: Theme) => void }) {
+  const { t } = useI18n();
+  const options: [Theme, string][] = [
+    ["dark", t.dark],
+    ["light", t.light],
+    ["system", t.system],
+  ];
+  return (
+    <div className="theme-cards" role="group" aria-label={t.theme}>
+      {options.map(([value, label]) => (
+        <button
+          key={value}
+          type="button"
+          className="theme-card"
+          data-preview={value}
+          aria-pressed={props.value === value}
+          onClick={() => props.onChange(value)}
+        >
+          <span className="theme-mini" aria-hidden="true">
+            <span className="tm-bar" />
+            <span className="tm-card">
+              <span className="tm-line" />
+              <span className="tm-line short" />
+              <span className="tm-btn" />
+            </span>
+          </span>
+          <span className="theme-card-label">{label}</span>
+        </button>
+      ))}
+    </div>
   );
 }

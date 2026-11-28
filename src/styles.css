@@ -5032,3 +5032,110 @@ textarea {
   background: rgb(0 0 0 / 0.55);
   color: #fff;
 }
+
+/* R3-D22: طيّة «متقدّم» (الفصل والجدولة وحد السرعة) تحت «ملفات مرافقة» مباشرة */
+details.extras + details.extras {
+  margin-top: var(--s-2);
+}
+.extras-advanced .extras-more {
+  margin-top: 0;
+  padding: var(--s-1) var(--s-4) var(--s-4);
+  border-top: 0;
+}
+/* سطر «ما يبقى وما يُصفَّر» كان ملتصقًا بحدّ الطيّة */
+details.extras > .extras-memory {
+  margin-top: 0;
+  padding: 0 var(--s-4) var(--s-4);
+}
+
+/* R3-V46: بطاقات معاينة المظهر. ألوانها ثابتة (تعرض الثيم الآخر أيضًا)، من توكنز الوضعين */
+.theme-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.theme-card {
+  display: grid;
+  gap: var(--s-1);
+  justify-items: center;
+  padding: var(--s-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition:
+    border-color var(--d-press, 120ms) ease,
+    color var(--d-press, 120ms) ease;
+}
+.theme-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  color: var(--text);
+}
+.theme-card[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.theme-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.theme-mini {
+  --m-bg: #0a1213;
+  --m-surface: #132223;
+  --m-line: #2b4243;
+  --m-accent: #2ec4b6;
+  display: grid;
+  grid-template-rows: 8px 1fr;
+  gap: 5px;
+  width: 84px;
+  height: 54px;
+  padding: 5px;
+  border-radius: 6px;
+  background: var(--m-bg);
+  overflow: hidden;
+}
+.theme-card[data-preview="light"] .theme-mini {
+  --m-bg: #eef4f3;
+  --m-surface: #fbfdfd;
+  --m-line: #cfdedc;
+  --m-accent: #067066;
+}
+/* «حسب النظام»: نصف داكن ونصف فاتح */
+.theme-card[data-preview="system"] .theme-mini {
+  background: linear-gradient(115deg, #0a1213 50%, #eef4f3 50%);
+}
+.theme-card[data-preview="system"] .tm-card {
+  background: linear-gradient(115deg, #132223 50%, #fbfdfd 50%);
+}
+.tm-bar {
+  border-radius: 3px;
+  background: var(--m-surface);
+}
+.tm-card {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 4px;
+  background: var(--m-surface);
+}
+.tm-line {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--m-line);
+}
+.tm-line.short {
+  width: 60%;
+}
+.tm-btn {
+  width: 40%;
+  height: 7px;
+  margin-top: 1px;
+  border-radius: 3px;
+  background: var(--m-accent);
+}
