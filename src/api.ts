@@ -362,6 +362,21 @@ export interface JobUpdate {
   /** العنوان والصورة من yt-dlp أثناء التنزيل */
   title?: string;
   thumbnail?: string;
+  /** إعادة تلقائية جارية أو منتظرة (R3-F4) */
+  retry?: Retry;
+}
+
+/** إعادة تلقائية (R3-F4، F5، F6) */
+export interface Retry {
+  /** رقم الإعادة: 1 = الأولى */
+  attempt: number;
+  max: number;
+  /** متى تبدأ (ms) أثناء الانتظار؛ فارغ = تبدأ الآن */
+  at?: number;
+  /** network | timeout | rateLimited | incomplete: انتظار؛ update: تحديث yt-dlp؛ impersonate: تقمّص متصفح */
+  reason: string;
+  /** خطأ المحاولة السابقة */
+  error: AppError;
 }
 
 export interface ToolsInfo {

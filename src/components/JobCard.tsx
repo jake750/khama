@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import type { AppError, ConvertRequest, Cue, DownloadRequest, Word, JobState, JobUpdate, SilenceLevels, Topic } from "../api";
+import type { AppError, ConvertRequest, Cue, DownloadRequest, Word, JobState, JobUpdate, Retry, SilenceLevels, Topic } from "../api";
 import type { Range, TopicPlan } from "../reels";
 import { LevelsLine, TopicPanel, type ExportOptions } from "./TopicPanel";
 import { SilenceView } from "./SilenceView";
@@ -44,6 +44,8 @@ export interface Job {
   thumbnail?: string | null;
   /** تنزيل مجدول: وقت البدء (ms) */
   at?: number;
+  /** إعادة تلقائية بعد خطأ عابر (R3-F4) */
+  retry?: Retry;
 }
 
 /** المجلد الذي فيه الملف، بآخر جزأين فقط ليبقى قصيرًا */
@@ -77,7 +79,13 @@ export function mergeUpdate(j: Job, u: JobUpdate): Job {
 const ACTIVE: JobState[] = ["queued", "starting", "analyzing", "downloading", "processing", "preparing", "separating", "converting"];
 export const isActive = (j: Job) => ACTIVE.includes(j.state);
 
-function statusText(t: Dict, j: Job, lang: string, queuePos?: [number, number]): string {
+function statusText(t: Dict, j: Job, lang: string, queuePos?: [number, number], now = Date.now()): string {
+  // إعادة تلقائية (R3-F4، F5، F6): العدّ التنازلي، أو تحديث yt-dlp، أو التقمّص
+  const rt = j.retry;
+  if (rt && j.state === "queued" && rt.at != null && rt.at > now)
+    return t.stRetryIn(formatDuration(Math.ceil((rt.at - now) / 1000)), rt.attempt, rt.max);
+  if (rt && j.state === "queued" && rt.at == null && rt.reason === "update") return t.stUpdatingYtdlp;
+  if (rt && j.state === "starting" && rt.reason === "impersonate") return t.stRetryBrowser;
   switch (j.state) {
     case "scheduled":
       // بعد اليوم يظهر اليوم أيضًا لا الساعة وحدها (U-46)
@@ -189,6 +197,15 @@ export function JobCard(props: {
     return () => window.clearTimeout(tm);
   }, [armed]);
   const active = isActive(j);
+  // العدّ التنازلي لإعادة تلقائية منتظرة (R3-F4): يتحدّث كل ثانية ما دام الانتظار
+  const [now, setNow] = useState(() => Date.now());
+  const retryAt = j.state === "queued" ? j.retry?.at : undefined;
+  useEffect(() => {
+    if (retryAt == null) return;
+    const tm = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(tm);
+  }, [retryAt]);
+  const priorError = j.retry?.error ?? j.lastError;
   // نسبة مجهولة (انتظار/تحضير/معالجة) ← شريط متحرك بدل رقم
   const indeterminate =
     active &&
@@ -259,7 +276,7 @@ export function JobCard(props: {
           {j.state === "done" && fileName ? fileName : j.title}
         </div>
         <div className="job-meta">
-          <span>{statusText(t, j, lang, props.queuePos)}</span>
+          <span>{statusText(t, j, lang, props.queuePos, now)}</span>
           {/* التحويل «بجانب الأصل» يكتب في مجلد لا يعرفه المستخدم من البطاقة (U-72) */}
           {j.state === "done" && j.type === "convert" && j.file && (
             <span className="job-dir ltr" title={j.file}>
@@ -360,9 +377,9 @@ export function JobCard(props: {
             {t.matchedFrom(j.source)}
           </div>
         )}
-        {j.lastError && active && (
+        {priorError && active && (
           <div className="faint job-last-error">
-            {t.lastAttempt}: {errorText(t, j.lastError)}
+            {t.lastAttempt}: {errorText(t, priorError)}
           </div>
         )}
       </div>

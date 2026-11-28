@@ -22,6 +22,12 @@ describe("mergeUpdate (T-43)", () => {
     expect(wait.speed).toBeUndefined();
     expect(mergeUpdate(wait, { id: 1, state: "separating", percent: 12 }).percent).toBe(12);
   });
+  it("الإعادة التلقائية تبقى على البطاقة بعد أن تبدأ (R3-F4): «المحاولة السابقة» وعدد الإعادات", () => {
+    const retry = { attempt: 1, max: 3, at: 5000, reason: "network", error: { code: "network" } };
+    const waiting = mergeUpdate(job("x"), { id: 1, state: "queued", retry });
+    const again = mergeUpdate(mergeUpdate(waiting, { id: 1, state: "starting" }), { id: 1, state: "downloading", percent: 3 });
+    expect(again.retry).toEqual(retry);
+  });
   it("تحديث التقدّم العادي يبقي العنوان", () => {
     expect(mergeUpdate(job("x"), { id: 1, state: "downloading", percent: 40 })).toMatchObject({ title: "x", percent: 40 });
   });

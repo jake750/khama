@@ -15,7 +15,7 @@ use std::{
     process::Stdio,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -97,11 +97,14 @@ impl Default for DownloadQueue {
     }
 }
 
+/// تنزيلات ردّها الموقع بـ «طلبات كثيرة» (rateLimited) وتنتظر إعادتها: ما دامت موجودة يعمل تنزيل واحد (R3-F4)
+static THROTTLED: AtomicUsize = AtomicUsize::new(0);
+
 impl DownloadQueue {
     /// يغيّر عدد الخانات. الزيادة فورية؛ والنقص يأخذ الخانات الفارغة الآن،
     /// والباقي يُسحب حين تنتهي تنزيلات جارية (لا نوقف تنزيلًا بدأ)
     pub fn set_limit(&self, n: usize) {
-        let n = n.clamp(1, 5);
+        let n = if THROTTLED.load(Ordering::SeqCst) > 0 { 1 } else { n.clamp(1, 5) };
         let mut cur = self.1.lock_ok();
         if n > *cur {
             self.0.add_permits(n - *cur);
@@ -119,6 +122,16 @@ impl DownloadQueue {
             }
         }
         *cur = n;
+    }
+
+    /// بدء التباطؤ بعد rateLimited أو نهايته: الحد ينزل إلى 1، ثم يعود إلى `user` (الإعدادات) حين لا يبقى تنزيل محظور
+    pub(super) fn throttle(&self, on: bool, user: usize) {
+        if on {
+            THROTTLED.fetch_add(1, Ordering::SeqCst);
+        } else if THROTTLED.load(Ordering::SeqCst) > 0 {
+            THROTTLED.fetch_sub(1, Ordering::SeqCst);
+        }
+        self.set_limit(user);
     }
 }
 
@@ -363,6 +376,24 @@ fn ts_name(sec: f64) -> String {
     }
 }
 
+/// إعادة تلقائية بعد خطأ عابر (R3-F4) أو بعد تحديث yt-dlp (R3-F5) أو بتقمّص متصفح (R3-F6)
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
+#[serde(rename_all = "camelCase")]
+pub struct Retry {
+    /// رقم الإعادة: 1 = الأولى
+    pub attempt: u32,
+    /// أقصى عدد للإعادات من هذا النوع
+    pub max: u32,
+    /// متى تبدأ (ms منذ 1970) أثناء الانتظار؛ فارغ = تبدأ الآن
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub at: Option<u64>,
+    /// لماذا: network | timeout | rateLimited | incomplete (انتظار)، update (تحديث yt-dlp)، impersonate (تقمّص متصفح)
+    pub reason: &'static str,
+    /// خطأ المحاولة السابقة
+    pub error: AppError,
+}
+
 /// تحديث تستقبله الواجهة. الحقول الفارغة لا تُرسل، فتدمجها الواجهة مع ما لديها.
 #[derive(Debug, Clone, Default, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS), ts(export))]
@@ -409,6 +440,9 @@ pub struct JobUpdate {
     pub title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thumbnail: Option<String>,
+    /// إعادة تلقائية جارية أو منتظرة (R3-F4)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retry: Option<Retry>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

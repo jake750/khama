@@ -820,3 +820,73 @@ fn editready_real_ffmpeg_falls_back_to_cpu() {
     assert!(out.exists());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// الإعادة التلقائية (R3-F4): أي الأخطاء تُعاد، ومتى
+#[test]
+fn transient_errors_are_retried_three_times() {
+    for c in ["network", "timeout", "rateLimited", "incomplete"] {
+        assert!(transient(c), "{c}");
+    }
+    for c in ["privateVideo", "forbidden", "extractorOutdated", "diskFull", "canceled", "unknown"] {
+        assert!(!transient(c), "{c}");
+    }
+    assert_eq!(RETRY_AFTER, [30, 120, 600]);
+    // رسائل yt-dlp 2026.10.26 المضمّن نفسه: خادم لا يرد، واسم لا يُحلّ (بلا إنترنت)
+    for e in [
+        "ERROR: [generic] a: Unable to download webpage: HTTPConnection(host='127.0.0.1', port=8799): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it (caused by TransportError(\"HTTPConnection(host='127.0.0.1', port=8799): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it\"))",
+        "ERROR: [generic] v: Unable to download webpage: HTTPSConnection(host='no-such-host-khama-test.invalid', port=443): Failed to resolve 'no-such-host-khama-test.invalid' ([Errno 11001] getaddrinfo failed) (caused by TransportError(\"HTTPSConnection(host='no-such-host-khama-test.invalid', port=443): Failed to resolve 'no-such-host-khama-test.invalid' ([Errno 11001] getaddrinfo failed)\"))",
+    ] {
+        assert_eq!(friendly_ytdlp_error(e).code, "network", "{e}");
+    }
+}
+
+#[test]
+fn host_port_from_links() {
+    let hp = |u: &str| host_port(u);
+    assert_eq!(hp("https://www.youtube.com/watch?v=x"), Some(("www.youtube.com".into(), 443)));
+    assert_eq!(hp("http://127.0.0.1:8765/a.m3u8"), Some(("127.0.0.1".into(), 8765)));
+    assert_eq!(hp("https://user:pw@vimeo.com"), Some(("vimeo.com".into(), 443)));
+    assert_eq!(hp("http://[::1]:8080/x"), Some(("::1".into(), 8080)));
+    assert_eq!(hp("HTTPS://Example.com?q=1"), Some(("Example.com".into(), 443)));
+    assert_eq!(hp("ytsearch:song"), None);
+    assert_eq!(hp("ftp://x.com"), None);
+}
+
+/// «عند عودة الاتصال» على منفذ حقيقي: مغلق ثم يُفتح، فيعود الانتظار قبل مؤقته. ومفتوح من البداية لا يعود
+#[test]
+fn back_online_waits_for_the_connection_to_return() {
+    let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+    let target = || Some(("127.0.0.1".to_string(), port));
+    tauri::async_runtime::block_on(async {
+        let t0 = Instant::now();
+        // Windows يعيد محاولة الاتصال المرفوض نحو ثانيتين قبل أن يعلن الرفض، فاتصال بدأ والمنفذ مغلق
+        // ينجح إن فُتح المنفذ خلالهما: نفتحه بعد أن تنتهي المحاولة الأولى مرفوضة
+        let reopen = tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(2500)).await;
+            std::net::TcpListener::bind(("127.0.0.1", port)).unwrap()
+        });
+        let back = tokio::time::timeout(Duration::from_secs(10), back_online(target(), Duration::from_millis(100))).await;
+        println!("back_online returned after {:?}", t0.elapsed());
+        assert!(back.is_ok(), "عاد الاتصال فانتهى الانتظار");
+        assert!(t0.elapsed() >= Duration::from_millis(2400), "لا يعود قبل أن يُفتح المنفذ");
+        let _listener = reopen.await.unwrap();
+        // المنفذ مفتوح من البداية: الموقع لم ينقطع، فالانتظار للمؤقت وحده
+        let never = tokio::time::timeout(Duration::from_millis(600), back_online(target(), Duration::from_millis(100))).await;
+        assert!(never.is_err());
+        let none = tokio::time::timeout(Duration::from_millis(200), back_online(None, Duration::from_millis(50))).await;
+        assert!(none.is_err());
+    });
+}
+
+/// rateLimited: تنزيل واحد في كل مرة حتى تنتهي إعادته، ثم حد الإعدادات (R3-F4). وحفظ الإعدادات أثناءه لا يرفعه
+#[test]
+fn rate_limit_throttles_to_one_download() {
+    let q = DownloadQueue::default();
+    assert_eq!(q.0.available_permits(), 3);
+    q.throttle(true, 3);
+    assert_eq!(q.0.available_permits(), 1);
+    q.set_limit(4);
+    assert_eq!(q.0.available_permits(), 1, "حفظ الإعدادات أثناء التباطؤ");
+    q.throttle(false, 4);
+    assert_eq!(q.0.available_permits(), 4);
+}
