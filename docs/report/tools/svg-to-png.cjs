@@ -11,7 +11,8 @@ const CHROME = process.env.CHROME || "C:/Program Files/Google/Chrome/Application
 (async () => {
   const [src, dst = src.replace(/\.svg$/i, ".png")] = process.argv.slice(2);
   const svg = fs.readFileSync(src, "utf8");
-  const w = Number(/width="(\d+)"/.exec(svg)[1]), h = Number(/height="(\d+)"/.exec(svg)[1]);
+  const w = Number(/width="(\d+)"/.exec(svg)[1]),
+    h = Number(/height="(\d+)"/.exec(svg)[1]);
   const browser = await puppeteer.launch({ executablePath: CHROME, args: ["--no-sandbox"], headless: true });
   const page = await browser.newPage();
   await page.setViewport({ width: w, height: h, deviceScaleFactor: 2 });

@@ -16,9 +16,28 @@ const NODE_MODULES = (process.env.NODE_PATH || "").split(path.delimiter).filter(
 const { marked } = require("marked");
 const D = require("docx");
 const {
-  Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell,
-  WidthType, ShadingType, BorderStyle, PageBreak, Footer, Header, PageNumber, TableOfContents,
-  LevelFormat, ExternalHyperlink, TabStopType, NumberFormat, StyleLevel,
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  HeadingLevel,
+  AlignmentType,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  ShadingType,
+  BorderStyle,
+  PageBreak,
+  Footer,
+  Header,
+  PageNumber,
+  TableOfContents,
+  LevelFormat,
+  ExternalHyperlink,
+  TabStopType,
+  NumberFormat,
+  StyleLevel,
 } = D;
 
 const argv = process.argv.slice(2);
@@ -40,7 +59,12 @@ const REPO = (CFG.repo || "https://github.com/jake750/khama").replace(/\/$/, "")
 const REF = opt("ref") || (SUBMIT ? CFG.defenseTag || "v1.0-defense" : "main");
 const REPO_ROOT = path.resolve(dir, "../..");
 const SKIP = /^(README|defense|PROCESS)/i; // notes that are not part of the submitted report
-const FILES = CFG.files || fs.readdirSync(dir).filter((f) => f.endsWith(".md") && !SKIP.test(f)).sort();
+const FILES =
+  CFG.files ||
+  fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(".md") && !SKIP.test(f))
+    .sort();
 // Front matter (numbered with Arabic abjad letters; chapter 1 starts at page 1): report.json "front", where "toc"
 // marks the place of the contents and the lists of figures and tables.
 const FRONT = CFG.front || ["toc"];
@@ -53,7 +77,8 @@ const CHROME = CFG.chrome || "C:/Program Files/Google/Chrome/Application/chrome.
 const FONT = "Arial";
 const MONO = "Consolas";
 const BODY = 24; // 12 pt
-const PAGE_W = 11906, MARGIN = 1418; // A4, 2.5 cm
+const PAGE_W = 11906,
+  MARGIN = 1418; // A4, 2.5 cm
 const TEXT_W = PAGE_W - 2 * MARGIN;
 const ACCENT = "1F3A5F";
 const STUDENT = "يكتبه الطالب";
@@ -68,11 +93,21 @@ function inline(tokens, fmt = {}) {
   const runs = [];
   for (const t of tokens || []) {
     switch (t.type) {
-      case "strong": runs.push(...inline(t.tokens, { ...fmt, bold: true })); break;
-      case "em": runs.push(...inline(t.tokens, { ...fmt, italics: true })); break;
-      case "del": runs.push(...inline(t.tokens, { ...fmt, strike: true })); break;
-      case "codespan": runs.push(run(unescape(t.text), { ...fmt, mono: true })); break;
-      case "br": runs.push(new TextRun({ break: 1 })); break;
+      case "strong":
+        runs.push(...inline(t.tokens, { ...fmt, bold: true }));
+        break;
+      case "em":
+        runs.push(...inline(t.tokens, { ...fmt, italics: true }));
+        break;
+      case "del":
+        runs.push(...inline(t.tokens, { ...fmt, strike: true }));
+        break;
+      case "codespan":
+        runs.push(run(unescape(t.text), { ...fmt, mono: true }));
+        break;
+      case "br":
+        runs.push(new TextRun({ break: 1 }));
+        break;
       case "link": {
         const url = linkTarget(t.href);
         const kids = inline(t.tokens, { ...fmt, link: !!url });
@@ -84,9 +119,13 @@ function inline(tokens, fmt = {}) {
         if (t.tokens && t.tokens.length) runs.push(...inline(t.tokens, fmt));
         else runs.push(...textRuns(unescape(t.text), fmt));
         break;
-      case "escape": runs.push(run(t.text, fmt)); break;
-      case "html": break;
-      default: runs.push(...textRuns(unescape(t.raw || t.text || ""), fmt));
+      case "escape":
+        runs.push(run(t.text, fmt));
+        break;
+      case "html":
+        break;
+      default:
+        runs.push(...textRuns(unescape(t.raw || t.text || ""), fmt));
     }
   }
   return runs;
@@ -107,7 +146,12 @@ function linkTarget(href) {
 }
 
 function unescape(s) {
-  return s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  return s
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
 }
 
 // Numbers joined by - / : × – → (dates, ratios, ranges, versions), or led by § or a sign. Inside an Arabic run Word lays
@@ -116,18 +160,26 @@ function unescape(s) {
 const NUM = String.raw`\d+(?:[.,]\d+)*`;
 const NUM_SEP = String.raw`(?:[-/:×]|\s?[–→]\s?)(?:§\s?)?`;
 // Not inside a Latin token: i5-1135G7 and BS.1534-3 stay whole.
-const NUMSEQ = new RegExp(String.raw`(?<![A-Za-z0-9.])((?:§\s?|[−±+])${NUM}(?:${NUM_SEP}${NUM})*%?|${NUM}(?:${NUM_SEP}${NUM})+%?)(?![A-Za-z0-9])`);
+const NUMSEQ = new RegExp(
+  String.raw`(?<![A-Za-z0-9.])((?:§\s?|[−±+])${NUM}(?:${NUM_SEP}${NUM})*%?|${NUM}(?:${NUM_SEP}${NUM})+%?)(?![A-Za-z0-9])`,
+);
 const LRM = "\u200E";
 
 // split out the student placeholder so it can be highlighted, and the number sequences so they keep their order
 function textRuns(s, fmt) {
   const out = [];
   for (const p of s.split(/(\[يكتبه الطالب\])/).filter(Boolean)) {
-    if (p === `[${STUDENT}]`) { out.push(run(p, { ...fmt, bold: true, highlight: "yellow" })); continue; }
+    if (p === `[${STUDENT}]`) {
+      out.push(run(p, { ...fmt, bold: true, highlight: "yellow" }));
+      continue;
+    }
     // Arabic text, or text with no letters at all (a bold date alone sits in an RTL paragraph too)
     const rtl = isRtlText(p) || fmt.rtl;
     const pieces = fmt.mono || (!rtl && /[A-Za-z]/.test(p)) ? [p] : p.split(NUMSEQ);
-    if (pieces.length === 1) { out.push(run(p, fmt)); continue; }
+    if (pieces.length === 1) {
+      out.push(run(p, fmt));
+      continue;
+    }
     // the pieces around a number stay RTL even when they are only a bracket or a space, or Word would leave them
     // unmirrored; a Latin piece ("Intel Core i") keeps its own direction
     pieces.forEach((q, i) => {
@@ -142,7 +194,9 @@ function textRuns(s, fmt) {
 function run(text, f = {}) {
   return new TextRun({
     text,
-    bold: f.bold, italics: f.italics, strike: f.strike,
+    bold: f.bold,
+    italics: f.italics,
+    strike: f.strike,
     font: f.mono ? MONO : FONT,
     size: f.size || (f.mono ? BODY - 4 : BODY),
     color: f.link ? "1F5FA8" : f.color,
@@ -155,7 +209,8 @@ function run(text, f = {}) {
 // ---------- blocks ----------
 function para(children, opts = {}) {
   return new Paragraph({
-    children, bidirectional: opts.ltr ? false : true,
+    children,
+    bidirectional: opts.ltr ? false : true,
     alignment: opts.align || (opts.ltr ? AlignmentType.LEFT : AlignmentType.BOTH),
     spacing: { after: opts.after ?? 120, line: opts.line ?? 312 },
     ...opts.extra,
@@ -169,11 +224,15 @@ function blocks(tokens, ctx) {
       case "heading": {
         const level = [HeadingLevel.HEADING_1, HeadingLevel.HEADING_2, HeadingLevel.HEADING_3, HeadingLevel.HEADING_4][t.depth - 1];
         const hl = isLtr(t.text);
-        out.push(new Paragraph({
-          heading: level, bidirectional: !hl, alignment: hl ? AlignmentType.LEFT : AlignmentType.START,
-          pageBreakBefore: t.depth === 1 && !ctx.first,
-          children: inline(t.tokens, { rtl: true }),
-        }));
+        out.push(
+          new Paragraph({
+            heading: level,
+            bidirectional: !hl,
+            alignment: hl ? AlignmentType.LEFT : AlignmentType.START,
+            pageBreakBefore: t.depth === 1 && !ctx.first,
+            children: inline(t.tokens, { rtl: true }),
+          }),
+        );
         ctx.first = false;
         break;
       }
@@ -194,30 +253,55 @@ function blocks(tokens, ctx) {
           const style = { الجدول: "TableCaption", الشكل: "FigureCaption" }[caption[1]];
           const rest = t.tokens.slice(1);
           const hasRest = plain(rest).trim().length > 0;
-          out.push(new Paragraph({
-            style, bidirectional: true, alignment: AlignmentType.CENTER, keepNext: keepNext || hasRest,
-            spacing: { after: hasRest ? 0 : 120, line: 312 },
-            children: inline(t.tokens[0].tokens, { bold: true }),
-          }));
+          out.push(
+            new Paragraph({
+              style,
+              bidirectional: true,
+              alignment: AlignmentType.CENTER,
+              keepNext: keepNext || hasRest,
+              spacing: { after: hasRest ? 0 : 120, line: 312 },
+              children: inline(t.tokens[0].tokens, { bold: true }),
+            }),
+          );
           if (hasRest) {
             if (rest[0].type === "text") rest[0] = { ...rest[0], text: rest[0].text.replace(/^\s+/, ""), tokens: undefined };
-            out.push(new Paragraph({
-              bidirectional: true, alignment: AlignmentType.CENTER, keepNext, spacing: { after: 120, line: 276 },
-              children: inline(rest, { size: 20, color: "555555" }),
-            }));
+            out.push(
+              new Paragraph({
+                bidirectional: true,
+                alignment: AlignmentType.CENTER,
+                keepNext,
+                spacing: { after: 120, line: 276 },
+                children: inline(rest, { size: 20, color: "555555" }),
+              }),
+            );
           }
           break;
         }
         out.push(para(inline(t.tokens), { ltr, align: ltr ? AlignmentType.BOTH : undefined }));
         break;
       }
-      case "list": out.push(...list(t, 0)); break;
-      case "table": out.push(table(t), para([], { after: 120 })); break;
-      case "code": out.push(...(t.lang === "mermaid" ? diagram(t.text) : code(t.text))); break;
-      case "blockquote": out.push(...blocks(t.tokens, ctx)); break;
-      case "hr": out.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "BBBBBB", space: 1 } }, spacing: { after: 160 } })); break;
-      case "space": case "html": break;
-      default: if (t.text) out.push(para(textRuns(t.text, {})));
+      case "list":
+        out.push(...list(t, 0));
+        break;
+      case "table":
+        out.push(table(t), para([], { after: 120 }));
+        break;
+      case "code":
+        out.push(...(t.lang === "mermaid" ? diagram(t.text) : code(t.text)));
+        break;
+      case "blockquote":
+        out.push(...blocks(t.tokens, ctx));
+        break;
+      case "hr":
+        out.push(
+          new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "BBBBBB", space: 1 } }, spacing: { after: 160 } }),
+        );
+        break;
+      case "space":
+      case "html":
+        break;
+      default:
+        if (t.text) out.push(para(textRuns(t.text, {})));
     }
   }
   return out;
@@ -237,11 +321,15 @@ function list(t, level) {
         inl.push(...inline(c.tokens && c.tokens.length ? c.tokens : [{ type: "text", text: c.text }]));
       }
     }
-    out.push(new Paragraph({
-      children: inl, bidirectional: true, alignment: AlignmentType.BOTH,
-      numbering: { reference: ref, level, instance },
-      spacing: { after: 60, line: 300 },
-    }));
+    out.push(
+      new Paragraph({
+        children: inl,
+        bidirectional: true,
+        alignment: AlignmentType.BOTH,
+        numbering: { reference: ref, level, instance },
+        spacing: { after: 60, line: 300 },
+      }),
+    );
     for (const n of nested) out.push(...list(n, level + 1));
   }
   return out;
@@ -259,30 +347,70 @@ function diagram(src) {
   const n = ++diagramN;
   const base = path.join(path.dirname(path.resolve(out)), ".diagrams");
   fs.mkdirSync(base, { recursive: true });
-  const inF = path.join(base, `d${n}.mmd`), outF = path.join(base, `d${n}.png`);
+  const inF = path.join(base, `d${n}.mmd`),
+    outF = path.join(base, `d${n}.png`);
   fs.writeFileSync(inF, src);
   const cfg = path.join(base, "puppeteer.json");
   fs.writeFileSync(cfg, JSON.stringify({ executablePath: CHROME, args: ["--no-sandbox"] }));
   // 16 px text on a 1200 px page (review item R3-A48: the old 1100 px default-font export printed faint and small)
   const mm = path.join(base, "mermaid.json");
-  fs.writeFileSync(mm, JSON.stringify({
-    theme: "neutral",
-    themeVariables: { fontFamily: "Arial", fontSize: `${DIAGRAM_FONT}px`, primaryTextColor: "#111111", lineColor: "#333333" },
-    sequence: { actorFontSize: DIAGRAM_FONT, messageFontSize: DIAGRAM_FONT, noteFontSize: DIAGRAM_FONT, mirrorActors: false, width: 120, actorMargin: 30, messageMargin: 30 },
-    flowchart: { useMaxWidth: false }, sequenceDiagram: { useMaxWidth: false }, state: { useMaxWidth: false },
-  }));
-  execFileSync(process.execPath, [path.join(NODE_MODULES, "@mermaid-js/mermaid-cli/src/cli.js"), "-i", inF, "-o", outF, "-p", cfg, "-c", mm, "-b", "white", "-s", "2", "-w", "1200"], { stdio: "pipe" });
+  fs.writeFileSync(
+    mm,
+    JSON.stringify({
+      theme: "neutral",
+      themeVariables: { fontFamily: "Arial", fontSize: `${DIAGRAM_FONT}px`, primaryTextColor: "#111111", lineColor: "#333333" },
+      sequence: {
+        actorFontSize: DIAGRAM_FONT,
+        messageFontSize: DIAGRAM_FONT,
+        noteFontSize: DIAGRAM_FONT,
+        mirrorActors: false,
+        width: 120,
+        actorMargin: 30,
+        messageMargin: 30,
+      },
+      flowchart: { useMaxWidth: false },
+      sequenceDiagram: { useMaxWidth: false },
+      state: { useMaxWidth: false },
+    }),
+  );
+  execFileSync(
+    process.execPath,
+    [
+      path.join(NODE_MODULES, "@mermaid-js/mermaid-cli/src/cli.js"),
+      "-i",
+      inF,
+      "-o",
+      outF,
+      "-p",
+      cfg,
+      "-c",
+      mm,
+      "-b",
+      "white",
+      "-s",
+      "2",
+      "-w",
+      "1200",
+    ],
+    { stdio: "pipe" },
+  );
   const png = fs.readFileSync(outF);
-  const w = png.readUInt32BE(16), h = png.readUInt32BE(20);
-  const maxW = 600, maxH = 760; // px at 96 dpi, inside the text block
+  const w = png.readUInt32BE(16),
+    h = png.readUInt32BE(20);
+  const maxW = 600,
+    maxH = 760; // px at 96 dpi, inside the text block
   const k = Math.min(maxW / w, maxH / h, 1);
   // the PNG is at scale 2, so the printed text is DIAGRAM_FONT · 2k px; warn below 9 px (about 7 pt)
   const printed = DIAGRAM_FONT * 2 * k;
   if (printed < 9) console.warn(`diagram ${n}: text prints at ${printed.toFixed(1)} px; draw it narrower (e.g. TB instead of LR)`);
-  return [new Paragraph({
-    alignment: AlignmentType.CENTER, spacing: { before: 120, after: 80 }, keepNext: true,
-    children: [new D.ImageRun({ type: "png", data: png, transformation: { width: Math.round(w * k), height: Math.round(h * k) } })],
-  })];
+  return [
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 120, after: 80 },
+      keepNext: true,
+      children: [new D.ImageRun({ type: "png", data: png, transformation: { width: Math.round(w * k), height: Math.round(h * k) } })],
+    }),
+  ];
 }
 const DIAGRAM_FONT = 16;
 
@@ -298,22 +426,29 @@ function image(href) {
 }
 
 function picture(png, maxW, maxH) {
-  const w = png.readUInt32BE(16), h = png.readUInt32BE(20);
+  const w = png.readUInt32BE(16),
+    h = png.readUInt32BE(20);
   const k = Math.min(maxW / w, maxH / h, 1);
   return new Paragraph({
-    alignment: AlignmentType.CENTER, spacing: { before: 120, after: 80 }, keepNext: true,
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 120, after: 80 },
+    keepNext: true,
     children: [new D.ImageRun({ type: "png", data: png, transformation: { width: Math.round(w * k), height: Math.round(h * k) } })],
   });
 }
 
 function code(text) {
-  return text.split("\n").map((line, i, a) => new Paragraph({
-    bidirectional: false, alignment: AlignmentType.LEFT,
-    shading: { type: ShadingType.CLEAR, fill: "F3F4F6", color: "auto" },
-    spacing: { after: i === a.length - 1 ? 160 : 0, line: 260 },
-    indent: { left: 120, right: 120 },
-    children: [new TextRun({ text: line || " ", font: MONO, size: 17, rightToLeft: false })],
-  }));
+  return text.split("\n").map(
+    (line, i, a) =>
+      new Paragraph({
+        bidirectional: false,
+        alignment: AlignmentType.LEFT,
+        shading: { type: ShadingType.CLEAR, fill: "F3F4F6", color: "auto" },
+        spacing: { after: i === a.length - 1 ? 160 : 0, line: 260 },
+        indent: { left: 120, right: 120 },
+        children: [new TextRun({ text: line || " ", font: MONO, size: 17, rightToLeft: false })],
+      }),
+  );
 }
 
 function plain(tokens) {
@@ -335,16 +470,21 @@ function table(t) {
   const small = n >= 5 ? 18 : 20;
   const border = { style: BorderStyle.SINGLE, size: 4, color: "B7C3D0" };
   const borders = { top: border, bottom: border, left: border, right: border };
-  const cell = (c, i, head) => new TableCell({
-    width: { size: widths[i], type: WidthType.DXA },
-    borders,
-    shading: head ? { type: ShadingType.CLEAR, fill: "E4EAF1", color: "auto" } : undefined,
-    margins: { top: 60, bottom: 60, left: 90, right: 90 },
-    children: [new Paragraph({
-      bidirectional: true, alignment: AlignmentType.START, spacing: { after: 0, line: 276 },
-      children: inline(c.tokens, { bold: head, size: small }).map((r) => r),
-    })],
-  });
+  const cell = (c, i, head) =>
+    new TableCell({
+      width: { size: widths[i], type: WidthType.DXA },
+      borders,
+      shading: head ? { type: ShadingType.CLEAR, fill: "E4EAF1", color: "auto" } : undefined,
+      margins: { top: 60, bottom: 60, left: 90, right: 90 },
+      children: [
+        new Paragraph({
+          bidirectional: true,
+          alignment: AlignmentType.START,
+          spacing: { after: 0, line: 276 },
+          children: inline(c.tokens, { bold: head, size: small }).map((r) => r),
+        }),
+      ],
+    });
   // inline() uses BODY size; rebuild runs at table size
   const rows = [
     new TableRow({ tableHeader: true, children: t.header.map((c, i) => cellSized(c, i, true)) }),
@@ -356,17 +496,24 @@ function table(t) {
       borders,
       shading: head ? { type: ShadingType.CLEAR, fill: "E4EAF1", color: "auto" } : undefined,
       margins: { top: 60, bottom: 60, left: 90, right: 90 },
-      children: [new Paragraph({
-        bidirectional: true, alignment: AlignmentType.START, spacing: { after: 0, line: 276 },
-        children: inlineSized(c.tokens, head, small),
-      })],
+      children: [
+        new Paragraph({
+          bidirectional: true,
+          alignment: AlignmentType.START,
+          spacing: { after: 0, line: 276 },
+          children: inlineSized(c.tokens, head, small),
+        }),
+      ],
     });
   }
   // fixed layout: Word keeps these widths and wraps a long identifier (a test name) inside its cell, instead of
   // widening the table past the margin
   return new Table({
-    width: { size: TEXT_W, type: WidthType.DXA }, columnWidths: widths, layout: D.TableLayoutType.FIXED,
-    visuallyRightToLeft: true, rows,
+    width: { size: TEXT_W, type: WidthType.DXA },
+    columnWidths: widths,
+    layout: D.TableLayoutType.FIXED,
+    visuallyRightToLeft: true,
+    rows,
   });
 }
 
@@ -382,8 +529,7 @@ function inlineSized(tokens, bold, size) {
         const kids = walk(t.tokens, { ...f, link: !!url });
         if (url) r.push(new ExternalHyperlink({ link: url, children: kids }));
         else r.push(...kids);
-      }
-      else if (t.type === "br") r.push(new TextRun({ break: 1 }));
+      } else if (t.type === "br") r.push(new TextRun({ break: 1 }));
       else if (t.tokens && t.tokens.length) r.push(...walk(t.tokens, f));
       else r.push(...textRuns(unescape(t.text ?? t.raw ?? ""), f));
     }
@@ -395,7 +541,9 @@ function inlineSized(tokens, bold, size) {
 // ---------- front matter ----------
 function center(text, size, opts = {}) {
   return new Paragraph({
-    bidirectional: true, alignment: AlignmentType.CENTER, spacing: { after: opts.after ?? 200 },
+    bidirectional: true,
+    alignment: AlignmentType.CENTER,
+    spacing: { after: opts.after ?? 200 },
     children: textRuns(text, { size, bold: opts.bold, color: opts.color, rtl: true }),
   });
 }
@@ -422,8 +570,12 @@ const cover = [
 // A title of the front matter that looks like a chapter title but stays out of the table of contents.
 function frontTitle(text, newPage = true) {
   return new Paragraph({
-    bidirectional: true, alignment: AlignmentType.START, pageBreakBefore: newPage, keepNext: true,
-    spacing: { after: 280 }, children: [run(text, { size: 36, bold: true, color: ACCENT, rtl: true })],
+    bidirectional: true,
+    alignment: AlignmentType.START,
+    pageBreakBefore: newPage,
+    keepNext: true,
+    spacing: { after: 280 },
+    children: [run(text, { size: 36, bold: true, color: ACCENT, rtl: true })],
   });
 }
 
@@ -443,7 +595,10 @@ const contents = [
 // A table whose rows do not all have the delimiter row's number of cells is not a table for marked:
 // it falls back to a paragraph of raw pipes in the PDF. Refuse it with file:line instead.
 function cellCount(line) {
-  let s = line.replace(/`[^`]*`/g, "C").replace(/\\\|/g, "").trim();
+  let s = line
+    .replace(/`[^`]*`/g, "C")
+    .replace(/\\\|/g, "")
+    .trim();
   if (s.startsWith("|")) s = s.slice(1);
   if (s.endsWith("|")) s = s.slice(0, -1);
   return s.split("|").length;
@@ -453,7 +608,10 @@ function checkTables(file, md) {
   const bad = [];
   let code = false;
   for (let i = 0; i < lines.length; i++) {
-    if (/^\s*```/.test(lines[i])) { code = !code; continue; }
+    if (/^\s*```/.test(lines[i])) {
+      code = !code;
+      continue;
+    }
     if (code || !/^\s*\|/.test(lines[i]) || !/^\s*\|?\s*:?-{3,}/.test(lines[i + 1] || "")) continue;
     const n = cellCount(lines[i + 1]);
     let j = i;
@@ -486,16 +644,18 @@ function checkCitations() {
   const unknown = [];
   for (const f of ALL.filter((x) => x !== refFile)) {
     let fence = false;
-    fs.readFileSync(path.join(dir, f), "utf8").split("\n").forEach((l, i) => {
-      if (/^\s*```/.test(l)) fence = !fence;
-      if (fence) return;
-      for (const m of l.replace(/`[^`]*`/g, "").matchAll(/\[(\d+)\](?:\s*[–-]\s*\[(\d+)\])?/g)) {
-        for (let n = +m[1]; n <= +(m[2] || m[1]); n++) {
-          cited.add(n);
-          if (!entries.has(n)) unknown.push(`${f}:${i + 1}: [${n}]`);
+    fs.readFileSync(path.join(dir, f), "utf8")
+      .split("\n")
+      .forEach((l, i) => {
+        if (/^\s*```/.test(l)) fence = !fence;
+        if (fence) return;
+        for (const m of l.replace(/`[^`]*`/g, "").matchAll(/\[(\d+)\](?:\s*[–-]\s*\[(\d+)\])?/g)) {
+          for (let n = +m[1]; n <= +(m[2] || m[1]); n++) {
+            cited.add(n);
+            if (!entries.has(n)) unknown.push(`${f}:${i + 1}: [${n}]`);
+          }
         }
-      }
-    });
+      });
   }
   const uncited = [...entries].filter((n) => !cited.has(n));
   if (unknown.length) {
@@ -504,7 +664,10 @@ function checkCitations() {
   }
   if (uncited.length) {
     const msg = `References cited nowhere in the text: ${uncited.map((n) => `[${n}]`).join(" ")}`;
-    if (SUBMIT) { console.error(msg); process.exit(1); }
+    if (SUBMIT) {
+      console.error(msg);
+      process.exit(1);
+    }
     console.warn(msg);
   }
 }
@@ -517,20 +680,25 @@ const REVIEW_CODE = /^[ATMD]-\d+$/;
 const HAS_CODE = /\b[ATMD]-\d+\b/;
 function stripCodes(md) {
   let fence = false;
-  return md.split("\n").map((line) => {
-    if (/^\s*```/.test(line)) fence = !fence;
-    if (fence || !HAS_CODE.test(line)) return line;
-    line = line.replace(/\[يكتبه الطالب[،,]\s*([^\]]*)\]/g, (m, inner) =>
-      inner.split(/\s*[،,]\s*|\s+و(?=[ATMD]-)/).every((x) => REVIEW_CODE.test(x.trim())) ? P : m);
-    return line.replace(/(\s?)\(([^()\n]*)\)/g, (m, sp, inner) => {
-      if (!HAS_CODE.test(inner)) return m;
-      const parts = inner.split(/(\s*[،؛;]\s*|,\s+|\s+و(?=[ATMD]-\d))/);
-      const kept = [];
-      for (let i = 0; i < parts.length; i += 2) if (!REVIEW_CODE.test(parts[i].trim())) kept.push({ sep: parts[i - 1] || "", text: parts[i] });
-      if (!kept.length) return "";
-      return `${sp}(${kept.map((k, j) => (j ? k.sep : "") + k.text).join("")})`;
-    });
-  }).join("\n");
+  return md
+    .split("\n")
+    .map((line) => {
+      if (/^\s*```/.test(line)) fence = !fence;
+      if (fence || !HAS_CODE.test(line)) return line;
+      line = line.replace(/\[يكتبه الطالب[،,]\s*([^\]]*)\]/g, (m, inner) =>
+        inner.split(/\s*[،,]\s*|\s+و(?=[ATMD]-)/).every((x) => REVIEW_CODE.test(x.trim())) ? P : m,
+      );
+      return line.replace(/(\s?)\(([^()\n]*)\)/g, (m, sp, inner) => {
+        if (!HAS_CODE.test(inner)) return m;
+        const parts = inner.split(/(\s*[،؛;]\s*|,\s+|\s+و(?=[ATMD]-\d))/);
+        const kept = [];
+        for (let i = 0; i < parts.length; i += 2)
+          if (!REVIEW_CODE.test(parts[i].trim())) kept.push({ sep: parts[i - 1] || "", text: parts[i] });
+        if (!kept.length) return "";
+        return `${sp}(${kept.map((k, j) => (j ? k.sep : "") + k.text).join("")})`;
+      });
+    })
+    .join("\n");
 }
 
 // ---------- body ----------
@@ -542,7 +710,9 @@ const read = (f) => {
     const rest = md.split("\n").filter((l) => HAS_CODE.test(l) && !/^\s*(```|    )/.test(l)).length;
     if (rest) console.warn(`${f}: ${rest} line(s) still carry a review code outside a parenthesis`);
   }
-  md.split("\n").forEach((l, i) => { if (l.includes(STUDENT)) left.push(`${f}:${i + 1}`); });
+  md.split("\n").forEach((l, i) => {
+    if (l.includes(STUDENT)) left.push(`${f}:${i + 1}`);
+  });
   return md;
 };
 const sources = new Map(ALL.map((f) => [f, read(f)]));
@@ -586,15 +756,46 @@ const doc = new Document({
       heading4: heading(24, 200, 100, "2F5A86"),
     },
     paragraphStyles: [
-      ...[1, 2, 3].map((l) => ({ id: `TOC${l}`, name: `toc ${l}`, basedOn: "Normal", run: { font: FONT, size: l === 1 ? 24 : 22, bold: l === 1, rightToLeft: true }, paragraph: { bidirectional: true, indent: { right: (l - 1) * 360 }, spacing: { after: 60 } } })),
+      ...[1, 2, 3].map((l) => ({
+        id: `TOC${l}`,
+        name: `toc ${l}`,
+        basedOn: "Normal",
+        run: { font: FONT, size: l === 1 ? 24 : 22, bold: l === 1, rightToLeft: true },
+        paragraph: { bidirectional: true, indent: { right: (l - 1) * 360 }, spacing: { after: 60 } },
+      })),
       // caption styles collected by the lists of figures and tables (TOC \t "FigureCaption,1")
-      ...["FigureCaption", "TableCaption"].map((id) => ({ id, name: id, basedOn: "Normal", next: "Normal", run: { font: FONT, size: BODY, bold: true, rightToLeft: true }, paragraph: { bidirectional: true, alignment: AlignmentType.CENTER } })),
+      ...["FigureCaption", "TableCaption"].map((id) => ({
+        id,
+        name: id,
+        basedOn: "Normal",
+        next: "Normal",
+        run: { font: FONT, size: BODY, bold: true, rightToLeft: true },
+        paragraph: { bidirectional: true, alignment: AlignmentType.CENTER },
+      })),
     ],
   },
   numbering: {
     config: [
-      { reference: "bullet", levels: [0, 1, 2].map((level) => ({ level, format: LevelFormat.BULLET, text: ["●", "○", "▪"][level], alignment: AlignmentType.START, style: { paragraph: { indent: { right: 540 + level * 360, hanging: 300 } }, run: { font: FONT, size: 16 } } })) },
-      { reference: "num", levels: [0, 1, 2].map((level) => ({ level, format: [LevelFormat.DECIMAL, LevelFormat.LOWER_LETTER, LevelFormat.LOWER_ROMAN][level], text: `%${level + 1}.`, alignment: AlignmentType.START, style: { paragraph: { indent: { right: 540 + level * 360, hanging: 360 } } } })) },
+      {
+        reference: "bullet",
+        levels: [0, 1, 2].map((level) => ({
+          level,
+          format: LevelFormat.BULLET,
+          text: ["●", "○", "▪"][level],
+          alignment: AlignmentType.START,
+          style: { paragraph: { indent: { right: 540 + level * 360, hanging: 300 } }, run: { font: FONT, size: 16 } },
+        })),
+      },
+      {
+        reference: "num",
+        levels: [0, 1, 2].map((level) => ({
+          level,
+          format: [LevelFormat.DECIMAL, LevelFormat.LOWER_LETTER, LevelFormat.LOWER_ROMAN][level],
+          text: `%${level + 1}.`,
+          alignment: AlignmentType.START,
+          style: { paragraph: { indent: { right: 540 + level * 360, hanging: 360 } } },
+        })),
+      },
     ],
   },
   // Two sections: the front matter numbered أ، ب، ج… (the cover counts as أ and shows no number), and the
@@ -606,9 +807,26 @@ const doc = new Document({
 });
 
 function section(format, titlePage) {
-  const page = { size: { width: PAGE_W, height: 16838 }, margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, pageNumbers: { start: 1, formatType: format } };
-  const header = new Header({ children: [new Paragraph({ bidirectional: true, alignment: AlignmentType.START, border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "B7C3D0", space: 4 } }, children: [run(HEADER, { size: 18, color: "6B7785", rtl: true })] })] });
-  const footer = new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ children: [PageNumber.CURRENT], font: FONT, size: 20 })] })] });
+  const page = {
+    size: { width: PAGE_W, height: 16838 },
+    margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
+    pageNumbers: { start: 1, formatType: format },
+  };
+  const header = new Header({
+    children: [
+      new Paragraph({
+        bidirectional: true,
+        alignment: AlignmentType.START,
+        border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "B7C3D0", space: 4 } },
+        children: [run(HEADER, { size: 18, color: "6B7785", rtl: true })],
+      }),
+    ],
+  });
+  const footer = new Footer({
+    children: [
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ children: [PageNumber.CURRENT], font: FONT, size: 20 })] }),
+    ],
+  });
   const empty = () => new Header({ children: [new Paragraph({ children: [] })] });
   return {
     properties: { page, titlePage, rightToLeft: true },
@@ -617,4 +835,7 @@ function section(format, titlePage) {
   };
 }
 
-Packer.toBuffer(doc).then((b) => { fs.writeFileSync(out, b); console.log("wrote", out, b.length); });
+Packer.toBuffer(doc).then((b) => {
+  fs.writeFileSync(out, b);
+  console.log("wrote", out, b.length);
+});
