@@ -47,16 +47,27 @@ console.log(
 );
 
 // ---------- commits ----------
-const log = git("log", ref, "--no-merges", "--date=short", "--format=%x1e%h%x1f%ad%x1f%B%x1f", "--name-only")
+// --numstat gives "added<TAB>deleted<TAB>path" per file ("-" for binary files)
+const log = git("log", ref, "--no-merges", "--date=short", "--format=%x1e%h%x1f%ad%x1f%s%x1f%B%x1f", "--numstat")
   .split("\x1e")
   .filter(Boolean)
   .map((c) => {
-    const [hash, date, body, files] = c.split("\x1f");
-    return { hash, date, claude: /Co-Authored-By: Claude/i.test(body), files: (files ?? "").trim().split("\n").filter(Boolean) };
+    const [hash, date, subject, body, stat] = c.split("\x1f");
+    const files = (stat ?? "")
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => {
+        const [a, , f] = l.split("\t");
+        return { path: f, added: Number(a) || 0 };
+      });
+    return { hash, date, subject, claude: /Co-Authored-By: Claude/i.test(body), files };
   });
 const claude = log.filter((c) => c.claude).length;
+const releases = log.filter((c) => !c.claude && /^الإصدار \d/.test(c.subject)).length;
 console.log(
-  `commits (no merges): ${log.length}, with the Claude co-author trailer: ${claude} (${Math.round((100 * claude) / log.length)} %)`,
+  `commits (no merges): ${log.length}, with the Claude co-author trailer: ${claude} (${Math.round((100 * claude) / log.length)} %); ` +
+    `without it: ${log.length - claude}, of which ${releases} are release commits written by scripts/release (version bump only)`,
 );
 
 const byDay = {};
@@ -79,9 +90,15 @@ const areas = [
   ["other docs (docs, *.md)", /^docs\/(?!report\/)|^[^/]+\.md$/],
 ];
 for (const [name, re] of areas) {
-  const touched = log.filter((c) => c.files.some((f) => re.test(f)));
+  const touched = log.filter((c) => c.files.some((f) => re.test(f.path)));
   const withClaude = touched.filter((c) => c.claude).length;
-  console.log(`  ${name}: ${touched.length} commits, ${withClaude} with the trailer`);
+  const added = (cs) => cs.reduce((s, c) => s + c.files.filter((f) => re.test(f.path)).reduce((a, f) => a + f.added, 0), 0);
+  const all = added(touched);
+  const byClaude = added(touched.filter((c) => c.claude));
+  console.log(
+    `  ${name}: ${touched.length} commits, ${withClaude} with the trailer; lines added ${all}, ` +
+      `${byClaude} of them in commits with the trailer (${all ? Math.round((100 * byClaude) / all) : 0} %)`,
+  );
 }
 
 const periods = [
