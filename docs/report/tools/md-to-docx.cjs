@@ -110,10 +110,29 @@ function unescape(s) {
   return s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 }
 
-// split out the student placeholder so it can be highlighted
+// Numbers joined by - / : × – → (dates, ratios, ranges, versions), or led by § or a sign. Inside an Arabic run Word lays
+// them out right to left: 2026-11-07 prints as 07-11-2026, 1/9 as 9/1, (§1.5) as (1.5§), 0.3.4 → 0.3.18 backwards.
+// Each one goes in its own LTR run between two LRM marks, which keeps it in reading order (A-50).
+const NUM = String.raw`\d+(?:[.,]\d+)*`;
+const NUM_SEP = String.raw`(?:[-/:×]|\s?[–→]\s?)(?:§\s?)?`;
+const NUMSEQ = new RegExp(String.raw`((?:§\s?|[−±+])${NUM}(?:${NUM_SEP}${NUM})*%?|${NUM}(?:${NUM_SEP}${NUM})+%?)`);
+const LRM = "‎";
+
+// split out the student placeholder so it can be highlighted, and the number sequences so they keep their order
 function textRuns(s, fmt) {
-  const parts = s.split(/(\[يكتبه الطالب\])/);
-  return parts.filter(Boolean).map((p) => run(p, p === `[${STUDENT}]` ? { ...fmt, bold: true, highlight: "yellow" } : fmt));
+  const out = [];
+  for (const p of s.split(/(\[يكتبه الطالب\])/).filter(Boolean)) {
+    if (p === `[${STUDENT}]`) { out.push(run(p, { ...fmt, bold: true, highlight: "yellow" })); continue; }
+    // Arabic text, or text with no letters at all (a bold date alone sits in an RTL paragraph too)
+    const rtl = isRtlText(p) || fmt.rtl;
+    const pieces = fmt.mono || (!rtl && /[A-Za-z]/.test(p)) ? [p] : p.split(NUMSEQ);
+    if (pieces.length === 1) { out.push(run(p, fmt)); continue; }
+    // the pieces around a number stay RTL even when they are only a bracket or a space, or Word would leave them unmirrored
+    pieces.forEach((q, i) => {
+      if (q) out.push(i % 2 ? run(LRM + q + LRM, { ...fmt, ltr: true }) : run(q, rtl ? { ...fmt, rtl: true } : fmt));
+    });
+  }
+  return out;
 }
 
 function run(text, f = {}) {
@@ -125,7 +144,7 @@ function run(text, f = {}) {
     color: f.link ? "1F5FA8" : f.color,
     underline: f.link ? {} : undefined,
     highlight: f.highlight,
-    rightToLeft: f.mono ? false : isRtlText(text) || f.rtl,
+    rightToLeft: f.mono || f.ltr ? false : isRtlText(text) || f.rtl,
   });
 }
 
