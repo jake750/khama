@@ -39,47 +39,41 @@
 
 ## 4.2 المعمارية العامة
 
-**الشكل 4.1: مخطط المكوّنات** (A-8)
-
 ```mermaid
 flowchart TB
   subgraph WebView["الواجهة: React + TypeScript (src/)"]
-    V[DownloadView · ConvertView · HistoryView · SettingsView]
-    API[api.ts: الأوامر والأحداث]
-    I18N[i18n.ts: عربي/إنجليزي]
+    direction LR
+    V["الشاشات<br/>Download · Convert<br/>History · Settings"]
+    API["api.ts<br/>الأوامر والأحداث"]
+    I18N["i18n.ts<br/>عربي / إنجليزي"]
     V --> API
     V --> I18N
   end
   subgraph Core["النواة: Rust (src-tauri/src)"]
-    CMD[lib.rs: تسجيل الأوامر]
-    DL[download/: الطابور، yt-dlp، التقدّم، الإلغاء]
-    CV[convert/: build_plan، FFmpeg، المراقبة]
-    SEP[separate.rs: STFT + ONNX]
-    ST[settings.rs · history.rs · persist.rs]
-    TL[tools.rs: مسارات الأدوات وتحديث yt-dlp]
-    BG[background.rs: الأيقونة، الحافظة، الروابط العميقة]
-    ER[errors.rs: أخطاء ← رموز]
+    CMD["lib.rs<br/>تسجيل الأوامر"]
+    DL["download/<br/>الطابور والإلغاء"]
+    CV["convert/<br/>الأوامر والمعايرة"]
+    SEP["separate.rs<br/>STFT + ONNX"]
+    AX["scenes.rs<br/>topics.rs"]
   end
-  subgraph Ext["أدوات مضمّنة"]
-    Y[yt-dlp] 
-    F[FFmpeg / ffprobe]
-    D[Deno]
-    O[ONNX Runtime + النموذج]
+  subgraph Ext["أدوات مضمّنة أو منزَّلة عند الطلب"]
+    Y["yt-dlp + Deno"]
+    F["FFmpeg / ffprobe"]
+    O["ONNX Runtime<br/>+ نماذج الفصل"]
+    WH["whisper.cpp<br/>+ نموذج التفريغ"]
   end
   API -- "invoke (IPC)" --> CMD
-  CMD --> DL & CV & SEP & ST & TL
-  DL -- "job-update (حدث)" --> API
-  DL --> Y --> D
-  DL --> F
-  CV --> F
+  DL -- "job-update" --> API
+  CMD --> DL & CV & SEP & AX
+  DL --> Y
+  DL & CV & AX --> F
   SEP --> O
-  SEP --> F
-  DL & CV & SEP --> ER
+  AX --> WH
 ```
 
-الواجهة لا تصل إلى النظام مباشرة: كل شيء عبر أوامر Tauri المسجّلة في `lib.rs` (عقدها كاملًا في [IPC.md](../IPC.md))، وسياسة المحتوى تمنع أي سكربت خارجي ([SECURITY.md](../SECURITY.md)).
+**الشكل 4.1: مخطط المكوّنات** (A-8)
 
-**الشكل 4.2: تسلسل تنزيل كامل**
+وحدات الإعدادات والسجلّ ومسارات الأدوات والأخطاء تخدم كل الوحدات، فتُركت من الشكل ليبقى مقروءًا، وهي في الجدول 4.3. الواجهة لا تصل إلى النظام مباشرة: كل شيء عبر أوامر Tauri المسجّلة في `lib.rs` (عقدها كاملًا في [IPC.md](../IPC.md))، وسياسة المحتوى تمنع أي سكربت خارجي ([SECURITY.md](../SECURITY.md)).
 
 ```mermaid
 sequenceDiagram
@@ -91,37 +85,39 @@ sequenceDiagram
   U->>W: يلصق الرابط
   W->>R: probe(url)
   R->>Y: yt-dlp -J
-  Y-->>R: JSON (العنوان، الصيغ، المدة)
+  Y-->>R: JSON: العنوان والصيغ
   R-->>W: ProbeInfo
-  U->>W: يختار المقطع والصيغة ويضغط «تنزيل»
-  W->>R: new_job_id ثم start_download(request)
-  R->>R: الطابور (حد التزامن)
-  R->>Y: yt-dlp -f … -S … --download-sections
+  U->>W: يختار ويضغط «تنزيل»
+  W->>R: start_download(request)
+  R->>R: الطابور
+  R->>Y: -f -S --download-sections
   loop كل سطر تقدّم
-    Y-->>R: KHAMA_DL downloading|…
-    R-->>W: job-update (النسبة، السرعة، المتبقي)
+    Y-->>R: KHAMA_DL downloading
+    R-->>W: job-update (النسبة)
   end
-  R->>F: ffprobe (فحص جاهز للمونتاج)
+  R->>F: ffprobe: جاهز للمونتاج؟
   alt ليس H.264 CFR
     R->>F: إعادة الترميز
   end
-  R->>R: السجلّ + إشعار
-  R-->>W: job-update (done, file)
+  R->>R: السجلّ وإشعار
+  R-->>W: job-update (done)
+```
+
+**الشكل 4.2: تسلسل تنزيل كامل**
+
+```mermaid
+flowchart TB
+  G["GitHub: main"] -->|push| CI["GitHub Actions: build.yml"]
+  CI --> W["Windows<br/>NSIS .exe"]
+  CI --> M1["macOS arm64<br/>.dmg"]
+  CI --> M2["macOS x64<br/>.dmg"]
+  CI --> L["Linux<br/>AppImage · deb · rpm"]
+  CI --> A["Android<br/>APK موقّع"]
+  W & M1 & M2 & L & A --> REL["GitHub Release<br/>+ latest.json موقّع + SBOM"]
+  REL -->|المحدِّث| APP["التطبيق المثبّت"]
 ```
 
 **الشكل 4.3: مخطط النشر**
-
-```mermaid
-flowchart LR
-  G[GitHub: main] -->|push| CI[GitHub Actions: build.yml]
-  CI --> W[Windows: NSIS .exe]
-  CI --> M1[macOS arm64: .dmg]
-  CI --> M2[macOS x64: .dmg]
-  CI --> L[Linux: AppImage · deb · rpm]
-  CI --> A[Android: APK موقّع]
-  W & M1 & M2 & L & A --> REL[GitHub Release + latest.json + SBOM]
-  REL -->|المحدِّث| APP[التطبيق المثبّت]
-```
 
 ## 4.3 الوحدات
 
@@ -148,8 +144,6 @@ flowchart LR
 
 ## 4.4 حالات العملية
 
-**الشكل 4.4: مخطط حالات العملية** (A-23، من `JobState` في `api.ts`)
-
 ```mermaid
 stateDiagram-v2
   [*] --> scheduled: تنزيل مجدول
@@ -160,8 +154,10 @@ stateDiagram-v2
   analyzing --> downloading
   downloading --> processing: دمج وفحص
   processing --> converting: ليس جاهزًا للمونتاج
-  processing --> separating: تنظيف بالذكاء الاصطناعي
-  preparing --> separating: تنزيل النموذج أول مرة
+  processing --> separating: تنظيف والنموذج موجود
+  processing --> preparing: تنظيف والنموذج غير موجود
+  converting --> preparing: نموذج غير موجود
+  preparing --> separating: نُزِّل النموذج وطابقت بصمته
   converting --> separating
   converting --> done
   separating --> done
@@ -169,14 +165,19 @@ stateDiagram-v2
   queued --> canceled
   downloading --> canceled
   converting --> canceled
+  preparing --> canceled
   separating --> canceled
   analyzing --> error
   downloading --> error
   converting --> error
+  preparing --> error: شبكة أو بصمة مختلفة
   separating --> error
   done --> [*]
+  canceled --> [*]
   error --> queued: أعد المحاولة
 ```
+
+**الشكل 4.4: مخطط حالات العملية** (A-23، من `JobState` في `api.ts`)
 
 العمليات الثقيلة (التحويل والفصل) لها حدّ مستقل عن حدّ التنزيل: ربع أنوية المعالج (`heavy_work_limit_is_a_quarter_of_the_cores`)، حتى لا يتجمّد الجهاز عند تنزيل قائمة طويلة جاهزة للمونتاج.
 
@@ -227,8 +228,6 @@ stateDiagram-v2
 
 ## 4.7 أندرويد
 
-**الشكل 4.5: بنية نسخة أندرويد** (A-56)
-
 ```mermaid
 flowchart TB
   UI[الواجهة نفسها: React في WebView أندرويد] -->|IPC| RS[Rust نفسه: download/، convert/، separate.rs]
@@ -239,6 +238,8 @@ flowchart TB
   YA --> QJ[QuickJS: محرّك JavaScript لـ yt-dlp]
   RS --> ORT[onnxruntime-android 1.22.0 من Maven]
 ```
+
+**الشكل 4.5: بنية نسخة أندرويد** (A-56)
 
 الكود نفسه يعمل على الهاتف: نفس أوامر yt-dlp، ونفس قراءة التقدّم، ونفس الإلغاء. الفرق في مكان الأدوات: مكتبة youtubedl-android تفكّ Python وyt-dlp وFFmpeg داخل التطبيق عند أول تشغيل وتعطي مساراتها لـ Rust عبر إضافة Kotlin. ONNX Runtime يأتي من Maven بدل التنزيل. على الهاتف لا يُختار مجلد الحفظ (الملفات في `Download/Khama`)، ولا سحب ولا أيقونة ولا مجلدات مراقَبة.
 

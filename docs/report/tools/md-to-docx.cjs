@@ -156,9 +156,11 @@ function blocks(tokens, ctx) {
           out.push(...imgs.map((x) => image(x.href)));
           break;
         }
-        const caption = /^\*\*(الجدول|الشكل)/.test(t.raw);
+        // captions: a table caption sits above its table and keeps with it; a figure caption sits below the
+        // figure (the figure paragraph keeps with it), so it does not keep with what follows
+        const caption = /^\*\*(الجدول|الشكل|المقتطف)/.exec(t.raw);
         const ltr = isLtr(t.raw);
-        out.push(para(inline(t.tokens), caption ? { extra: { keepNext: true }, align: AlignmentType.CENTER } : { ltr, align: ltr ? AlignmentType.BOTH : undefined }));
+        out.push(para(inline(t.tokens), caption ? { extra: { keepNext: caption[1] !== "الشكل" }, align: AlignmentType.CENTER } : { ltr, align: ltr ? AlignmentType.BOTH : undefined }));
         break;
       }
       case "list": out.push(...list(t, 0)); break;
@@ -213,18 +215,28 @@ function diagram(src) {
   fs.writeFileSync(inF, src);
   const cfg = path.join(base, "puppeteer.json");
   fs.writeFileSync(cfg, JSON.stringify({ executablePath: CHROME, args: ["--no-sandbox"] }));
+  // 16 px text on a 1200 px page (review item R3-A48: the old 1100 px default-font export printed faint and small)
   const mm = path.join(base, "mermaid.json");
-  fs.writeFileSync(mm, JSON.stringify({ theme: "neutral", themeVariables: { fontFamily: "Arial" } }));
-  execFileSync(process.execPath, [path.join(NODE_MODULES, "@mermaid-js/mermaid-cli/src/cli.js"), "-i", inF, "-o", outF, "-p", cfg, "-c", mm, "-b", "white", "-s", "2", "-w", "1100"], { stdio: "pipe" });
+  fs.writeFileSync(mm, JSON.stringify({
+    theme: "neutral",
+    themeVariables: { fontFamily: "Arial", fontSize: `${DIAGRAM_FONT}px`, primaryTextColor: "#111111", lineColor: "#333333" },
+    sequence: { actorFontSize: DIAGRAM_FONT, messageFontSize: DIAGRAM_FONT, noteFontSize: DIAGRAM_FONT, mirrorActors: false, width: 120, actorMargin: 30, messageMargin: 30 },
+    flowchart: { useMaxWidth: false }, sequenceDiagram: { useMaxWidth: false }, state: { useMaxWidth: false },
+  }));
+  execFileSync(process.execPath, [path.join(NODE_MODULES, "@mermaid-js/mermaid-cli/src/cli.js"), "-i", inF, "-o", outF, "-p", cfg, "-c", mm, "-b", "white", "-s", "2", "-w", "1200"], { stdio: "pipe" });
   const png = fs.readFileSync(outF);
   const w = png.readUInt32BE(16), h = png.readUInt32BE(20);
   const maxW = 600, maxH = 760; // px at 96 dpi, inside the text block
   const k = Math.min(maxW / w, maxH / h, 1);
+  // the PNG is at scale 2, so the printed text is DIAGRAM_FONT · 2k px; warn below 9 px (about 7 pt)
+  const printed = DIAGRAM_FONT * 2 * k;
+  if (printed < 9) console.warn(`diagram ${n}: text prints at ${printed.toFixed(1)} px; draw it narrower (e.g. TB instead of LR)`);
   return [new Paragraph({
-    alignment: AlignmentType.CENTER, spacing: { before: 120, after: 200 },
+    alignment: AlignmentType.CENTER, spacing: { before: 120, after: 80 }, keepNext: true,
     children: [new D.ImageRun({ type: "png", data: png, transformation: { width: Math.round(w * k), height: Math.round(h * k) } })],
   })];
 }
+const DIAGRAM_FONT = 16;
 
 // ![](relative/path.png): a PNG from the repository (results figures, screenshots), fitted to the text block.
 // The figure keeps with the caption paragraph that follows it.
