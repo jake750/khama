@@ -5,6 +5,11 @@ import { useState } from "react";
 import type { AppError } from "../api";
 import { errorText, useI18n } from "../i18n";
 import { Icon } from "./Icon";
+import { isMobile } from "../platform";
+
+/** R3-U16: متصفحات لوحة «استعمل كوكيز من…» مكان الخطأ (Firefox أولًا: الوحيد الذي يُقرأ دائمًا على Windows) */
+const QUICK_BROWSERS = ["firefox", "chrome", "edge", "brave"];
+export const browserName = (b: string) => (b === "edge" ? "Edge" : b[0].toUpperCase() + b.slice(1));
 
 /** ماذا يستطيع المستخدم أن يفعل حيال الخطأ؟ (زر واحد بجانب الرسالة) */
 export type ErrorFix = "cookies" | "ytdlp" | "retry";
@@ -30,6 +35,8 @@ export function ErrorBox(props: {
   onFix?: (fix: ErrorFix) => void | Promise<void>;
   /** البطاقة فيها زر «أعد» خاص بها: لا نكرّره هنا */
   noRetry?: boolean;
+  /** R3-U16: كوكيز من متصفح بنقرة ثم إعادة المحاولة وحدها، بدل الذهاب إلى الإعدادات */
+  onCookies?: (browser: string) => void | Promise<void>;
 }) {
   const { t } = useI18n();
   const { error } = props;
@@ -39,7 +46,10 @@ export function ErrorBox(props: {
   const [copied, setCopied] = useState(false);
   // تحديث yt-dlp يستغرق ثواني: الزر يُظهر الانتظار ولا يُضغط مرتين (UX9)
   const [busy, setBusy] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const quickCookies = fix === "cookies" && !!props.onCookies && !isMobile;
   const runFix = async () => {
+    if (quickCookies) return setPicking((p) => !p);
     setBusy(true);
     try {
       await props.onFix!(fix!);
@@ -76,11 +86,43 @@ export function ErrorBox(props: {
         <Icon name="alert" size={16} />
         <span className="grow">{errorText(t, error)}</span>
         {fix && (
-          <button className="btn btn-sm" onClick={runFix} disabled={busy} aria-busy={busy || undefined}>
+          <button
+            className="btn btn-sm"
+            onClick={runFix}
+            disabled={busy}
+            aria-busy={busy || undefined}
+            aria-expanded={quickCookies ? picking : undefined}
+          >
             <Icon name={fix === "cookies" ? "settings" : "retry"} size={16} /> {fixLabel}
           </button>
         )}
       </div>
+      {quickCookies && picking && (
+        <div className="cookie-pick" role="group" aria-label={t.cookiesPickFrom}>
+          <span className="faint">{t.cookiesPickFrom}</span>
+          {QUICK_BROWSERS.map((b) => (
+            <button
+              key={b}
+              className="btn btn-sm"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await props.onCookies!(b);
+                  setPicking(false);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {browserName(b)}
+            </button>
+          ))}
+          <button className="btn btn-sm btn-ghost" onClick={() => props.onFix!("cookies")}>
+            {t.cookiesOther}
+          </button>
+        </div>
+      )}
       {error.detail && (
         <details className="tech">
           <summary>{t.techDetails}</summary>

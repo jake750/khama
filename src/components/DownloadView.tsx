@@ -290,6 +290,15 @@ export function DownloadView(props: {
     }
   }
 
+  /** R3-U16: كوكيز المتصفح تُحفظ (وتنتظر الحفظ فيقرؤها Rust) ثم يُعاد الفحص */
+  async function useBrowserCookies(browser: string) {
+    const patch = { cookiesMode: "browser", cookiesBrowser: browser } as const;
+    update(patch);
+    await api.saveSettings({ ...s, ...patch }).catch(logError("saveSettings"));
+    setStartError(null);
+    setReprobe((n) => n + 1);
+  }
+
   async function fix(f: ErrorFix) {
     if (f === "cookies") return props.onOpenSettings("cookies");
     if (f === "ytdlp") {
@@ -524,8 +533,8 @@ export function DownloadView(props: {
         )}
       </div>
 
-      {probe.status === "error" && !multiLinks && <ErrorBox error={probe.error} inline onFix={fix} />}
-      {startError && <ErrorBox error={startError} inline onFix={fix} />}
+      {probe.status === "error" && !multiLinks && <ErrorBox error={probe.error} inline onFix={fix} onCookies={useBrowserCookies} />}
+      {startError && <ErrorBox error={startError} inline onFix={fix} onCookies={useBrowserCookies} />}
       {noRoom && (
         <div className="alert warn" role="alert">
           <Icon name="alert" size={16} />

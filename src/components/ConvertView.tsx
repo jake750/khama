@@ -440,7 +440,7 @@ export function ConvertView(props: {
       const keep = Object.entries(m).filter(([p]) => files.some((f) => f.path === p));
       return keep.length === Object.keys(m).length ? m : Object.fromEntries(keep);
     });
-  }, [files]);
+  }, [files, setOverrides]);
   const audioOnly = ready.filter((f) => !f.info!.video).length;
   const anyVideo = ready.some((f) => f.info!.video);
   const loading = files.some((f) => !f.info && !f.error);
@@ -1434,6 +1434,8 @@ export function ConvertView(props: {
                     { value: "each", label: t.modeEach, title: t.modeEachHint },
                   ]}
                 />
+                {/* R3-D19: الشرح ظاهرًا لا في title فقط (اللمس لا يعرض title) */}
+                <span className="faint seg-desc">{oneFile ? t.modeOneHint : t.modeEachHint}</span>
               </div>
             )}
             {isMobile ? (

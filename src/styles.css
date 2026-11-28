@@ -4872,3 +4872,18 @@ textarea {
 :root[data-motion="reduce"] .job.celebrate::after {
   animation: none;
 }
+
+/* R3-U16: «استعمل كوكيز من…» تحت رسالة الخطأ، ثم إعادة المحاولة وحدها */
+.cookie-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+}
+.seg-desc {
+  display: block;
+  max-width: 48ch;
+  margin-top: var(--s-1);
+  font-size: var(--fs-cap);
+}

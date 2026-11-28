@@ -17,7 +17,7 @@ import {
 } from "../api";
 import { snapshotProject } from "../projects";
 import { errorText, useI18n } from "../i18n";
-import { ErrorBox } from "./ErrorBox";
+import { browserName, ErrorBox } from "./ErrorBox";
 import { useConfirm } from "./Dialog";
 import { Icon, type IconName } from "./Icon";
 import { Hint } from "./Hint";
@@ -66,7 +66,6 @@ function AboutLinks() {
 // المتصفحات التي يستطيع yt-dlp قراءة الكوكيز منها، حسب النظام
 const isMac = navigator.userAgent.includes("Mac");
 const BROWSERS = ["firefox", "chrome", "edge", "brave", "opera", "vivaldi", "chromium", ...(isMac ? ["safari"] : [])];
-const browserName = (b: string) => (b === "edge" ? "Edge" : b[0].toUpperCase() + b.slice(1));
 
 export function SettingsView(props: {
   settings: Settings;
