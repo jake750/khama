@@ -389,7 +389,10 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       if (req.history)
         pending.set(id, { ...req.history, url: req.url ?? "", kind: cmd === "start_convert" ? "convert" : (req.kind ?? "video") });
       const preset = (args.request as { preset?: string } | undefined)?.preset;
-      if (preset === "topics") setTimeout(() => fakeTopics(id), 50);
+      // رابط فيه «private» يحتاج كوكيز حتى تُختار كوكيز متصفح (لتجربة زر الكوكيز على البطاقة الفاشلة)
+      if (cmd === "start_download" && req.url?.includes("private") && settings.cookiesMode !== "browser")
+        setTimeout(() => emit("job-update", { id, state: "error", error: { code: "loginRequired" } }), 300);
+      else if (preset === "topics") setTimeout(() => fakeTopics(id), 50);
       else if (preset === "detect_silence") setTimeout(() => fakeSilence(id), 50);
       else setTimeout(() => fakeJob(id), 50);
       return id;

@@ -179,6 +179,8 @@ export function JobCard(props: {
   onFindTopics?: () => void;
   /** زر الإصلاح المقترح للخطأ (تحديث yt-dlp ثم إعادة، أو الكوكيز) (R2-2) */
   onFix?: (fix: ErrorFix) => Promise<void>;
+  /** R3-U16: «استعمل كوكيز Firefox…» من رسالة الخطأ: يحفظ الاختيار ويعيد المحاولة */
+  onCookies?: (browser: string) => Promise<void>;
 }) {
   const { t, lang } = useI18n();
   const j = props.job;
@@ -370,7 +372,7 @@ export function JobCard(props: {
           </div>
         )}
 
-        {j.state === "error" && j.error && <ErrorBox error={j.error} compact noRetry onFix={props.onFix} />}
+        {j.state === "error" && j.error && <ErrorBox error={j.error} compact noRetry onFix={props.onFix} onCookies={props.onCookies} />}
         {j.source && j.source !== j.title && (
           <div className="faint job-source" dir="auto" title={j.source}>
             {t.matchedFrom(j.source)}

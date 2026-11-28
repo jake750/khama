@@ -1003,6 +1003,14 @@ ${navigator.userAgent}`).catch(() => {})
     if (j.type === "convert" && j.convert) startConvert(j.convert, j.title, j.meta, j.error, j.inDownloads).catch(logError("retryConvert"));
   };
 
+  /** R3-U16: كوكيز المتصفح المختار تُحفظ أولًا (Rust يقرؤها من الإعدادات)، ثم تُعاد المحاولة */
+  const cookiesAndRetry = async (j: Job, browser: string) => {
+    update({ cookiesMode: "browser", cookiesBrowser: browser });
+    // حفظ مباشر لا عبر الطابور: flushSave يعود فورًا إن كان حفظ آخر جاريًا، فتسبق الإعادةُ الحفظ
+    if (settingsRef.current) await api.saveSettings(settingsRef.current).catch(logError("saveSettings"));
+    retry(j);
+  };
+
   /** زر الإصلاح على بطاقة تنزيل فاشلة (R2-2): الكوكيز تفتح الإعدادات، وyt-dlp يُحدَّث ثم يُعاد التنزيل */
   const fixJob = async (j: Job, fix: ErrorFix) => {
     if (fix === "cookies") return openSettings("cookies");
@@ -1587,6 +1595,7 @@ ${navigator.userAgent}`).catch(() => {})
                           onCopyPath={isMobile ? undefined : () => j.file && copyText(j.file, t.pathCopied)}
                           onRetry={() => retry(j)}
                           onFix={j.type === "download" ? (fix) => fixJob(j, fix) : undefined}
+                          onCookies={j.type === "download" ? (browser) => cookiesAndRetry(j, browser) : undefined}
                           onRemove={() => setJobs((p) => p.filter((x) => x.id !== j.id))}
                           onConvert={
                             j.type === "download" && j.file
