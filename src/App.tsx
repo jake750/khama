@@ -1030,7 +1030,9 @@ export default function App() {
       };
       startDownload(request, { title: `${j.title} · ${formatTimecode(from)}`, thumbnail: j.thumbnail })
         .then((id) => {
-          if (id != null) afterDownload.current.set(id, (file) => exportFromFile(moved, file, secs.map(shift), o));
+          // العلامات بأوقات ما نُزّل أيضًا (R3-F11)
+          const shifted = o.marks && { ...o, marks: o.marks.map((m) => ({ ...m, start: m.start - from, end: m.end - from })) };
+          if (id != null) afterDownload.current.set(id, (file) => exportFromFile(moved, file, secs.map(shift), shifted || o));
         })
         .catch(logError("exportFromUrl"));
     }
@@ -1060,6 +1062,22 @@ export default function App() {
         cues: cuesFor(sections),
         name: `${fileStem(input)} timeline`,
         keepCuts: false,
+        markers: o.marks ?? [],
+        markersOnly: false,
+      });
+      return;
+    }
+    // علامات المواضيع على الملف كله، والترجمة كلها بأوقاتها كما هي (R3-F11)
+    if (o.as === "markers") {
+      const whole: Range[] = [[0, 1e9]];
+      saveTimeline({
+        input,
+        pieces: [],
+        cues: o.subs && j.cues?.length ? exportCues(j.cues, whole, [], lines, j.words, j.markers ?? []) : [],
+        name: `${fileStem(input)} markers`,
+        keepCuts: false,
+        markers: o.marks ?? [],
+        markersOnly: true,
       });
       return;
     }

@@ -350,6 +350,11 @@ fn file_xml(m: &Media, id: usize) -> String {
 /// تايم لاين بالقطع `clips` من الملفات `files`. الصورة على مسار والصوت على مسار، وكل قطعة صورة
 /// مربوطة بقطعة صوتها (تتحرك معها في برنامج المونتاج)
 pub fn xmeml(files: &[Media], clips: &[Clip], name: &str) -> String {
+    xmeml_marked(files, clips, name, &[])
+}
+
+/// مثل `xmeml`، وعلى التسلسل علامات `marks` (R3-F11)
+pub fn xmeml_marked(files: &[Media], clips: &[Clip], name: &str, marks: &[Mark]) -> String {
     let Some(first) = files.first() else { return String::new() };
     let r = first.rate;
     let has_video = files.iter().any(|m| m.video.is_some());
@@ -417,12 +422,13 @@ pub fn xmeml(files: &[Media], clips: &[Clip], name: &str) -> String {
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE xmeml>\n<xmeml version=\"4\"><sequence id=\"sequence-1\"><name>{}</name><duration>{}</duration>{}{}\
          <media><video><format><samplecharacteristics>{}<width>{w}</width><height>{h}</height><pixelaspectratio>square</pixelaspectratio>\
-         <fielddominance>none</fielddominance></samplecharacteristics></format>{video_track}</video>{audio_part}</media></sequence></xmeml>\n",
+         <fielddominance>none</fielddominance></samplecharacteristics></format>{video_track}</video>{audio_part}</media>{}</sequence></xmeml>\n",
         xml_escape(name),
         total(clips),
         r.xml(),
         r.timecode_xml(r.record_start()),
         r.xml(),
+        markers_xml(marks),
     )
 }
 
@@ -459,6 +465,178 @@ pub fn edl_cuts(m: &Media, clips: &[Clip], title: &str) -> String {
     out
 }
 
+// ======================= العلامات (R3-F11) =======================
+
+/// علامة من الواجهة بثواني المصدر
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
+pub struct TimelineMarker {
+    pub start: f64,
+    /// = start لعلامة نقطة
+    pub end: f64,
+    pub name: String,
+    /// تعليق العلامة (نوعها ومدتها وملخصها)
+    #[serde(default)]
+    pub note: String,
+    /// لون Resolve بالإنجليزية (Green، Yellow، Red، …). غير معروف = الأزرق
+    #[serde(default)]
+    pub color: String,
+}
+
+/// ألوان علامات Resolve كما يكتبها في EDL العلامات
+const RESOLVE_COLORS: &[&str] = &[
+    "Blue", "Cyan", "Green", "Yellow", "Red", "Pink", "Purple", "Fuchsia", "Rose", "Lavender", "Sky", "Mint", "Lemon", "Sand", "Cocoa",
+    "Cream",
+];
+
+fn resolve_color(c: &str) -> &'static str {
+    RESOLVE_COLORS
+        .iter()
+        .find(|n| n.eq_ignore_ascii_case(c.trim()))
+        .copied()
+        .unwrap_or("Blue")
+}
+
+/// علامة على التايم لاين، بالإطارات
+#[derive(Debug, Clone, PartialEq)]
+pub struct Mark {
+    pub at: u64,
+    /// 0 = علامة نقطة
+    pub len: u64,
+    pub name: String,
+    pub note: String,
+    pub color: String,
+    /// موضعها في المصدر (ث)، للجدول
+    pub src: (f64, f64),
+}
+
+fn one_line(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// علامات المصدر على التايم لاين. علامة بمدى تبقى إن بقي شيء منها، وتبدأ من أول ما بقي؛
+/// وعلامة نقطة في جزء محذوف تنتقل إلى أول ما بعده. ما خرج كله يسقط
+pub fn place_marks(marks: &[TimelineMarker], clips: &[Clip], rate: Rate) -> Vec<Mark> {
+    let (Some(lo), Some(hi)) = (clips.iter().map(|c| c.src_in).min(), clips.iter().map(|c| c.src_out).max()) else {
+        return Vec::new();
+    };
+    let last = total(clips).saturating_sub(1);
+    let mut out: Vec<Mark> = marks
+        .iter()
+        .filter_map(|m| {
+            let ranged = m.end > m.start;
+            // قبل أول الملف كلها (موضوع قبل ما نُزّل من رابط): لا تصير علامة عند صفره
+            if m.end.max(m.start) < 0.0 || (ranged && m.end <= 0.0) {
+                return None;
+            }
+            let (s, e) = (m.start.max(0.0) * rate.fps, m.end.max(m.start) * rate.fps);
+            let keep = if ranged {
+                clips.iter().any(|c| (c.src_in as f64) < e && (c.src_out as f64) > s)
+            } else {
+                s >= lo as f64 && s < hi as f64
+            };
+            if !keep {
+                return None;
+            }
+            let a = source_to_timeline(s, clips, false)?;
+            let b = if ranged {
+                source_to_timeline(e, clips, true).unwrap_or(a)
+            } else {
+                a
+            };
+            let at = (a.round() as u64).min(last);
+            Some(Mark {
+                at,
+                len: (b.round() as u64).saturating_sub(at),
+                name: one_line(&m.name),
+                note: one_line(&m.note),
+                color: m.color.clone(),
+                src: (m.start, m.end.max(m.start)),
+            })
+        })
+        .collect();
+    out.sort_by_key(|m| m.at);
+    out
+}
+
+/// علامات التسلسل في xmeml: يقرؤها Premiere (اسم وتعليق ومدة). اللون لا يُكتب: ترميز Premiere
+/// له غير موثّق، فالنوع في التعليق، واللون في EDL العلامات لـ Resolve
+fn markers_xml(marks: &[Mark]) -> String {
+    marks
+        .iter()
+        .map(|m| {
+            let out = if m.len > 0 { (m.at + m.len).to_string() } else { "-1".into() };
+            format!(
+                "<marker><name>{}</name><comment>{}</comment><in>{}</in><out>{out}</out></marker>",
+                xml_escape(&m.name),
+                xml_escape(&m.note),
+                m.at
+            )
+        })
+        .collect()
+}
+
+/// EDL علامات بصيغة Resolve (Timeline → Import → Timeline Markers from EDL): حدث لكل علامة على
+/// تايم لاين يبدأ من 01:00:00:00، وتحته سطر « |C:ResolveColorGreen |M:الاسم |D:المدة بالإطارات»
+pub fn edl_markers(marks: &[Mark], r: Rate, title: &str) -> String {
+    let rec0 = r.record_start();
+    let mut out = edl_header(title, r);
+    for (n, m) in marks.iter().enumerate() {
+        let (a, b) = (r.tc(rec0 + m.at), r.tc(rec0 + m.at + 1));
+        let name = m.name.replace('|', "/");
+        let name = if name.is_empty() { format!("Marker {}", n + 1) } else { name };
+        out.push_str(&format!(
+            "{:03}  001      V     C        {a} {b} {a} {b}  \n |C:ResolveColor{} |M:{name} |D:{}\n\n",
+            n + 1,
+            resolve_color(&m.color),
+            m.len.max(1)
+        ));
+    }
+    out
+}
+
+fn csv_field(s: &str) -> String {
+    if s.contains([',', '"', '\n', '\r']) {
+        format!("\"{}\"", s.replace('"', "\"\""))
+    } else {
+        s.to_string()
+    }
+}
+
+/// وقت المصدر بصيغة 00:01:02.345
+fn clock(sec: f64) -> String {
+    let ms = (sec.max(0.0) * 1000.0).round() as u64;
+    format!(
+        "{:02}:{:02}:{:02}.{:03}",
+        ms / 3_600_000,
+        ms / 60_000 % 60,
+        ms / 1000 % 60,
+        ms % 1000
+    )
+}
+
+/// جدول العلامات (يفتحه Excel وGoogle Sheets بالعربية كما هي: UTF-8 مع BOM)
+pub fn csv_markers(marks: &[Mark], r: Rate) -> String {
+    let rec0 = r.record_start();
+    let mut out = String::from("\u{feff}#,Name,Timeline in,Timeline out,Duration,Source in,Source out,Colour,Note\r\n");
+    for (n, m) in marks.iter().enumerate() {
+        let row = [
+            (n + 1).to_string(),
+            csv_field(&m.name),
+            r.tc(rec0 + m.at),
+            r.tc(rec0 + m.at + m.len),
+            clock(r.secs(m.len)),
+            clock(m.src.0),
+            clock(m.src.1),
+            resolve_color(&m.color).to_string(),
+            csv_field(&m.note),
+        ];
+        out.push_str(&row.join(","));
+        out.push_str("\r\n");
+    }
+    out
+}
+
 // ======================= الطلب من الواجهة =======================
 
 /// سطر ترجمة على ناتج الواجهة (ثوانٍ من بداية الناتج)
@@ -486,6 +664,12 @@ pub struct TimelineRequest {
     /// كل قطعة مقطع وحده ولو لاصقت ما قبلها (تايم لاين المشاهد: قطع عند كل مشهد)
     #[serde(default)]
     pub keep_cuts: bool,
+    /// علامات بثواني المصدر (R3-F11): تُكتب في XML، وفي EDL علامات لـ Resolve
+    #[serde(default)]
+    pub markers: Vec<TimelineMarker>,
+    /// true = العلامات على الملف كله بلا قطع: XML وEDL العلامات وجدول CSV
+    #[serde(default)]
+    pub markers_only: bool,
 }
 
 /// الترجمة على التايم لاين: كل سطر يُنقل إلى مواضع القطع بعد تقريبها إلى الإطارات
@@ -534,29 +718,48 @@ pub fn safe_name(name: &str) -> String {
     }
 }
 
-/// أول اسم لا يوجد بأي من الامتدادات: «اسم»، «اسم (1)»، … فلا تختلط ملفات تصديرين
-pub fn free_base(dir: &Path, name: &str, exts: &[&str]) -> String {
+/// أول اسم لا يوجد بأي من النهايات («.xml»، « markers.edl»): «اسم»، «اسم (1)»، … فلا تختلط ملفات تصديرين
+pub fn free_base(dir: &Path, name: &str, tails: &[&str]) -> String {
     (0..1000)
         .map(|n| if n == 0 { name.to_string() } else { format!("{name} ({n})") })
-        .find(|b| exts.iter().all(|e| !dir.join(format!("{b}.{e}")).exists()))
+        .find(|b| tails.iter().all(|t| !dir.join(format!("{b}{t}")).exists()))
         .unwrap_or_else(|| format!("{name} {}", std::process::id()))
 }
 
-/// الملفات المكتوبة: XML، وEDL، وSRT إن وُجدت ترجمة
+/// الملفات المكتوبة، كل منها بآخر اسمه: XML، وEDL القطع، وEDL العلامات إن وُجدت علامات، وSRT إن
+/// وُجدت ترجمة. وللعلامات وحدها (`markers_only`): XML على الملف كله، وEDL العلامات، وCSV
 pub fn render(req: &TimelineRequest, m: &Media) -> Result<Vec<(&'static str, String)>, AppError> {
     let whole = [[0.0, m.rate.secs(m.frames)]];
-    let pieces: &[[f64; 2]] = if req.pieces.is_empty() { &whole } else { &req.pieces };
-    let clips = layout_with(pieces, m.rate, m.frames, !req.keep_cuts);
+    let pieces: &[[f64; 2]] = if req.pieces.is_empty() || req.markers_only {
+        &whole
+    } else {
+        &req.pieces
+    };
+    let clips = if req.keep_cuts {
+        layout_with(pieces, m.rate, m.frames, false)
+    } else {
+        layout(pieces, m.rate, m.frames)
+    };
     if clips.is_empty() {
         return Err(AppError::new("timelineEmpty"));
     }
-    let mut files = vec![
-        ("xml", xmeml(std::slice::from_ref(m), &clips, &req.name)),
-        ("edl", edl_cuts(m, &clips, &req.name)),
-    ];
+    let marks = place_marks(&req.markers, &clips, m.rate);
+    if req.markers_only && marks.is_empty() {
+        return Err(AppError::new("markersEmpty"));
+    }
+    let mut files = vec![(".xml", xmeml_marked(std::slice::from_ref(m), &clips, &req.name, &marks))];
+    if req.markers_only {
+        files.push((".edl", edl_markers(&marks, m.rate, &req.name)));
+        files.push((".csv", csv_markers(&marks, m.rate)));
+    } else {
+        files.push((".edl", edl_cuts(m, &clips, &req.name)));
+        if !marks.is_empty() {
+            files.push((" markers.edl", edl_markers(&marks, m.rate, &req.name)));
+        }
+    }
     let cues = timeline_cues(&req.cues, pieces, &clips, m.rate);
     if !cues.is_empty() {
-        files.push(("srt", crate::srt::write(&cues)));
+        files.push((".srt", crate::srt::write(&cues)));
     }
     Ok(files)
 }
@@ -596,11 +799,11 @@ pub async fn export_timeline(app: tauri::AppHandle, request: TimelineRequest) ->
     let files = render(&request, &media)?;
     let dir = output_dir(&app, &input)?;
     std::fs::create_dir_all(&dir).map_err(|e| AppError::with_detail("outputDirCreate", e.to_string()))?;
-    let exts: Vec<&str> = files.iter().map(|(e, _)| *e).collect();
-    let base = free_base(&dir, &safe_name(&request.name), &exts);
+    let tails: Vec<&str> = files.iter().map(|(t, _)| *t).collect();
+    let base = free_base(&dir, &safe_name(&request.name), &tails);
     let mut written = Vec::new();
-    for (ext, body) in files {
-        let path = dir.join(format!("{base}.{ext}"));
+    for (tail, body) in files {
+        let path = dir.join(format!("{base}{tail}"));
         crate::persist::write_atomic(&path, body.as_bytes())?;
         written.push(path.to_string_lossy().into_owned());
     }
@@ -863,9 +1066,11 @@ mod tests {
             }],
             name: "x".into(),
             keep_cuts: false,
+            markers: vec![],
+            markers_only: false,
         };
         let files = render(&req, &m).unwrap();
-        assert_eq!(files.iter().map(|f| f.0).collect::<Vec<_>>(), vec!["xml", "edl", "srt"]);
+        assert_eq!(files.iter().map(|f| f.0).collect::<Vec<_>>(), vec![".xml", ".edl", ".srt"]);
         assert!(files[2].1.contains("00:00:00,500 --> 00:00:01,500\nسطر"));
         // بلا قطع = الملف كله، وقطع كلها خارج الملف = خطأ واضح
         let whole = TimelineRequest {
@@ -888,10 +1093,130 @@ mod tests {
             cues: vec![],
             name: "x".into(),
             keep_cuts: true,
+            markers: vec![],
+            markers_only: false,
         };
         let edl = &render(&scenes, &m).unwrap()[1].1;
         assert_eq!(edl.matches("* FROM CLIP NAME").count(), 3);
         assert!(edl.contains("003  AX       V     C        00:00:05:00 00:10:00:00 01:00:05:00 01:10:00:00"));
+    }
+
+    fn marker(start: f64, end: f64, name: &str, color: &str) -> TimelineMarker {
+        TimelineMarker {
+            start,
+            end,
+            name: name.into(),
+            note: String::new(),
+            color: color.into(),
+        }
+    }
+
+    #[test]
+    fn markers_follow_the_cuts() {
+        let r = Rate::new(25.0, false);
+        // [1,2] و[5,7.5]: على التايم لاين 0..25 و25..88
+        let clips = layout(&[[1.0, 2.0], [5.0, 7.5]], r, 10_000);
+        let marks = place_marks(
+            &[
+                marker(6.0, 7.0, "داخل الثانية", "green"),
+                marker(3.0, 3.0, "نقطة في المحذوف", "Red"),
+                marker(0.0, 1.5, "يبدأ قبل الأول", "Yellow"),
+                marker(2.5, 4.5, "كله محذوف", "Red"),
+                marker(9.0, 9.0, "بعد الآخر", "Red"),
+                marker(-5.0, -1.0, "قبل الملف", "Red"),
+                marker(1.2, 6.0, "عبر  القطع\n", ""),
+            ],
+            &clips,
+            r,
+        );
+        let got: Vec<(&str, u64, u64)> = marks.iter().map(|m| (m.name.as_str(), m.at, m.len)).collect();
+        assert_eq!(
+            got,
+            vec![
+                ("يبدأ قبل الأول", 0, 13),
+                ("عبر القطع", 5, 45),
+                ("نقطة في المحذوف", 25, 0),
+                ("داخل الثانية", 50, 25)
+            ]
+        );
+        assert_eq!(resolve_color("green"), "Green");
+        assert_eq!(resolve_color("nope"), "Blue");
+        assert!(place_marks(&[marker(1.0, 2.0, "x", "")], &[], r).is_empty());
+    }
+
+    #[test]
+    fn marker_files_for_premiere_and_resolve() {
+        let m = media(25.0, true);
+        let req = TimelineRequest {
+            input: "x".into(),
+            pieces: vec![],
+            cues: vec![],
+            name: "درس markers".into(),
+            keep_cuts: false,
+            markers: vec![
+                TimelineMarker {
+                    start: 10.0,
+                    end: 40.0,
+                    name: "الصبر | والشكر".into(),
+                    note: "يصلح ريلًا · 0:30".into(),
+                    color: "Green".into(),
+                },
+                TimelineMarker {
+                    start: 60.0,
+                    end: 60.0,
+                    name: "Silence, 2".into(),
+                    note: "say \"hi\"".into(),
+                    color: "nope".into(),
+                },
+            ],
+            markers_only: true,
+        };
+        let files = render(&req, &m).unwrap();
+        assert_eq!(files.iter().map(|f| f.0).collect::<Vec<_>>(), vec![".xml", ".edl", ".csv"]);
+        // XML: الملف كله مقطع واحد، والعلامتان على التسلسل
+        let xml = &files[0].1;
+        assert_eq!(xml.matches("<clipitem").count(), 2);
+        assert!(xml.contains("<marker><name>الصبر | والشكر</name><comment>يصلح ريلًا · 0:30</comment><in>250</in><out>1000</out></marker>"));
+        assert!(xml.contains("<comment>say &quot;hi&quot;</comment><in>1500</in><out>-1</out></marker>"));
+        // EDL العلامات لـ Resolve
+        let edl = &files[1].1;
+        assert!(edl.starts_with("TITLE: درس markers\nFCM: NON-DROP FRAME\n\n"));
+        assert!(edl.contains(
+            "001  001      V     C        01:00:10:00 01:00:10:01 01:00:10:00 01:00:10:01  \n |C:ResolveColorGreen |M:الصبر / والشكر |D:750\n"
+        ));
+        assert!(edl.contains(
+            "002  001      V     C        01:01:00:00 01:01:00:01 01:01:00:00 01:01:00:01  \n |C:ResolveColorBlue |M:Silence, 2 |D:1\n"
+        ));
+        // CSV
+        let csv = &files[2].1;
+        assert!(csv.starts_with("\u{feff}#,Name,Timeline in,"));
+        assert!(
+            csv.contains("\r\n1,الصبر | والشكر,01:00:10:00,01:00:40:00,00:00:30.000,00:00:10.000,00:00:40.000,Green,يصلح ريلًا · 0:30\r\n")
+        );
+        assert!(
+            csv.contains("\r\n2,\"Silence, 2\",01:01:00:00,01:01:00:00,00:00:00.000,00:01:00.000,00:01:00.000,Blue,\"say \"\"hi\"\"\"\r\n")
+        );
+        // تايم لاين بقطع: العلامات في XML وفي EDL علامات بجانب EDL القطع، بلا CSV
+        let cut = TimelineRequest {
+            pieces: vec![[5.0, 20.0], [50.0, 70.0]],
+            markers_only: false,
+            ..req.clone()
+        };
+        let files = render(&cut, &m).unwrap();
+        assert_eq!(files.iter().map(|f| f.0).collect::<Vec<_>>(), vec![".xml", ".edl", " markers.edl"]);
+        assert!(
+            files[0]
+                .1
+                .contains("<comment>يصلح ريلًا · 0:30</comment><in>125</in><out>375</out></marker>")
+        );
+        assert!(files[0].1.contains("<in>625</in><out>-1</out></marker>"));
+        assert!(files[1].1.contains("* FROM CLIP NAME"));
+        // علامات كلها خارج الملف: خطأ واضح
+        let none = TimelineRequest {
+            markers: vec![marker(700.0, 800.0, "x", "")],
+            ..req
+        };
+        assert_eq!(render(&none, &m).unwrap_err().code, "markersEmpty");
     }
 
     #[test]
@@ -903,8 +1228,10 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("khama-tl-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("x.edl"), "").unwrap();
-        assert_eq!(free_base(&dir, "x", &["xml", "edl"]), "x (1)");
-        assert_eq!(free_base(&dir, "y", &["xml", "edl"]), "y");
+        assert_eq!(free_base(&dir, "x", &[".xml", ".edl"]), "x (1)");
+        assert_eq!(free_base(&dir, "y", &[".xml", ".edl"]), "y");
+        std::fs::write(dir.join("z markers.edl"), "").unwrap();
+        assert_eq!(free_base(&dir, "z", &[".xml", " markers.edl"]), "z (1)");
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -961,14 +1288,41 @@ mod tests {
             cues: vec![],
             name: name.clone(),
             keep_cuts: false,
+            markers: vec![],
+            markers_only: false,
         };
         let t1 = std::time::Instant::now();
         let files = render(&req, &m).unwrap();
         let render_us = t1.elapsed().as_micros();
         let mut sizes = Vec::new();
         for (ext, body) in &files {
-            std::fs::write(out.join(format!("{name}.{ext}")), body).unwrap();
+            std::fs::write(out.join(format!("{name}{ext}")), body).unwrap();
             sizes.push(format!("{ext} {} B", body.len()));
+        }
+        // العلامات (R3-F11): كل صمت علامة حمراء على الملف كله
+        let marks_req = TimelineRequest {
+            input: input.to_string_lossy().into_owned(),
+            pieces: vec![],
+            cues: vec![],
+            name: format!("{} silence markers", input.file_stem().unwrap().to_string_lossy()),
+            keep_cuts: false,
+            markers: silences
+                .iter()
+                .enumerate()
+                .map(|(i, [s, e])| TimelineMarker {
+                    start: *s,
+                    end: *e,
+                    name: format!("Silence {}", i + 1),
+                    note: format!("{:.1} s", e - s),
+                    color: "Red".into(),
+                })
+                .collect(),
+            markers_only: true,
+        };
+        let mut marker_sizes = Vec::new();
+        for (tail, body) in render(&marks_req, &m).unwrap() {
+            std::fs::write(out.join(format!("{}{tail}", marks_req.name)), &body).unwrap();
+            marker_sizes.push(format!("{tail} {} B", body.len()));
         }
         let clips = layout(&pieces, m.rate, m.frames);
         let kept: f64 = pieces.iter().map(|[a, b]| b - a).sum();
@@ -977,7 +1331,7 @@ mod tests {
             "duration_s": dur, "fps": m.rate.fps, "video": m.video, "audio": m.audio,
             "threshold_db": threshold, "silences": silences.len(), "detect_ms": detect_ms,
             "clips": clips.len(), "kept_s": kept, "timeline_s": m.rate.secs(total(&clips)),
-            "saved_s": dur - kept, "render_us": render_us, "files": sizes,
+            "saved_s": dur - kept, "render_us": render_us, "files": sizes, "silence_marker_files": marker_sizes,
         });
         // المشاهد (فيديو فقط): قطع عند كل تغيّر، كما يفعل scenePieces في الواجهة
         if m.video.is_some() {
@@ -1009,10 +1363,34 @@ mod tests {
                 cues: vec![],
                 name: name.clone(),
                 keep_cuts: true,
+                markers: vec![],
+                markers_only: false,
             };
             let files = render(&req, &m).unwrap();
             for (ext, body) in &files {
-                std::fs::write(out.join(format!("{name}.{ext}")), body).unwrap();
+                std::fs::write(out.join(format!("{name}{ext}")), body).unwrap();
+            }
+            let scene_marks = TimelineRequest {
+                name: format!("{} scene markers", input.file_stem().unwrap().to_string_lossy()),
+                pieces: vec![],
+                keep_cuts: false,
+                markers: found
+                    .iter()
+                    .enumerate()
+                    .map(|(i, [s, e])| TimelineMarker {
+                        start: *s,
+                        end: *e,
+                        name: format!("Scene {}", i + 2),
+                        note: String::new(),
+                        color: "Cyan".into(),
+                    })
+                    .collect(),
+                markers_only: true,
+                ..req
+            };
+            // بلا تغيّر مشهد لا علامات: الخطأ markersEmpty كما في التطبيق
+            for (tail, body) in render(&scene_marks, &m).unwrap_or_default() {
+                std::fs::write(out.join(format!("{}{tail}", scene_marks.name)), &body).unwrap();
             }
             let clips = layout_with(&pieces, m.rate, m.frames, false);
             stats["scenes"] = serde_json::json!({

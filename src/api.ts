@@ -12,8 +12,8 @@ export type Theme = "dark" | "light" | "system";
 export type Language = "en" | "ar";
 export type { LayoutDir } from "./layoutDir";
 import type { LayoutDir } from "./layoutDir";
-import type { TimelineRequest } from "./bindings";
-export type { TimelineRequest };
+import type { TimelineMarker, TimelineRequest } from "./bindings";
+export type { TimelineMarker, TimelineRequest };
 export type CookiesMode = "none" | "browser" | "file";
 
 export interface Settings {

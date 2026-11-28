@@ -1,6 +1,6 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, asAppError, type SilenceLevels, type TimelineRequest } from "../api";
+import { api, asAppError, type SilenceLevels, type TimelineMarker, type TimelineRequest } from "../api";
 import { formatDuration, formatTimecode } from "../format";
 import { errorText, useI18n } from "../i18n";
 import { isMobile } from "../platform";
@@ -20,7 +20,21 @@ const timelineRequest = (input: string, pieces: Range[], name: string, keepCuts 
   cues: [],
   name,
   keepCuts,
+  markers: [],
+  markersOnly: false,
 });
+
+/** علامات وحدها على الملف كله (R3-F11): XML لـ Premiere، وEDL علامات لـ Resolve، وجدول CSV */
+const markersRequest = (input: string, markers: TimelineMarker[], name: string): TimelineRequest => ({
+  ...timelineRequest(input, [], name),
+  markers,
+  markersOnly: true,
+});
+
+/** الفترات علاماتٍ مرقّمة بلون واحد، ومدة كل منها في تعليقها */
+export function rangeMarkers(ranges: Range[], name: (n: number) => string, color: string): TimelineMarker[] {
+  return ranges.map(([s, e], i) => ({ start: s, end: e, name: name(i + 1), note: e > s ? formatDuration(e - s) : "", color }));
+}
 
 export interface EditorAction {
   label: string;
@@ -70,16 +84,32 @@ export function EditorExport({ actions }: { actions: EditorAction[] }) {
   );
 }
 
-/** نتيجة كشف المشاهد: تايم لاين على الأصل مقطوع عند كل تغيّر مشهد، فيصير كل مشهد قطعة (R3-F10) */
+/**
+ * نتيجة كشف المشاهد: تايم لاين على الأصل مقطوع عند كل تغيّر مشهد، فيصير كل مشهد قطعة (R3-F10)،
+ * أو علامة عند كل تغيّر (R3-F11؛ الانتقال التدريجي علامة بمداه)
+ */
 export function SceneExport(props: { path: string; changes: Range[]; range: Range }) {
   const { t } = useI18n();
+  const stem = fileStem(props.path);
   const actions: EditorAction[] = isLocal(props.path)
     ? [
         {
           label: t.timelineExport,
           hint: t.sceneTimelineHint,
           icon: "timeline",
-          request: () => timelineRequest(props.path, scenePieces(props.changes, ...props.range), `${fileStem(props.path)} scenes`, true),
+          request: () => timelineRequest(props.path, scenePieces(props.changes, ...props.range), `${stem} scenes`, true),
+        },
+        {
+          label: t.markersExport,
+          hint: t.sceneMarkersHint,
+          icon: "list",
+          // المشهد الأول يبدأ من أول الملف: أول تغيّر بداية المشهد الثاني
+          request: () =>
+            markersRequest(
+              props.path,
+              rangeMarkers(props.changes, (n) => t.markerScene(n + 1), "Cyan"),
+              `${stem} scene markers`,
+            ),
         },
       ]
     : [];
@@ -193,17 +223,27 @@ export function SilenceView(props: {
 
   // ===== تايم لاين للمونتاج (R3-F10): ما يبقى بعد الحذف قطعًا على الأصل، بلا تحويل =====
   const path = props.path && isLocal(props.path) ? props.path : null;
-  const actions: EditorAction[] =
-    path && props.cuts.length > 0
-      ? [
-          {
-            label: t.timelineExport,
-            hint: t.timelineExportHint,
-            icon: "timeline",
-            request: () => timelineRequest(path, keptPieces(lo, hi, props.cuts), `${fileStem(path)} timeline`),
-          },
-        ]
-      : [];
+  const actions: EditorAction[] = [];
+  if (path && props.cuts.length > 0)
+    actions.push({
+      label: t.timelineExport,
+      hint: t.timelineExportHint,
+      icon: "timeline",
+      request: () => timelineRequest(path, keptPieces(lo, hi, props.cuts), `${fileStem(path)} timeline`),
+    });
+  // العلامات (R3-F11): كل صمت (أو سواد) علامة بمداه على الملف كله، بلا قطع
+  if (path && props.found.length > 0)
+    actions.push({
+      label: t.markersExport,
+      hint: t.silenceMarkersHint,
+      icon: "list",
+      request: () =>
+        markersRequest(
+          path,
+          rangeMarkers(props.found, props.black ? t.markerBlack : t.markerSilence, props.black ? "Purple" : "Red"),
+          `${fileStem(path)} ${props.black ? "black" : "silence"} markers`,
+        ),
+    });
 
   return (
     <div className="silence-view">

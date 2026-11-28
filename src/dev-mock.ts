@@ -350,9 +350,10 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return false;
     // تايم لاين للمونتاج (R3-F10): الملفات التي كان Rust سيكتبها بجانب الإعدادات
     case "export_timeline": {
-      const req = (args.request ?? {}) as { name?: string; cues?: unknown[] };
+      const req = (args.request ?? {}) as { name?: string; cues?: unknown[]; markers?: unknown[]; markersOnly?: boolean };
       const base = `C:\\Users\\me\\Downloads\\Khama\\${req.name ?? "timeline"}`;
-      return ["xml", "edl", ...(req.cues?.length ? ["srt"] : [])].map((e) => `${base}.${e}`);
+      const marks = req.markersOnly ? [".csv"] : req.markers?.length ? [" markers.edl"] : [];
+      return [".xml", ".edl", ...marks, ...(req.cues?.length ? [".srt"] : [])].map((e) => `${base}${e}`);
     }
     case "counter_next":
       return 4;

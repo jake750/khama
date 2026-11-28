@@ -1,9 +1,10 @@
 import { useState } from "react";
-import type { Cue, SilenceLevels } from "../api";
+import type { Cue, SilenceLevels, TimelineMarker } from "../api";
 import { formatDuration, formatTimecode } from "../format";
 import { useI18n } from "../i18n";
 import type { Range, TopicPlan } from "../reels";
 import { isMobile } from "../platform";
+import { topicMarkers } from "../topics";
 import { Icon } from "./Icon";
 import type { TopicRow } from "./JobCard";
 import { Pick } from "./Pick";
@@ -17,8 +18,13 @@ export interface ExportOptions {
   subs: boolean;
   maxWords: number | null;
   maxSecs: number | null;
-  /** "timeline" = XML وEDL (وSRT) تشير إلى الأصل بلا تحويل (R3-F10). فارغ = ملفات فيديو */
-  as?: "video" | "timeline";
+  /**
+   * "timeline" = XML وEDL (وSRT) تشير إلى الأصل بلا تحويل (R3-F10)، و"markers" = المواضيع علاماتٍ
+   * على الملف كله (R3-F11). فارغ = ملفات فيديو
+   */
+  as?: "video" | "timeline" | "markers";
+  /** علامات المواضيع بثواني المصدر: تُكتب على التايم لاين وفي ملفات العلامات */
+  marks?: TimelineMarker[];
 }
 
 /** المقاطع المختارة بالترتيب: موضوع كامل أو أجزاء منه (لا يجتمعان في موضوع واحد) */
@@ -79,6 +85,9 @@ export function TopicPanel(props: {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [o, setO] = useState<ExportOptions>({ join: false, tight: true, subs: true, maxWords: 7, maxSecs: 3.5 });
   const sections = selectedSections(props.rows, props.plans, picked);
+  const marks = () => topicMarkers(props.rows, props.plans, { topic: t.markerTopic, part: t.topicPart, kind: t.topicKind });
+  /** المواضيع كلها بالترتيب: مدى ما يُنزَّل لتحليل رابط */
+  const allTopics = () => props.rows.map((r) => [r.start, r.end] as Range).sort((a, b) => a[0] - b[0]);
 
   const toggle = (key: string) =>
     setPicked((prev) => {
@@ -235,7 +244,7 @@ export function TopicPanel(props: {
               <button
                 className="btn btn-sm mt-2"
                 title={t.timelineExportHint}
-                onClick={() => props.onExport!(sections, { ...o, join: true, as: "timeline" })}
+                onClick={() => props.onExport!(sections, { ...o, join: true, as: "timeline", marks: marks() })}
               >
                 <Icon name="timeline" size={14} /> {t.timelineExport}
               </button>
@@ -244,11 +253,23 @@ export function TopicPanel(props: {
         </div>
       )}
 
-      {props.onCopyTopics && (
-        <button className="btn btn-sm mt-2" onClick={props.onCopyTopics}>
-          <Icon name="copy" size={16} /> {t.copyTopics}
-        </button>
-      )}
+      <div className="topic-export-actions">
+        {props.onCopyTopics && (
+          <button className="btn btn-sm mt-2" onClick={props.onCopyTopics}>
+            <Icon name="copy" size={16} /> {t.copyTopics}
+          </button>
+        )}
+        {/* علامات للمونتاج (R3-F11): كل موضوع باسمه ولون صلاحيته ريلًا، على الملف كله */}
+        {props.onExport && !isMobile && props.rows.length > 0 && (
+          <button
+            className="btn btn-sm mt-2"
+            title={t.topicMarkersHint}
+            onClick={() => props.onExport!(allTopics(), { ...o, join: true, as: "markers", marks: marks() })}
+          >
+            <Icon name="list" size={16} /> {t.markersExport}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
-import type { Topic } from "./api";
+import type { TimelineMarker, Topic } from "./api";
 import type { TopicRow } from "./components/JobCard";
 import { formatDuration, formatTimecode } from "./format";
-import { silenceCuts } from "./reels";
+import { silenceCuts, type TopicKind, type TopicPlan } from "./reels";
 
 export { silenceCuts };
 
@@ -33,4 +33,29 @@ export function topicsText(rows: TopicRow[], reelLabel: string): string {
       ].join("\t"),
     )
     .join("\n");
+}
+
+/** ألوان العلامات (أسماء ألوان Resolve): الأخضر يصلح ريلًا، والأصفر بعد تقسيمه، والأحمر لا يصلح */
+export const MARKER_COLORS: Record<TopicKind, string> = { reel: "Green", split: "Yellow", no: "Red" };
+
+/**
+ * المواضيع علاماتٍ لبرنامج المونتاج (R3-F11): علامة بمدى كل موضوع، باسمه ولون نوعه، وفي تعليقها
+ * نوعه ومدته بعد حذف الصمت وأول كلامه. وأجزاء «يصلح بعد تقسيمه» علامات خضراء بأسمائها
+ */
+export function topicMarkers(
+  rows: TopicRow[],
+  plans: TopicPlan[],
+  names: { topic: (n: number) => string; part: (n: number) => string; kind: Record<TopicKind, string> },
+): TimelineMarker[] {
+  const out: TimelineMarker[] = [];
+  rows.forEach((r, i) => {
+    const plan = plans[i] ?? { kind: r.reel ? "reel" : "no", parts: [] };
+    const name = r.title.trim() || names.topic(i + 1);
+    const note = [names.kind[plan.kind], formatDuration(r.after), r.text.trim()].filter(Boolean).join(" · ");
+    out.push({ start: r.start, end: r.end, name, note, color: MARKER_COLORS[plan.kind] });
+    plan.parts.forEach(([s, e], k) =>
+      out.push({ start: s, end: e, name: `${name} · ${names.part(k + 1)}`, note: names.kind.reel, color: MARKER_COLORS.reel }),
+    );
+  });
+  return out;
 }

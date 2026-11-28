@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { silenceCuts, topicRows, topicsText } from "./topics";
+import { silenceCuts, topicMarkers, topicRows, topicsText } from "./topics";
 
 const topics = [
   { start: 0, end: 40, title: "a · b", text: "first" },
@@ -36,5 +36,33 @@ describe("تحليل المواضيع", () => {
     expect(lines).toHaveLength(2);
     expect(lines[0].split("\t")).toEqual(["0:00", "0:40", "0:40", "0:40", "Reel", "a · b", "first"]);
     expect(lines[1].split("\t")[4]).toBe("");
+  });
+
+  it("يجعل المواضيع علامات بأسمائها وألوان صلاحيتها (R3-F11)", () => {
+    const rows = topicRows([...topics, { start: 200, end: 210, title: " ", text: "" }], [], 0, [15, 90]);
+    const marks = topicMarkers(
+      rows,
+      [
+        { kind: "reel", parts: [] },
+        {
+          kind: "split",
+          parts: [
+            [40, 100],
+            [100, 160],
+          ],
+        },
+      ],
+      { topic: (n) => `Topic ${n}`, part: (n) => `Part ${n}`, kind: { reel: "Reel", split: "Split", no: "No" } },
+    );
+    expect(marks.map((m) => [m.name, m.start, m.end, m.color])).toEqual([
+      ["a · b", 0, 40, "Green"],
+      ["c", 40, 200, "Yellow"],
+      ["c · Part 1", 40, 100, "Green"],
+      ["c · Part 2", 100, 160, "Green"],
+      // بلا عنوان ولا خطة: برقمه، ولا يصلح (أقصر من الريل)
+      ["Topic 3", 200, 210, "Red"],
+    ]);
+    expect(marks[0].note).toBe("Reel · 0:40 · first");
+    expect(marks[4].note).toBe("No · 0:10");
   });
 });
