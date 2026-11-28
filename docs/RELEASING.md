@@ -18,6 +18,8 @@ Khama uses `MAJOR.MINOR.PATCH`:
 
 ## How · الطريقة
 
+Before releasing something users will notice, add its lines to `src/changelog.ts` under the next version, in both languages, in the user's words. After the update, "What's new" opens them in the app in the interface language (R3-U36); a version with no lines falls back to its GitHub release page.
+
 ```bash
 npm run release
 ```

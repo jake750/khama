@@ -399,6 +399,9 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       listeners.set(ev, [...(listeners.get(ev) ?? []), Number(args.handler)]);
       return Number(args.handler);
     }
+    // بلا نسخة لا يظهر «ما الجديد» في المعاينة؛ لتجربته: localStorage["khama.mockVersion"] = "0.3.47"
+    case "plugin:app|version":
+      return localStorage.getItem("khama.mockVersion");
     default:
       return null;
   }

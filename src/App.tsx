@@ -34,6 +34,7 @@ import { logError } from "./log";
 import { nextTheme } from "./theme";
 import { limiter } from "./limit";
 import { announceUpdate } from "./whatsNew";
+import { WhatsNewDialog } from "./components/WhatsNewDialog";
 import { REEL_MAX, REEL_MIN, silenceCuts, topicRows, topicsText } from "./topics";
 import { exportCues, fileStem, keptLength, keptSource, planTopic, savedSummary, toSrt, type Range } from "./reels";
 import type { ExportOptions } from "./components/TopicPanel";
@@ -489,10 +490,11 @@ export default function App() {
 
   // «ما الجديد» بعد التحديث، بلغة المستخدم: ننتظر الإعدادات (U-59)
   const announced = useRef(false);
+  const [whatsNew, setWhatsNew] = useState<{ from: string; to: string } | null>(null);
   useEffect(() => {
     if (!settings || announced.current) return;
     announced.current = true;
-    void announceUpdate(t, toast);
+    void announceUpdate(t, toast, (from, to) => setWhatsNew({ from, to }));
   }, [settings, t, toast]);
   // أحدث القيم للمستمعين والمؤقّتات، تُحدَّث بعد الرسم لا أثناءه
   useLayoutEffect(() => {
@@ -1671,6 +1673,7 @@ ${navigator.userAgent}`).catch(() => {})
         )}
 
         {/* تحديثات خامة: الكمبيوتر يثبّتها بنفسه، والهاتف يفتح رابط ملف APK الجديد */}
+        {whatsNew && <WhatsNewDialog from={whatsNew.from} to={whatsNew.to} onClose={() => setWhatsNew(null)} />}
         <UpdateDialog enabled={settings.checkUpdates} busy={running.length > 0} request={updateRequest} onAvailable={setUpdateVersion} />
 
         <Presence show={!settings.acceptedNotice}>
