@@ -119,3 +119,5 @@
 [58] S. K. Card, T. P. Moran, and A. Newell, "The keystroke-level model for user performance time with interactive systems," *Communications of the ACM*, vol. 23, no. 7, pp. 396–410, 1980.
 
 [59] D. S. Kerby, "The simple difference formula: An approach to teaching nonparametric correlation," *Comprehensive Psychology*, vol. 3, art. 11.IT.3.1, 2014.
+
+[60] ITU-R, "Method for the subjective assessment of intermediate quality level of audio systems," Recommendation ITU-R BS.1534-3, International Telecommunication Union, Geneva, Switzerland, Oct. 2015.
