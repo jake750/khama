@@ -94,6 +94,7 @@ Failed job cards show the same fix button (cookies, update yt-dlp) as the main e
 | `cookiesExpired` | All the cookies in this file have expired. Sign in to the site again in your browser, then export fresh cookies. | — |
 | `clipboard` | Couldn't access the clipboard. Paste with Ctrl+V inside the field. | — |
 | `noMediaInFolder` | No video or audio files in this folder (or its subfolders). | — |
+| `interrupted` | Stopped when Khama was closed. Try again to finish it (a download carries on from where it stopped). | — |
 | `noThumbnail` | This link has no thumbnail. | — |
 | `stillsFailed` | The download worked, but grabbing stills from it failed. | — |
 | `window` | Couldn't resize the window. | — |

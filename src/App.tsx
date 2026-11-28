@@ -39,6 +39,17 @@ const GuideView = lazy(() => import("./components/GuideView").then((m) => ({ def
 
 type Tab = "download" | "convert" | "history" | "settings" | "guide";
 
+/** R3-U40: ما لم يكتمل عند الإغلاق (بطاقات وملفات المحوّل) */
+const UNFINISHED_KEY = "khama-unfinished";
+function readUnfinished(): { jobs: Job[]; files: string[] } {
+  try {
+    const v = JSON.parse(localStorage.getItem(UNFINISHED_KEY) || "null");
+    return { jobs: Array.isArray(v?.jobs) ? v.jobs : [], files: Array.isArray(v?.files) ? v.files : [] };
+  } catch {
+    return { jobs: [], files: [] };
+  }
+}
+
 /** R3-V3: الثيم واللغة والاتجاه المطبَّقة الآن، لبداية التشغيل القادم قبل React (public/boot.js) */
 function saveBoot() {
   const r = document.documentElement;
@@ -573,18 +584,6 @@ export default function App() {
     api.cancelDownload(j.id).catch(logError("cancelDownload"));
   }, []);
 
-  // العمليات التي ما زالت تعمل في Rust بعد إعادة تحميل الواجهة (T-17)
-  useEffect(() => {
-    api
-      .listJobs()
-      .then((live) => {
-        const cards = (live ?? []).filter((j) => typeof j.type === "string") as unknown as Job[];
-        if (!cards.length) return;
-        setJobs((prev) => [...cards.filter((c) => !prev.some((j) => j.id === c.id)), ...prev]);
-      })
-      .catch(logError("listJobs"));
-  }, []);
-
   // استرجاع المجدولة المحفوظة عند الفتح (ما فات وقته يبدأ فورًا عبر الفاحص)
   useEffect(() => {
     let alive = true;
@@ -669,10 +668,10 @@ export default function App() {
   );
 
   /** يضيف ملفات للمحوّل ويقرأ معلوماتها */
-  const addFiles = useCallback((paths: string[]) => {
+  const addFiles = useCallback((paths: string[], stay?: boolean) => {
     const media = paths.filter(isMedia);
     if (!media.length) return;
-    setTab("convert");
+    if (!stay) setTab("convert");
     // التحليل خارج دالة التحديث (FE16: React قد يستدعيها مرتين)، ونتيجته تُحفظ أيضًا
     // فـ«تراجع» بعد «مسح» يعيد الملفات محلَّلة لا عالقة على «جارٍ التحليل» (FE4)
     const fresh = media.filter((p) => !filesRef.current.some((f) => f.path === p));
@@ -687,6 +686,57 @@ export default function App() {
     }
     setFiles((prev) => [...prev, ...fresh.filter((p) => !prev.some((f) => f.path === p)).map((path) => ({ path }))]);
   }, []);
+
+  // العمليات التي ما زالت تعمل في Rust بعد إعادة تحميل الواجهة (T-17)
+  // R3-U40: وما لم يكتمل قبل إغلاق خامة (فاشل أو انقطع) وقائمة ملفات المحوّل تعود بعد إعادة التشغيل.
+  // المنقطع يعود بطاقة «توقّف حين أُغلقت خامة» بزر «أعد» (yt-dlp يكمل من الجزء المنزَّل)
+  const [unfinishedLoaded, setUnfinishedLoaded] = useState(false);
+  const restored = useRef(false);
+  useEffect(() => {
+    // مرة واحدة فقط: وضع StrictMode يشغّل الأثر مرتين، فتتكرر البطاقة المسترجعة
+    if (restored.current) return;
+    restored.current = true;
+    api
+      .listJobs()
+      .catch((e) => {
+        logError("listJobs")(e);
+        return [];
+      })
+      .then((live) => {
+        const cards = (live ?? []).filter((j) => typeof j.type === "string") as unknown as Job[];
+        const saved = readUnfinished();
+        const back = saved.jobs
+          .filter((j) => !cards.some((c) => c.id === j.id))
+          .map((j) => ({ ...j, id: nextLocalId.current--, state: "error", error: j.error ?? { code: "interrupted" } }) as Job);
+        if (cards.length || back.length) setJobs((prev) => [...cards.filter((c) => !prev.some((j) => j.id === c.id)), ...prev, ...back]);
+        if (saved.files.length) addFiles(saved.files, true);
+      })
+      .finally(() => setUnfinishedLoaded(true));
+  }, [addFiles]);
+  const unfinishedJson = JSON.stringify({
+    jobs: jobs
+      .filter((j) => (j.state === "error" || isActive(j)) && (j.request || j.convert))
+      .map((j) => ({
+        id: j.id,
+        type: j.type,
+        title: j.title,
+        meta: j.meta,
+        request: j.request,
+        convert: j.convert,
+        thumbnail: j.thumbnail,
+        inDownloads: j.inDownloads,
+        error: j.state === "error" ? j.error : undefined,
+      })),
+    files: files.map((f) => f.path),
+  });
+  useEffect(() => {
+    if (!unfinishedLoaded) return;
+    try {
+      localStorage.setItem(UNFINISHED_KEY, unfinishedJson);
+    } catch {
+      /* التخزين معطّل: لا استرجاع بعد إعادة التشغيل */
+    }
+  }, [unfinishedLoaded, unfinishedJson]);
 
   /** سحب ملف مكتمل إلى Premiere/DaVinci/CapCut أو إلى أي مجلد */
   const dragOut = useCallback(async (file: string | string[], thumbnail?: string | null) => {
