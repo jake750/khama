@@ -659,3 +659,98 @@ fn concurrent_fragments_only_without_rate_limit() {
     let a = download_args(&tools, vec![], &r, &o, None, Path::new("out"), Path::new("work"));
     assert!(!a.iter().any(|x| x == "--concurrent-fragments"));
 }
+
+fn media_check(codec: &str, video_ok: bool, audio_ok: bool) -> MediaCheck {
+    MediaCheck {
+        duration: Some(60.0),
+        video_ok,
+        audio_ok,
+        video: Some(crate::convert::VideoInfo {
+            codec: codec.into(),
+            profile: None,
+            width: 3840,
+            height: 2160,
+            fps: Some(30.0),
+            vfr: false,
+            pix_fmt: "yuv420p".into(),
+            bit_depth: 8,
+            hdr: false,
+            interlaced: false,
+        }),
+    }
+}
+
+/// «جاهز للمونتاج» بمشفّر كرت الشاشة نفسه الذي يستعمله المحوّل، والمعالج بلا كرت (R3-F7)
+#[test]
+fn editready_uses_the_gpu_encoder_like_the_converter() {
+    let (i, o) = (Path::new("in.webm"), Path::new("out/in.webm"));
+    let j = |a: Vec<String>| a.join(" ");
+    let cpu = j(editready_args(i, o, &media_check("av1", false, false), None));
+    assert!(
+        cpu.contains("-c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p -fps_mode cfr"),
+        "{cpu}"
+    );
+    assert!(cpu.contains("-c:a aac -b:a 320k"));
+    let qsv = j(editready_args(i, o, &media_check("av1", false, true), Some("h264_qsv")));
+    assert!(
+        qsv.contains("-c:v h264_qsv -preset medium -global_quality 20 -pix_fmt nv12"),
+        "{qsv}"
+    );
+    assert!(qsv.contains("-fps_mode cfr") && qsv.contains("-c:a copy"));
+    assert!(!qsv.contains("-hwaccel"), "فك الترميز بالعتاد لم يُسرّع شيئًا حين قيس");
+    assert!(
+        !qsv.contains("320k") && !qsv.contains("write_colr"),
+        "وسائط الصوت والحاوية من المحوّل لا تُنقل"
+    );
+    let nv = j(editready_args(i, o, &media_check("vp9", false, true), Some("h264_nvenc")));
+    assert!(nv.contains("-c:v h264_nvenc -preset p5 -rc vbr -cq 19"), "{nv}");
+    // الفيديو صالح: نسخ بلا مشفّر، حتى مع كرت الشاشة
+    let copy = j(editready_args(i, o, &media_check("h264", true, false), Some("h264_nvenc")));
+    assert!(copy.contains("-c:v copy") && !copy.contains("nvenc"));
+}
+
+/// الأمر نفسه على FFmpeg الحقيقي: مشفّر غير موجود يفشل، والمعالج بعده ينجح (الرجوع في convert_for_editing).
+/// KHAMA_FFMPEG=<مجلد bin> cargo test -- --ignored editready_real
+#[test]
+#[ignore]
+fn editready_real_ffmpeg_falls_back_to_cpu() {
+    let bin = PathBuf::from(std::env::var("KHAMA_FFMPEG").expect("KHAMA_FFMPEG"));
+    let ffmpeg = bin.join(format!("ffmpeg{}", tools::EXE));
+    let dir = std::env::temp_dir().join(format!("khama-editready-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("src.webm");
+    let made = std::process::Command::new(&ffmpeg)
+        .args([
+            "-v",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=s=640x360:r=30:d=2",
+            "-c:v",
+            "libvpx-vp9",
+        ])
+        .arg(&src)
+        .status()
+        .unwrap();
+    assert!(made.success());
+    let out = dir.join("out.mp4");
+    let check = media_check("vp9", false, true);
+    let run = |hw: Option<&str>| {
+        std::process::Command::new(&ffmpeg)
+            .args(editready_args(&src, &out, &check, hw))
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap()
+            .success()
+    };
+    // على جهاز بلا NVENC (هذا الجهاز: MX350) يفشل h264_nvenc، فيرجع الكود إلى المعالج
+    let nvenc = run(Some("h264_nvenc"));
+    assert!(run(Some("h264_qsv")) || run(None), "كرت آخر أو المعالج بعد فشل الأول");
+    println!("nvenc worked: {nvenc}");
+    assert!(out.exists());
+    let _ = std::fs::remove_dir_all(&dir);
+}

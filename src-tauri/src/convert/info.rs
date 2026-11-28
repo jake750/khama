@@ -292,7 +292,7 @@ pub(super) async fn detect_hw(tools: &Tools) -> Vec<String> {
 }
 
 /// عدد إطارات الفيديو المرمّزة في ملف (0 = لا فيديو)
-pub(super) async fn video_packets(tools: &Tools, file: &Path) -> u64 {
+pub(crate) async fn video_packets(tools: &Tools, file: &Path) -> u64 {
     let f = file.to_string_lossy();
     let args = [
         "-v",
@@ -348,7 +348,7 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-pub(super) async fn hw_list(app: &AppHandle, tools: &Tools) -> Vec<String> {
+pub(crate) async fn hw_list(app: &AppHandle, tools: &Tools) -> Vec<String> {
     HW.get_or_init(|| async {
         let file = app.path().app_cache_dir().ok().map(|d| d.join("hw-encoders.json"));
         let key = hw_cache_key(&tools.ffmpeg);

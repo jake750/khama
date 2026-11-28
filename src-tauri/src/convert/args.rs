@@ -358,6 +358,19 @@ pub(super) fn codec_args(p: &Preset, o: &ConvertOptions, hw: &[String], src: Opt
     a
 }
 
+/// مشفّر الفيديو لـ«جاهز للمونتاج» بعد التنزيل (R3-F7): نفس وسائط صيغة «H.264 للمونتاج» في المحوّل
+/// (الجودة المتوازنة) على مشفّر كرت الشاشة `enc`، بلا وسائط الصوت والحاوية
+pub(crate) fn edit_video_args(enc: &str, src: Option<&VideoInfo>) -> Vec<String> {
+    let p = preset("edit_h264").expect("edit_h264");
+    let o = ConvertOptions {
+        hw: true,
+        ..Default::default()
+    };
+    let a = codec_args(&p, &o, &[enc.to_string()], src);
+    let end = a.iter().position(|x| x == "-c:a").unwrap_or(a.len());
+    a[..end].to_vec()
+}
+
 /// مقاس افتراضي لبعض الـ Presets (الضلع القصير)
 pub(super) fn default_short(p: &Preset) -> Option<u32> {
     match p.id {
