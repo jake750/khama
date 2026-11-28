@@ -115,8 +115,9 @@ function unescape(s) {
 // Each one goes in its own LTR run between two LRM marks, which keeps it in reading order (A-50).
 const NUM = String.raw`\d+(?:[.,]\d+)*`;
 const NUM_SEP = String.raw`(?:[-/:×]|\s?[–→]\s?)(?:§\s?)?`;
-const NUMSEQ = new RegExp(String.raw`((?:§\s?|[−±+])${NUM}(?:${NUM_SEP}${NUM})*%?|${NUM}(?:${NUM_SEP}${NUM})+%?)`);
-const LRM = "‎";
+// Not inside a Latin token: i5-1135G7 and BS.1534-3 stay whole.
+const NUMSEQ = new RegExp(String.raw`(?<![A-Za-z0-9.])((?:§\s?|[−±+])${NUM}(?:${NUM_SEP}${NUM})*%?|${NUM}(?:${NUM_SEP}${NUM})+%?)(?![A-Za-z0-9])`);
+const LRM = "\u200E";
 
 // split out the student placeholder so it can be highlighted, and the number sequences so they keep their order
 function textRuns(s, fmt) {
@@ -127,9 +128,12 @@ function textRuns(s, fmt) {
     const rtl = isRtlText(p) || fmt.rtl;
     const pieces = fmt.mono || (!rtl && /[A-Za-z]/.test(p)) ? [p] : p.split(NUMSEQ);
     if (pieces.length === 1) { out.push(run(p, fmt)); continue; }
-    // the pieces around a number stay RTL even when they are only a bracket or a space, or Word would leave them unmirrored
+    // the pieces around a number stay RTL even when they are only a bracket or a space, or Word would leave them
+    // unmirrored; a Latin piece ("Intel Core i") keeps its own direction
     pieces.forEach((q, i) => {
-      if (q) out.push(i % 2 ? run(LRM + q + LRM, { ...fmt, ltr: true }) : run(q, rtl ? { ...fmt, rtl: true } : fmt));
+      if (!q) return;
+      const around = rtl && !/[A-Za-z]/.test(q) ? { ...fmt, rtl: true } : fmt;
+      out.push(i % 2 ? run(LRM + q + LRM, { ...fmt, ltr: true }) : run(q, around));
     });
   }
   return out;
@@ -358,7 +362,12 @@ function table(t) {
       })],
     });
   }
-  return new Table({ width: { size: TEXT_W, type: WidthType.DXA }, columnWidths: widths, visuallyRightToLeft: true, rows });
+  // fixed layout: Word keeps these widths and wraps a long identifier (a test name) inside its cell, instead of
+  // widening the table past the margin
+  return new Table({
+    width: { size: TEXT_W, type: WidthType.DXA }, columnWidths: widths, layout: D.TableLayoutType.FIXED,
+    visuallyRightToLeft: true, rows,
+  });
 }
 
 function inlineSized(tokens, bold, size) {
