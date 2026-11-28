@@ -116,6 +116,7 @@ export const GUIDE: GuideEntry[] = [
           "Turn on “Download only a part”.",
           "Set start and end, or play the preview and press “Set start here” / “Set end here”.",
           "Need more moments? “Add clip”, then save them as one video or separate files.",
+          "Keyboard: Space or K plays and pauses, I and O set start and end, J and L jump a second, the arrows move a frame.",
         ],
       },
       ar: {
@@ -127,6 +128,7 @@ export const GUIDE: GuideEntry[] = [
           "فعّل «تنزيل جزء فقط».",
           "حدّد البداية والنهاية، أو شغّل المعاينة واضغط «البداية من هنا» و«النهاية هنا».",
           "تريد لحظات أخرى؟ «إضافة مقطع»، ثم احفظها فيديو واحدًا أو ملفات منفصلة.",
+          "بلوحة المفاتيح: المسافة أو K للتشغيل والإيقاف، وI وO للبداية والنهاية، وJ وL ثانية للخلف وللأمام، والأسهم إطارًا.",
         ],
       },
     },
@@ -328,10 +330,10 @@ export const GUIDE: GuideEntry[] = [
         what: "Ready-made formats for editing (H.264, ProRes, DNxHR, proxies), publishing (YouTube, Reels, WhatsApp, GIF) and audio (MP3, WAV, AAC…). Files stay on your device.",
         when: "A file your editor won't open smoothly, a video too big to send, or audio you need on its own.",
         steps: [
-          "Drop files on the Convert screen, or press “Choose files”.",
-          "Pick a format from For editing, For publishing, Audio or Tools.",
+          "Drop files or a whole folder on the Convert screen, or press “Choose files” / “Choose a folder…”.",
+          "Build the recipe from the sections: Format, Enhance, Audio, Size and speed, Trim and text, Analyze and extract.",
           "Pick a quality: High, Balanced or Small.",
-          "Press Convert. Several files? “Merge into one” joins them in order.",
+          "Press Convert. Several files? “Merge into one” joins them in order. Burning subtitles in a batch? “Each video's own subtitles” uses the file named like each video.",
         ],
       },
       ar: {
@@ -339,10 +341,10 @@ export const GUIDE: GuideEntry[] = [
         what: "صيغ جاهزة للمونتاج (H.264 وProRes وDNxHR والبروكسي) وللنشر (يوتيوب وريلز وواتساب وGIF) وللصوت (MP3 وWAV وAAC…). الملفات لا تغادر جهازك.",
         when: "ملف لا يعمل بسلاسة في برنامج المونتاج، أو فيديو أكبر من أن يُرسل، أو صوت تحتاجه وحده.",
         steps: [
-          "أفلت الملفات في شاشة التحويل، أو اضغط «اختر ملفات».",
-          "اختر صيغة من: للمونتاج، للنشر، صوت، أدوات.",
+          "أفلت الملفات أو مجلدًا كاملًا في شاشة التحويل، أو اضغط «اختر ملفات» أو «اختيار مجلد…».",
+          "ركّب الوصفة من الأقسام: الصيغة، والتحسين، والصوت، والمقاس والسرعة، والقص والكتابة، والتحليل والاستخراج.",
           "اختر الجودة: عالية أو متوازنة أو حجم صغير.",
-          "اضغط «حوّل». عدة ملفات؟ «ادمجها في ملف واحد» يضمّها بالترتيب.",
+          "اضغط «حوّل». عدة ملفات؟ «ادمجها في ملف واحد» يضمّها بالترتيب. تحرق ترجمة في دفعة؟ «ترجمة كل فيديو باسمه» تأخذ الملف الذي يحمل اسم كل فيديو.",
         ],
       },
     },
@@ -350,7 +352,7 @@ export const GUIDE: GuideEntry[] = [
       en: {
         steps: [
           "On the Convert screen, tap “Choose video or audio files”.",
-          "Pick a format from For editing, For publishing, Audio or Tools.",
+          "Build the recipe from the sections: Format, Enhance, Audio, Size and speed, Trim and text, Analyze and extract.",
           "Pick a quality: High, Balanced or Small.",
           "Tap Convert.",
         ],
@@ -358,7 +360,7 @@ export const GUIDE: GuideEntry[] = [
       ar: {
         steps: [
           "في شاشة التحويل اضغط «اختر ملفات فيديو أو صوت».",
-          "اختر صيغة من: للمونتاج، للنشر، صوت، أدوات.",
+          "ركّب الوصفة من الأقسام: الصيغة، والتحسين، والصوت، والمقاس والسرعة، والقص والكتابة، والتحليل والاستخراج.",
           "اختر الجودة: عالية أو متوازنة أو حجم صغير.",
           "اضغط «حوّل».",
         ],
@@ -464,9 +466,10 @@ export const GUIDE: GuideEntry[] = [
         what: "Khama scans the file and lists the times where the shot changes, the screen goes black, or the audio goes quiet.",
         when: "Splitting a long recording into its shots, or finding the pauses in an interview.",
         steps: [
-          "Add a file and open the Tools group.",
-          "Pick “Find scene cuts”, “Find black frames” or “Find silences”, then Convert.",
+          "Add a file.",
+          "Open “Analyze and extract” and pick “Find scene cuts”, “Find black frames” or “Find silences”, then Analyze.",
           "On the result: “Split at these points” makes one file per part, “Copy times” copies the list.",
+          "Editing in Premiere or DaVinci Resolve? “Export a timeline” gives an XML and an EDL that point at your original file, cut where the silences or scenes are, with no conversion. “Export markers” puts the times on your file as markers.",
         ],
       },
       ar: {
@@ -474,12 +477,46 @@ export const GUIDE: GuideEntry[] = [
         what: "تفحص خامة الملف وتعطيك أوقات تغيّر اللقطة، أو الشاشة السوداء، أو الصمت.",
         when: "تقسيم تسجيل طويل إلى لقطاته، أو إيجاد الوقفات في مقابلة.",
         steps: [
-          "أضف ملفًا وافتح مجموعة «أدوات».",
-          "اختر «كشف تغيّر المشاهد» أو «كشف الشاشات السوداء» أو «كشف الصمت»، ثم حوّل.",
+          "أضف ملفًا.",
+          "افتح «التحليل والاستخراج» واختر «كشف تغيّر المشاهد» أو «كشف الشاشات السوداء» أو «كشف الصمت»، ثم «حلّل».",
           "على النتيجة: «قسّم الملف عند هذه النقاط» يعطيك ملفًا لكل جزء، و«نسخ الأوقات» ينسخ القائمة.",
+          "تمنتج في Premiere أو DaVinci Resolve؟ «صدّر تايم لاين» يعطيك ملف XML وملف EDL يشيران إلى ملفك الأصلي، مقطوعًا عند الصمت أو المشاهد، بلا تحويل. و«صدّر العلامات» يضع الأوقات على ملفك علاماتٍ.",
         ],
       },
     },
+  },
+
+  {
+    id: "topics",
+    group: "convert",
+    icon: "layers",
+    art: "detect",
+    go: { tab: "convert" },
+    text: {
+      en: {
+        title: "Turn a long talk into Reels",
+        what: "Khama reads the speech (subtitles first, otherwise it transcribes on your device), splits it into topics with their times, and marks which ones stand alone as a Reel.",
+        when: "A lecture, podcast or interview you want to cut into short clips.",
+        steps: [
+          "Add the file, or paste a link and press “Analyze video” to skip downloading the whole thing.",
+          "In “Analyze and extract” pick “Find topics (for Reels)”, then “Find topics”.",
+          "Press ▶ on a topic to watch it. Nudge its start and end by half a second, and rename it: the title becomes the file name.",
+          "“Select what fits”, then export the clips, or “Export a timeline” / “Export markers” to finish it in your editor.",
+        ],
+      },
+      ar: {
+        title: "حوّل محاضرة طويلة إلى ريلز",
+        what: "تقرأ خامة الكلام (من الترجمة أولًا، وإلا تفرّغه على جهازك)، وتقسّمه إلى مواضيع بأوقاتها، وتحدّد ما يصلح منها ريلًا وحده.",
+        when: "محاضرة أو بودكاست أو مقابلة تريد تقطيعها إلى مقاطع قصيرة.",
+        steps: [
+          "أضف الملف، أو الصق رابطًا واضغط «حلّل الفيديو» فلا تنزّله كله.",
+          "من «التحليل والاستخراج» اختر «استخراج المواضيع (للريلز)»، ثم «استخرج المواضيع».",
+          "اضغط ▶ على موضوع لتشاهده. قدّم بدايته ونهايته أو أخّرهما بنصف ثانية، وغيّر عنوانه: العنوان يصير اسم الملف.",
+          "«حدّد ما يصلح»، ثم صدّر المقاطع، أو «صدّر تايم لاين» و«صدّر العلامات» لتكمل في برنامج المونتاج.",
+        ],
+      },
+    },
+    only: "desktop",
   },
 
   // ---------------- التنظيم ----------------
