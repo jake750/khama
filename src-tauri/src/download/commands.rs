@@ -27,35 +27,43 @@ pub async fn start_download(
         let mut retries = 0;
         let mut jumped = false;
         let mut throttled = false;
+        // تحديث yt-dlp ثم إعادة واحدة (R3-F5)، والخانة تبقى محجوزة له
+        let mut healed = false;
+        let mut keep_slot = false;
         let result = loop {
             // ننتظر دورنا إن كانت كل الخانات مشغولة (والإلغاء ممكن أثناء الانتظار)
-            let slot = match slots.clone().try_acquire_owned() {
-                Ok(p) => Some(p),
-                Err(_) if jumped => None,
-                Err(_) => {
-                    let jump = jump_signal(id);
-                    emit(
-                        &app2,
-                        JobUpdate {
-                            id,
-                            state: "queued",
-                            ..Default::default()
-                        },
-                    );
-                    let got = tokio::select! {
-                        p = slots.clone().acquire_owned() => Some(p.expect("semaphore never closed")),
-                        // «ابدأ الآن»: بلا خانة، فوق العدد المحدد (U-11)
-                        _ = jump.notified() => None,
-                        _ = canceled(&mut rx) => {
-                            forget_jump(id);
-                            break Ok(None);
-                        }
-                    };
-                    forget_jump(id);
-                    got
+            let slot = if keep_slot {
+                None
+            } else {
+                match slots.clone().try_acquire_owned() {
+                    Ok(p) => Some(p),
+                    Err(_) if jumped => None,
+                    Err(_) => {
+                        let jump = jump_signal(id);
+                        emit(
+                            &app2,
+                            JobUpdate {
+                                id,
+                                state: "queued",
+                                ..Default::default()
+                            },
+                        );
+                        let got = tokio::select! {
+                            p = slots.clone().acquire_owned() => Some(p.expect("semaphore never closed")),
+                            // «ابدأ الآن»: بلا خانة، فوق العدد المحدد (U-11)
+                            _ = jump.notified() => None,
+                            _ = canceled(&mut rx) => {
+                                forget_jump(id);
+                                break Ok(None);
+                            }
+                        };
+                        forget_jump(id);
+                        got
+                    }
                 }
             };
             jumped = false;
+            keep_slot = false;
             if let Some(slot) = slot {
                 hold_slot(id, slot);
             }
@@ -74,6 +82,7 @@ pub async fn start_download(
                 Ok((d, k)) => (Ok(d), k),
                 Err(e) => (Err(e), None),
             };
+            let generation = crate::tools::ytdlp_generation();
             let result = match &job_dir {
                 // في مهمة منفصلة: panic داخلها (خلل غير متوقع) يصير خطأً على البطاقة،
                 // وتُحرَّر الخانة والمجلد تحته، بدل بطاقة عالقة وخانة محجوزة إلى الأبد (RD7)
@@ -91,6 +100,37 @@ pub async fn start_download(
             };
             let error = match result {
                 Err(e) if !*rx.borrow() && transient(e.code) && retries < RETRY_AFTER.len() => e,
+                // الموقع تغيّر أو رفض: تحديث yt-dlp (مرة في الساعة على الأكثر) ثم إعادة هذه المهمة وحدها مرة (R3-F5)
+                Err(e) if !*rx.borrow() && !healed && heals(e.code) => {
+                    healed = true;
+                    emit(
+                        &app2,
+                        JobUpdate {
+                            id,
+                            state: "queued",
+                            retry: Some(Retry {
+                                attempt: 1,
+                                max: 1,
+                                at: None,
+                                reason: "update",
+                                error: e.clone(),
+                            }),
+                            ..Default::default()
+                        },
+                    );
+                    // التحديث لا يُقطع بالإلغاء (نسخته الاحتياطية تُعاد في آخره)، ثم يُحترم الإلغاء
+                    let newer = crate::tools::heal_ytdlp(&app2, generation).await;
+                    if *rx.borrow() {
+                        break Ok(None);
+                    }
+                    if !newer {
+                        break Err(e);
+                    }
+                    log::warn!("download {id}: {}, retrying once with the updated yt-dlp", e.code);
+                    crate::settings::finish_counter(&app2, id, false);
+                    keep_slot = true;
+                    continue;
+                }
                 other => break other,
             };
 
@@ -201,6 +241,11 @@ pub(super) const RETRY_AFTER: [u64; 3] = [30, 120, 600];
 /// أخطاء تزول وحدها غالبًا: انقطاع الاتصال، مهلة، حظر مؤقت لكثرة الطلبات، تنزيل وصل ناقصًا
 pub(super) fn transient(code: &str) -> bool {
     matches!(code, "network" | "timeout" | "rateLimited" | "incomplete")
+}
+
+/// أخطاء يصلحها تحديث yt-dlp غالبًا (R3-F5): الموقع تغيّر، أو صار يرفض النسخة القديمة (403)
+pub(super) fn heals(code: &str) -> bool {
+    matches!(code, "extractorOutdated" | "forbidden")
 }
 
 /// عدد التنزيلات معًا كما في الإعدادات الآن (يعود إليه الحد بعد التباطؤ)

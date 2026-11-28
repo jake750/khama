@@ -831,6 +831,13 @@ fn transient_errors_are_retried_three_times() {
         assert!(!transient(c), "{c}");
     }
     assert_eq!(RETRY_AFTER, [30, 120, 600]);
+    // تحديث yt-dlp ثم إعادة (R3-F5): الموقع تغيّر أو رفض، لا أخطاء الشبكة ولا ما لا يصلحه تحديث
+    for c in ["extractorOutdated", "forbidden"] {
+        assert!(heals(c) && !transient(c), "{c}");
+    }
+    for c in ["network", "privateVideo", "geoBlocked", "drm", "diskFull"] {
+        assert!(!heals(c), "{c}");
+    }
     // رسائل yt-dlp 2026.10.26 المضمّن نفسه: خادم لا يرد، واسم لا يُحلّ (بلا إنترنت)
     for e in [
         "ERROR: [generic] a: Unable to download webpage: HTTPConnection(host='127.0.0.1', port=8799): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it (caused by TransportError(\"HTTPConnection(host='127.0.0.1', port=8799): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it\"))",
