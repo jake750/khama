@@ -76,7 +76,7 @@ def main() -> None:
                 loco_size_median=np.median(size_loco), clips=len(clips)))
     path = RESULTS / "stats_calibration_loco.csv"
     with open(path, "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=list(out[0]))
+        w = csv.DictWriter(f, fieldnames=list(out[0]), lineterminator="\n")
         w.writeheader()
         for r in out:
             w.writerow({k: (f"{v:.3f}" if isinstance(v, float) else v) for k, v in r.items()})

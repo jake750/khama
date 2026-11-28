@@ -46,7 +46,7 @@ def read(name: str) -> list[dict]:
 
 def write(name: str, rows: list[dict]) -> None:
     with open(RESULTS / name, "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=list(rows[0]))
+        w = csv.DictWriter(f, fieldnames=list(rows[0]), lineterminator="\n")
         w.writeheader()
         for r in rows:
             w.writerow({k: (f"{v:.4g}" if isinstance(v, float) else v) for k, v in r.items()})
