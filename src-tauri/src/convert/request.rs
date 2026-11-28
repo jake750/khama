@@ -62,6 +62,12 @@ pub struct ConvertOptions {
     pub reel_max: Option<f64>,
     /// مجلد ناتج محدد (مثلًا من مجلد مراقَب). فارغ = حسب الإعدادات
     pub out_dir: Option<String>,
+    /// ملف بعدة مسارات صوت (OBS، Zoom، كاميرا بمايكين): ادمجها في مسار واحد بدل إبقائها منفصلة (R3-F12)
+    pub mix_audio: bool,
+    /// داخلي: مسار الصوت الذي يقيسه مرور توحيد الصوت حين تبقى المسارات منفصلة
+    #[serde(skip)]
+    #[cfg_attr(test, ts(skip))]
+    pub audio_track: Option<usize>,
 }
 
 impl Default for ConvertOptions {
@@ -100,6 +106,8 @@ impl Default for ConvertOptions {
             reel_min: None,
             reel_max: None,
             out_dir: None,
+            mix_audio: false,
+            audio_track: None,
         }
     }
 }

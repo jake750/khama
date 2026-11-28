@@ -164,13 +164,21 @@ pub(super) async fn run_convert(app: &AppHandle, id: u64, req: ConvertRequest, c
     let hw = if o.hw { hw_list(app, &tools).await } else { vec![] };
 
     // ---- توحيد الصوت: مرور أول للقياس ----
-    let loudnorm = match o.loudness.filter(|_| matches!(p.kind, PKind::Video | PKind::Audio) && !o.mute) {
-        Some(target) => match measure_loudness(&c, o, &infos, target, cancel).await? {
-            Some(l) => Some(l),
-            None => return Ok(None),
-        },
-        None => None,
-    };
+    // كل مسار يُقاس وحده حين تبقى المسارات منفصلة (R3-F12): المايك والصوت الداخلي بعلوّين مختلفين
+    let mut loudnorm = Vec::new();
+    if let Some(target) = o.loudness.filter(|_| matches!(p.kind, PKind::Video | PKind::Audio) && !o.mute) {
+        let tracks = if keeps_all_audio(&p, o, &infos) { infos[0].audio.len() } else { 1 };
+        for t in 0..tracks {
+            let m = ConvertOptions {
+                audio_track: (tracks > 1).then_some(t),
+                ..o.clone()
+            };
+            match measure_loudness(&c, &m, &infos, target, cancel).await? {
+                Some(l) => loudnorm.push(l),
+                None => return Ok(None),
+            }
+        }
+    }
 
     // ---- مكان الناتج ----
     let dir = output_dir_for(app, o, &first_path)?;
@@ -207,7 +215,7 @@ pub(super) async fn run_convert(app: &AppHandle, id: u64, req: ConvertRequest, c
         temp.clone()
     };
 
-    let plan = build_plan(&p, o, &infos, &hw, &target, loudnorm.as_deref())?;
+    let plan = build_plan_tracks(&p, o, &infos, &hw, &target, &loudnorm)?;
     emit(
         app,
         JobUpdate {
@@ -232,7 +240,7 @@ pub(super) async fn run_convert(app: &AppHandle, id: u64, req: ConvertRequest, c
             result.as_ref().err()
         );
         let _ = std::fs::remove_file(&temp);
-        let plan = build_plan(&p, o, &infos, &[], &target, loudnorm.as_deref())?;
+        let plan = build_plan_tracks(&p, o, &infos, &[], &target, &loudnorm)?;
         emit(
             app,
             JobUpdate {

@@ -88,4 +88,8 @@ reelMin: number | null, reelMax: number | null,
 /**
  * مجلد ناتج محدد (مثلًا من مجلد مراقَب). فارغ = حسب الإعدادات
  */
-outDir: string | null, };
+outDir: string | null, 
+/**
+ * ملف بعدة مسارات صوت (OBS، Zoom، كاميرا بمايكين): ادمجها في مسار واحد بدل إبقائها منفصلة (R3-F12)
+ */
+mixAudio: boolean, };

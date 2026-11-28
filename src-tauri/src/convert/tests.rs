@@ -489,6 +489,88 @@ mod real {
             }
         }
     }
+
+    /// علوّ مسار صوت (LUFS) وعدد قنواته
+    fn track(path: &Path, i: usize) -> (f64, u32) {
+        let r = Std::new(bin("ffmpeg"))
+            .args(["-hide_banner", "-nostdin", "-i"])
+            .arg(path)
+            .args(["-map", &format!("0:a:{i}"), "-af", "ebur128", "-f", "null", "-"])
+            .output()
+            .unwrap();
+        let err = String::from_utf8_lossy(&r.stderr);
+        let lufs = err.rsplit("I:").next().unwrap().split_whitespace().next().unwrap().parse().unwrap();
+        (lufs, probe(path).audio[i].channels)
+    }
+
+    /// ملف بعدة مسارات صوت (R3-F12) بالأوامر التي يبنيها الكود: مرور القياس لكل مسار، ثم صيغة المونتاج والبروكسي
+    /// بالمسارات كلها بعدد قنواتها، وكل مسار بعلوّه المطلوب، ثم «ادمجها».
+    /// KHAMA_MULTITRACK=<ملف بمسارين> cargo test -- --ignored multitrack_real --nocapture
+    #[test]
+    #[ignore]
+    fn multitrack_real() {
+        let src = PathBuf::from(std::env::var("KHAMA_MULTITRACK").expect("KHAMA_MULTITRACK"));
+        let info = probe(&src);
+        let n = info.audio.len();
+        assert!(n > 1, "الملف بمسار صوت واحد");
+        for i in 0..n {
+            println!("source track {i}: {:?}", track(&src, i));
+        }
+        let out = std::env::temp_dir().join("khama-multitrack");
+        std::fs::create_dir_all(&out).unwrap();
+        let base = "loudnorm=I=-16.0:TP=-1.5:LRA=11";
+        for id in ["edit_h264", "proxy", "prores_proxy"] {
+            let p = preset(id).unwrap();
+            let o = ConvertOptions {
+                loudness: Some(-16.0),
+                ..Default::default()
+            };
+            // مثل measure_loudness في run.rs: مرور لكل مسار
+            let mut ln = Vec::new();
+            for t in 0..n {
+                let m = ConvertOptions {
+                    audio_track: Some(t),
+                    ..o.clone()
+                };
+                let wav = preset("wav").unwrap();
+                let measure = format!("{base}:print_format=json");
+                let mut args = build_plan(&wav, &m, std::slice::from_ref(&info), &[], Path::new("-"), Some(&measure))
+                    .unwrap()
+                    .args;
+                args.pop();
+                args.extend(["-f", "null", "-"].map(String::from));
+                let r = Std::new(bin("ffmpeg")).args(&args).output().unwrap();
+                let measured = parse_loudnorm(&String::from_utf8_lossy(&r.stderr)).unwrap();
+                ln.push(format!("{base}:{measured}:linear=true"));
+            }
+            let file = out.join(format!("{id}.{}", p.ext));
+            let plan = build_plan_tracks(&p, &o, std::slice::from_ref(&info), &[], &file, &ln).unwrap();
+            let r = Std::new(bin("ffmpeg")).args(&plan.args).output().unwrap();
+            assert!(r.status.success(), "{id}: {}", String::from_utf8_lossy(&r.stderr));
+            let got = probe(&file);
+            assert_eq!(got.audio.len(), n, "{id}: كل المسارات");
+            for i in 0..n {
+                let (lufs, ch) = track(&file, i);
+                println!("{id} track {i}: {lufs} LUFS, {ch} ch");
+                assert_eq!(ch, info.audio[i].channels, "{id}: عدد القنوات كما هو");
+                assert!((lufs + 16.0).abs() < 1.5, "{id} track {i}: {lufs} LUFS");
+            }
+        }
+        // «ادمجها في مسار واحد»
+        let p = preset("edit_h264").unwrap();
+        let o = ConvertOptions {
+            mix_audio: true,
+            ..Default::default()
+        };
+        let file = out.join("mixed.mp4");
+        let plan = build_plan(&p, &o, std::slice::from_ref(&info), &[], &file, None).unwrap();
+        let r = Std::new(bin("ffmpeg")).args(&plan.args).output().unwrap();
+        assert!(r.status.success(), "{}", String::from_utf8_lossy(&r.stderr));
+        let got = probe(&file);
+        let widest = info.audio.iter().map(|a| a.channels).max().unwrap();
+        println!("mixed: {:?}", track(&file, 0));
+        assert_eq!((got.audio.len(), got.audio[0].channels), (1, widest));
+    }
 }
 
 #[test]
@@ -717,4 +799,96 @@ fn enhance_cleans_before_scaling_and_sharpens_after() {
     };
     let s = joined(&build_plan(&p, &o, &[video(1920, 1080)], &[], Path::new("o.mp4"), None).unwrap());
     assert!(s.find("fftdnoiz=").unwrap() < s.find("scale=3840:2160").unwrap(), "{s}");
+}
+
+/// تسجيل OBS: مسار سطح المكتب ستيريو ومايك أحادي
+fn two_tracks() -> MediaInfo {
+    let mut v = video(1920, 1080);
+    v.audio = vec![
+        AudioInfo {
+            codec: "aac".into(),
+            channels: 2,
+            sample_rate: 48000,
+        },
+        AudioInfo {
+            codec: "aac".into(),
+            channels: 1,
+            sample_rate: 48000,
+        },
+    ];
+    v
+}
+
+/// صيغ المونتاج والبروكسي تُبقي كل مسارات الصوت، ولكل مسار توحيد صوته (R3-F12)
+#[test]
+fn edit_presets_keep_every_audio_track() {
+    let src = [two_tracks()];
+    for id in ["edit_h264", "proxy", "prores_hq", "dnxhr_sq"] {
+        let p = preset(id).unwrap();
+        let o = ConvertOptions::default();
+        assert!(keeps_all_audio(&p, &o, &src), "{id}");
+        let s = joined(&build_plan(&p, &o, &src, &[], Path::new("o.mov"), None).unwrap());
+        assert!(s.contains("[0:a:0]anull[aout0]") && s.contains("[0:a:1]anull[aout1]"), "{id}: {s}");
+        assert!(s.contains("-map [aout0] -map [aout1]"), "{id}: {s}");
+        assert!(!s.contains("-ac "), "عدد القنوات كما هو: {s}");
+    }
+    // لكل مسار قياسه
+    let p = preset("edit_h264").unwrap();
+    let ln = ["loudnorm=A".to_string(), "loudnorm=B".to_string()];
+    let s = joined(&build_plan_tracks(&p, &ConvertOptions::default(), &src, &[], Path::new("o.mp4"), &ln).unwrap());
+    assert!(
+        s.contains("[0:a:0]loudnorm=A,aresample=48000[aout0]") && s.contains("[0:a:1]loudnorm=B,aresample=48000[aout1]"),
+        "{s}"
+    );
+    // صيغ النشر: مسار واحد كما كان
+    let yt = preset("youtube").unwrap();
+    let s = joined(&build_plan(&yt, &ConvertOptions::default(), &src, &[], Path::new("o.mp4"), None).unwrap());
+    assert!(s.contains("[0:a:0]anull[aout]") && !s.contains("0:a:1"), "{s}");
+    // مسار واحد: الأمر القديم نفسه
+    let one = [video(1920, 1080)];
+    let s = joined(&build_plan(&p, &ConvertOptions::default(), &one, &[], Path::new("o.mp4"), None).unwrap());
+    assert!(s.contains("[0:a:0]anull[aout]") && s.contains("-map [aout]"), "{s}");
+    // استبدال الصوت والكتم: كما كانا
+    let o = ConvertOptions {
+        mute: true,
+        ..Default::default()
+    };
+    assert!(!keeps_all_audio(&p, &o, &src));
+    let o = ConvertOptions {
+        replace_audio: Some("song.mp3".into()),
+        ..Default::default()
+    };
+    assert!(!keeps_all_audio(&p, &o, &src));
+}
+
+/// «ادمجها في مسار واحد»: amix بلا خفض للعلوّ، والتوحيد على الناتج المدموج، وفي أي صيغة
+#[test]
+fn mix_audio_merges_tracks_into_one() {
+    let src = [two_tracks()];
+    let o = ConvertOptions {
+        mix_audio: true,
+        ..Default::default()
+    };
+    for id in ["edit_h264", "youtube", "mp3"] {
+        let p = preset(id).unwrap();
+        assert!(!keeps_all_audio(&p, &o, &src));
+        let s = joined(&build_plan(&p, &o, &src, &[], Path::new("o.mp4"), Some("loudnorm=X")).unwrap());
+        // كل مسار إلى أوسع تخطيط أولًا: وإلا يأخذ amix تخطيط أول مدخل، فمايك أحادي أولًا يُخرج الكل أحاديًّا
+        assert!(
+            s.contains("[0:a:0]aformat=channel_layouts=stereo[m0];[0:a:1]aformat=channel_layouts=stereo[m1]"),
+            "{id}: {s}"
+        );
+        assert!(s.contains("[m0][m1]amix=inputs=2:duration=longest:normalize=0[amix]"), "{id}: {s}");
+        assert!(
+            s.contains("[amix]loudnorm=X,aresample=48000[aout]") && s.contains("-map [aout]"),
+            "{id}: {s}"
+        );
+    }
+    // مرور القياس لمسار بعينه
+    let o = ConvertOptions {
+        audio_track: Some(1),
+        ..Default::default()
+    };
+    let s = joined(&build_plan(&preset("wav").unwrap(), &o, &src, &[], Path::new("-"), None).unwrap());
+    assert!(s.contains("[0:a:1]anull[aout]") && !s.contains("0:a:0"), "{s}");
 }

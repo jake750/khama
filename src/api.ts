@@ -191,6 +191,8 @@ export interface ConvertOptions {
   reelMin?: number | null;
   reelMax?: number | null;
   outDir?: string | null;
+  /** ملف بعدة مسارات صوت: ادمجها في مسار واحد (R3-F12). بدونه تبقى منفصلة في صيغ المونتاج والبروكسي */
+  mixAudio?: boolean;
 }
 
 export interface ConvertRequest {

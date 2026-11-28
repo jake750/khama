@@ -519,6 +519,38 @@ pub struct Plan {
     pub duration: f64,
 }
 
+/// صيغ المونتاج والبروكسي: تُبقي كل مسارات الصوت منفصلة كما في المصدر (R3-F12)
+pub(super) fn is_edit_preset(id: &str) -> bool {
+    matches!(id, "edit_h264" | "proxy") || id.starts_with("prores_") || id.starts_with("dnxhr_")
+}
+
+/// مسارات صوت المصدر التي تُبقى أو تُدمج: ملف واحد، بلا كتم ولا استبدال للصوت
+fn source_tracks(o: &ConvertOptions, infos: &[MediaInfo]) -> usize {
+    match infos {
+        [one] if !o.mute && o.replace_audio.is_none() => one.audio.len(),
+        _ => 0,
+    }
+}
+
+/// هل يخرج كل مسار صوت مسارًا منفصلًا (OBS: سطح المكتب والمايك)؟ صيغة مونتاج، وأكثر من مسار، وبلا «ادمجها»
+pub fn keeps_all_audio(p: &Preset, o: &ConvertOptions, infos: &[MediaInfo]) -> bool {
+    p.kind == PKind::Video && is_edit_preset(p.id) && source_tracks(o, infos) > 1 && !o.mix_audio && o.audio_track.is_none()
+}
+
+/// أوسع تخطيط قنوات بين المسارات المدموجة: amix يأخذ تخطيط أول مدخل، فمايك أحادي أولًا كان يُخرج الكل أحاديًّا
+fn mix_layout(channels: u32) -> &'static str {
+    match channels {
+        1 => "mono",
+        3 => "2.1",
+        4 => "quad",
+        5 => "5.0",
+        6 => "5.1",
+        7 => "6.1",
+        8 => "7.1",
+        _ => "stereo",
+    }
+}
+
 pub fn build_plan(
     p: &Preset,
     o: &ConvertOptions,
@@ -526,6 +558,19 @@ pub fn build_plan(
     hw: &[String],
     output: &Path,
     loudnorm: Option<&str>,
+) -> Result<Plan, AppError> {
+    let ln: Vec<String> = loudnorm.map(String::from).into_iter().collect();
+    build_plan_tracks(p, o, infos, hw, output, &ln)
+}
+
+/// مثل build_plan، وloudnorm لكل مسار صوت ناتج بالترتيب (R3-F12: كل مسار بقياسه)
+pub fn build_plan_tracks(
+    p: &Preset,
+    o: &ConvertOptions,
+    infos: &[MediaInfo],
+    hw: &[String],
+    output: &Path,
+    loudnorm: &[String],
 ) -> Result<Plan, AppError> {
     let first = infos.first().ok_or_else(|| AppError::new("badInput"))?;
     let merging = infos.len() > 1;
@@ -669,21 +714,46 @@ pub fn build_plan(
 
     // ---- فلاتر الصوت ----
     let wants_audio = matches!(p.kind, PKind::Video | PKind::Audio) && !o.mute;
-    let asrc = if !wants_audio {
-        None
-    } else if let Some(r) = replace_idx {
-        Some(format!("[{r}:a:0]"))
-    } else if let Some(l) = &alabel {
-        Some(format!("[{l}]"))
-    } else if !first.audio.is_empty() {
-        Some("[0:a:0]".to_string())
+    let tracks = source_tracks(o, infos);
+    let ln = |i: usize| loudnorm.get(i).map(String::as_str);
+    let mut alabels: Vec<String> = Vec::new();
+    if wants_audio && keeps_all_audio(p, o, infos) {
+        // كل مسار بفلاتره (القص والسرعة وتوحيد الصوت) وبعدد قنواته كما هو
+        for i in 0..tracks {
+            let out = format!("aout{i}");
+            graph.push(audio_graph(o, &format!("[0:a:{i}]"), keep_ts, keep_ts, ln(i), &out));
+            alabels.push(out);
+        }
     } else {
-        None
-    };
-    alabel = asrc.map(|src| {
-        graph.push(audio_graph(o, &src, keep_ts && replace_idx.is_none(), keep_ts, loudnorm));
-        "aout".to_string()
-    });
+        let asrc = if !wants_audio {
+            None
+        } else if let Some(r) = replace_idx {
+            Some(format!("[{r}:a:0]"))
+        } else if let Some(l) = &alabel {
+            Some(format!("[{l}]"))
+        } else if o.mix_audio && tracks > 1 {
+            // «ادمجها في مسار واحد»: بلا خفض للعلوّ (normalize=0)، كما يسمعها صاحب التسجيل معًا
+            let layout = mix_layout(first.audio.iter().map(|t| t.channels).max().unwrap_or(2));
+            let mut ins = String::new();
+            for i in 0..tracks {
+                graph.push(format!("[0:a:{i}]aformat=channel_layouts={layout}[m{i}]"));
+                ins.push_str(&format!("[m{i}]"));
+            }
+            graph.push(format!("{ins}amix=inputs={tracks}:duration=longest:normalize=0[amix]"));
+            Some("[amix]".to_string())
+        } else if let Some(t) = o.audio_track.filter(|t| *t < first.audio.len()) {
+            // مرور القياس لمسار بعينه
+            Some(format!("[0:a:{t}]"))
+        } else if !first.audio.is_empty() {
+            Some("[0:a:0]".to_string())
+        } else {
+            None
+        };
+        if let Some(src) = asrc {
+            graph.push(audio_graph(o, &src, keep_ts && replace_idx.is_none(), keep_ts, ln(0), "aout"));
+            alabels.push("aout".to_string());
+        }
+    }
 
     if !graph.is_empty() {
         a.extend(["-filter_complex".into(), graph.join(";")]);
@@ -691,7 +761,7 @@ pub fn build_plan(
     if let Some(v) = &vlabel {
         a.extend(["-map".into(), format!("[{v}]")]);
     }
-    if let Some(al) = &alabel {
+    for al in &alabels {
         a.extend(["-map".into(), format!("[{al}]")]);
     }
     if replace_idx.is_some() {
@@ -702,7 +772,7 @@ pub fn build_plan(
         PKind::Video => {
             a.extend(codec);
             a.extend(s(&["-fps_mode", "cfr"]));
-            if alabel.is_none() {
+            if alabels.is_empty() {
                 a.push("-an".into());
             }
         }
@@ -874,8 +944,8 @@ pub(super) fn video_graph(
     }
 }
 
-/// سلسلة فلاتر الصوت من `src` إلى [aout]: تصفير التوقيت بعد القص، والسرعة، وتوحيد الصوت
-fn audio_graph(o: &ConvertOptions, src: &str, reset_ts: bool, keep_ts: bool, loudnorm: Option<&str>) -> String {
+/// سلسلة فلاتر الصوت من `src` إلى [out]: تصفير التوقيت بعد القص، والسرعة، وتوحيد الصوت
+fn audio_graph(o: &ConvertOptions, src: &str, reset_ts: bool, keep_ts: bool, loudnorm: Option<&str>, out: &str) -> String {
     let mut af: Vec<String> = Vec::new();
     if let Some(e) = cut_expr(o, keep_ts) {
         af.push(format!("aselect='{e}',asetpts=N/SR/TB"));
@@ -893,5 +963,5 @@ fn audio_graph(o: &ConvertOptions, src: &str, reset_ts: bool, keep_ts: bool, lou
     if af.is_empty() {
         af.push("anull".into());
     }
-    format!("{src}{}[aout]", af.join(","))
+    format!("{src}{}[{out}]", af.join(","))
 }
