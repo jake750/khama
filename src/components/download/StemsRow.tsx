@@ -16,9 +16,6 @@ async function lowBattery(): Promise<number | null> {
   }
 }
 
-/** «الاثنان» (R3-F21) يمرّ إلى الطلب كما هو. Stems في downloadPlan.ts لم يضمّه بعد، فالاختيار أوسع منه هنا */
-type StemsChoice = Stems | "both";
-
 /** إزالة الموسيقى أو الصوت، ولقائمة التشغيل: على كل العناصر أو المختار منها */
 export function StemsRow(props: {
   stems: Stems;
@@ -35,7 +32,7 @@ export function StemsRow(props: {
   const { stems, scope } = props;
   const [confirmNode, confirm] = useConfirm();
   // أول استعمال يُنزّل ~140MB: نسأل قبلها، فلا تكون مفاجأة على بيانات الهاتف (U-29)
-  const choose = async (v: StemsChoice) => {
+  const choose = async (v: Stems) => {
     if (v !== "off" && stems === "off") {
       const ready = await api.aiReady().catch(() => true);
       if (!ready && !(await confirm(t.aiDownloadTitle, isMobile ? t.aiDownloadBodyMobile : t.aiDownloadBody, t.aiDownloadOk))) return;
@@ -43,15 +40,15 @@ export function StemsRow(props: {
       const pct = isMobile ? await lowBattery() : null;
       if (pct != null && !(await confirm(t.lowBatteryTitle, t.lowBatteryBody(pct), t.lowBatteryOk))) return;
     }
-    props.onStems(v as Stems);
+    props.onStems(v);
   };
-  const choice = stems as StemsChoice;
+  const choice = stems;
   const label = choice === "music" ? t.stemsMusic : choice === "both" ? t.stemsBoth : t.stemsVoice;
   return (
     <div className="stems-row">
       {confirmNode}
       <span className="field-label">{t.stemsLabel}</span>
-      <Segmented<StemsChoice>
+      <Segmented<Stems>
         label={t.stemsLabel}
         value={choice}
         onChange={(v) => void choose(v)}

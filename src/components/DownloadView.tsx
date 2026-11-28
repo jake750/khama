@@ -15,7 +15,7 @@ import {
 } from "../api";
 import { extractUrls, formatBytes, formatDuration, isHttpUrl, mediaKey } from "../format";
 import { limiter } from "../limit";
-import { planDownloads, type EntryClips, RATES, scheduledAt, type Stills } from "../downloadPlan";
+import { planDownloads, type EntryClips, RATES, scheduledAt, type Stems, type Stills } from "../downloadPlan";
 import { numLocale, useI18n } from "../i18n";
 import { ErrorBox, type ErrorFix } from "./ErrorBox";
 import { Icon } from "./Icon";
@@ -119,7 +119,7 @@ export function DownloadView(props: {
   const [clips, setClips] = useState<Range[] | null>(null);
   const [joinClips, setJoinClips] = useState(true);
   const [timeline, setTimeline] = useState(true);
-  const [stems, setStems] = useState<"off" | "voice" | "music">("off");
+  const [stems, setStems] = useState<Stems>("off");
   const [stills, setStills] = useState<Stills>("off");
   // قائمة التشغيل: العناصر المحدَّدة للتنزيل، وأيّها تُزال منه الموسيقى (إن اختار "عناصر أحدّدها")
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -290,7 +290,7 @@ export function DownloadView(props: {
   const duration = info && !entries && !info.isLive && info.duration ? info.duration : null;
   const activeClips = trimOn && duration ? (clips ?? [{ start: 0, end: duration }]) : null;
   const stemsOn = stems !== "off";
-  const stemsLabel = stems === "music" ? t.stemsMusic : t.stemsVoice;
+  const stemsLabel = stems === "music" ? t.stemsMusic : stems === "both" ? t.stemsBoth : t.stemsVoice;
   // العناصر المحدَّدة التي ستُزال منها الموسيقى
   const stemsCount = !entries || !stemsOn ? 0 : stemsScope === "all" ? selected.size : [...picked].filter((i) => selected.has(i)).length;
   const multi = !!activeClips && activeClips.length > 1;

@@ -650,7 +650,8 @@ const en = {
   parallelTitle: "Downloads at once",
   parallelHint: "More is faster on a good connection. The rest wait their turn.",
   ytdlpWeekly: "Check for yt-dlp updates weekly",
-  ytdlpWeeklyHint: "Sites change often and yt-dlp keeps up. Khama checks once a week, never during a download.",
+  ytdlpWeeklyHint:
+    "Sites change often and yt-dlp keeps up. Khama checks once a week, never during a download, and updates it on its own when a site stops working, then tries that download again.",
   updateAvailable: (v: string) => `Khama ${v} is available.`,
   filenameHint:
     "Use {title}, {uploader}, {date} (when it was published, like 2024-03-15), {today} (when you download it), {site}, {id}, {res} (like 1080p, empty for audio) and {n} (a counter: 001, 002…).",
@@ -1593,7 +1594,8 @@ const ar: Dict = {
   parallelTitle: "عدد التنزيلات معًا",
   parallelHint: "أكثر يعني أسرع مع اتصال جيد. الباقي ينتظر دوره.",
   ytdlpWeekly: "افحص تحديثات yt-dlp أسبوعيًا",
-  ytdlpWeeklyHint: "المواقع تتغيّر كثيرًا وyt-dlp يواكبها. تفحص خامة مرة في الأسبوع، ولا تفحص أثناء تنزيل.",
+  ytdlpWeeklyHint:
+    "المواقع تتغيّر كثيرًا وyt-dlp يواكبها. تفحص خامة مرة في الأسبوع، ولا تفحص أثناء تنزيل، وتحدّثه وحدها حين يتعطّل موقع ثم تعيد ذلك التنزيل.",
   updateAvailable: (v: string) => `خامة ${v} متاحة.`,
   filenameHint:
     "استخدم {title} و{uploader} و{date} (تاريخ النشر، مثل 2024-03-15) و{today} (تاريخ التنزيل) و{site} و{id} و{res} (مثل 1080p، وفارغ للصوت) و{n} (عدّاد: 001، 002…).",

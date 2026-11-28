@@ -276,6 +276,20 @@ export const PRESETS: PresetDef[] = [
     name: { en: "Remove voice (AI)", ar: "إزالة الصوت البشري (ذكاء اصطناعي)" },
     desc: { en: "Keeps only the music — an instant instrumental.", ar: "يُبقي الموسيقى فقط، نسخة بلا غناء." },
   }),
+  // R3-F21: مرور واحد للنموذج بدل اثنين. الفيديو بمسارين، والصوت ملفان
+  P({
+    id: "stem_both",
+    group: "audio",
+    kind: "stems",
+    ext: "wav",
+    quality: false,
+    hw: false,
+    name: { en: "Voice and music apart (AI)", ar: "الحوار والموسيقى منفصلين (ذكاء اصطناعي)" },
+    desc: {
+      en: "One pass, both parts: a video gets two audio tracks, an audio file becomes two WAVs.",
+      ar: "مرور واحد يُخرج الجزأين: الفيديو بمسارين صوتيين، والملف الصوتي ملفّا WAV.",
+    },
+  }),
   P({
     id: "stem_lead",
     group: "audio",

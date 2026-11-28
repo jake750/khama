@@ -20,7 +20,7 @@ const YTDLP_CODES = ["extractorOutdated", "unknown", "formatUnavailable", "forbi
 export function suggestedFix(e: AppError): ErrorFix | null {
   if (COOKIE_CODES.includes(e.code)) return "cookies";
   if (YTDLP_CODES.includes(e.code)) return "ytdlp";
-  if (["network", "timeout", "rateLimited"].includes(e.code)) return "retry";
+  if (["network", "timeout", "rateLimited", "incomplete"].includes(e.code)) return "retry";
   return null;
 }
 

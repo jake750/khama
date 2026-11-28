@@ -138,8 +138,10 @@ pub async fn start_download(
                     keep_slot = true;
                     continue;
                 }
-                // الموقع تغيّر أو رفض: تحديث yt-dlp (مرة في الساعة على الأكثر) ثم إعادة هذه المهمة وحدها مرة (R3-F5)
-                Err(e) if !*rx.borrow() && !healed && heals(e.code) => {
+                // الموقع تغيّر أو رفض: تحديث yt-dlp (مرة في الساعة على الأكثر) ثم إعادة هذه المهمة وحدها مرة (R3-F5).
+                // فقط لمن وافق على تحديث yt-dlp تلقائيًا (مفتاح «افحص تحديثات yt-dlp أسبوعيًا»، معطّل افتراضيًا، T-100):
+                // تنزيل ملف تنفيذي من GitHub لا يحدث بلا موافقة، ويبقى للبقية زر «حدّث yt-dlp» على البطاقة
+                Err(e) if !*rx.borrow() && !healed && settings.ytdlp_weekly && heals(e.code) => {
                     healed = true;
                     emit(
                         &app2,

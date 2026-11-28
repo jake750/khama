@@ -3,7 +3,8 @@
 import type { DownloadRequest, PlaylistEntry, ProbeInfo, Settings, SubLang } from "./api";
 
 export type Stills = "off" | "5" | "10" | "scene";
-export type Stems = "off" | "voice" | "music";
+/** «both» (R3-F21): الحوار والموسيقى معًا من مرور واحد للنموذج */
+export type Stems = "off" | "voice" | "music" | "both";
 export interface Clip {
   start: number;
   end: number;
