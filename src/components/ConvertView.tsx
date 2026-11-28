@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   api,
   asAppError,
@@ -572,6 +572,26 @@ export function ConvertView(props: {
   const previewPreset = previewFile ? conv(previewFile) : convPreset;
   const previewAt = previewFile ? (effective(previewPreset, previewFile).start ?? (previewFile.info!.duration ?? 0) / 3) : 0;
   const wide = useWide();
+  // R3-D10: في العمود الواحد الوصفة والزر آخر الصفحة، تحت حافة النافذة الافتراضية. حين يكون سطر
+  // الزر تحت الحافة يظهر شريط لاصق صغير بالوصفة والزر نفسه، ويختفي حين يظهر السطر الحقيقي
+  const actionRef = useRef<HTMLDivElement>(null);
+  const [actionBelow, setActionBelow] = useState(false);
+  const hasFiles = files.length > 0;
+  useEffect(() => {
+    const el = actionRef.current;
+    if (!el || wide || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      ([e]) => setActionBelow(!e.isIntersecting && e.boundingClientRect.top > (e.rootBounds?.bottom ?? 0)),
+      {
+        threshold: 0.6,
+      },
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      setActionBelow(false);
+    };
+  }, [wide, hasFiles]);
   /** ملف خياراته الخاصة تختلف فعلًا عن المشتركة (العلامة على صفّه) */
   const differs = (f: SourceFile) =>
     !!overrides[f.path] && JSON.stringify(effective(conv(f), f)) !== JSON.stringify(effective(conv(f), f, true, shared));
@@ -1398,7 +1418,7 @@ export function ConvertView(props: {
 
           {error && <ErrorBox error={error} />}
 
-          <div className="action-row">
+          <div className="action-row" ref={actionRef}>
             {askMode && (
               <div className="dest">
                 <Segmented<"one" | "each">
@@ -1469,6 +1489,19 @@ export function ConvertView(props: {
           </div>
         </div>
       </div>
+      {actionBelow && !wide && (
+        <div className="cv-float-bar" role="group" aria-label={t.recipe}>
+          <span className="cv-float-recipe">{recipe.length ? recipe.map((r) => r.label).join(" · ") : t.recipeEmpty}</span>
+          <button
+            className="btn btn-primary"
+            disabled={busy || loading || stepCount === 0}
+            title={stepCount === 0 ? t.recipeEmpty : undefined}
+            onClick={() => start(false)}
+          >
+            <Icon name={convNeeded || (!analysis.length && !ai.length) ? "convert" : "search"} /> {startLabel}
+          </button>
+        </div>
+      )}
     </>
   );
 }

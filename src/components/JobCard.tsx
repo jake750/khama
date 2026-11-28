@@ -201,6 +201,10 @@ export function JobCard(props: {
   const r = j.request;
 
   const draggable = j.state === "done" && !!j.file && !!props.onDragOut;
+  // R3-V2: لحظة الاكتمال تُرى مرة واحدة: فقط إن عاشت البطاقة الانتقال إلى «اكتمل» أمام المستخدم،
+  // لا حين تُرسم مكتملة من جديد بعد الرجوع إلى التبويب
+  const [bornDone] = useState(j.state === "done");
+  const celebrate = j.state === "done" && !bornDone;
   // الأفعال الثانوية في «⋯»، والظاهر: إظهار، وإلغاء أو إعادة (D-25)
   const extra: MenuItem[] = [];
   if (j.state === "queued" && props.onStartNow) extra.push({ label: t.skipQueue, icon: "download", onClick: props.onStartNow });
@@ -219,7 +223,7 @@ export function JobCard(props: {
 
   return (
     <div
-      className={`card job state-${j.state} ${draggable ? "draggable" : ""}`}
+      className={`card job state-${j.state} ${draggable ? "draggable" : ""} ${celebrate ? "celebrate" : ""}`}
       data-job-id={j.id}
       style={{ "--fill": `${fill}%` } as CSSProperties}
       draggable={draggable || undefined}

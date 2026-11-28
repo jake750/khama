@@ -4773,3 +4773,102 @@ textarea {
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   color: var(--text-dim);
 }
+
+/* R3-D10: شريط الوصفة والزر اللاصق في المحوّل حين يكون سطر الزر الحقيقي تحت حافة النافذة.
+   -12px من حافة المحتوى = 12px فوق حافة النافذة (وفوق التبويبات السفلية على الهاتف) */
+.cv-float-bar {
+  position: sticky;
+  bottom: -12px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-top: var(--s-3);
+  padding: var(--s-2);
+  padding-inline-start: var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: 0 8px 24px -12px rgb(2 8 9 / 0.6);
+  animation: float-bar-in var(--d-soft) var(--ease-out);
+}
+.cv-float-recipe {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: var(--fs-meta);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@keyframes float-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cv-float-bar {
+    animation: none;
+  }
+}
+
+/* R3-V2: لحظة الاكتمال: الشارة تنتفخ وترتد إلى ✓، ووميض فيروزي واحد يعبر البطاقة (مرة واحدة) */
+.job.celebrate .job-badge {
+  animation: done-pop 600ms var(--m-bounce) both;
+}
+.job.celebrate::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 35%, color-mix(in srgb, var(--accent) 24%, transparent) 50%, transparent 65%);
+  background-size: 260% 100%;
+  animation: done-sweep 800ms var(--ease-out) both;
+}
+[dir="rtl"] .job.celebrate::after {
+  animation-name: done-sweep-rtl;
+}
+@keyframes done-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.4);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes done-sweep {
+  from {
+    background-position: 100% 0;
+    opacity: 1;
+  }
+  to {
+    background-position: 0% 0;
+    opacity: 0;
+  }
+}
+@keyframes done-sweep-rtl {
+  from {
+    background-position: 0% 0;
+    opacity: 1;
+  }
+  to {
+    background-position: 100% 0;
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .job.celebrate .job-badge,
+  .job.celebrate::after {
+    animation: none;
+  }
+}
+:root[data-motion="reduce"] .job.celebrate .job-badge,
+:root[data-motion="reduce"] .job.celebrate::after {
+  animation: none;
+}
