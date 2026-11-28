@@ -1,7 +1,15 @@
 // Converts docs/report/*.md into one Arabic (RTL) Word report.
-// usage: node md-to-docx.cjs <reportDir> <out.docx>   (needs: npm i docx@9 marked@15 @mermaid-js/mermaid-cli@11 with PUPPETEER_SKIP_DOWNLOAD=1)
+// usage: node md-to-docx.cjs <reportDir> <out.docx> [--submit] [--ref=<git ref>] [--keep-codes]
+//   (needs: npm i docx@9 marked@15 @mermaid-js/mermaid-cli@11 with PUPPETEER_SKIP_DOWNLOAD=1)
 // The packages can live outside the repository: run from their folder, or set NODE_PATH to its node_modules.
 // Copy of the arabic-academic-report skill template, extended for this report (figures, checks).
+//
+// Draft and submitted copy (review item R3-A20):
+//   - review codes such as "(A-41)", "(T-1)", "A-30، A-31" are removed from the text in both modes; they stay in the
+//     Markdown for traceability (--keep-codes keeps them in the Word file too). Objective and hypothesis labels (O4, H2) stay.
+//   - relative links to repository files become links to GitHub at <ref>: "main" for a draft, the defense tag
+//     "v1.0-defense" (report.json "defenseTag") with --submit. Links between files of the report keep the text only.
+//   - --submit refuses to export while a "[يكتبه الطالب]" placeholder is left, and lists where.
 const fs = require("fs");
 const path = require("path");
 const NODE_MODULES = (process.env.NODE_PATH || "").split(path.delimiter).filter(Boolean)[0] || path.join(process.cwd(), "node_modules");
@@ -13,9 +21,24 @@ const {
   LevelFormat, ExternalHyperlink, TabStopType,
 } = D;
 
-const [, , dir, out] = process.argv;
-// Optional <reportDir>/report.json: { "files": [...], "title", "subtitle", "header", "degree", "year", "chrome" }
+const argv = process.argv.slice(2);
+const opt = (name) => {
+  const a = argv.find((x) => x === `--${name}` || x.startsWith(`--${name}=`));
+  return a === undefined ? undefined : a.includes("=") ? a.slice(a.indexOf("=") + 1) : true;
+};
+const [dir, out] = argv.filter((a) => !a.startsWith("--"));
+if (!dir || !out) {
+  console.error("usage: node md-to-docx.cjs <reportDir> <out.docx> [--submit] [--ref=<git ref>] [--keep-codes]");
+  process.exit(2);
+}
+// Optional <reportDir>/report.json: { "files": [...], "title", "subtitle", "header", "degree", "year", "chrome",
+//   "repo" (GitHub URL), "defenseTag" }
 const CFG = fs.existsSync(path.join(dir, "report.json")) ? JSON.parse(fs.readFileSync(path.join(dir, "report.json"), "utf8")) : {};
+const SUBMIT = !!opt("submit");
+const KEEP_CODES = !!opt("keep-codes");
+const REPO = (CFG.repo || "https://github.com/jake750/khama").replace(/\/$/, "");
+const REF = opt("ref") || (SUBMIT ? CFG.defenseTag || "v1.0-defense" : "main");
+const REPO_ROOT = path.resolve(dir, "../..");
 const SKIP = /^(README|defense|PROCESS)/i; // notes that are not part of the submitted report
 const FILES = CFG.files || fs.readdirSync(dir).filter((f) => f.endsWith(".md") && !SKIP.test(f)).sort();
 const TITLE = CFG.title || "[يكتبه الطالب] عنوان المشروع";
@@ -47,9 +70,10 @@ function inline(tokens, fmt = {}) {
       case "codespan": runs.push(run(unescape(t.text), { ...fmt, mono: true })); break;
       case "br": runs.push(new TextRun({ break: 1 })); break;
       case "link": {
-        const kids = inline(t.tokens, { ...fmt, link: /^https?:/.test(t.href) });
-        if (/^https?:/.test(t.href)) runs.push(new ExternalHyperlink({ link: t.href, children: kids }));
-        else runs.push(...kids); // relative links to repo files: keep the text only
+        const url = linkTarget(t.href);
+        const kids = inline(t.tokens, { ...fmt, link: !!url });
+        if (url) runs.push(new ExternalHyperlink({ link: url, children: kids }));
+        else runs.push(...kids); // a link to another chapter of the report: keep the text only
         break;
       }
       case "text":
@@ -62,6 +86,20 @@ function inline(tokens, fmt = {}) {
     }
   }
   return runs;
+}
+
+// A link in the Markdown → the URL it gets in Word, or null to keep the text only.
+// Relative links point at files of the repository, which do not exist next to a PDF: link them on GitHub at REF.
+function linkTarget(href) {
+  if (/^(https?:|mailto:)/.test(href)) return href;
+  if (!href || href.startsWith("#")) return null;
+  const [p, hash] = href.split("#");
+  const abs = path.resolve(dir, decodeURI(p));
+  if (path.dirname(abs) === path.resolve(dir) && FILES.includes(path.basename(abs))) return null;
+  const rel = path.relative(REPO_ROOT, abs).split(path.sep).join("/");
+  if (!rel || rel.startsWith("..")) return null;
+  const isDir = p.endsWith("/") || (fs.existsSync(abs) && fs.statSync(abs).isDirectory());
+  return `${REPO}/${isDir ? "tree" : "blob"}/${REF}/${encodeURI(rel)}${hash ? "#" + hash : ""}`;
 }
 
 function unescape(s) {
@@ -274,7 +312,12 @@ function inlineSized(tokens, bold, size) {
       if (t.type === "strong") r.push(...walk(t.tokens, { ...f, bold: true }));
       else if (t.type === "em") r.push(...walk(t.tokens, { ...f, italics: true }));
       else if (t.type === "codespan") r.push(run(unescape(t.text), { ...f, mono: true, size: size - 2 }));
-      else if (t.type === "link") r.push(...walk(t.tokens, f));
+      else if (t.type === "link") {
+        const url = linkTarget(t.href);
+        const kids = walk(t.tokens, { ...f, link: !!url });
+        if (url) r.push(new ExternalHyperlink({ link: url, children: kids }));
+        else r.push(...kids);
+      }
       else if (t.type === "br") r.push(new TextRun({ break: 1 }));
       else if (t.tokens && t.tokens.length) r.push(...walk(t.tokens, f));
       else r.push(...textRuns(unescape(t.text ?? t.raw ?? ""), f));
@@ -292,19 +335,23 @@ function center(text, size, opts = {}) {
   });
 }
 
+// Cover fields come from report.json ("university", "student", "supervisor", "degree", "year", "dedication",
+// "thanks"); a missing one is a highlighted placeholder in a draft and an error with --submit.
+const P = `[${STUDENT}]`;
+const field = (k) => CFG[k] || P;
 const cover = [
-  center("[يكتبه الطالب] الجامعة · الكلية · القسم", 26, { after: 1600 }),
-  center(`مشروع تخرّج لنيل شهادة ${CFG.degree || "[يكتبه الطالب]"}`, 26, { after: 700 }),
+  center(CFG.university || `${P} الجامعة · الكلية · القسم`, 26, { after: 1600 }),
+  center(`مشروع تخرّج لنيل شهادة ${field("degree")}`, 26, { after: 700 }),
   center(TITLE, 72, { bold: true, color: ACCENT, after: 200 }),
   ...(SUBTITLE ? [center(SUBTITLE, 30, { after: 1400 })] : [new Paragraph({ spacing: { after: 1400 } })]),
-  center("إعداد الطالب: [يكتبه الطالب]", 26),
-  center("إشراف: [يكتبه الطالب]", 26, { after: 1400 }),
-  center(`السنة الجامعية ${CFG.year || "[يكتبه الطالب]"}`, 24),
+  center(`إعداد الطالب: ${field("student")}`, 26),
+  center(`إشراف: ${field("supervisor")}`, 26, { after: 1400 }),
+  center(`السنة الجامعية ${field("year")}`, 24),
   new Paragraph({ children: [new PageBreak()] }),
   new Paragraph({ heading: HeadingLevel.HEADING_1, bidirectional: true, children: [run("الإهداء", { rtl: true })] }),
-  para(textRuns("[يكتبه الطالب]", {})),
+  para(textRuns(field("dedication"), {})),
   new Paragraph({ heading: HeadingLevel.HEADING_1, bidirectional: true, pageBreakBefore: true, children: [run("شكر وتقدير", { rtl: true })] }),
-  para(textRuns("[يكتبه الطالب]", {})),
+  para(textRuns(field("thanks"), {})),
   new Paragraph({ heading: HeadingLevel.HEADING_1, bidirectional: true, pageBreakBefore: true, children: [run("فهرس المحتويات", { rtl: true })] }),
   new TableOfContents("فهرس المحتويات", { hyperlink: true, headingStyleRange: "1-3" }),
   para(textRuns("(إن لم يظهر الفهرس: انقر عليه بالزر الأيمن ← تحديث الحقل ← تحديث الجدول بأكمله)", { size: 18, color: "777777" })),
@@ -344,14 +391,51 @@ if (problems.length) {
   process.exit(1);
 }
 
+// Review codes (A-41, T-1, M-42, D-84) are for the author, not the jury. In a parenthesis they are removed with
+// their separator, and the parenthesis goes when nothing else is left: "(A-9، O4، H2)" → "(O4، H2)",
+// "بصراحة (A-45):" → "بصراحة:". "[يكتبه الطالب، A-63]" → "[يكتبه الطالب]". Code blocks are left alone.
+const REVIEW_CODE = /^[ATMD]-\d+$/;
+const HAS_CODE = /\b[ATMD]-\d+\b/;
+function stripCodes(md) {
+  let fence = false;
+  return md.split("\n").map((line) => {
+    if (/^\s*```/.test(line)) fence = !fence;
+    if (fence || !HAS_CODE.test(line)) return line;
+    line = line.replace(/\[يكتبه الطالب[،,]\s*([^\]]*)\]/g, (m, inner) =>
+      inner.split(/\s*[،,]\s*|\s+و(?=[ATMD]-)/).every((x) => REVIEW_CODE.test(x.trim())) ? P : m);
+    return line.replace(/(\s?)\(([^()\n]*)\)/g, (m, sp, inner) => {
+      if (!HAS_CODE.test(inner)) return m;
+      const parts = inner.split(/(\s*[،؛;]\s*|,\s+|\s+و(?=[ATMD]-\d))/);
+      const kept = [];
+      for (let i = 0; i < parts.length; i += 2) if (!REVIEW_CODE.test(parts[i].trim())) kept.push({ sep: parts[i - 1] || "", text: parts[i] });
+      if (!kept.length) return "";
+      return `${sp}(${kept.map((k, j) => (j ? k.sep : "") + k.text).join("")})`;
+    });
+  }).join("\n");
+}
+
 // ---------- body ----------
+const left = [];
+const sources = FILES.map((f) => {
+  let md = fs.readFileSync(path.join(dir, f), "utf8");
+  if (!KEEP_CODES) {
+    md = stripCodes(md);
+    const rest = md.split("\n").filter((l) => HAS_CODE.test(l) && !/^\s*(```|    )/.test(l)).length;
+    if (rest) console.warn(`${f}: ${rest} line(s) still carry a review code outside a parenthesis`);
+  }
+  md.split("\n").forEach((l, i) => { if (l.includes(STUDENT)) left.push(`${f}:${i + 1}`); });
+  return md;
+});
+const coverLeft = ["degree", "student", "supervisor", "year", "dedication", "thanks", "university"].filter((k) => !CFG[k]);
+if (SUBMIT && (left.length || coverLeft.length)) {
+  console.error(`--submit: ${left.length} "[${STUDENT}]" placeholder(s) are left:\n  ${left.join("\n  ")}`);
+  if (coverLeft.length) console.error(`  report.json lacks: ${coverLeft.join(", ")}`);
+  process.exit(1);
+}
+console.log(`${SUBMIT ? "submitted copy" : "draft"}: links to ${REPO} at ${REF}; ${left.length} placeholder line(s) left`);
 const body = [];
 const ctx = { first: true };
-for (const f of FILES) {
-  let md = fs.readFileSync(path.join(dir, f), "utf8");
-  // the French résumé is a placeholder section: keep it
-  body.push(...blocks(marked.lexer(md), ctx));
-}
+for (const md of sources) body.push(...blocks(marked.lexer(md), ctx));
 
 const heading = (size, before, after, color = ACCENT) => ({
   run: { font: FONT, size, bold: true, color },

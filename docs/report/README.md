@@ -46,3 +46,20 @@
 - **الاتساق مع الكود** (A-95): التقرير يصف النسخة الموسومة للمناقشة ([defense.md](defense.md)). قبل التسليم: أعد تشغيل القياسات (§6) وراجع كل ادعاء في §4 مقابل الكود.
 - **المراجعة اللغوية** (A-69): نصوص الواجهة تخضع لاختبارين آليين (لا إنجليزية منسية، لا ثلاث نقاط) ولدليل [STYLE.md](../STYLE.md). التقرير نفسه يمرّ على مدقق لغوي بشري قبل الطباعة.
 - **التنسيق** (A-102): قالب الجامعة (الهوامش، والخط، والترقيم، والغلاف) يُطبَّق عند النقل إلى Word أو LaTeX.
+
+## ملف Word وPDF
+
+`tools/md-to-docx.cjs` يجمع الفصول (بالترتيب في `report.json`) في ملف Word من اليمين إلى اليسار، و`tools/export-pdf.ps1` يحدّث الفهارس في Word ويصدّر PDF. يحتاج المحوّل الحزم `docx@9` و`marked@15` و`@mermaid-js/mermaid-cli@11` في مجلد خارج المستودع:
+
+```sh
+# مرة واحدة، في مجلد مؤقت
+npm init -y && PUPPETEER_SKIP_DOWNLOAD=1 npm i docx@9 marked@15 @mermaid-js/mermaid-cli@11
+# مسودة: روابط ملفات المستودع إلى main
+NODE_PATH=$PWD/node_modules node <المستودع>/docs/report/tools/md-to-docx.cjs <المستودع>/docs/report khama-report.docx
+pwsh <المستودع>/docs/report/tools/export-pdf.ps1 khama-report.docx
+```
+
+- **رموز المراجعة** مثل (A-41) تبقى في Markdown لتتبّع كل تعديل إلى ملاحظته، وتُحذف من ملف Word في الحالتين (`--keep-codes` يبقيها).
+- **روابط المستودع** النسبية تصير روابط GitHub: إلى `main` في المسودة، وإلى وسم المناقشة `v1.0-defense` مع `--submit` (أو `--ref=<وسم>`).
+- **نسخة التسليم**: `--submit` يرفض التصدير ما بقي أي «[يكتبه الطالب]» ويذكر الملف والسطر، ويطلب حقول الغلاف من `report.json`: ‏`university`، `degree`، `student`، `supervisor`، `year`، `dedication`، `thanks`.
+- **الفحوص قبل التحويل**: جدول بعدد خلايا مختلف عن سطر الفصل يوقف التحويل بالملف والسطر.
