@@ -75,7 +75,7 @@
 | 12 | SoundCloud | https://soundcloud.com/this-user-does-not-exist-khama/none | `unavailable` | ✓ |
 | 13–50 | **[يكتبه الطالب]** | منشور عام من إنستغرام وتيك توك وX وفيسبوك وGoogle Drive؛ قائمة تشغيل؛ بث مباشر قادم (`live`)؛ فيديو مقيّد بالعمر (`ageRestricted`)؛ فيديو خاص (`privateVideo`)؛ فيديو محجوب جغرافيًا (`geoBlocked`)؛ مقطع قصير جدًا (أقل من 5 ث) وطويل جدًا (أكثر من ساعتين)؛ 4K؛ 60 fps؛ صوت فقط | حسب الحالة | |
 
-**قابلية التكرار** (A-51): كل الأدوات بنسخ مثبّتة. yt-dlp 2026.10.26 وDeno v2.9.8 وبناء FFmpeg بتاريخ 2026-11-14 في [scripts/binaries.lock.json](../../scripts/binaries.lock.json) مع بصماتها، ونسخ المكتبات في `Cargo.lock` و`package-lock.json`. تُعاد كل تجربة في الفصل 6 بأوامر مذكورة بجانبها، بنفس النسخ، من الوسم `v1.0-defense` ([defense.md](defense.md)). لكن نتيجة التنزيل نفسها تتغيّر مع الوقت لأن المواقع تتغيّر، كما يُظهر السطر 2.
+**قابلية التكرار** (A-51): كل الأدوات بنسخ مثبّتة. yt-dlp 2026.10.26 وDeno v2.9.8 وبناء FFmpeg بتاريخ 2026-10-31 في [scripts/binaries.lock.json](../../scripts/binaries.lock.json) مع بصماتها، ونسخ المكتبات في `Cargo.lock` و`package-lock.json`. تُعاد كل تجربة في الفصل 6 بأوامر الملحق ط، بنفس النسخ، من الوسم `v1.0-defense` ([defense.md](defense.md)). لكن نتيجة التنزيل نفسها تتغيّر مع الوقت لأن المواقع تتغيّر، كما يُظهر السطر 2.
 
 
 ### نتائج تحويل الصيغ لكل مقطع
